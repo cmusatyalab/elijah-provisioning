@@ -39,7 +39,7 @@ else:
     USING_STRINGBUILDER = False
     from io import BytesIO as StringIO
 
-from cloudlet.msgpack.exceptions import (
+from exceptions import (
         BufferFull,
         OutOfData,
         UnpackValueError,

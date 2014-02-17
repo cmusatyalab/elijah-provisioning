@@ -25,7 +25,7 @@ import subprocess
 import os
 from tempfile import NamedTemporaryFile
 
-from cloudlet.Configuration import Const
+from Configuration import Const
 
 
 class xrayError(Exception):

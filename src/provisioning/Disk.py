@@ -26,13 +26,13 @@ from math import ceil
 from hashlib import sha256
 from operator import itemgetter
 
-from cloudlet import tool
-from cloudlet import delta
-from cloudlet.delta import DeltaItem
-from cloudlet.delta import DeltaList
-from cloudlet.delta import Recovered_delta
-from cloudlet.progressbar import AnimatedProgressBar
-from cloudlet import log as logging
+import tool
+import delta
+from delta import DeltaItem
+from delta import DeltaList
+from delta import Recovered_delta
+from progressbar import AnimatedProgressBar
+import log as logging
 
 LOG = logging.getLogger(__name__)
 

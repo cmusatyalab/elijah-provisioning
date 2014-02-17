@@ -31,9 +31,9 @@ import struct
 from lzma import LZMACompressor
 from lzma import LZMADecompressor
 
-from cloudlet import msgpack 
-from cloudlet.Configuration import Const
-from cloudlet import log as logging
+import msgpack 
+from Configuration import Const
+import log as logging
 
 LOG = logging.getLogger(__name__)
 

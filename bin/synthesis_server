@@ -17,12 +17,18 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+import os
 import sys
 import signal
 sys.path.insert(0, "../src/")
 
-from cloudlet.server import SynthesisServer
-from cloudlet.synthesis import validate_congifuration
+if os.path.exists("../src/provisioning") is True:
+    sys.path.insert(0, "../src/")
+    from provisioning.server import SynthesisServer
+    from provisioning.synthesis import validate_congifuration
+else:
+    from elijah.provisioning.server import SynthesisServer
+    from elijah.provisioning.synthesis import validate_congifuration
 
 
 def sigint_handler(signum, frame):

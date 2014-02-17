@@ -32,10 +32,10 @@ from lxml.builder import ElementMaker
 import sys
 import subprocess
 
-from cloudlet.Configuration import Const
-from cloudlet import log as logging
-from cloudlet.db.api import DBConnector
-from cloudlet.db.table_def import BaseVM
+from Configuration import Const
+import log as logging
+from db.api import DBConnector
+from db.table_def import BaseVM
 
 LOG = logging.getLogger(__name__)
 

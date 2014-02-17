@@ -22,7 +22,7 @@ from __future__ import division
 import os
 import io
 import struct
-from cloudlet import log as logging
+import log as logging
 
 LOG = logging.getLogger(__name__)
 import subprocess

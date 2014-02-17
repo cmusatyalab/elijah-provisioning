@@ -33,16 +33,16 @@ import libvirt
 import shutil
 import multiprocessing
 
-from cloudlet.db import api as db_api
-from cloudlet.db import table_def as db_table
-from cloudlet.Configuration import Const
-from cloudlet.Configuration import Options
-from cloudlet.Configuration import Caching_Const
-from cloudlet.delta import DeltaList
-from cloudlet.delta import DeltaItem
-from cloudlet import msgpack
-from cloudlet.progressbar import AnimatedProgressBar
-from cloudlet.package import VMOverlayPackage
+from db import api as db_api
+from db import table_def as db_table
+from Configuration import Const
+from Configuration import Options
+from Configuration import Caching_Const
+from delta import DeltaList
+from delta import DeltaItem
+import msgpack
+from progressbar import AnimatedProgressBar
+from package import VMOverlayPackage
 
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
@@ -55,10 +55,10 @@ import threading
 import traceback
 from optparse import OptionParser
 
-from cloudlet.tool import comp_lzma
-from cloudlet.tool import diff_files
-from cloudlet.tool import decomp_overlay
-from cloudlet import log as logging
+from tool import comp_lzma
+from tool import diff_files
+from tool import decomp_overlay
+import log as logging
 
 LOG = logging.getLogger(__name__)
 

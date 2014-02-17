@@ -22,8 +22,8 @@ import subprocess
 import threading
 import os
 import sys
-from cloudlet.Configuration import Const as Const
-from cloudlet import log as logging
+from Configuration import Const as Const
+import log as logging
 
 LOG = logging.getLogger(__name__)
 

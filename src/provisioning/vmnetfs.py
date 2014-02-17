@@ -25,7 +25,7 @@ import threading
 import multiprocessing
 import time
 import sys
-from cloudlet import log as logging
+import log as logging
 
 LOG = logging.getLogger(__name__)
 

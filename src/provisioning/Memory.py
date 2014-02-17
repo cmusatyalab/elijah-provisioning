@@ -27,13 +27,13 @@ import subprocess
 from optparse import OptionParser
 from hashlib import sha256
 
-from cloudlet import vmnetx
-from cloudlet.Configuration import Const
-from cloudlet.progressbar import AnimatedProgressBar
-from cloudlet.delta import DeltaItem
-from cloudlet.delta import DeltaList
-from cloudlet.delta import Recovered_delta
-from cloudlet import log as logging
+import vmnetx
+from Configuration import Const
+from progressbar import AnimatedProgressBar
+from delta import DeltaItem
+from delta import DeltaList
+from delta import Recovered_delta
+import log as logging
 
 LOG = logging.getLogger(__name__)
 

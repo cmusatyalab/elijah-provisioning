@@ -30,8 +30,8 @@ from operator import itemgetter
 from hashlib import sha256
 from lzma import LZMACompressor
 
-from cloudlet.Configuration import Const
-from cloudlet import log as logging
+from Configuration import Const
+import log as logging
 
 
 LOG = logging.getLogger(__name__)

@@ -30,20 +30,20 @@ import struct
 import shutil
 import threading
 
-from cloudlet import synthesis as synthesis
-from cloudlet.db.api import DBConnector
-from cloudlet.db.table_def import BaseVM, Session, OverlayVM
-from cloudlet.synthesis_protocol import Protocol as Protocol
-from cloudlet.upnp_server import UPnPServer, UPnPError
-from cloudlet.Configuration import Const as Cloudlet_Const
-from cloudlet.Configuration import Synthesis_Const as Synthesis_Const
-from cloudlet import msgpack
+import synthesis as synthesis
+from db.api import DBConnector
+from db.table_def import BaseVM, Session, OverlayVM
+from synthesis_protocol import Protocol as Protocol
+from upnp_server import UPnPServer, UPnPError
+from Configuration import Const as Cloudlet_Const
+from Configuration import Synthesis_Const as Synthesis_Const
+import msgpack
 
 from pprint import pformat
 from optparse import OptionParser
 from multiprocessing import Process, JoinableQueue, Queue, Manager
 from lzma import LZMADecompressor
-from cloudlet import log as logging
+import log as logging
 
 
 LOG = logging.getLogger(__name__)

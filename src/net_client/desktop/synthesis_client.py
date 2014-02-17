@@ -36,8 +36,14 @@ try:
     import_msgpack = True
 except ImportError as e:
     pass
+
+# search local repo
 if import_msgpack is False:
-    from cloudlet import msgpack as msgpack
+    if os.path.exists("../src") is True:
+        sys.path.insert(0, "../src")
+    if os.path.exists("../../../src") is True:
+        sys.path.insert(0, "../../../src")
+    from provisioning import msgpack as msgpack
     import_msgpack = True
 
 
