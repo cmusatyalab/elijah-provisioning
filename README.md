@@ -239,7 +239,7 @@ How to use
 
     3) Network client (Android version)
 
-	We have source codes for a Android client at ./src/client/android and you can
+	We have source codes for a Android client at ./android/android and you can
 	import it to ``Eclipse`` as an Android project. This client program will
 	automatically find nearby Cloudlet using UPnP if both client and Cloudlet
 	are located in same broadcasting domain (e.g. sharing WiFi access point)
