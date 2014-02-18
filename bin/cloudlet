@@ -23,27 +23,16 @@ import sys
 import traceback
 from optparse import OptionParser
 
-if os.path.exists("../src/provisioning") is True:
-    sys.path.insert(0, "../src/")
-    from provisioning import synthesis as synthesis
-    from provisioning.Configuration import Const as Const
-    from provisioning.Configuration import Options
-    from provisioning import log as logging
-    from provisioning.db.table_def import BaseVM
-    from provisioning.db.table_def import Session
-    from provisioning.db.table_def import OverlayVM
-    from provisioning.db.api import DBConnector
-    from provisioning.package import PackagingUtil
-else:
-    from elijah.provisioning import synthesis as synthesis
-    from elijah.provisioning.Configuration import Const as Const
-    from elijah.provisioning.Configuration import Options
-    from elijah.provisioning import log as logging
-    from elijah.provisioning.db.table_def import BaseVM
-    from elijah.provisioning.db.table_def import Session
-    from elijah.provisioning.db.table_def import OverlayVM
-    from elijah.provisioning.db.api import DBConnector
-    from elijah.provisioning.package import PackagingUtil
+sys.path.insert(0, "../")
+from elijah.provisioning import synthesis as synthesis
+from elijah.provisioning.Configuration import Const as Const
+from elijah.provisioning.Configuration import Options
+from elijah.provisioning import log as logging
+from elijah.provisioning.db.table_def import BaseVM
+from elijah.provisioning.db.table_def import Session
+from elijah.provisioning.db.table_def import OverlayVM
+from elijah.provisioning.db.api import DBConnector
+from elijah.provisioning.package import PackagingUtil
 
 LOG = logging.getLogger(__name__)
 

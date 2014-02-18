@@ -30,21 +30,7 @@ from optparse import OptionParser
 from pprint import pprint
 
 # import msgpack
-import_msgpack = False
-try:
-    import msgpack
-    import_msgpack = True
-except ImportError as e:
-    pass
-
-# search local repo
-if import_msgpack is False:
-    if os.path.exists("../src") is True:
-        sys.path.insert(0, "../src")
-    if os.path.exists("../../../src") is True:
-        sys.path.insert(0, "../../../src")
-    from provisioning import msgpack as msgpack
-    import_msgpack = True
+import msgpack
 
 
 class Protocol(object):

@@ -13,14 +13,15 @@
 #
 #   unless required by applicable law or agreed to in writing, software
 #   distributed under the license is distributed on an "as is" basis,
-#   without warranties or conditions of any kind, either express or implied.  #   see the license for the specific language governing permissions and
+#   without warranties or conditions of any kind, either express or implied.  
+#   see the license for the specific language governing permissions and
 #   limitations under the license.
 #
 
 import os
 import sys
-sys.path.insert(0, "./src/")
-from cloudlet.Configuration import Const
+sys.path.insert(0, "./elijah/")
+from provisioning.Configuration import Const
 
 #from setuptools import setup, find_packages
 from distutils.core import setup
@@ -41,30 +42,30 @@ def get_all_files(package_dir, target_path, exclude_names=list()):
     return data_files
 
 script_files = get_all_files(".", "bin")
-executable_files = get_all_files('.', 'src/cloudlet/lib')
-conf_files = get_all_files('.', 'src/cloudlet/config', 
+executable_files = get_all_files('.', 'elijah/provisioning/lib')
+conf_files = get_all_files('.', 'elijah/provisioning/config', 
         exclude_names=['cloudlet.db'])
 
 setup(
-        name='cloudlet',
+        name='elijah-provisioning',
         version=str(Const.VERSION),
-        description='Cloudlet library for cloud computing at the edge',
+        description='Cloudlet provisioning library using VM synthesis',
         long_description=open('README.md', 'r').read(),
-        url='https://github.com/cmusatyalab/elijah-cloudlet/',
+        url='https://github.com/cmusatyalab/elijah-provisioning/',
 
         author='Kiryong Ha',
         author_email='krha@cmu.edu',
-        keywords="cloud cloudlet cmu VM libvirt KVM QEMU virtualization",
+        keywords="cloud cloudlet provisioning cmu VM libvirt KVM QEMU virtualization",
         license='Apache License Version 2.0',
         scripts=script_files+executable_files,
         packages=[
-            'cloudlet',
-            'cloudlet.db',
-            'cloudlet.caching',
-            'cloudlet.msgpack',
-            'net_client.desktop',
+            'elijah',
+            'elijah.provisioning',
+            'elijah.provisioning.db',
+            'elijah.provisioning.caching',
+            'elijah.provisioning.msgpack',
+            'elijah.provisioning.client',
             ],
-        package_dir={'':'./src'},
         data_files=[
             (Const.CONFIGURATION_DIR, conf_files),
             ],
