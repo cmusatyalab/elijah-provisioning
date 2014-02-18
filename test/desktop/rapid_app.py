@@ -21,10 +21,10 @@
 import sys
 import time
 import os
-from synthesis_client import Client
 from optparse import OptionParser
 import cloudlet_client
-from cloudlet.synthesis_protocol import Protocol as protocol
+from elijah.provisioning.synthesis_protocol import Protocol as protocol
+from elijah.provisioning.synthesis_client import Client
 
 sys.path.append("../src/")
 
