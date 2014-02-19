@@ -619,7 +619,7 @@ class PackagingUtil(object):
             if basedisk_path == item.disk_path: 
                 ret_basevm = item
                 break
-        return ret_basevm
+        return dbconn, ret_basevm
 
     @staticmethod
     def export_basevm(name, basevm_path, basevm_hashvalue):
@@ -668,7 +668,7 @@ class PackagingUtil(object):
         temp_dir = mkdtemp(prefix="cloudlet-base-")
         disk_tmp_path = os.path.join(temp_dir, disk_name)
         disk_target_path = os.path.join(base_vm_dir, disk_name)
-        matching_basevm = PackagingUtil._get_matching_basevm(disk_target_path)
+        dbconn, matching_basevm = PackagingUtil._get_matching_basevm(disk_target_path)
         if matching_basevm != None:
             LOG.info("Base VM is already exists")
             LOG.info("Delete existing Base VM using command")
