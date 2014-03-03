@@ -687,6 +687,12 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
         if network_filter is not None:
             network_element.remove(network_filter)
 
+    # remove security option:
+    # this option only works with OpenStack and causes error in standalone version
+    security_element = xml.find("seclabel")
+    if security_element is not None:
+        xml.remove(security_element)
+
     new_xml_str = ElementTree.tostring(xml)
     new_xml_str = new_xml_str.replace(old_uuid, str(uuid))
     if mem_snapshot is not None:
