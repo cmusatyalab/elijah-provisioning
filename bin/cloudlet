@@ -128,8 +128,8 @@ def main(argv):
             CMD_LIST_BASE: "show all base VM at this machine",
             CMD_ADD_BASE: "add existing base vm to DB",
             CMD_DEL_BASE: "delete base vm at database",
-            CMD_EXPORT_BASE: "export base VM into a single file",
-            CMD_IMPORT_BASE: "import base VM from a single file",
+            CMD_EXPORT_BASE: "export base VM into a portable file",
+            CMD_IMPORT_BASE: "import base VM from a exported file",
             CMD_LIST_SESSION: "list all the session history",
             CMD_LIST_OVERLAY: "list all the overlay history",
             }
@@ -151,7 +151,7 @@ def main(argv):
     elif mode == CMD_OVERLAY_CREATION:
         # create overlay
         if len(left_args) < 1:
-            sys.stderr.write("Need path to base disk\n")
+            sys.stderr.write("\nNeed path to base disk\n")
             sys.stderr.write("Check your base VM list './cloudet %s'\n" % (CMD_LIST_BASE))
             return 1
         disk_image_path = left_args[0] 
@@ -207,7 +207,7 @@ def main(argv):
             return 1
     elif mode == CMD_SYNTEHSIS:
         if len(left_args) < 2:
-            sys.stderr.write("Synthesis requires path to VM disk and overlay-meta\n \
+            sys.stderr.write("\nSynthesis requires path to VM disk and overlay-meta\n \
                     Ex) ./cloudlet synthesis [VM disk] /path/to/precise.overlay-meta [options]\n")
             return 1
         disk_image_path = left_args[0] 
@@ -235,10 +235,13 @@ def main(argv):
         dbconn = get_database()
 
         if len(left_args) < 2:
-            sys.stderr.write("Add existing base vm requires: \n \
-                    1) base path\n \
-                    2) hash value of the base\n \
-                    Ex) ./cloudlet add_base /path/to/base_disk.img 4304c473a9f98480c7d6387f01158881d3440bb81c8a9452b1abdef794e51111\n")
+            msg = "\n(Deprecated: This command is only for RAW base file format)\n"
+            msg += "(NewL Use export-base, import-base command to register your Base VM)\n\n"
+            msg += "Adding existing base VM from RAW file requires: \n"
+            msg += "1) base path\n"
+            msg += "2) hash value of the base\n"
+            msg += "Ex) ./cloudlet add_base /path/to/base_disk.img 4304c473a9f98480c7d6387f01158881d3440bb81c8a9452b1abdef794e51111\n\n"
+            sys.stderr.write(msg)
             return 1
         basedisk_path = os.path.abspath(left_args[0])
         base_hashvalue = left_args[1]
@@ -250,7 +253,7 @@ def main(argv):
         dbconn.add_item(new_basevm)
     elif mode == CMD_DEL_BASE:
         if len(left_args) < 1:
-            sys.stderr.write("delete base vm requires base path\n \
+            sys.stderr.write("\nDeleting base vm requires base path\n \
                     Ex) ./cloudlet del_base /path/to/base_disk.img \n")
             return 1
         dbconn, deleting_base = PackagingUtil._get_matching_basevm(left_args[0])
@@ -261,7 +264,7 @@ def main(argv):
             return 1
     elif mode == CMD_IMPORT_BASE:
         if len(left_args) < 1:
-            sys.stderr.write("import base vm requires 1) path to the exported file\n" +
+            sys.stderr.write("\nImporting base vm requires 1) path to the exported file\n" +
                     "Ex) ./cloudlet import-base /path/to/base_disk.img\n")
             return 1
         import_file = os.path.abspath(left_args[0])
@@ -273,8 +276,12 @@ def main(argv):
         PackagingUtil.import_basevm(import_file)
     elif mode == CMD_EXPORT_BASE:
         if len(left_args) < 2:
-            sys.stderr.write("export base vm requires 1) base path 2) name of base VM\n" +
-                    "Ex) ./cloudlet export-base /path/to/base_disk.img Ubuntu-12.04-i686 \n")
+            msg = "\nExporting base vm requires\n"
+            msg += "  1) path to the base VM\n"
+            msg += "  2) name of exported file\n"
+            msg += "Ex) ./cloudlet export-base /path/to/base_disk.img ubuntu.zip \n"
+            msg += "\nYou can find 'path to the base VM' using cloudlet list-base command\n\n"
+            sys.stderr.write(msg)
             return 1
         basedisk_path = left_args[0]
         dbconn, matching_basevm = PackagingUtil._get_matching_basevm(basedisk_path)
