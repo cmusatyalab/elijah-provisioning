@@ -4,7 +4,7 @@
 		 In OpenStack extension, we follow what is defined in OpenStack logic.
 		 
 		 You can edit anything except the followings
-		 1. We use kvm64 CPU model to have compatibilities across different CPU
+		 1. We use qemu64 CPU model to have compatibilities across different CPU
 		 2. We use raw disk to precise get the modified disk
 
 		 Above two things are adjusted automatically in the code
@@ -17,10 +17,13 @@
 	<vcpu>4</vcpu>
 	<cpu>
 		<!--
-			 kvm64 model is enforced at the source code
+			 qemu64 model is enforced at the source code
 			 (_convert_xml in cloudlet.py)
+			 svm should not be added since it is not supported in x86
+			 (QEMU bug)
 	<cpu match='exact'>
-		<model fallback='forbid'>kvm64</model>
+		<model fallback='forbid'>qemu64</model>
+		<feature policy="disable" name="svm"/>
 		-->
 		<topology sockets='1' cores='4' threads='1'/>
 	</cpu>

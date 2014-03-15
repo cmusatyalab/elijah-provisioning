@@ -565,20 +565,34 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
     if padding_element != None:
         xml.remove(padding_element)
 
-    # enforce CPU model to have kvm64
+    # enforce CPU model to qemu64 only if not specified
+    # svm should not be added since it is not supported in x86 (QEMU bug)
     cpu_element = xml.find("cpu")
     if cpu_element is None:
         cpu_element = Element("cpu")
         xml.append(cpu_element)
-    cpu_element.set("match", "exact")
-    if cpu_element.find("arch") is not None:
-        cpu_element.remove(cpu_element.find("arch"))
     if cpu_element.find("model") is not None:
         cpu_element.remove(cpu_element.find("model"))
+    if cpu_element.find("arch") is not None:
+        cpu_element.remove(cpu_element.find("arch"))
     cpu_model_element = Element("model")
-    cpu_model_element.text = "kvm64"
+    cpu_model_element.text = "qemu64"
     cpu_model_element.set("fallback", "forbid")
     cpu_element.append(cpu_model_element)
+    # append 'disable svm flag' if not exist
+    cpu_feature_elements = cpu_element.findall("feature")
+    is_svm_feature = False
+    for cpu_feature_element in cpu_feature_elements:
+        feature_policy = cpu_feature_element.get("policy")
+        feature_name = cpu_feature_element.get("name")
+        if feature_policy.lower() == "disable" and\
+                feature_name.lower() == "svm":
+            is_svm_feature = True
+    if is_svm_feature is False:
+        cpu_feature_element = Element("feature")
+        cpu_feature_element.set("policy", "disable")
+        cpu_feature_element.set("name", "svm")
+        cpu_element.append(cpu_feature_element)
 
     # update uuid
     if uuid is None:
@@ -662,7 +676,7 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
         qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':'-cloudlet'}))
         qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':"logfile=%s" % qemu_logfile}))
 
-    # append qemu argument give from user
+    # append qemu argument given from user
     if qemu_args:
         qemu_xmlns = "http://libvirt.org/schemas/domain/qemu/1.0"
         qemu_element = xml.find("{%s}commandline" % qemu_xmlns)

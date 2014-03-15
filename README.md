@@ -29,9 +29,9 @@ codes for mobile applications, rather it provides functions to create
 **VM overlay** and perform **VM Synthesis** that will rapidly reconstruct 
 your custom VM at an arbitrary computer.
 
-Please read [The Case for VM-based Cloudlets in Mobile Computing](https://github.com/cmusatyalab/elijah-cloudlet/blob/master/doc/papers/satya-ieeepvc-cloudlets-2009.pdf?raw=true)
-to understand what we do here and find the detail techniques at
-[Just-in-Time Provisioning for Cyber Foraging](https://github.com/cmusatyalab/elijah-cloudlet/blob/master/doc/papers/kiryong-mobisys-vmsynthesis.pdf?raw=true)
+Please read [Just-in-Time Provisioning for Cyber Foraging](http://www.cs.cmu.edu/~satya/docdir/ha-mobisys-vmsynthesis-2013.pdf)
+to understand what we do here and find the detail techniques.
+
 
 The key to rapid provisioning is the recognition that a large part of
 a VM image is devoted to the guest OS, software libraries, and
