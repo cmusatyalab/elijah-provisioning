@@ -24,9 +24,11 @@ import re
 import requests
 import struct
 import shutil
+import urlparse
 from lxml import etree
 from tempfile import mkdtemp
 from urlparse import urlsplit
+from urllib import pathname2url 
 import zipfile
 from lxml.builder import ElementMaker
 import sys
@@ -703,4 +705,19 @@ class PackagingUtil(object):
         LOG.info("Success")
         dbconn.add_item(new_basevm)
         return disk_target_path, base_hashvalue
+
+    @staticmethod
+    def is_zip_contained(filepath):
+        if os.path.exists(filepath):
+            # refular file
+            abspath = os.path.abspath(filepath)
+            urlpath = urlparse.urljoin("file:", pathname2url(abspath))
+        else:
+            urlpath = filepath
+        try:
+            overlay = VMOverlayPackage(urlpath)
+            return True, urlpath
+        except Exception, e:
+            return False, None
+
 

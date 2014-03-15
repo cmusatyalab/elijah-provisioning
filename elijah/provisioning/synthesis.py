@@ -231,7 +231,7 @@ class VM_Overlay(threading.Thread):
                 if os.path.exists(overlay_file) == True:
                     os.remove(overlay_file)
 
-        # 5. terminting
+        # 5. terminate
         # option for data-intensive application
         if self.options.DATA_SOURCE_URI != None:
             overlay_uri_meta = os.path.join(temp_dir, Const.OVERLAY_URIs)
@@ -1698,6 +1698,7 @@ def synthesis(base_disk, meta, **kwargs):
     base_memmeta = kwargs.get('base_memmeta', None)
 
     overlay_filename = NamedTemporaryFile(prefix="cloudlet-overlay-file-")
+    decompe_time_s = time()
     if zip_container == False:
         if os.path.exists(meta) == False:
             msg = "Meta file for VM overlay does not exist at %s" % meta
@@ -1720,7 +1721,7 @@ def synthesis(base_disk, meta, **kwargs):
             decomp_data += decompressor.flush()
             overlay_fd.write(decomp_data)
         overlay_fd.close()
-
+    LOG.info("Decompression time : %f (s)" % (time()-decompe_time_s))
     LOG.info("Recovering launch VM")
     launch_disk, launch_mem, fuse, delta_proc, fuse_thread = \
             recover_launchVM(base_disk, meta_info, overlay_filename.name, \

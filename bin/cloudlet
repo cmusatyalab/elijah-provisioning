@@ -21,6 +21,7 @@
 import os
 import sys
 import traceback
+import zipfile
 from optparse import OptionParser
 
 sys.path.insert(0, "../")
@@ -73,7 +74,7 @@ def process_command_line(argv, commands):
             '-d', '--disk', action='store_true', dest='disk_only', default=False,
             help='[overlay_creation] create only disk overlay only')
     parser.add_option(
-            '-z', '--zip', action='store_true', dest='zip_container', default=False,
+            '-z', '--zip', action='store_true', dest='zip_container', default=True,
             help='[overlay_creation] encapsulate vm overlay files into a single zip file')
     parser.add_option(
             '-s', '--samba-mount', action='store', dest='source_uri', default=None,
@@ -174,7 +175,7 @@ def main(argv):
             vm_overlay.create_overlay()
 
             # print output
-            if options.ZIP_CONTAINER == False:
+            if options.ZIP_CONTAINER is False:
                 sys.stdout.write("[INFO] overlay metafile (%ld) : %s\n" % \
                         (os.path.getsize(vm_overlay.overlay_metafile), \
                         vm_overlay.overlay_metafile))
@@ -182,7 +183,6 @@ def main(argv):
                     sys.stdout.write("[INFO] overlay (%ld) : %s\n" % \
                             (os.path.getsize(overlay_file), overlay_file))
             else:
-                import zipfile
                 overlay_zip = zipfile.ZipFile(vm_overlay.overlay_zipfile)
                 filesize_count = 0
                 for zipinfo in overlay_zip.infolist():
@@ -210,14 +210,17 @@ def main(argv):
             sys.stderr.write("\nSynthesis requires path to VM disk and overlay-meta\n \
                     Ex) ./cloudlet synthesis [VM disk] /path/to/precise.overlay-meta [options]\n")
             return 1
-        disk_image_path = left_args[0] 
-        meta = left_args[1]
+        disk_image_path = left_args[0]
+        overlay_meta = left_args[1]
         qemu_args = left_args[2:]
+        is_zip_contained, url_path = PackagingUtil.is_zip_contained(overlay_meta)
+        if is_zip_contained is True:
+            overlay_meta = url_path
         try:
-            synthesis.synthesis(disk_image_path, meta, \
+            synthesis.synthesis(disk_image_path, overlay_meta, \
                                 disk_only=settings.disk_only, \
                                 return_residue=settings.return_residue, \
-                                zip_container=settings.zip_container, \
+                                zip_container=is_zip_contained,
                                 qemu_args=qemu_args)
         except Exception, e:
             LOG.warning(str(e))
