@@ -76,12 +76,12 @@ You will need:
 
 To install, you either 
 
-* run a installation script::
+* run a installation script
 
 		> $ sudo apt-get install fabric openssh-server  
 		> $ fab localhost install
 
-* install manually:
+* install manually
 	- install required package  
 
 			> $ sudo apt-get install qemu-kvm libvirt-bin gvncviewer python-libvirt python-xdelta3 python-dev openjdk-6-jre liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev
@@ -263,6 +263,31 @@ How to use
 
 
 
+Directories
+----------------------------------------------
+<pre>
+<b>HOME</b>
+  ├── bin: executable binaries such as command line tool, VM synthesis server and client
+  │   
+  ├── elijah: Cloudlet provisioning code using VM synthesis
+  │   
+  ├── android: Android client
+  │     ├─ android: main android client for VM synthesis
+  │     ├─ android_fluid: fluid simulation client used in demo videos
+  │     │	├─ YouTube: <a href=https://www.youtube.com/watch?v=hWc2fpejfiw target="_blank">Using Amazon EC2 West</a>
+  │     │	└─ YouTube: <a href=https://www.youtube.com/watch?v=f9MN-kvG_ko target="_blank">Using Cloudlet</a>
+  │     └─ android_ESVMRecogn, android_ESVMTrainer: under development
+  │
+  ├── test: Test applications' client code
+  │     ├─ applications: client codes for each test application
+  │     │				server code is not available due to the license issue
+  │     └─ desktop: batch scripts to test application using VM synthesis on x86 (not Android)
+  │
+  └── fabric.py: installation script using <a href=http://docs.fabfile.org/en target="_blank">Fabric</a>
+</pre>
+
+
+
 Compiling external library that Cloudlet uses
 ----------------------------------------------
 
@@ -270,13 +295,4 @@ You will need:
 
 * qemu-kvm 1.1.1 (for Free memory and TRIM support)
 * libc6-dev-i386 (for Free memory support)
-
-
-Related research works
---------------------------
-
-* [The Case for VM-based Cloudlets in Mobile Computing](https://github.com/cmusatyalab/elijah-cloudlet/blob/master/doc/papers/satya-ieeepvc-cloudlets-2009.pdf?raw=true)
-* [The Impact of Mobile Multimedia Applications on Data Center Consolidation](https://github.com/cmusatyalab/elijah-cloudlet/blob/master/doc/papers/kiryong-ic2e-latency.pdf?raw=true)
-* [Just-in-Time Provisioning for Cyber Foraging](https://github.com/cmusatyalab/elijah-cloudlet/blob/master/doc/papers/kiryong-mobisys-vmsynthesis.pdf?raw=true)
-* [Scalable Crowd-Sourcing of Video from Mobile Devices](http://reports-archive.adm.cs.cmu.edu/anon/2012/CMU-CS-12-147.pdf)
 
