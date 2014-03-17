@@ -26,6 +26,8 @@ class Protocol(object):
     # client -> server
     MESSAGE_COMMAND_SEND_META           = 0x11
     MESSAGE_COMMAND_SEND_OVERLAY        = 0x12
+    MESSAGE_COMMAND_SEND_OVERLAY_URL    = 0x17
+
     MESSAGE_COMMAND_FINISH              = 0x13
     MESSAGE_COMMAND_GET_RESOURCE_INFO   = 0x14
     MESSAGE_COMMAND_SESSION_CREATE      = 0x15
@@ -46,8 +48,9 @@ class Protocol(object):
     KEY_REQUEST_SEGMENT_SIZE    = "blob_size"
     KEY_FAILED_REASON           = "reasons"
     KEY_PAYLOAD                 = "payload"
-    KEY_SESSION_ID             = "session_id"
+    KEY_SESSION_ID              = "session_id"
     KEY_REQUESTED_COMMAND       = "requested_command"
+    KEY_OVERLAY_URL             = "overlay_url"
 
     # synthesis option
     KEY_SYNTHESIS_OPTION        = "synthesis_option"

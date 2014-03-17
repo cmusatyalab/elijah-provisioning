@@ -20,12 +20,11 @@
 import os
 import sys
 import signal
-sys.path.insert(0, "../src/")
 
-if os.path.exists("../src/provisioning") is True:
-    sys.path.insert(0, "../src/")
-    from provisioning.server import SynthesisServer
-    from provisioning.synthesis import validate_congifuration
+if os.path.exists("../elijah") is True:
+    sys.path.insert(0, "../")
+    from elijah.provisioning.server import SynthesisServer
+    from elijah.provisioning.synthesis import validate_congifuration
 else:
     from elijah.provisioning.server import SynthesisServer
     from elijah.provisioning.synthesis import validate_congifuration
