@@ -410,8 +410,8 @@ class VMOverlayPackage(object):
         self.metadata = self.zip_overlay.read(self.metafile)
         return self.metadata
 
-    def read_blob(self, blobname):
-        self.blobdata = self.zip_overlay.read(blobname)
+    def read_blob(self, blobname, size=None):
+        self.blobdata = self.zip_overlay.read(blobname, size)
         return self.blobdata
 
     @classmethod

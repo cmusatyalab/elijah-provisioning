@@ -153,7 +153,8 @@ class NetworkUtil(object):
 class NetworkStepThread(threading.Thread):
     MAX_REQUEST_SIZE = 1024*512 # 512 KB
 
-    def __init__(self, network_handler, overlay_urls, overlay_urls_size, demanding_queue, out_queue, time_queue, chunk_size):
+    def __init__(self, network_handler, overlay_urls, overlay_urls_size, 
+            demanding_queue, out_queue, time_queue, chunk_size):
         self.network_handler = network_handler
         self.read_stream = network_handler.rfile
         self.overlay_urls = overlay_urls
@@ -322,11 +323,10 @@ class DecompStepProc(Process):
 class URLFetchStep(threading.Thread):
     MAX_REQUEST_SIZE = 1024*512 # 512 KB
 
-    def __init__(self, network_handler, overlay_files, overlay_package, \
+    def __init__(self, overlay_package, overlay_files, overlay_files_size, 
             demanding_queue, out_queue, time_queue, chunk_size):
-        self.network_handler = network_handler
-        self.read_stream = network_handler.rfile
         self.overlay_files = overlay_files
+        self.overlay_files_size = overlay_files_size
         self.overlay_package = overlay_package
         self.demanding_queue = demanding_queue
         self.out_queue = out_queue
@@ -366,12 +366,21 @@ class URLFetchStep(threading.Thread):
             else:
                 requesting_overlay = self.overlay_files.pop(0)
 
-            # request overlay blob
-            data = self.overlay_package.read_blob(requesting_overlay)
-
             finished_url[requesting_overlay] = True
-            self.out_queue.put(data)
-            total_read_size += len(data)
+            read_count = 0
+            blob_size = self.overlay_files_size[requesting_overlay]
+            while read_count < blob_size:
+                read_min_size = min(self.chunk_size, blob_size-read_count)
+                chunk = self.overlay_package.read_blob(requesting_overlay, read_min_size)
+                read_size = len(chunk)
+                if chunk:
+                    self.out_queue.put(chunk)
+                else:
+                    break
+                read_count += read_size
+
+            # request overlay blob
+            total_read_size += read_count
 
         self.out_queue.put(Synthesis_Const.END_OF_FILE)
         end_time = time.time()
@@ -710,10 +719,9 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
         # overlay
         demanding_queue = Queue()
         download_queue = JoinableQueue()
-        download_process = URLFetchStep(self, 
-                    overlay_urls, overlay_package, demanding_queue, 
-                    download_queue, time_transfer, Synthesis_Const.TRANSFER_SIZE, 
-                    )
+        download_process = URLFetchStep(overlay_package, overlay_urls, 
+                overlay_urls_size, demanding_queue, download_queue, 
+                time_transfer, Synthesis_Const.TRANSFER_SIZE, )
         decomp_process = DecompStepProc(
                 download_queue, self.overlay_pipe, time_decomp, temp_overlay_file,
                 )
