@@ -576,7 +576,7 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
     if cpu_element.find("arch") is not None:
         cpu_element.remove(cpu_element.find("arch"))
     cpu_model_element = Element("model")
-    cpu_model_element.text = "qemu64"
+    cpu_model_element.text = "core2duo"
     cpu_model_element.set("fallback", "forbid")
     cpu_element.append(cpu_model_element)
     # append 'disable svm flag' if not exist
@@ -588,11 +588,13 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
         if feature_policy.lower() == "disable" and\
                 feature_name.lower() == "svm":
             is_svm_feature = True
+    '''
     if is_svm_feature is False:
         cpu_feature_element = Element("feature")
         cpu_feature_element.set("policy", "disable")
         cpu_feature_element.set("name", "svm")
         cpu_element.append(cpu_feature_element)
+    '''
 
     # update uuid
     if uuid is None:
