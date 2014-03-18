@@ -16,18 +16,17 @@ Copyright (C) 2011-2014 Carnegie Mellon University
 License
 ----------
 
-Source code, documentation, and related artifacts excepts binaries listed below
-are licensed under the [Apache License, Version
+All source code and documentation except binary files listed below are licensed
+under the [Apache License, Version
 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
-Binaries under GPL v2
-
-1.  Modified [QEMU/KVM](http://www.linux-kvm.org/page/Main_Page) at $HOME/elijah/provisioning/lib/bin/x86_64/cloudlet\_qemu-system-x86_64.
-  - To start VM before having entire memory snapshot, we have modified QEMU-KVM
-  - [Download source code](https://github.com/cmusatyalab/elijah-provisioning/releases/download/v0.8.6/qemu-1.1.1.tar.gz)
-2. Modified [vmnetfs](https://github.com/cmusatyalab/vmnetx) at $HOME/elijah/provisioning/lib/bin/x86_64/cloudlet\_vmnetfs
-  - To enable on-demand fetches of VM disk/memory using, we have modified vmnetfs.
-  - [Download source code](https://github.com/cmusatyalab/elijah-provisioning/releases/download/v0.8.6/vmnetx-0.2.tar.gz)
+- Binary files under GPL v2
+  1.  Modified [QEMU/KVM](http://www.linux-kvm.org/page/Main_Page) at $HOME/elijah/provisioning/lib/bin/x86_64/cloudlet\_qemu-system-x86_64.
+	- To start VM before having entire memory snapshot, we have modified QEMU-KVM
+	- [Download source code](https://github.com/cmusatyalab/elijah-provisioning/releases/download/v0.8.6/qemu-1.1.1.tar.gz)
+	2. Modified [vmnetfs](https://github.com/cmusatyalab/vmnetx) at $HOME/elijah/provisioning/lib/bin/x86_64/cloudlet\_vmnetfs
+	- To enable on-demand fetches of VM disk/memory using, we have modified vmnetfs.
+	- [Download source code](https://github.com/cmusatyalab/elijah-provisioning/releases/download/v0.8.6/vmnetx-0.2.tar.gz)
 
 
 
