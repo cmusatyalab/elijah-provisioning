@@ -29,8 +29,9 @@ import select
 from optparse import OptionParser
 from pprint import pprint
 
-# import msgpack
-import msgpack
+if os.path.exists("../elijah") is True:
+    sys.path.insert(0, "../")
+from elijah.provisioning import msgpack
 
 
 class Protocol(object):

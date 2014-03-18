@@ -23,11 +23,8 @@ import signal
 
 if os.path.exists("../elijah") is True:
     sys.path.insert(0, "../")
-    from elijah.provisioning.server import SynthesisServer
-    from elijah.provisioning.synthesis import validate_congifuration
-else:
-    from elijah.provisioning.server import SynthesisServer
-    from elijah.provisioning.synthesis import validate_congifuration
+from elijah.provisioning.server import SynthesisServer
+from elijah.provisioning.synthesis import validate_congifuration
 
 
 def sigint_handler(signum, frame):
