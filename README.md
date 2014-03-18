@@ -1,51 +1,60 @@
 Elijah: Cloudlet Infrastructure for Mobile Computing
 ========================================================
-A cloudlet is a new architectural element that arises from the convergence of
-mobile computing and cloud computing. It represents the middle tier of a
-3-tier hierarchy:  mobile device - cloudlet - cloud.   A cloudlet can be
-viewed as a "data center in a box" whose  goal is to "bring the cloud closer".
 
-Copyright (C) 2011-2012 Carnegie Mellon University
-This is a developing project and some features might not be stable yet.
-Please visit our website at [Elijah page](http://elijah.cs.cmu.edu/).
+A cloudlet is a new architectural element that arises from the convergence of
+mobile computing and cloud computing. It represents the middle tier of a 3-tier
+hierarchy:  mobile device - cloudlet - cloud.   A cloudlet can be viewed as a
+"data center in a box" whose  goal is to "bring the cloud closer". Please visit
+our website at [Elijah page](http://elijah.cs.cmu.edu/).
+
+Copyright (C) 2011-2014 Carnegie Mellon University
+
+
 
 
 
 License
 ----------
 
-All source code, documentation, and related artifacts associated with the
-cloudlet open source project are licensed under the [Apache License, Version
+Source code, documentation, and related artifacts excepts binaries listed below
+are licensed under the [Apache License, Version
 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
+
+Binaries under GPL v2
+
+1.  Modified [QEMU/KVM](http://www.linux-kvm.org/page/Main_Page) at $HOME/elijah/provisioning/lib/bin/x86_64/cloudlet\_qemu-system-x86_64.
+  - To start VM before having entire memory snapshot, we have modified QEMU-KVM
+  - [Download source code](https://github.com/cmusatyalab/elijah-provisioning/releases/download/v0.8.6/qemu-1.1.1.tar.gz)
+2. Modified [vmnetfs](https://github.com/cmusatyalab/vmnetx) at $HOME/elijah/provisioning/lib/bin/x86_64/cloudlet\_vmnetfs
+  - To enable on-demand fetches of VM disk/memory using, we have modified vmnetfs.
+  - [Download source code](https://github.com/cmusatyalab/elijah-provisioning/releases/download/v0.8.6/vmnetx-0.2.tar.gz)
 
 
 
 Before you start
 -----------------
 
-This code is about **Virtual Machine Synthesis** that aimed to provide 
-**Rapid provisioning of a custom virtual machine**. This does not include any
-codes for mobile applications, rather it provides functions to create
-**VM overlay** and perform **VM Synthesis** that will rapidly reconstruct 
-your custom VM at an arbitrary computer.
+This code is about **rapid provisioning of a custom VM(Virtual Machine)** to
+cloudlet using **VM synthesis technique** that aimed to provide . This does not
+include any code for mobile applications, rather it provides functions to
+create **VM overlay** and perform **VM Synthesis** that will rapidly
+reconstruct your custom VM at an arbitrary computer.
 
 Please read [Just-in-Time Provisioning for Cyber Foraging](http://www.cs.cmu.edu/~satya/docdir/ha-mobisys-vmsynthesis-2013.pdf)
 to understand what we do here and find the detail techniques.
 
 
-The key to rapid provisioning is the recognition that a large part of
-a VM image is devoted to the guest OS, software libraries, and
-supporting software packages. The customizations of a base system
-needed for a particular application are usually relatively small.
-Therefore, if the ``base VM`` already exists on the cloudlet, only
-its difference relative to the desired custom VM, called a ``VM overlay``,
-needs to be transferred. Our approach of using VM overlays
-to provision cloudlets is called ``VM synthesis``.  A good analogy is
-a QCOW2 file with a backing file. You can consider ``VM overlay`` as
-a QCOW2 file and ``Base VM`` as a backing file. The main difference 
-is that ``VM synthesis`` includes both disk and memory state and 
-it is much more efficient in generating diff and reconstructing
-suspended state.
+The key to rapid provisioning is the recognition that a large part of a VM
+image is devoted to the guest OS, software libraries, and supporting software
+packages. The customizations of a base system needed for a particular
+application are usually relatively small.  Therefore, if the ``base VM``
+already exists on the cloudlet, only its difference relative to the desired
+custom VM, called a ``VM overlay``, needs to be transferred. Our approach of
+using VM overlays to provision cloudlets is called ``VM synthesis``.  A good
+analogy is a QCOW2 file with a backing file. You can consider ``VM overlay`` as
+a QCOW2 file and ``Base VM`` as a backing file. The main difference is that
+``VM synthesis`` includes both disk and memory state and it is much more
+efficient in generating diff and reconstructing suspended state.
 
 
 
@@ -287,12 +296,4 @@ Directories
 </pre>
 
 
-
-Compiling external library that Cloudlet uses
-----------------------------------------------
-
-You will need:
-
-* qemu-kvm 1.1.1 (for Free memory and TRIM support)
-* libc6-dev-i386 (for Free memory support)
 
