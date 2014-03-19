@@ -33,12 +33,13 @@ Before you start
 -----------------
 
 This code is about **rapid provisioning of a custom VM(Virtual Machine)** to
-cloudlet using **VM synthesis technique** that aimed to provide . This does not
-include any code for mobile applications, rather it provides functions to
-create **VM overlay** and perform **VM Synthesis** that will rapidly
-reconstruct your custom VM at an arbitrary computer.
+cloudlet using **VM synthesis**. This does not include any code for mobile
+applications, rather it provides functions to create **VM overlay** and perform
+**VM Synthesis** that will rapidly reconstruct your custom VM at an arbitrary
+computer.
 
-Please read [Just-in-Time Provisioning for Cyber Foraging](http://www.cs.cmu.edu/~satya/docdir/ha-mobisys-vmsynthesis-2013.pdf)
+Please read [Just-in-Time Provisioning for Cyber
+Foraging](http://www.cs.cmu.edu/~satya/docdir/ha-mobisys-vmsynthesis-2013.pdf)
 to understand what we do here and find the detail techniques.
 
 
@@ -124,149 +125,205 @@ We have tested at __Ubuntu 12.04 LTS 64-bit__ and it's derivatives such as Kubun
 
 This version of Cloudlet has several dependencies on other projects for further
 optimization, and currently we include this dependency as a binary.  Therefore,
-we recommend you to use __Ubuntu 12.04 LTS 64-bit__. Later after solving all
-license issues, we'll provide relevant binaries.
+we recommend you to use __Ubuntu 12.04 LTS 64-bit__. 
 
 
 
 How to use
---------------			
+-------------
 
-1. Creating ``base VM``.  
+1. Import ``Base VM``
 
-	You will first create or import ``base VM``. Here we provide methods for both
-	importing ``base VM`` and creating your own ``base VM``.
+  First thing you need is a ``Base VM``. ``Base VM`` is a pre-loaded element
+  and you can think it as a golden image similar to [Amazon
+  AMI](http://en.wikipedia.org/wiki/Amazon_Machine_Image).  We provide __sample
+  base VM__ of Ubuntu 12.04 32-bit server for easy	bootstrapping.  Download
+  sample ``base VM`` at:
 
-	1) We provide __sample base VM__ of Ubuntu 12.04 32bit server for easy
-	bootstrapping. You first need to download preconfigured ``base VM`` at:
+	[Base VM for Ubuntu-12.04.01-i386-Server](https://storage.cmusatyalab.org/cloudlet-vm/ubuntu-12.04-32bit.zip)
+	(Ubuntu account: cloudlet, password: cloudlet)
 
-	[Base VM for Ubuntu-12.04.01-i386-Server](https://storage.cmusatyalab.org/cloudlet-basevm-ubuntu-12.04.01-i386/ubuntu-12.04.01-i386-server.tar.gz)
-	(Account: cloudlet, password: cloudlet)
+  Then, you can import this ``base VM`` using command line tool, _cloudlet_.
 
-	Untar the downloaded file into a specific directory (e.g. ~/base_VM/) and
-	you can import it to the cloudlet DB by
+  > $ cloudlet import-base ./ubuntu-12.04-32bit.zip  
+  > INFO     create directory for base VM  
+  > INFO     Decompressing Base VM to temp directory at /tmp/cloudlet-base-k7ANqB  
+  > INFO     Place base VM to the right directory  
+  > INFO     Register New Base to DB  
+  > INFO     ID for the new Base VM:   406ed612a6a8b8a03fbbc5f45cceb0408a1c1d947f09d3b8a5352973d77d01f5  
+  > INFO     Success
 
-		> $ cloudlet add-base [path/to/base_disk] [hash value]
+  You can check the imported ``base VM`` by
+
+  > $ cloudlet list-base  
+  > hash value<code>&nbsp;&nbsp;&nbsp;&nbsp;</code>path  
+  > \------------------------------------------------------------------------------------------  
+  > 406ed6<code>&nbsp;&nbsp;&nbsp;&nbsp;</code>/home/krha/.cloudlet/406ed6/precise.raw  
+  > \------------------------------------------------------------------------------------------
 	
-	For example,
+2. Perform __VM synthesis__ using a sample ``VM overlay``.
 
-		> $ cd ~/base_VM/
-		> $ tar xvf ubuntu-12.04.01-i386-server.tar.gz
-		> $ cloudlet add-base ./ubuntu-12.04.01-i386-server/precise.raw 32854753f684c10e8ab8553315c7bf6ada2ab93a27c36f9bbb164514b96d516a
-	
-	You can find the hash value for the base VM from base VM hash file you just
-	downloaded(e.g. precise.base-hash). You can check import result by
+  First, launch the VM synthesis server at Cloudlet.
 
-		> $ cloudlet list-base
-	
-	Later, we will provide more golden images for ``base VM`` such as vanilla
-	Ubuntu 12.04 LTS 64bit and Fedora 19. It would be similar with [Ubuntu
-	Cloud Image](http://cloud-images.ubuntu.com/).  We expect that typical
-	users import these ``base VMs`` rather than generating his own.
-	
+  > $ synthesis_server  
+  > INFO     --------------------------------------------------  
+> INFO     * Base VM Configuration  
+  > INFO      0 : /home/krha/cloudlet/image/ubuntu-12.04.1-server-i386/precise.raw (Disk 8192 MB, Memory 1040 MB)  
+  > INFO      1 : /home/krha/.cloudlet/406ed612a6a8b8a03fbbc5f45cceb0408a1c1d947f09d3b8a5352973d77d01f5/precise.raw (Disk 8192 MB, Memory 1040 MB)  
+  > INFO     --------------------------------------------------  
+  > INFO     * Server configuration  
+  > INFO      - Open TCP Server at ('0.0.0.0', 8021)  
+  > INFO      - Disable Nagle(No TCP delay)  : 1  
+  > INFO     --------------------------------------------------  
+  > INFO     [INFO] Start UPnP Server  
 
-	2) You can also create your own __base VM__ from a regular VM disk image.
-	Here the _regular VM disk image_ means a raw format virtual disk image
-	you normaly use for KVM/QEMU or Xen. 
+  Then, you can perform VM synthesis using a sample **VM overlay URL** for
+  Fluid simulation's back-end server. The demo video of this application is at
+  <a href=https://www.youtube.com/watch?v=f9MN-kvG_ko
+  target="_blank">YouTube</a>. The URL for the Fluid VM overlay is  <a
+  href=https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip
+  target="_blank">https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip</a>.
+  You can perform VM synthesis like
 
-        > $ cloudlet base /path/to/base_disk.img
-        > % Use raw file format virtual disk
+  > $ synthesis_client -s localhost -u https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip  
+  > Synthesis SUCCESS  
+  > SUCCESS in Provisioning  
+  > $
+
+  If VM synthesis is successful, you will see a screen-shot like
+
+  <img src="https://raw.github.com/cmusatyalab/elijah-provisioning/master/doc/screenshot-synthesis-success.png" align=middle width=480>
+
+  The custom VM of Fluid simulation back-end server is running and ready to
+  receive client connection. Note that it is a TCP client, so you can execute
+  synthesis_client program at a different machine.
+
+  If the VM synthesis is failed showing a screen-shot like below, it is due to
+  the memory snapshot compatibility of the ``base VM``.
+
+  <img src="https://raw.github.com/cmusatyalab/elijah-provisioning/master/doc/screenshot-synthesis-fail.png" align=middle width=480>
+
+  This kernel panic is causes by CPU flag incompatibility coming from QEMU
+  side. We do our best to make a VM memory snapshot work across heterogeneous
+  host machine, but it can failed in an old machine. In this case, you need to
+  create your own ``base VM`` (See more at [How to create your own Base
+  VM](#How-to-create-your-own-Base-VM))
+
+
+3. VM synthesis  in different ways
+
+  In addition to using a synthesis server and a client, you can perform VM
+  synthesis 1) using command line tool and 2) using an Android client.  
+
+    1) Command line tool
+
+        > $ cloudlet synthesis /path/to/base_disk.img /path/to/overlay.zip
+    
+    2) Android client
+
+	We have sample Android client at $HOME/android/android and you can import
+	it to ``Eclipse`` as an Android project. This client program will
+	automatically find nearby Cloudlet using UPnP if both client and Cloudlet
+	are located in same broadcasting domain (e.g. sharing WiFi access point).
+	Otherwise, you can manually specify IP address of the Cloudlet by clicking
+	cancel in discovery pop-up.
+
+	Once installing application at your phone, you have to copy your VM overlay
+	to Android phone. For example with Fluid overlay example, download VM
+	overlay from <a
+	href=https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip
+	target="_blank">https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip</a>
+	and **unzip it**, then copy both overlay-meta and overlay-blob_1.xz file to
+	/sdcard/Cloudlet/overlay/fluid/ directory. This directory name, _fluid_,
+	will be appeared to your Android application when you're asked to select
+	``Overlay VM``. Right directory name is important since the directory name
+	will be	saved as appName in internal data structure and being used to
+	launch associated mobile application after finishing ``VM synthesis``. 
+
+  Please recall that this VM synthesis client is for **provisioning custom
+  back-end server VM at arbitrary 	computer** and you need to launch your
+  mobile application after finishing VM synthesis. This client application will
+  communicate with the back-end server you just provisioned. To launch mobile
+  application after VM synthesis, we use Android Activity launcher and the
+  directory name is used as an index for associated mobile application. See
+  more details at handleSucessSynthesis() method at CloudletConnector.java
+  file.
+
+    
+
+Sample application: Fluid Simulation
+---------------------------
+* Fluid Simulation is an interactive fluid dynamics simulation, that renders a liquid sloshing in a container on the screen of a phone based on accelerometer inputs.  The application back-end runs on Linux and performs a [smoothed particle hydrodynamics](http://dl.acm.org/citation.cfm?id=1531346) physics simulation using 2218 particles, generating up to 50 frames per second.  The structure of this application is representative of real-time (i.e., not turn-based) games.
+* [Doyub Kim](http://www.doyub.com/) is a primary contributor of this application.
+* Video demo
+  - <a href=https://www.youtube.com/watch?v=f9MN-kvG_ko target="_blank">Using Cloudlet</a>
+  - <a href=https://www.youtube.com/watch?v=hWc2fpejfiw target="_blank">Using Amazon EC2 West</a>
+  - <a href=https://www.youtube.com/watch?v=aSjQnfkUoU8 target="_blank">Using Amazon EC2 Asia</a>
+
+* Code
+  - Binary back-end server: $ HOME/test/app-server/fluid-bin32/
+  - Android client source code: $HOME/android/android_fluid/
+  - Python client source code: $HOME/test/app-client/scripts/graphics_client.py
+    > $ ./graphics_client.py -s localhost -p 9093 -i acc_input_50sec 
+
+  - VM overlay for the back-end server: <a href=https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip target="_blank">https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip</a>
+
+
+Details Usage
+--------------
+
+### How to create your own Base VM
+
+You can also create your own ``base VM`` from a regular VM disk image. Here the
+_regular VM disk image_ means a raw format virtual disk image you normally use
+for KVM/QEMU or Xen. 
+
+  > $ cloudlet base /path/to/base_disk.img  
+  > % Use raw file format virtual disk
         
-	This will launch GUI (VNC) connecting to your guest OS and the code will
-	start creating ``base VM`` when you close VNC window. So, please close the
-	GUI window when you think it's right point to snapshot the VM as a base VM
-	(typically you close it after booting up).  Then, it will generate snapshot
-	of the current states for both memory and disk and save that information
-	to DB. You can check list of ``base VM`` by
+This command will launch GUI (VNC) connecting to your guest OS and the code
+will start creating ``base VM`` right after you close VNC window. So, please
+close the VNC window when you think it's right point to snapshot the VM as a
+base VM (typically you close it after booting up).  Then, it will generate
+snapshot of the current states for both memory and disk and save that
+information to DB. You can check list of ``base VM`` by
 
     	> $ cloudlet list-base
 	
 
-2. Creating ``VM overlay`` using ``base VM``.  
-    Now you can create your customized VM based on top of ``base VM``  
+### How to create VM overlay
+
+Now you can create your customized VM based on top of ``base VM``  
   
-        > $ cloudlet overlay /path/to/base_disk.img
-        > % Path to base_disk is the path for virtual disk you used earlier
-        > % You can check the path by "cloudlet list-base"
+  > $ cloudlet overlay /path/to/base\_disk.img  
+  > % Path to base_disk is the path for virtual disk you used earlier  
+  > % You can check the path by "cloudlet list-base"  
 
-	This will launch VNC again with resumed ``base VM``. Now you can start making
-	any customizations on top of this ``base VM``. For example, if you're a
-	developer of ``face recognition`` backend server, we will install required
-	libraries, binaries and finally start your face recognition server. 
-	After closing the GUI windows, cloudlet will capture only the change portion
-	between your customization and ``base VM`` to generate ``VM overlay`` that
-	is a minimal binary for reconstructing your customized VM.
+This will launch VNC again with resumed ``base VM``. Now you can start making
+any customizations on top of this ``base VM``. For example, if you're a
+developer of ``face recognition`` back-end server, we will install required
+libraries, binaries and finally start your face recognition server. After
+closing the GUI windows, cloudlet will capture only the change portion between
+your customization and ``base VM`` to generate ``VM overlay`` that is a minimal
+binary for reconstructing your customized VM.
 
-	``VM overlay`` is composed of 2 files; 1) ``overlay-meta file`` ends with
-	.overlay-meta, 2) compressed ``overlay blob files`` ends with .xz
+``VM overlay`` is using zip container and inside of the zip file there are 2
+types of files; 1) ``overlay-meta file`` ends with .overlay-meta, 2) compressed
+``overlay blob files`` ends with .xz
+
+**If your application need specific TCP/UDP port to communicate with a client,
+then you can make a port forwarding using -redir parameter as below.** 
+
+  > $ cloudlet overlay /path/to/base_disk.img -- -redir tcp:2222::22 -redir tcp:8080::80
+
+  This will forward client connection at host port 2222 to VM's 22 and 8080 to 80, respectively.
 
 
-	Note: if your application need specific port and you want to make a port
-	forwarding host to VM, you can use -redir parameter as below. 
-
-        > $ cloudlet overlay /path/to/base_disk.img -- -redir tcp:2222::22 -redir tcp:8080::80
-
-	This will forward client connection at host port 2222 to VM's 22 and 8080
-	to 80, respectively.
-
-
-	### Note
-
-	If you have experience kernel panic error like
-	[this](https://github.com/cmusatyalab/elijah-cloudlet/issues/1), You should
-	follow workaround of this link. It happens at a machine that does not have
-	enough memory with EPT support, and you can avoid this problem by disabling
-	EPT support. We're current suspicious about kernel bug, and we'll report
-	this soon.  
-    
-
-3. Synthesizing custom VM using ``VM overlay``  
-
-	Here, we'll show 3 different ways to perform VM synthesis using ``overlay
-	vm`` that you just generated; 1) verifying integrity of VM overlay using command line
-	interface, 2) synthesize over network using desktop client, and 3)
-	synthesize over network using an Android client.  
-
-    1) Command line interface: You can synthesize your ``VM overlay`` using 
-
-        > $ cloudlet synthesis /path/to/base_disk.img /path/to/overlay-meta
-    
-    2) Network client (python version)  
-
-	We have a synthesis server that received ``VM synthesis`` request from
-	mobile client and you can start the server as below.
-  
-        > $ synthesis_server
-    
-	You can test this server using the client. You also need to copy the
-	overlay that you like to reconstruct to the other machine when you execute
-	this client.
-    
-        > $ synthesis_client -s [cloudlet ip address] -o [/path/to/overlay-meta]
-
-    3) Network client (Android version)
-
-	We have source codes for a Android client at ./android/android and you can
-	import it to ``Eclipse`` as an Android project. This client program will
-	automatically find nearby Cloudlet using UPnP if both client and Cloudlet
-	are located in same broadcasting domain (e.g. sharing WiFi access point)
-
-	Once installing application at your mobile device, you should copy your
-	VM overlay (both overlay-meta and xz file) to Android phone. You can copy
-	it to /sdcard/Cloudlet/overlay/ directory creating your overlay directory
-	name.  For example, you can copy your ``VM overlay for face recognition`` to
-	/sdcard/Cloudlet/overlay/face/ directory. This directory name will be
-	appeared to your Android application when you're asked to select ``overlay vm``.
-	Right directory name is important since the directory name will be
-	saved as appName in internal data structure and being used to launch
-	associated mobile application after finishing ``VM synthesis``. Recall that
-	this VM synthesis client is for reconstructing your custom VM at arbitrary 
-	computer and you need to launch your mobile application after finishing VM
-	thesis that will communicate with the server you just launched. To launch
-	mobile application after VM synthesis, we use Android Activity launch and
-	the directory name is used as an index to point out associated mobile
-	application. See more details at handleSucessSynthesis() method at 
-	CloudletConnector.java file.
+**Note**: If you have experience kernel panic error like
+[this](https://github.com/cmusatyalab/elijah-cloudlet/issues/1), You should
+follow a workaround at this link. It happens at a machine that does not have
+enough memory with EPT support, and you can avoid this problem by disabling EPT
+support. We're current suspicious about kernel bug, and we'll report this soon.  
 
 
 
@@ -285,13 +342,13 @@ Directories
   │     │	└─ YouTube: <a href=https://www.youtube.com/watch?v=f9MN-kvG_ko target="_blank">Using Cloudlet</a>
   │     └─ android_ESVMRecogn, android_ESVMTrainer: under development
   │
-  ├── test: Test applications' client code
-  │     ├─ applications: client codes for each test application
-  │     │				server code is not available due to the license issue
-  │     └─ desktop: batch scripts to test application using VM synthesis on x86 (not Android)
+  ├── test: Test applications' code
+  │     ├─ app-client 
+  │     │	├─ scripts: client codes for each test application
+  │     │	└─ batch_files: batch scripts to test application using VM synthesis on x86 (not Android)
+  │     └─ app-server: server binary for each test application
   │
   └── fabric.py: installation script using <a href=http://docs.fabfile.org/en target="_blank">Fabric</a>
 </pre>
-
 
 
