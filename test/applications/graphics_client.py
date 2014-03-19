@@ -92,12 +92,12 @@ def recv_data(sock, last_client_id, exception_callback):
         ret_size = struct.unpack("!I", data)[0]
         #print "Client ID : %d, Server_token: %d, Recv size : %d" % (client_id, server_token_id, ret_size)
         token_id = server_token_id
-        #if server_token_id%100 == 0:
-        #    print "id: %d, FPS: %4.2f" % (token_id, token_id/(time.time()-start_time))
+        if server_token_id%100 == 0:
+            print "id: %d, FPS: %4.2f" % (token_id, token_id/(time.time()-start_time))
 
         # TODO: DELTE THIS. THIS is only for measuring first reponse
-        if client_id >= 0:
-            exception_callback()
+        #if client_id >= 0:
+        #    exception_callback()
         
         if not ret_size == 0:
             ret_data = recv_all(sock, ret_size)
