@@ -95,8 +95,6 @@ class Client(object):
         self.ip = ip
         self.port = port
         self.overlay_file = overlay_file
-        if self.overlay_file is not None:
-            self.is_zip_contained = self._is_zip_contained(self.overlay_file)
         self.overlay_url = overlay_url
         self.app_function = app_function
         self.synthesis_option = synthesis_option or dict()
@@ -114,6 +112,9 @@ class Client(object):
             msg = "Invalid overlay path: %s\n" % self.overlay_file
             sys.stderr.write(msg)
             raise ClientError(msg)
+
+        if self.overlay_file is not None:
+            self.is_zip_contained = self._is_zip_contained(self.overlay_file)
 
         # get session
         self.session_id = Client.associate_with_cloudlet(ip, port)
