@@ -26,6 +26,7 @@ import socket
 import time
 import threading
 import select
+import zipfile
 from optparse import OptionParser
 from pprint import pprint
 
@@ -84,7 +85,7 @@ class Client(object):
     RET_SUCCESS = 1
     CLOUDLET_PORT = 8021
 
-    def __init__(self, ip, port, overlay_file =None, overlay_url=None, \
+    def __init__(self, ip, port, overlay_file = None, overlay_url=None, \
             app_function=None, synthesis_option=dict()):
         '''
         Need either overlay_file or overlay_url
@@ -94,17 +95,19 @@ class Client(object):
         self.ip = ip
         self.port = port
         self.overlay_file = overlay_file
+        if self.overlay_file is not None:
+            self.is_zip_contained = self._is_zip_contained(self.overlay_file)
         self.overlay_url = overlay_url
         self.app_function = app_function
         self.synthesis_option = synthesis_option or dict()
         self.time_dict = dict()
 
         if self.overlay_url is None and self.overlay_file is None:
-            msg = "Need either overlay file or overlay url"
+            msg = "Need either overlay file or overlay URL"
             sys.stderr.write(msg)
             raise ClientError(msg)
         if self.overlay_url is not None and self.overlay_file is not None:
-            msg = "Need either overlay file or overlay url"
+            msg = "Need either overlay file or overlay URL"
             sys.stderr.write(msg)
             raise ClientError(msg)
         if self.overlay_file is not None and os.path.exists(self.overlay_file) is False:
@@ -119,13 +122,28 @@ class Client(object):
             sys.stderr.write(msg)
             raise ClientError(msg)
 
+    def _is_zip_contained(self, filepath): 
+        abspath = os.path.abspath(filepath)
+        if os.path.exists(abspath) is False:
+            raise ClientError("Cannot access %s" % abspath)
+        if zipfile.is_zipfile(abspath) is False:
+            return False
+        # check validity of the zip file
+        zip_overlay = zipfile.ZipFile(abspath, 'r')
+        if "overlay-meta" not in zip_overlay.namelist():
+            # 'overlay-meta' is defined in Configuration.py 
+            # but use magic string to make this client independent
+            return False
+        return True
+
     def provisioning(self):
         if self.overlay_file:
-            self.provisioning_from_file()
+            self.provisioning_from_file(self.session_id, self.overlay_file, 
+                    self.is_zip_contained)
         elif self.overlay_url:
-            self.provisioning_from_url()
+            self.provisioning_from_url(self.session_id, self.overlay_url)
 
-    def provisioning_from_url(self):
+    def provisioning_from_url(self, session_id, overlay_url):
         # connection
         self.start_provisioning_time = time.time()
         sock = Client.connect(self.ip, self.port)
@@ -137,8 +155,8 @@ class Client(object):
         # send
         header_dict = {
             Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_SEND_OVERLAY_URL,
-            Protocol.KEY_OVERLAY_URL: self.overlay_url,
-            Protocol.KEY_SESSION_ID: self.session_id,
+            Protocol.KEY_OVERLAY_URL: overlay_url,
+            Protocol.KEY_SESSION_ID: session_id,
             }
         if len(self.synthesis_option) > 0:
             header_dict[Protocol.KEY_SYNTHESIS_OPTION] = self.synthesis_option
@@ -158,7 +176,7 @@ class Client(object):
             sys.stderr.write("[ERROR] %s\n" % msg)
             raise ClientError(msg)
 
-        # wait unitil VM synthesis finishes
+        # wait until VM synthesis finishes
         self.app_thread = None
         data = Client.recv_all(sock, 4)
         msg_size = struct.unpack("!I", data)[0]
@@ -174,8 +192,7 @@ class Client(object):
         else:
             sys.stderr.write("Protocol error:%d\n" % (command))
 
-
-    def provisioning_from_file(self):
+    def provisioning_from_file(self, session_id, overlay_file, is_zipped):
         # connection
         self.start_provisioning_time = time.time()
         sock = Client.connect(self.ip, self.port)
@@ -185,22 +202,22 @@ class Client(object):
             raise ClientError(msg)
 
         blob_request_list = list()
-        sys.stdout.write("Overlay Meta: %s\n" % (self.overlay_file))
-        sys.stdout.write("Session ID: %ld\n" % (self.session_id))
-        meta_info = Client.decoding(open(self.overlay_file, "r").read())
+        sys.stdout.write("Sending overlay meta")
+        sys.stdout.write("Session ID: %ld\n" % (session_id))
+        meta_data = self._read_overlay_meta(overlay_file, is_zipped)
 
         # send header
         header_dict = {
             Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_SEND_META,
-            Protocol.KEY_META_SIZE : os.path.getsize(self.overlay_file),
-            Protocol.KEY_SESSION_ID: self.session_id,
+            Protocol.KEY_META_SIZE : len(meta_data),
+            Protocol.KEY_SESSION_ID: session_id,
             }
         if len(self.synthesis_option) > 0:
             header_dict[Protocol.KEY_SYNTHESIS_OPTION] = self.synthesis_option
         header = Client.encoding(header_dict)
         sock.sendall(struct.pack("!I", len(header)))
         sock.sendall(header)
-        sock.sendall(open(self.overlay_file, "r").read())
+        sock.sendall(meta_data)
         self.time_dict['send_end_time'] = time.time()
 
         # recv header
@@ -216,6 +233,7 @@ class Client(object):
             raise ClientError(msg)
 
         self.app_thread = None
+        meta_info = Client.decoding(meta_data)
         total_blob_count = len(meta_info['overlay_files'])
         sent_blob_list = list()
         is_synthesis_finished = False
@@ -267,22 +285,25 @@ class Client(object):
                     if requested_uri not in sent_blob_list:
                         sent_blob_list.append(requested_uri)
                     else:
-                        raise ClientError("sending duplicated blob: %s" % requested_uri)
+                        msg = "sending duplicated blob: %s" % requested_uri
+                        raise ClientError(msg)
 
-                    filename = os.path.basename(requested_uri)
-                    blob_path = os.path.join(os.path.dirname(self.overlay_file), filename)
+                    blob_name = os.path.basename(requested_uri)
+                    blob_size = self._get_overlay_blob_size(overlay_file, 
+                            blob_name, is_zipped)
                     segment_info = {
                             Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_SEND_OVERLAY,
                             Protocol.KEY_REQUEST_SEGMENT : requested_uri,
-                            Protocol.KEY_REQUEST_SEGMENT_SIZE : os.path.getsize(blob_path),
-                            Protocol.KEY_SESSION_ID: self.session_id,
+                            Protocol.KEY_REQUEST_SEGMENT_SIZE : blob_size,
+                            Protocol.KEY_SESSION_ID: session_id,
                             }
 
                     # send close signal to cloudlet server
                     header = Client.encoding(segment_info)
                     sock.sendall(struct.pack("!I", len(header)))
                     sock.sendall(header)
-                    sock.sendall(open(blob_path, "rb").read())
+                    sock.sendall(self._read_overlay_blob(overlay_file,
+                        blob_name, is_zipped))
 
                     if len(sent_blob_list) == total_blob_count:
                         self.time_dict['send_end_time'] = time.time()
@@ -300,6 +321,36 @@ class Client(object):
                     if is_synthesis_finished == True:
                         break
 
+    '''
+    wrapper methods to cover different types of VM overlay,
+        1) a list of regular file
+        2) single file with zip container
+    eventually, we will only use zip container format
+    '''
+    def _read_overlay_meta(self, filepath, is_zipped):
+        if is_zipped is True:
+            zz = zipfile.ZipFile(filepath, "r")
+            # 'overlay-meta' is defined in Configuration.py 
+            # but use magic string to make this client independent
+            return zz.read("overlay-meta")
+        else:
+            return open(filepath, "r").read()
+
+    def _read_overlay_blob(self, filepath, blobname, is_zipped):
+        if is_zipped is True:
+            zz = zipfile.ZipFile(filepath, "r")
+            return zz.read(blobname)
+        else:
+            blob_path = os.path.join(os.path.dirname(filepath), blobname)
+            return open(blob_path, 'r').read()
+
+    def _get_overlay_blob_size(self, filepath, blobname, is_zipped):
+        if is_zipped is True:
+            zz = zipfile.ZipFile(filepath, "r")
+            return zz.getinfo(blobname).file_size
+        else:
+            blob_path = os.path.join(os.path.dirname(filepath), blobname)
+            return os.path.getsize(blob_path)
 
     def terminate(self):
         sock = Client.connect(self.ip, self.port)
