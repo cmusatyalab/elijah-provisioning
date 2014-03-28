@@ -265,6 +265,29 @@ class _HttpFile(object):
         self._offset += len(ret)
         return ret
 
+    def iter_content(self, offset, size, chunk_size):
+        range = '%d-%d' % (offset, offset + size - 1)
+        self._last_network = range
+        range = 'bytes=' + range
+
+        try:
+            resp = self._session.get(self.url, auth=self._auth, headers={
+                'Range': range,
+            }, stream=True)
+            for data in resp.iter_content(chunk_size):
+                yield data
+            '''
+            resp.raise_for_status()
+            if resp.status_code != 206:
+                raise _HttpError('Server ignored range request')
+            if (self._get_etag(resp) != self.etag or
+                    self._get_last_modified(resp) != self.last_modified):
+                raise _HttpError('Resource changed on server')
+            return resp.content
+            '''
+        except requests.exceptions.RequestException, e:
+            raise _HttpError(str(e))
+
     def seek(self, offset, whence=0):
         if self.closed:
             raise _HttpError('File is closed')
@@ -319,9 +342,19 @@ class _FileFile(file):
                 int(os.fstat(self.fileno()).st_mtime), tzutc())
     # pylint: enable=E1103
 
+    def iter_content(self, offset, size, chunk_size):
+        self.seek(offset)
+        total_read = 0
+        try:
+            while total_read < size:
+                data = self.read(chunk_size)
+                yield data
+        except:
+            raise StopIteration()
+
 
 class _PackageObject(object):
-    def __init__(self, zip, path, load_data=False):
+    def __init__(self, zip, path):
         self._fh = zip.fp
         self.url = self._fh.url
         self.etag = self._fh.etag
@@ -351,25 +384,9 @@ class _PackageObject(object):
         self.offset = info.header_offset + header_len + name_len + extra_len
         self.size = info.file_size
 
-        if load_data:
-            # Eagerly read file data into memory, since _HttpFile likely has
-            # it in cache.
-            self._fh.seek(self.offset)
-            self.data = self._fh.read(self.size)
-        else:
-            self.data = None
 
-    def write_to_file(self, fh, buf_size=1 << 20):
-        if self.data is not None:
-            fh.write(self.data)
-        else:
-            self._fh.seek(self.offset)
-            count = self.size
-            while count > 0:
-                cur = min(count, buf_size)
-                buf = self._fh.read(cur)
-                fh.write(buf)
-                count -= len(buf)
+    def iter_content(self, chunk_size):
+        return self._fh.iter_content(self.offset, self.size, chunk_size)
 
 
 class VMOverlayPackage(object):
@@ -410,9 +427,9 @@ class VMOverlayPackage(object):
         self.metadata = self.zip_overlay.read(self.metafile)
         return self.metadata
 
-    def read_blob(self, blobname, size=None):
-        self.blobdata = self.zip_overlay.read(blobname, size)
-        return self.blobdata
+    def iter_blob(self, blobname, chunk_size):
+        package_blob = _PackageObject(self.zip_overlay, blobname)
+        return package_blob.iter_content(chunk_size)
 
     @classmethod
     def create(cls, outfilename, metafile, blobfiles):
@@ -469,8 +486,8 @@ class VMOverlayPackage(object):
 #
 #            # Create attributes
 #            self.name = tree.get('name')
-#            self.domain = _PackageObject(zip,
-#                    tree.find(NSP + 'domain').get('path'), True)
+#            self.domain = _packageobject(zip,
+#                    tree.find(nsp + 'domain').get('path'))
 #            self.disk = _PackageObject(zip,
 #                    tree.find(NSP + 'disk').get('path'))
 #            memory = tree.find(NSP + 'memory')

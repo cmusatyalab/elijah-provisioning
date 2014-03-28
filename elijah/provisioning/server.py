@@ -368,10 +368,8 @@ class URLFetchStep(threading.Thread):
 
             finished_url[requesting_overlay] = True
             read_count = 0
-            blob_size = self.overlay_files_size[requesting_overlay]
-            while read_count < blob_size:
-                read_min_size = min(self.chunk_size, blob_size-read_count)
-                chunk = self.overlay_package.read_blob(requesting_overlay, read_min_size)
+            for chunk in self.overlay_package.iter_blob(requesting_overlay, \
+                    self.chunk_size):
                 read_size = len(chunk)
                 if chunk:
                     self.out_queue.put(chunk)
