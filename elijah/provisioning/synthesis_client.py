@@ -32,7 +32,10 @@ from pprint import pprint
 
 if os.path.exists("../elijah") is True:
     sys.path.insert(0, "../")
-from elijah.provisioning import msgpack
+try:
+    from elijah.provisioning import msgpack
+except ImportError as e:
+    import msgpack
 
 
 class Protocol(object):
