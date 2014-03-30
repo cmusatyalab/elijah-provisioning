@@ -427,6 +427,12 @@ class VMOverlayPackage(object):
         self.metadata = self.zip_overlay.read(self.metafile)
         return self.metadata
 
+<<<<<<< HEAD
+    def read_blob(self, blobname):
+        return self.zip_overlay.read(blobname)
+
+=======
+>>>>>>> 8e561c20b9d3bd30272dfddc5fb3ff30f5f8e238
     def iter_blob(self, blobname, chunk_size):
         package_blob = _PackageObject(self.zip_overlay, blobname)
         return package_blob.iter_content(chunk_size)
