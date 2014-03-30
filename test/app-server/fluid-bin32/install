@@ -1,6 +1,0 @@
-#!/bin/bash
-cd ./lib-download
-sudo dpkg -i --force-depends *.deb
-cd -
-export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
-

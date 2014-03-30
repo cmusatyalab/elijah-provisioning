@@ -25,6 +25,10 @@ Installation & Run
 
 Tested only on Ubuntu 12.04 32bit
 
-  > $ . ./install
-  > $ cloudlet_test -j [number of cores to use]
+  > $ wget https://storage.cmusatyalab.org/cloudlet-app/fluid-server-bin32.tag.gz  
+  > $ tar xvfz fluid-server-bin32.tar.gz  
+  > $ cd ./fluid-server-bin32/  
+  > $ sudo apt-get install libgomp1  
+  > $ export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH  
+  > $ ./cloudlet_test -j [number of cores to use]  
 
