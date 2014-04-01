@@ -98,31 +98,37 @@ public class CloudletDiscoveryAPI {
 		return messageMap;
 	}
 
-	public static BigInteger asssociate(String ipAddress, int port) {
+	public static BigInteger asssociate(String ipAddress, int port) throws IOException {
+		BigInteger sessionID = INVALID_SESSION_ID;
+		NetworkMsg networkCommand = NetworkMsg.MSG_send_associateMessage();
+		HashMap messageMap = CloudletDiscoveryAPI.sendMsg(ipAddress, port, networkCommand);
+		sessionID = (BigInteger) messageMap.get(NetworkMsg.KEY_SESSION_ID);
+		return sessionID;
+	}
 
+	public static BigInteger disasssociate(String ipAddress, int port, BigInteger sessionID) throws IOException {
+		NetworkMsg networkCommand = NetworkMsg.MSG_send_disassociateMessage(sessionID);
+		HashMap messageMap = CloudletDiscoveryAPI.sendMsg(ipAddress, port, networkCommand);
+		return sessionID;
+	}
+
+	private static HashMap sendMsg(String ipAddress, int port, NetworkMsg networkCommand) throws IOException {
 		Socket socket = connect(ipAddress, port);
 		BigInteger sessionID = INVALID_SESSION_ID;
-		try {
-			if (socket == null)
-				throw new IOException();
-			DataInputStream networkReader = new DataInputStream(socket.getInputStream());
-			DataOutputStream networkWriter = new DataOutputStream(socket.getOutputStream());
-			
-			NetworkMsg networkCommand = NetworkMsg.MSG_send_associateMessage();
-			sendCommand(networkWriter, networkCommand);
-			ByteArrayBuffer responseArray = receiveMsg(networkReader);
-			String resString = new String(responseArray.toByteArray());
-			HashMap messageMap = convertMessagePackToMap(responseArray.toByteArray());
-			sessionID = (BigInteger) messageMap.get(NetworkMsg.KEY_SESSION_ID);
-			
-			networkReader.close();
-			networkWriter.close();
-			socket.close();
-		} catch (IOException e) {
-			errMsg = e.getMessage();
-			KLog.printErr(e.getMessage());
-		}
-		return sessionID;
+		if (socket == null)
+			throw new IOException();
+		DataInputStream networkReader = new DataInputStream(socket.getInputStream());
+		DataOutputStream networkWriter = new DataOutputStream(socket.getOutputStream());
+
+		sendCommand(networkWriter, networkCommand);
+		ByteArrayBuffer responseArray = receiveMsg(networkReader);
+		String resString = new String(responseArray.toByteArray());
+		HashMap messageMap = convertMessagePackToMap(responseArray.toByteArray());
+
+		networkReader.close();
+		networkWriter.close();
+		socket.close();
+		return messageMap;
 	}
 
 }

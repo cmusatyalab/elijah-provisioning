@@ -88,15 +88,18 @@ public class CloudletConnector extends Thread {
 
 	public void run() {
 		// Create Session (Associate)
-		this.sessionID = CloudletDiscoveryAPI.asssociate(this.ipAddress,
-				this.port);
+		try {
+			this.sessionID = CloudletDiscoveryAPI.asssociate(this.ipAddress, this.port);
+		} catch (IOException e1) {
+			handleFailSynthesis("Cannot create new Session at " + this.ipAddress + ":" + this.port);
+			return;
+		}
 
 		// Make connection
 		boolean ret = this.initConnection(this.ipAddress, this.port);
 		if (ret == false) {
 			this.close();
-			handleFailSynthesis("Cannot Connect to " + this.ipAddress + ":"
-					+ this.port);
+			handleFailSynthesis("Cannot Connect to " + this.ipAddress + ":" + this.port);
 			return;
 		}
 
@@ -106,13 +109,12 @@ public class CloudletConnector extends Thread {
 		this.receiver.start();
 
 		// Send Synthesis start message
-		NetworkMsg networkMsg = NetworkMsg.MSG_send_overlaymeta(this.overlayVM,
-				this.sessionID);
+		NetworkMsg networkMsg = NetworkMsg.MSG_send_overlaymeta(this.overlayVM, this.sessionID);
 		this.sender.requestCommand(networkMsg);
 
 		// wait for finishing transfer
-		while (true){
-			if (this.overlayVM.transferFinish() == true){
+		while (true) {
+			if (this.overlayVM.transferFinish() == true) {
 				Measure.record(Measure.OVERLAY_TRANSFER_END);
 				break;
 			}
@@ -127,16 +129,11 @@ public class CloudletConnector extends Thread {
 	private boolean initConnection(String ipAddress, int port) {
 		try {
 			this.mClientSocket = new Socket();
-			this.mClientSocket.connect(new InetSocketAddress(ipAddress, port),
-					10 * 1000);
-			this.networkWriter = new DataOutputStream(
-					mClientSocket.getOutputStream());
-			this.networkReader = new DataInputStream(
-					mClientSocket.getInputStream());
-			this.sender = new NetworkClientSender(this.networkWriter,
-					eventHandler);
-			this.receiver = new NetworkClientReceiver(this.networkReader,
-					eventHandler);
+			this.mClientSocket.connect(new InetSocketAddress(ipAddress, port), 10 * 1000);
+			this.networkWriter = new DataOutputStream(mClientSocket.getOutputStream());
+			this.networkReader = new DataInputStream(mClientSocket.getInputStream());
+			this.sender = new NetworkClientSender(this.networkWriter, eventHandler);
+			this.receiver = new NetworkClientReceiver(this.networkReader, eventHandler);
 		} catch (UnknownHostException e) {
 			return false;
 		} catch (IOException e) {
@@ -148,18 +145,8 @@ public class CloudletConnector extends Thread {
 
 	public void closeRequest() {
 		try {
-			// Request Finishing synchronously
-			NetworkMsg networkCommand = NetworkMsg
-					.MSG_send_finishMessage(this.sessionID);
-			this.sender.sendCommand(this.networkWriter, networkCommand);
-			ByteArrayBuffer responseArray = this.receiver
-					.receiveMsg(this.networkReader);
-			HashMap messageMap = convertMessagePackToMap(responseArray
-					.toByteArray());
-			NetworkMsg retMsg = new NetworkMsg(messageMap);
-			int command = retMsg.getCommandType();
-
-			// TODO: disassociate session
+			// Disassociate session
+			this.sessionID = CloudletDiscoveryAPI.disasssociate(this.ipAddress, this.port, this.sessionID);
 		} catch (IOException e) {
 			// KLog.printErr(e.getMessage());
 		}
@@ -203,8 +190,7 @@ public class CloudletConnector extends Thread {
 				// unpack messsage-pack
 				HashMap messageMap = null;
 				try {
-					messageMap = convertMessagePackToMap(responseArray
-							.toByteArray());
+					messageMap = convertMessagePackToMap(responseArray.toByteArray());
 				} catch (IOException e) {
 					KLog.printErr(e.toString());
 					handleFailSynthesis("Synthesis message failed");
@@ -213,8 +199,7 @@ public class CloudletConnector extends Thread {
 
 				// Handle Response
 				Object value = messageMap.get(NetworkMsg.KEY_COMMAND);
-				BigInteger command = (BigInteger) messageMap
-						.get(NetworkMsg.KEY_COMMAND);
+				BigInteger command = (BigInteger) messageMap.get(NetworkMsg.KEY_COMMAND);
 				switch (command.intValue()) {
 				case NetworkMsg.MESSAGE_COMMAND_SUCCESS:
 					break;
@@ -236,14 +221,12 @@ public class CloudletConnector extends Thread {
 
 	};
 
-	public static HashMap convertMessagePackToMap(byte[] byteArray)
-			throws IOException {
+	public static HashMap convertMessagePackToMap(byte[] byteArray) throws IOException {
 		HashMap<String, Object> messageMap = new HashMap<String, Object>();
 		MessagePack msgpack = new MessagePack();
 		BufferUnpacker au = msgpack.createBufferUnpacker().wrap(byteArray);
 		Map<Value, Value> metaMap = au.readValue().asMapValue();
-		for (Map.Entry<Value, Value> e : ((Map<Value, Value>) metaMap)
-				.entrySet()) {
+		for (Map.Entry<Value, Value> e : ((Map<Value, Value>) metaMap).entrySet()) {
 			ValueType valueType = e.getValue().getType();
 			String key = e.getKey().toString().replace("\"", "");
 			switch (valueType) {
@@ -251,8 +234,7 @@ public class CloudletConnector extends Thread {
 				messageMap.put(key, e.getValue().asBooleanValue().getBoolean());
 				break;
 			case INTEGER:
-				messageMap.put(key, e.getValue().asIntegerValue()
-						.getBigInteger());
+				messageMap.put(key, e.getValue().asIntegerValue().getBigInteger());
 				break;
 			case FLOAT:
 				messageMap.put(key, e.getValue().asFloatValue().getDouble());
@@ -264,8 +246,7 @@ public class CloudletConnector extends Thread {
 				messageMap.put(key, e.getValue().asMapValue());
 				break;
 			case RAW:
-				String rawValue = e.getValue().asRawValue().toString()
-						.replace("\"", "");
+				String rawValue = e.getValue().asRawValue().toString().replace("\"", "");
 				messageMap.put(key, rawValue);
 				break;
 			case NIL:
@@ -296,13 +277,10 @@ public class CloudletConnector extends Thread {
 
 	private void handleOverlayRequest(HashMap messageMap) {
 		// add requested overlay to queue
-		String ovelraySegmentURI = (String) messageMap
-				.get(NetworkMsg.KEY_REQUEST_SEGMENT);
+		String ovelraySegmentURI = (String) messageMap.get(NetworkMsg.KEY_REQUEST_SEGMENT);
 		try {
-			File overlayFile = overlayVM.getOverlayFile(ovelraySegmentURI
-					.toString());
-			NetworkMsg networkMsg = NetworkMsg.MSG_send_overlayfile(
-					overlayFile, this.sessionID);
+			File overlayFile = overlayVM.getOverlayFile(ovelraySegmentURI.toString());
+			NetworkMsg networkMsg = NetworkMsg.MSG_send_overlayfile(overlayFile, this.sessionID);
 			sender.requestCommand(networkMsg);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -315,7 +293,7 @@ public class CloudletConnector extends Thread {
 		msg.obj = messageString;
 		synthesisCallbackHandler.sendMessage(msg);
 	}
-	
+
 	public void updateStatus(int percent) {
 		Message msg = Message.obtain();
 		msg.what = CloudletConnector.SYNTHESIS_PROGRESS_PERCENT;

@@ -86,6 +86,20 @@ public class NetworkMsg {
 		return null;
 	}
 
+	public static NetworkMsg MSG_send_disassociateMessage(BigInteger sessionID) {
+		HashMap<String, Object> overlay_header = new HashMap<String, Object>();
+		overlay_header.put(KEY_COMMAND, MESSAGE_COMMAND_SESSION_CLOSE);
+		overlay_header.put(KEY_SESSION_ID, sessionID);
+
+		NetworkMsg msg;
+		try {
+			msg = new NetworkMsg(overlay_header);
+			return msg;
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
 	
 	public static NetworkMsg MSG_send_overlaymeta(VMInfo overlay, BigInteger sessionID) {
 		HashMap<String, Object> overlay_header = new HashMap<String, Object>();
