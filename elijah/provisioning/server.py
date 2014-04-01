@@ -610,7 +610,6 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
                     mem_access_list, disk_access_list)
         LOG.info("[SOCKET] waiting for client exit message")
 
-
     def _handle_finish(self, message):
         global session_resources
 
@@ -625,6 +624,7 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
             msg = "Deallocating resources for the Session (%s)" % session_id
             LOG.info(msg)
             session_resource.deallocate()
+            del session_resources[session_id]
 
         LOG.info("  - %s" % str(pformat(message)))
         self.ret_success(Protocol.MESSAGE_COMMAND_FINISH)
@@ -823,6 +823,22 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
         if ret_session:
             ret_session.terminate()
         self.server.dbconn.session.commit()
+
+        # deallocate all resource in the session
+        session_resource = session_resources.get(my_session_id)
+        if session_resource is None:
+            # No saved resource for the session
+            msg = "No resource to be deallocated found at Session (%s)" % my_session_id
+            LOG.warning(msg)
+        else:
+            # deallocate all the session resource
+            msg = "Deallocating resources for the Session (%s)" % my_session_id
+            LOG.info(msg)
+            session_resource.deallocate()
+            del session_resources[my_session_id]
+
+        LOG.info("  - %s" % str(pformat(message)))
+        self.ret_success(Protocol.MESSAGE_COMMAND_FINISH)
 
         # send response
         self.ret_success(Protocol.MESSAGE_COMMAND_SESSION_CLOSE)
