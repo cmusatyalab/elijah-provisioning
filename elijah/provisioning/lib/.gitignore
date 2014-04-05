@@ -1,3 +1,2 @@
-qemu-kvm/
-qemu-kvm-1.1.1/
+bin/x86_64/qemu-system-x86_64
 
