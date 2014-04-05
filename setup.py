@@ -41,13 +41,13 @@ def download_dependency(download_dir):
     if user_input.lower() == "n":
         sys.exit(1)
 
-    filename = os.path.basename(URL_MODIFIED_QEMU)
+    filename = os.path.basename(Const.QEMU_BIN_PATH)
     download_path = os.path.join(download_dir, filename)
 
     # download binary for modified QEMU
     urllib.urlretrieve(URL_MODIFIED_QEMU, download_path)
 
-    username = os.getenv("SUDO_USER")
+    username = os.getenv("SUDO_USER") or os.getenv("USER")
     userinfo = getpwnam(username)
     os.chmod(download_path, 0775)
     os.chown(download_path, userinfo.pw_uid, userinfo.pw_gid)

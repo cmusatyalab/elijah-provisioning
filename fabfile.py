@@ -13,9 +13,6 @@ import os
 import sys
 
 
-# Constant
-CUSTOM_KVM = os.path.abspath("./src/cloudlet/lib/bin/x86_64/cloudlet_qemu-system-x86_64") 
-
 def check_support():
     if run("egrep '^flags.*(vmx|svm)' /proc/cpuinfo > /dev/null").failed:
         abort("Need hardware VM support (vmx)")
@@ -30,15 +27,6 @@ def disable_EPT():
         sudo('modprobe kvm_intel "ept=0"')
 
 
-def install_kvm():
-    global CUSTOM_KVM
-
-    dest_path = "/usr/bin/qemu-system-x86_64"
-    if CUSTOM_KVM != dest_path:
-        sudo("cp %s %s.old" % (dest_path, dest_path))
-        sudo("cp %s %s" % (CUSTOM_KVM, dest_path))
-
-
 @task
 def localhost():
     env.run = local
@@ -48,7 +36,6 @@ def localhost():
 
 @task
 def install():
-    global CUSTOM_KVM
     check_support()
 
     # install dependent package
@@ -85,9 +72,6 @@ def install():
         abort("Failed to change permission of fuse configuration")
     if sudo("sed -i 's/#user_allow_other/user_allow_other/g' /etc/fuse.conf"):
         abort("Failed to allow other user to access FUSE file")
-
-    # install custom KVM
-    install_kvm()
 
     # (Optional) disable EPT support
     # When you use EPT support with FUSE+mmap, it randomly causes kernel panic.
