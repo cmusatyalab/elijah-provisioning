@@ -21,10 +21,36 @@
 import os
 import sys
 sys.path.insert(0, "./elijah/")
+
+import urllib
+from pwd import getpwnam
 from provisioning.Configuration import Const
 
 #from setuptools import setup, find_packages
 from distutils.core import setup
+
+
+def download_dependency(download_dir):
+    URL_MODIFIED_QEMU = "https://github.com/cmusatyalab/elijah-qemu/releases/download/cloudlet-v0.8.6/qemu-system-x86_64"
+
+    msg = "  " + "-"*70+ "\n"
+    msg += "  Download modified QEMU from https://github.com/cmusatyalab/elijah-qemu/\n"
+    msg += "  It enables on-demand VM fetching. Unlike the codes in elijah-provisioning,\n"
+    msg += "  Modified QEMU is distributed under GPL license. Agree (Y/n) ? "
+    user_input = raw_input(msg).strip()
+    if user_input.lower() == "n":
+        sys.exit(1)
+
+    filename = os.path.basename(URL_MODIFIED_QEMU)
+    download_path = os.path.join(download_dir, filename)
+
+    # download binary for modified QEMU
+    urllib.urlretrieve(URL_MODIFIED_QEMU, download_path)
+
+    username = os.getenv("SUDO_USER")
+    userinfo = getpwnam(username)
+    os.chmod(download_path, 0775)
+    os.chown(download_path, userinfo.pw_uid, userinfo.pw_gid)
 
 # get all data file under ./src/cloudlet/lib
 def get_all_files(package_dir, target_path, exclude_names=list()):
@@ -41,6 +67,8 @@ def get_all_files(package_dir, target_path, exclude_names=list()):
     os.chdir(cur_dir)
     return data_files
 
+
+download_dependency('elijah/provisioning/lib/bin/x86_64')
 script_files = get_all_files(".", "bin")
 executable_files = get_all_files('.', 'elijah/provisioning/lib')
 conf_files = get_all_files('.', 'elijah/provisioning/config', 
