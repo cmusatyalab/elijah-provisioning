@@ -15,17 +15,17 @@ Copyright (C) 2011-2014 Carnegie Mellon University
 License
 ----------
 
-All source code and documentation except binary files listed below are licensed
-under the [Apache License, Version
-2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
+All source code and documentation except modified-QEMU listed below are
+under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
-- Binary files under GPL v2
-  1.  Modified [QEMU/KVM](http://www.linux-kvm.org/page/Main_Page) at $HOME/elijah/provisioning/lib/bin/x86_64/cloudlet\_qemu-system-x86_64.
-      - To start VM before having entire memory snapshot, we have modified QEMU-KVM
-      - [Download source code](https://github.com/cmusatyalab/elijah-provisioning/releases/download/v0.8.6/qemu-1.1.1.tar.gz)
-  2. Modified [vmnetfs](https://github.com/cmusatyalab/vmnetx) at $HOME/elijah/provisioning/lib/bin/x86_64/cloudlet\_vmnetfs
-      - To enable on-demand fetches of VM disk/memory using, we have modified vmnetfs.
-      - [Download source code](https://github.com/cmusatyalab/elijah-provisioning/releases/download/v0.8.6/vmnetx-0.2.tar.gz)
+- To enable on-demand fetching of the virtual machine, we use modified-QEMU,
+which is distributed under GPLv2.  
+- The binary of this modified-QEMU will be automatically downloaded at 
+installation script upon your agreement.
+  * [Repository for modified-QEMU](https://github.com/cmusatyalab/elijah-qemu)
+  * [Download link for the binary](http://github.com/cmusatyalab/elijah-qemu/releases/download/cloudlet-v0.8.6/qemu-system-x86_64)
+
+A copy of this license is reproduced in the [LICENSE](LICENSE) file.
 
 
 
