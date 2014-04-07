@@ -1,4 +1,4 @@
-msgpack-python==0.3.0
+msgpack-python==0.1.13
 pyliblzma==0.5.3
 psutil==0.6.1
 SQLAlchemy==0.8.2
