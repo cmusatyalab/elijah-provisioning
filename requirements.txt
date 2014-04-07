@@ -1,0 +1,7 @@
+msgpack-python==0.3.0
+pyliblzma==0.5.3
+psutil==0.6.1
+SQLAlchemy==0.8.2
+python-dateutil==1.5
+requests==1.1.0
+lxml==2.3.5

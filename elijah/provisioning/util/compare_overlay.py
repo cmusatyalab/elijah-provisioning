@@ -23,7 +23,10 @@ import sys
 from optparse import OptionParser
 sys.path.insert(0, "../src/")
 
-from cloudlet import msgpack
+try:
+    from elijah.provisioning import msgpack
+except ImportError as e:
+    import msgpack
 from cloudlet import synthesis
 from cloudlet.Configuration import Const as Const
 from cloudlet import delta

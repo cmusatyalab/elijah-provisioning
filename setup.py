@@ -91,7 +91,6 @@ setup(
             'elijah.provisioning',
             'elijah.provisioning.db',
             'elijah.provisioning.caching',
-            'elijah.provisioning.msgpack',
             ],
         data_files=[
             (Const.CONFIGURATION_DIR, conf_files),

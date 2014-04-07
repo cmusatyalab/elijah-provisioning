@@ -33,7 +33,10 @@ from multiprocessing import JoinableQueue, Queue, Manager
 from cloudlet import synthesis as synthesis
 from cloudlet import server as synthesis_server
 from cloudlet.Configuration import Const
-from cloudlet import msgpack
+try:
+    from elijah.provisioning import msgpack
+except ImportError as e:
+    import msgpack
 
 CHUNK_SIZE = 1024*16
 
