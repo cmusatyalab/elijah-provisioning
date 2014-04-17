@@ -35,7 +35,6 @@ from package import VMOverlayPackage
 from db.api import DBConnector
 from db.table_def import BaseVM, Session, OverlayVM
 from synthesis_protocol import Protocol as Protocol
-from upnp_server import UPnPServer, UPnPError
 from Configuration import Const as Cloudlet_Const
 from Configuration import Synthesis_Const as Synthesis_Const
 import msgpack
@@ -1003,7 +1002,8 @@ class SynthesisServer(SocketServer.TCPServer):
                 % str(self.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY)))
         LOG.info("-"*50)
 
-        # Start UPnP Server
+        # This is cloudlet discovery related part and separated out
+        '''
         try:
             self.upnp_server = UPnPServer()
             self.upnp_server.start()
@@ -1013,8 +1013,6 @@ class SynthesisServer(SocketServer.TCPServer):
             self.upnp_server = None
         LOG.info("[INFO] Start UPnP Server")
 
-        # This is cloudlet discovery related part and separated out
-        '''
         if settings.register_server:
             try:
                 self.register_client = RegisterThread(
@@ -1064,10 +1062,6 @@ class SynthesisServer(SocketServer.TCPServer):
         # close all thread
         if self.socket != -1:
             self.socket.close()
-        if hasattr(self, 'upnp_server') and self.upnp_server != None:
-            LOG.info("[TERMINATE] Terminate UPnP Server")
-            self.upnp_server.terminate()
-            self.upnp_server.join()
         if hasattr(self, 'register_client') and self.register_client != None:
             LOG.info("[TERMINATE] Deregister from directory service")
             self.register_client.terminate()
