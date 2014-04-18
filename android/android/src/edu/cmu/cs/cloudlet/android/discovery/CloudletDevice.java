@@ -19,6 +19,11 @@ public class CloudletDevice {
 		this.ipAddress = address.getHost();
 		this.isUPnP = true;
 	}
+
+	public CloudletDevice(String address, int port) {
+		this.ipAddress = address;
+		this.isUPnP = true;
+	}
 	
 	public CloudletDevice(JSONObject device){
 		this.isUPnP = false;

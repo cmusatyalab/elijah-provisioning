@@ -37,7 +37,7 @@ def getLogger(name='unknown'):
             os.makedirs(os.path.dirname(log_filepath))
             os.chmod(os.path.dirname(log_filepath), 0o777)
             open(log_filepath, "w+").close()
-        os.chmod(log_filepath, 0o666)
+        os.chmod(log_filepath, 0o777)
         logging.basicConfig(level=logging.DEBUG,
                 format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                 datefmt='%m-%d %H:%M',

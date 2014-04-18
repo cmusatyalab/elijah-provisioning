@@ -21,7 +21,7 @@ public class CloudletDiscovery {
 	private int lastSelectedIndex = -1;
 	
 	private CloudletDirectoryClient globalDiscovery;
-	private UPnPDiscovery localDiscovery;
+	private AvahiDiscovery localDiscovery;
 	
 	private Activity activity;
 	private Context context;
@@ -35,9 +35,8 @@ public class CloudletDiscovery {
 		this.listAdapter = new ArrayAdapter<CloudletDevice>(this.context, R.layout.dialog_list_item);
 		
 		// upnp service binding and show dialog
-		this.localDiscovery = new UPnPDiscovery(this.activity, this.listAdapter);
-		this.activity.getApplicationContext().bindService(new Intent(this.activity, AndroidUpnpServiceImpl.class),
-				this.localDiscovery.serviceConnection, Context.BIND_AUTO_CREATE);		
+		this.localDiscovery = new AvahiDiscovery(this.activity, this.listAdapter);
+		this.localDiscovery.start();
 		this.showDialogSelectOption();
 
 		// Cloudlet discovery client
@@ -82,7 +81,6 @@ public class CloudletDiscovery {
 	}
 	
 	public void close(){
-		this.activity.getApplicationContext().unbindService(this.localDiscovery.serviceConnection);
 		if (this.localDiscovery != null)
 			this.localDiscovery.close();
 		
