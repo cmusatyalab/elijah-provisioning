@@ -4,29 +4,21 @@ import java.net.URL;
 
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.teleal.cling.model.meta.Device;
-import org.teleal.cling.model.meta.RemoteDevice;
 
 import edu.cmu.cs.cloudlet.android.util.KLog;
 
 public class CloudletDevice {
 
 	private String ipAddress;
-	private boolean isUPnP;
-
-	public CloudletDevice(Device device) {
-		URL address = ((RemoteDevice) device).getIdentity().getDescriptorURL();
-		this.ipAddress = address.getHost();
-		this.isUPnP = true;
-	}
+	private boolean isLocalDiscovery;
 
 	public CloudletDevice(String address, int port) {
 		this.ipAddress = address;
-		this.isUPnP = true;
+		this.isLocalDiscovery = true;
 	}
 	
 	public CloudletDevice(JSONObject device){
-		this.isUPnP = false;
+		this.isLocalDiscovery = false;
 
 		try {
 			this.ipAddress = device.getString("ip_address");

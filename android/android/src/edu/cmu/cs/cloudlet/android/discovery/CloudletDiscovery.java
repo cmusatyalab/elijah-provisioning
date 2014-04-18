@@ -1,7 +1,5 @@
 package edu.cmu.cs.cloudlet.android.discovery;
 
-import org.teleal.cling.android.AndroidUpnpServiceImpl;
-
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;

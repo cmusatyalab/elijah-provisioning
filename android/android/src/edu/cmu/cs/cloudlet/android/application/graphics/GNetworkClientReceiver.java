@@ -13,7 +13,6 @@ import java.util.TreeMap;
 
 import org.apache.http.util.ByteArrayBuffer;
 import org.json.JSONException;
-import org.teleal.common.util.ByteArray;
 
 import android.os.Bundle;
 import android.os.Handler;
