@@ -33,11 +33,11 @@ public class CloudletDevice {
 	public boolean equals(Object o) {
 		if (this == o)
 			return true;
-		if (o == null || getClass() != o.getClass())
+		if (o == null || (o instanceof CloudletDevice) == false)
 			return false;
 		
 		CloudletDevice that = (CloudletDevice) o;
-		if (this.ipAddress == that.ipAddress)
+		if (this.ipAddress.equals(that.ipAddress) == true)
 			return true;
 		else
 			return false;
