@@ -89,8 +89,7 @@ class Const(object):
     MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
     QEMU_BIN_PATH           = which("cloudlet_qemu-system-x86_64")
     FREE_MEMORY_BIN_PATH    = which("cloudlet_free_page_scan")
-    VMNETFS_PATH            = "/home/krha/vmnetx/vmnetfs/vmnetfs"
-    #VMNETFS_PATH            = which("cloudlet_vmnetfs")
+    VMNETFS_PATH            = which("cloudlet_vmnetfs")
     XRAY_BIN_PATH           = which("cloudlet_disk_analyzer")
     UPnP_SERVER             = which("upnp_server.jar")
 

@@ -27,7 +27,6 @@ import Disk
 import vmnetfs
 import vmnetx
 import delta
-import xray
 import hashlib
 import libvirt
 import shutil
@@ -751,6 +750,7 @@ def _get_monitoring_info(conn, machine, options,
     # 1-5. get used sector information from x-ray
     used_blocks_dict = None
     if options.XRAY_SUPPORT:
+        import xray
         used_blocks_dict = xray.get_used_blocks(modified_disk)
 
     m_chunk_dict = fuse_stream_monitor.modified_chunk_dict
@@ -1932,41 +1932,6 @@ def main(argv):
         LOG.info("overlay metafile : %s" % vm_overlay.overlay_metafile)
         LOG.info("overlay : %s" % str(vm_overlay.overlay_files[0]))
         LOG.info("overlay creation time: %f" % (time()-start_time()))
-
-    elif mode == 'dedup_source':
-        if len(args) != 4:
-            parser.error("analyzing deduplication source need 3 arguments\n \
-                    1)meta file\n \
-                    2)raw disk\n \
-                    3)output logfile\n")
-            sys.exit(1)
-        meta = args[1]
-        raw_disk = args[2]
-        output_path = args[3]
-        output_log = open(output_path, "w")
-
-        overlay_path = NamedTemporaryFile(prefix="cloudlet-qemu-log-")
-        meta_info = decomp_overlay(meta, overlay_path.name)
-        delta_list = DeltaList.fromfile(overlay_path.name)
-
-        memory_delta_list = list()
-        disk_delta_list = list()
-        for delta_item in delta_list:
-            if delta_item.ref_id == DeltaItem.REF_BASE_DISK:
-                if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
-                    memory_delta_list.append(long(delta_item.data))
-                elif delta_item.delta_type == DeltaItem.DELTA_DISK:
-                    disk_delta_list.append(long(delta_item.data))
-
-        from pprint import pprint
-        sectors_overlay_disk = [item/512 for item in disk_delta_list]
-        sectors_overlay_memory = [item/512 for item in memory_delta_list]
-        sec_file_overlay_disk = xray.get_files_from_sectors(raw_disk, sectors_overlay_disk)
-        sec_file_overlay_memory = xray.get_files_from_sectors(raw_disk, sectors_overlay_memory)
-        pprint("deduped file at overlay memory", output_log)
-        pprint(sec_file_overlay_memory.keys(), output_log)
-        pprint("deduped file at overlay disk", output_log)
-        pprint(sec_file_overlay_disk.keys(), output_log)
 
     elif mode == 'compress':
         if len(args) != 3:
