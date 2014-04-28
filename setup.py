@@ -96,11 +96,10 @@ setup(
             (Const.CONFIGURATION_DIR, conf_files),
             ],
         requires=[
-            'bson(>=0.3.3)',
             'pyliblzma(>=0.5.3)', 
-            'psutil(>=0.7.1)', 
-            'sqlalchemy(==0.7.2)', # due to openstack. OpenStack Grizzly is not 
-                                 # compatible with latest version of sqlalchemy
+            # due to openstack. OpenStack Grizzly is not 
+            # compatible with latest version of sqlalchemy 
+            'sqlalchemy(==0.7.2)',
             ],
         #classifier=[
         #    'Development Status :: 3 - Alpha',

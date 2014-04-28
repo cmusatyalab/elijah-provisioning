@@ -69,7 +69,6 @@ You will need:
 * python-xdelta3
 * python-dev (for message pack)
 * liblzma-dev (for pyliblzma)
-* Java JRE (for UPnP server)
 * apparmor-utils (for disable apparmor for libvirt)
 * libc6-i386 (for extracting free memory of 32 bit vm)
 * libxml2-dev libxslt1-dev (for overlay packaging)
@@ -92,8 +91,8 @@ To install, you either
 * install manually
 	- install required package  
 
-			> $ sudo apt-get install qemu-kvm libvirt-bin gvncviewer python-libvirt python-xdelta3 python-dev openjdk-6-jre liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev
-			> $ sudo pip install bson pyliblzma psutil sqlalchemy python-dateutil requests lxml
+			> $ sudo apt-get install qemu-kvm libvirt-bin gvncviewer python-libvirt python-xdelta3 python-dev liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev
+			> $ sudo pip install -r requirements.txt
 
 	- Disable security module. This is for allowing custom KVM. Example at Ubuntu 12  
 

@@ -36,19 +36,19 @@ def localhost():
 
 @task
 def install():
-    check_support()
+    #check_support()
 
     # install dependent package
     with hide('stdout'):
         sudo("apt-get update")
     if sudo("apt-get install -y qemu-kvm libvirt-bin gvncviewer " +
-            "python-libvirt python-xdelta3 python-dev openjdk-6-jre  " +
+            "python-libvirt python-xdelta3 python-dev " +
             "liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev " +
             "libxslt1-dev").failed:
         abort("Failed to install libraries")
-    if sudo("pip install msgpack-python==0.1.13 pyliblzma==0.5.3 " + 
-            "psutil==0.6.1 SQLAlchemy==0.8.2 python-dateutil==1.5 " +
-            "requests==1.1.0 lxml==2.3.5").failed:
+    if sudo("pip install msgpack-python==0.1.13 pyliblzma>=0.5.3 " + 
+            "SQLAlchemy==0.8.2 python-dateutil>=1.5 " +
+            "requests>=1.1.0 lxml>=2.3.5").failed:
         # Use old-version of msgpack library due to OpenStack compatibility
         # See at https://bugs.launchpad.net/devstack/+bug/1134575
         abort("Failed to install python libraries")
