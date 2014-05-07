@@ -980,24 +980,20 @@ def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
     memory_overlay_map = str(memory_overlay_map) if memory_overlay_map else ""
 
     # launch fuse
-    execute_args = ['', '', \
+    execute_args = [
             # disk parameter
-            '%s' % vmnetfs.VMNetFS.FUSE_TYPE_DISK,
             "%s" % os.path.abspath(original_disk),  # base path
             "%s" % resumed_disk,                    # overlay path
             "%s" % disk_overlay_map,                # overlay map
-            '%d' % fuse_disk_size,                       # size of base
-            '0',                                    # segment size
+            '%d' % fuse_disk_size,                  # size of base
             "%d" % chunk_size]
     if original_memory:
         for parameter in [
                 # memory parameter
-                '%s' % vmnetfs.VMNetFS.FUSE_TYPE_MEMORY,
                 "%s" % os.path.abspath(original_memory),
                 "%s" % resumed_memory,
                 "%s" % memory_overlay_map,
                 '%d' % fuse_memory_size,
-                '0',\
                 "%d" % chunk_size
                 ]:
             execute_args.append(parameter)
