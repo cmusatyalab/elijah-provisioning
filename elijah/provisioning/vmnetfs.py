@@ -122,7 +122,6 @@ class VMNetFS(threading.Thread):
     def launch(self):
         read, write = os.pipe()
         try:
-            import pdb;pdb.set_trace()
             self.proc = subprocess.Popen([self.vmnetfs_path], stdin=read,
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                     close_fds=True)
