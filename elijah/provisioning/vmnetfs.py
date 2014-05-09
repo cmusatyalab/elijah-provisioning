@@ -128,7 +128,7 @@ class VMNetFS(threading.Thread):
             self._pipe = os.fdopen(write, 'w')
             self._pipe.write(self._args)
             self._pipe.flush()
-            out = self.proc.stdout.readline()
+            out = self.proc.stdout.readline() 
             self.mountpoint = out.strip()
         except:
             if self._pipe is not None:
@@ -153,6 +153,7 @@ class VMNetFS(threading.Thread):
             LOG.info("Fuse close pipe")
             # invalid formated string will shutdown fuse
             self.fuse_write("terminate")
+            self.proc.wait()
             self._pipe.close()
             self._pipe = None
 
@@ -199,9 +200,8 @@ class StreamMonitor(threading.Thread):
             for fileno, event in events:
                 self._handle(fileno, event)
         
-        for fileno in self.stream_dict.keys():
-            self.epoll.unregister(fileno)
-            os.close(fileno)
+        for fileno, item in self.stream_dict.items():
+            self.del_path(item['name'])
         self._running = False
         LOG.info("close Stream monitoring thread")
 

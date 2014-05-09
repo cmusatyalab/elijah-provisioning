@@ -238,19 +238,15 @@ class VM_Overlay(threading.Thread):
         self.terminate()
 
     def terminate(self):
-        if hasattr(self, 'fuse'):
-            self.fuse.terminate()
         if hasattr(self, 'fuse_stream_monitor'):
             self.fuse_stream_monitor.terminate()
+            self.fuse_stream_monitor.join()
+        if hasattr(self, 'fuse'):
+            self.fuse.terminate()
+            self.fuse.join()
         if hasattr(self, 'qemu_monitor'):
             self.qemu_monitor.terminate()
-        if hasattr(self, 'fuse_stream_monitor'):
-            self.fuse_stream_monitor.join()
-        if hasattr(self, 'qemu_monitor'):
             self.qemu_monitor.join()
-        if hasattr(self, 'fuse'):
-            self.fuse.join()
-
         if hasattr(self, "cache_manager") and self.cache_manager != None:
             self.cache_manager.terminate()
             self.cache_manager.join()
@@ -419,10 +415,10 @@ class SynthesizedVM(threading.Thread):
             pass
 
         # terminate
-        self.fuse.terminate()
         self.monitor.terminate()
-        self.qemu_monitor.terminate()
         self.monitor.join()
+        self.fuse.terminate()
+        self.qemu_monitor.terminate()
         self.qemu_monitor.join()
 
         # delete all temporary file

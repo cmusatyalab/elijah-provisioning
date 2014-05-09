@@ -621,7 +621,8 @@ class BaseVMPackage(object):
         cmd = ['zip', '-j', '-9']
         cmd += ["%s" % outfile]
         cmd += [base_disk, base_memory, disk_hash, memory_hash]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, \
+                stderr=subprocess.PIPE, close_fds=True)
         LOG.info("Start compressing")
         LOG.info("%s" % ' '.join(cmd))
         for line in iter(proc.stdout.readline, ''):
