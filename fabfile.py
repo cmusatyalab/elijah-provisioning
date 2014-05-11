@@ -19,6 +19,9 @@ def check_support():
 
 
 def disable_EPT():
+    # (Optional) disable EPT support
+    # When you use EPT support with FUSE+mmap, it randomly causes kernel panic.
+    # We're investigating it whether it's Linux kernel bug or not.
     if run("egrep '^flags.*(ept)' /proc/cpuinfo > /dev/null").failed:
         return
     else:
@@ -37,21 +40,20 @@ def localhost():
 @task
 def install():
     #check_support()
+    current_dir = os.path.abspath(os.curdir)
 
-    # install dependent package
-    with hide('stdout'):
-        sudo("apt-get update")
+    # install dependent packages
+    sudo("apt-get update")
     if sudo("apt-get install -y qemu-kvm libvirt-bin gvncviewer " +
-            "python-libvirt python-xdelta3 python-dev " +
-            "liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev " +
+            "python-dev python-libvirt python-xdelta3 python-lzma " +
+            "apparmor-utils libc6-i386 python-pip libxml2-dev " +
             "libxslt1-dev").failed:
         abort("Failed to install libraries")
-    if sudo("pip install msgpack-python==0.1.13 pyliblzma>=0.5.3 " + 
-            "SQLAlchemy==0.8.2 python-dateutil>=1.5 " +
-            "requests>=1.1.0 lxml>=2.3.5").failed:
-        # Use old-version of msgpack library due to OpenStack compatibility
-        # See at https://bugs.launchpad.net/devstack/+bug/1134575
-        abort("Failed to install python libraries")
+    with cd(current_dir):
+        if sudo("pip install -r requirements.txt").failed:
+            # Use old-version of msgpack library due to OpenStack compatibility
+            # See at https://bugs.launchpad.net/devstack/+bug/1134575
+            abort("Failed to install python libraries")
 
     # disable libvirtd from appArmor to enable custom KVM
     if sudo("aa-complain /usr/sbin/libvirtd").failed:
@@ -83,7 +85,6 @@ def install():
     disable_EPT()
 
     # install cloudlet package
-    current_dir = os.path.abspath(os.curdir)
     with cd(current_dir):
         if sudo("python setup.py install").failed:
             abort("cannot install cloudlet library")

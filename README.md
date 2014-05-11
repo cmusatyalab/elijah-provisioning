@@ -67,53 +67,50 @@ You will need:
 * gvncviewer
 * python-libvirt
 * python-xdelta3
-* python-dev (for message pack)
+* python-dev (to pip install msgpack)
 * liblzma-dev (for pyliblzma)
 * apparmor-utils (for disable apparmor for libvirt)
 * libc6-i386 (for extracting free memory of 32 bit vm)
 * libxml2-dev libxslt1-dev (for overlay packaging)
-* python library
-    - bson
-	- pyliblzma
-	- psutil
-	- SQLAlchemy
-	- fabric
-	- dateutil
+* python libraries at requirements.txt
 
 
 To install, you either 
 
 * run a installation script
-
-		> $ sudo apt-get install fabric openssh-server  
-		> $ fab localhost install
+  
+  > $ sudo apt-get install fabric openssh-server  
+  > $ fab localhost install
 
 * install manually
-	- install required package  
+  - install required package  
 
-			> $ sudo apt-get install qemu-kvm libvirt-bin gvncviewer python-libvirt python-xdelta3 python-dev liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev
-			> $ sudo pip install -r requirements.txt
+      > $ sudo apt-get install qemu-kvm libvirt-bin gvncviewer python-libvirt python-xdelta3 python-lzma python-dev liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev
+      > $ sudo pip install -r requirements.txt
 
-	- Disable security module. This is for allowing custom KVM. Example at Ubuntu 12  
+  - Disable security module. This is for allowing custom KVM. Example at Ubuntu 12  
+    
+      > $ sudo aa-complain /usr/sbin/libvirtd  
 
-			> $ sudo aa-complain /usr/sbin/libvirtd  
+  - Add current user to kvm, libvirtd group.  
 
-	- Add current user to kvm, libvirtd group.  
+      > $ sudo adduser [your_account_name] kvm  
+      > $ sudo adduser [your_account_name] libvirtd  
 
-			> $ sudo adduser [your_account_name] kvm  
-			> $ sudo adduser [your_account_name] libvirtd  
+  - Make sure the current user to have fuse permission. The qemu-kvm library
+  changes fuse access permission while it's being installed, and the permission
+  is recovered if you reboot the host.  This is a known bug in qemu-kvm
+  installation script
+  (https://bugs.launchpad.net/ubuntu/+source/udev/+bug/1152718), so you can
+  either reboot the machine to have valid fuse permission of just revert the
+  permission manually as bellow.
 
-	- Change permission of the fuse access (The qemu-kvm library changes fuse access permission while it's being installed, and the permission is
-		recovered if you reboot the host.  We believe this is a bug in qemu-kvm
-		installation script, so you can either reboot the machine to have valid
-		permission of just revert the permission manually as bellow).
-
-			> $ sudo chmod 644 /etc/fuse.conf  
-			> $ sod sed -i 's/#user_allow_other/user_allow_other/g' /etc/fuse.conf  
+      > $ sudo chmod 644 /etc/fuse.conf  
+      > $ sod sed -i 's/#user_allow_other/user_allow_other/g' /etc/fuse.conf  
 	
   - Finally, install cloudlet package using python setup tool
 
-			> $ sudo python setup.py install
+      > $ sudo python setup.py install
 
 
 
@@ -159,7 +156,8 @@ How to use
   > \------------------------------------------------------------------------------------------  
   > 406ed6<code>&nbsp;&nbsp;&nbsp;&nbsp;</code>/home/krha/.cloudlet/406ed6/precise.raw  
   > \------------------------------------------------------------------------------------------
-	
+
+
 2. Perform __VM synthesis__ using a sample ``VM overlay``.
 
   First, launch the VM synthesis server at Cloudlet.
@@ -252,6 +250,7 @@ How to use
 
 Sample application: Fluid Simulation
 ---------------------------
+* __Backend-server is temporarily unavailable__
 * Fluid Simulation is an interactive fluid dynamics simulation, that renders a liquid sloshing in a container on the screen of a phone based on accelerometer inputs.  The application back-end runs on Linux and performs a [smoothed particle hydrodynamics](http://dl.acm.org/citation.cfm?id=1531346) physics simulation using 2218 particles, generating up to 50 frames per second.  The structure of this application is representative of real-time (i.e., not turn-based) games.
 * [Doyub Kim](http://www.doyub.com/) is a primary contributor of this application.
 * Video demo
@@ -259,13 +258,14 @@ Sample application: Fluid Simulation
   - <a href=https://www.youtube.com/watch?v=hWc2fpejfiw target="_blank">Using Amazon EC2 West</a>
   - <a href=https://www.youtube.com/watch?v=aSjQnfkUoU8 target="_blank">Using Amazon EC2 Asia</a>
 
-* Code
-  - Binary back-end server: $ HOME/test/app-server/fluid-bin32/
+* ~~Code~~
+  - ~~Binary back-end server: $ HOME/test/app-server/fluid-bin32/~~
   - Android client source code: $HOME/android/android_fluid/
   - Python client source code: $HOME/test/app-client/scripts/graphics_client.py
     > $ ./graphics_client.py -s localhost -p 9093 -i acc_input_50sec 
 
-  - VM overlay for the back-end server: <a href=https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip target="_blank">https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip</a>
+  - ~~VM overlay for the back-end server: <a href=https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip target="_blank">https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip</a>~~
+
 
 
 Details Usage
@@ -287,7 +287,7 @@ base VM (typically you close it after booting up).  Then, it will generate
 snapshot of the current states for both memory and disk and save that
 information to DB. You can check list of ``base VM`` by
 
-    	> $ cloudlet list-base
+  > $ cloudlet list-base
 	
 
 ### How to create VM overlay
