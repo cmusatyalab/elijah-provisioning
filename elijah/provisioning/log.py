@@ -36,8 +36,14 @@ def getLogger(name='unknown'):
         if os.path.exists(os.path.dirname(log_filepath)) == False:
             os.makedirs(os.path.dirname(log_filepath))
             os.chmod(os.path.dirname(log_filepath), 0o777)
+        if os.path.exists(log_filepath) == False:
+            # make this log file can be access by anyone
+            # because it will be shared by nova and primary user
+            import grp
             open(log_filepath, "w+").close()
-        os.chmod(log_filepath, 0o777)
+            gid = grp.getgrnam("nogroup").gr_gid
+            os.chmod(log_filepath, 0o666)
+            os.chown(log_filepath, -1, gid)
         logging.basicConfig(level=logging.DEBUG,
                 format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                 datefmt='%m-%d %H:%M',
