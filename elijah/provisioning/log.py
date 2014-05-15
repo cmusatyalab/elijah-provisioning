@@ -43,7 +43,6 @@ def getLogger(name='unknown'):
             open(log_filepath, "w+").close()
             gid = grp.getgrnam("nogroup").gr_gid
             os.chmod(log_filepath, 0o666)
-            os.chown(log_filepath, -1, gid)
         logging.basicConfig(level=logging.DEBUG,
                 format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                 datefmt='%m-%d %H:%M',
