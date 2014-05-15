@@ -1,18 +1,20 @@
 #
-# vmnetx.package - Handling of .nxpk files
+# cloudlet-overlay.package
 #
-# Copyright (C) 2012-2013 Carnegie Mellon University
+#   author: Kiryong Ha <krha@cmu.edu>
 #
-# This program is free software; you can redistribute it and/or modify it
-# under the terms of version 2 of the GNU General Public License as published
-# by the Free Software Foundation.  A copy of the GNU General Public License
-# should have been distributed along with this program in the file
-# COPYING.
+#   copyright (c) 2011-2013 carnegie mellon university
+#   licensed under the apache license, version 2.0 (the "license");
+#   you may not use this file except in compliance with the license.
+#   you may obtain a copy of the license at
 #
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-# for more details.
+#       http://www.apache.org/licenses/license-2.0
+#
+#   unless required by applicable law or agreed to in writing, software
+#   distributed under the license is distributed on an "as is" basis,
+#   without warranties or conditions of any kind, either express or implied.
+#   see the license for the specific language governing permissions and
+#   limitations under the license.
 #
 
 from cookielib import Cookie
@@ -99,7 +101,7 @@ class _HttpFile(object):
         else:
             # requests < 0.13.3
             self._session.headers['User-Agent'] = \
-                    'vmnetx/%s python-requests/%s' % (
+                    'cloudleti-provisioning/%s python-requests/%s' % (
                     Const.VERSION, requests.__version__)
 
         # Debugging
@@ -334,9 +336,7 @@ class _FileFile(file):
         self.length = self.tell()
         self.seek(0)
 
-        # Set validators.  We could synthesize an ETag from st_dev and
-        # st_ino, but this would confuse vmnetfs since libcurl doesn't do
-        # the same.
+        # Set validators.
         self.etag = None
         self.last_modified = datetime.fromtimestamp(
                 int(os.fstat(self.fileno()).st_mtime), tzutc())
@@ -445,91 +445,6 @@ class VMOverlayPackage(object):
         zip.close()
 
 
-# vmnetx specific package
-# create xml file for demand fetching
-
-#from lxml.builder import ElementMaker
-#from lxml import etree
-#MANIFEST_FILENAME = 'vmnetx-package.xml'
-#DOMAIN_FILENAME = 'domain.xml'
-#DISK_FILENAME = 'disk.img'
-#MEMORY_FILENAME = 'memory.img'
-#
-#NS = 'http://olivearchive.org/xmlns/vmnetx/package'
-#NSP = '{' + NS + '}'
-#
-#SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'schema', 'package.xsd')
-#schema = etree.XMLSchema(etree.parse(SCHEMA_PATH))
-#
-#class Package(object):
-#    # pylint doesn't understand named tuples
-#    # pylint: disable=E1103
-#    def __init__(self, url, scheme=None, username=None, password=None):
-#        self.url = url
-#
-#        # Open URL
-#        parsed = urlsplit(url)
-#        if parsed.scheme == 'http' or parsed.scheme == 'https':
-#            fh = _HttpFile(url, scheme=scheme, username=username,
-#                    password=password)
-#        elif parsed.scheme == 'file':
-#            fh = _FileFile(url)
-#        else:
-#            raise ValueError('%s: URLs not supported' % parsed.scheme)
-#
-#        # Read Zip
-#        try:
-#            zip = zipfile.ZipFile(fh, 'r')
-#
-#            # Parse manifest
-#            if MANIFEST_FILENAME not in zip.namelist():
-#                raise BadPackageError('Package does not contain manifest')
-#            xml = zip.read(MANIFEST_FILENAME)
-#            tree = etree.fromstring(xml, etree.XMLParser(schema=schema))
-#
-#            # Create attributes
-#            self.name = tree.get('name')
-#            self.domain = _packageobject(zip,
-#                    tree.find(nsp + 'domain').get('path'))
-#            self.disk = _PackageObject(zip,
-#                    tree.find(NSP + 'disk').get('path'))
-#            memory = tree.find(NSP + 'memory')
-#            if memory is not None:
-#                self.memory = _PackageObject(zip, memory.get('path'))
-#            else:
-#                self.memory = None
-#        except etree.XMLSyntaxError, e:
-#            raise BadPackageError('Manifest XML does not validate', str(e))
-#        except (zipfile.BadZipfile, _HttpError), e:
-#            raise BadPackageError(str(e))
-#    # pylint: enable=E1103
-#
-#    @classmethod
-#    def create(cls, out, name, domain_xml, disk_path, memory_path=None):
-#        # Generate manifest XML
-#        e = ElementMaker(namespace=NS, nsmap={None: NS})
-#        tree = e.image(
-#            e.domain(path=DOMAIN_FILENAME),
-#            e.disk(path=DISK_FILENAME),
-#            name=name,
-#        )
-#        if memory_path:
-#            tree.append(e.memory(path=MEMORY_FILENAME))
-#        schema.assertValid(tree)
-#        xml = etree.tostring(tree, encoding='UTF-8', pretty_print=True,
-#                xml_declaration=True)
-#
-#        # Write package
-#        zip = zipfile.ZipFile(out, 'w', zipfile.ZIP_STORED, True)
-#        zip.comment = 'VMNetX package'
-#        zip.writestr(MANIFEST_FILENAME, xml)
-#        zip.writestr(DOMAIN_FILENAME, domain_xml)
-#        if memory_path is not None:
-#            zip.write(memory_path, MEMORY_FILENAME)
-#        zip.write(disk_path, DISK_FILENAME)
-#        zip.close()
-#
-
 class BaseVMPackage(object):
     NS = 'http://opencloudlet.org/xmlns/vmsynthesis/package'
     NSP = '{' + NS + '}'
@@ -537,10 +452,6 @@ class BaseVMPackage(object):
     schema = etree.XMLSchema(etree.parse(SCHEMA_PATH))
 
     MANIFEST_FILENAME = 'basevm-package.xml'
-    #DISK_FILENAME = 'disk.img'
-    #MEMORY_FILENAME = 'memory.img'
-    #DISK_HASH_FILENAME = 'disk-hash.img'
-    #MEMORY_HASH_FILENAME = 'memory-hash.img'
 
     # pylint doesn't understand named tuples
     # pylint: disable=E1103

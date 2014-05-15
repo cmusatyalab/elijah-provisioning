@@ -24,8 +24,8 @@ import functools
 import subprocess
 import Memory
 import Disk
-import vmnetfs
-import vmnetx
+import cloudletfs
+import memory_util
 import delta
 import hashlib
 import libvirt
@@ -161,7 +161,7 @@ class VM_Overlay(threading.Thread):
             cache_manager, mount_point = self._start_emulate_cache_fs()
 
         # make FUSE disk & memory
-        self.fuse = run_fuse(Const.VMNETFS_PATH, Const.CHUNK_SIZE,
+        self.fuse = run_fuse(Const.CLOUDLETFS_PATH, Const.CHUNK_SIZE,
                 self.base_disk, os.path.getsize(self.base_disk),
                 self.base_mem, os.path.getsize(self.base_mem))
         self.modified_disk = os.path.join(self.fuse.mountpoint, 'disk', 'image')
@@ -171,12 +171,12 @@ class VM_Overlay(threading.Thread):
         stream_modified = os.path.join(self.fuse.mountpoint, 'disk', 'streams', 'chunks_modified')
         stream_access = os.path.join(self.fuse.mountpoint, 'disk', 'streams', 'chunks_accessed')
         memory_access = os.path.join(self.fuse.mountpoint, 'memory', 'streams', 'chunks_accessed')
-        self.fuse_stream_monitor = vmnetfs.StreamMonitor()
-        self.fuse_stream_monitor.add_path(stream_modified, vmnetfs.StreamMonitor.DISK_MODIFY)
-        self.fuse_stream_monitor.add_path(stream_access, vmnetfs.StreamMonitor.DISK_ACCESS)
-        self.fuse_stream_monitor.add_path(memory_access, vmnetfs.StreamMonitor.MEMORY_ACCESS)
+        self.fuse_stream_monitor = cloudletfs.StreamMonitor()
+        self.fuse_stream_monitor.add_path(stream_modified, cloudletfs.StreamMonitor.DISK_MODIFY)
+        self.fuse_stream_monitor.add_path(stream_access, cloudletfs.StreamMonitor.DISK_ACCESS)
+        self.fuse_stream_monitor.add_path(memory_access, cloudletfs.StreamMonitor.MEMORY_ACCESS)
         self.fuse_stream_monitor.start()
-        self.qemu_monitor = vmnetfs.FileMonitor(self.qemu_logfile, vmnetfs.FileMonitor.QEMU_LOG)
+        self.qemu_monitor = cloudletfs.FileMonitor(self.qemu_logfile, cloudletfs.FileMonitor.QEMU_LOG)
         self.qemu_monitor.start()
 
         # 1. resume & get modified disk
@@ -359,18 +359,20 @@ class SynthesizedVM(threading.Thread):
         open(self.qemu_logfile, "w+").close()
         os.chmod(os.path.dirname(self.qemu_logfile), 0o771)
         os.chmod(self.qemu_logfile, 0o666)
+        LOG.info("Launch disk: %s" % os.path.abspath(launch_disk))
+        LOG.info("Launch memory: %s" % os.path.abspath(launch_mem))
 
         self.resumed_disk = os.path.join(fuse.mountpoint, 'disk', 'image')
         self.resumed_mem = os.path.join(fuse.mountpoint, 'memory', 'image')
         self.stream_modified = os.path.join(fuse.mountpoint, 'disk', 'streams', 'chunks_modified')
         self.stream_disk_access = os.path.join(fuse.mountpoint, 'disk', 'streams', 'chunks_accessed')
         self.stream_memory_access = os.path.join(fuse.mountpoint, 'memory', 'streams', 'chunks_accessed')
-        self.monitor = vmnetfs.StreamMonitor()
-        self.monitor.add_path(self.stream_modified, vmnetfs.StreamMonitor.DISK_MODIFY)
-        self.monitor.add_path(self.stream_disk_access, vmnetfs.StreamMonitor.DISK_ACCESS)
-        self.monitor.add_path(self.stream_memory_access, vmnetfs.StreamMonitor.MEMORY_ACCESS)
+        self.monitor = cloudletfs.StreamMonitor()
+        self.monitor.add_path(self.stream_modified, cloudletfs.StreamMonitor.DISK_MODIFY)
+        self.monitor.add_path(self.stream_disk_access, cloudletfs.StreamMonitor.DISK_ACCESS)
+        self.monitor.add_path(self.stream_memory_access, cloudletfs.StreamMonitor.MEMORY_ACCESS)
         self.monitor.start()
-        self.qemu_monitor = vmnetfs.FileMonitor(self.qemu_logfile, vmnetfs.FileMonitor.QEMU_LOG)
+        self.qemu_monitor = cloudletfs.FileMonitor(self.qemu_logfile, cloudletfs.FileMonitor.QEMU_LOG)
         self.qemu_monitor.start()
 
         threading.Thread.__init__(self, target=self.resume)
@@ -536,7 +538,7 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
         raise CloudletGenerationError("we need either input xml or memory snapshot path")
 
     if mem_snapshot != None:
-        hdr = vmnetx._QemuMemoryHeader(open(mem_snapshot))
+        hdr = memory_util._QemuMemoryHeader(open(mem_snapshot))
         xml = ElementTree.fromstring(hdr.xml)
     original_xml_backup = ElementTree.tostring(xml)
 
@@ -725,7 +727,7 @@ def _get_monitoring_info(conn, machine, options,
     '''
 
     # 1-2. Stop monitoring for memory access (snapshot will create a lot of access)
-    fuse_stream_monitor.del_path(vmnetfs.StreamMonitor.MEMORY_ACCESS)
+    fuse_stream_monitor.del_path(cloudletfs.StreamMonitor.MEMORY_ACCESS)
     # TODO: support stream of modified memory rather than tmp file
     if not options.DISK_ONLY:
         save_mem_snapshot(conn, machine, modified_mem, nova_util=nova_util)
@@ -939,7 +941,7 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
 
     # make FUSE disk & memory
     kwargs['meta_info'] = meta_info
-    fuse = run_fuse(Const.VMNETFS_PATH, Const.CHUNK_SIZE,
+    fuse = run_fuse(Const.CLOUDLETFS_PATH, Const.CHUNK_SIZE,
             base_image, vm_disk_size, base_mem, vm_memory_size,
             resumed_disk=launch_disk.name,  disk_overlay_map=disk_overlay_map,
             resumed_memory=launch_mem.name, memory_overlay_map=memory_overlay_map,
@@ -954,7 +956,7 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
             launch_mem.name, vm_memory_size,
             launch_disk.name, vm_disk_size, Const.CHUNK_SIZE,
             out_pipename=named_pipename)
-    fuse_thread = vmnetfs.FuseFeedingProc(fuse,
+    fuse_thread = cloudletfs.FuseFeedingProc(fuse,
             named_pipename, delta.Recovered_delta.END_OF_PIPE)
     return [launch_disk.name, launch_mem.name, fuse, delta_proc, fuse_thread]
 
@@ -994,7 +996,7 @@ def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
                 ]:
             execute_args.append(parameter)
 
-    fuse_process = vmnetfs.VMNetFS(bin_path, execute_args, **kwargs)
+    fuse_process = cloudletfs.CloudletFS(bin_path, execute_args, **kwargs)
     fuse_process.launch()
     fuse_process.start()
     return fuse_process
@@ -1061,7 +1063,7 @@ class MemoryReadProcess(multiprocessing.Process):
             total_read_size = 0
             # read first 40KB and aligen header with 4KB
             data = self.in_fd.read(Memory.Memory.RAM_PAGE_SIZE*10)
-            libvirt_header = vmnetx._QemuMemoryHeaderData(data)
+            libvirt_header = memory_util._QemuMemoryHeaderData(data)
             original_header = libvirt_header.get_header()
             align_size = Memory.Memory.RAM_PAGE_SIZE*2
             new_header = libvirt_header.get_aligned_header(align_size)
@@ -1151,7 +1153,7 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
             # OpenStack runs VM with nova account and snapshot 
             # is generated from system connection
             nova_util.chown(fout_path, os.getuid())
-    except vmnetx.MachineGenerationError, e:
+    except memory_util.MachineGenerationError, e:
         raise CloudletGenerationError("Machine Generation Error: " + str(e))
     finally:
         if machine is not None:
@@ -1265,7 +1267,7 @@ def restore_with_config(conn, mem_snapshot, xml):
 
 def overwrite_xml(in_path, new_xml):
     fin = open(in_path, "rb")
-    hdr = vmnetx._QemuMemoryHeader(fin)
+    hdr = memory_util._QemuMemoryHeader(fin)
     fin.close()
 
     # Write header
@@ -1277,7 +1279,7 @@ def overwrite_xml(in_path, new_xml):
 def copy_with_xml(in_path, out_path, xml):
     fin = open(in_path)
     fout = open(out_path, 'wrb')
-    hdr = vmnetx._QemuMemoryneader(fin)
+    hdr = memory_util._QemuMemoryneader(fin)
 
     # Write header
     hdr.xml = xml

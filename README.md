@@ -334,6 +334,9 @@ Directories
   │   
   ├── elijah: Cloudlet provisioning code using VM synthesis
   │   
+  ├── cloudletfs: FUSE file system for creating VM overlay and performing early start 
+  │               optimization at VM Synthesis
+  │   
   ├── android: Android client
   │     ├─ android: main android client for VM synthesis
   │     ├─ android_fluid: fluid simulation client used in demo videos

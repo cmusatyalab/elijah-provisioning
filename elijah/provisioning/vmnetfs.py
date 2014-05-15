@@ -35,16 +35,16 @@ LOG = logging.getLogger(__name__)
 # pylint: disable=F0401,C0103
 # pylint: enable=F0401,C0103
 
-class VMNetFSError(Exception):
+class CloudletFSError(Exception):
     pass
 
 
-class VMNetFS(threading.Thread):
+class CloudletFS(threading.Thread):
     FUSE_TYPE_DISK      =   "disk"
     FUSE_TYPE_MEMORY    =   "memory"
 
     def __init__(self, bin_path, args, **kwargs):
-        self.vmnetfs_path = bin_path
+        self.cloudletfs_path = bin_path
         self._args = '%d\n%s\n' % (len(args),
                 '\n'.join(a.replace('\n', '') for a in args))
         self._pipe = None
@@ -82,17 +82,17 @@ class VMNetFS(threading.Thread):
                         (request_split[0].find("REQUEST") > 0):
                     overlay_type = request_split[1].split(":")[1].strip()
                     chunk = long(request_split[2].split(":")[1])
-                    if overlay_type == VMNetFS.FUSE_TYPE_DISK:
+                    if overlay_type == CloudletFS.FUSE_TYPE_DISK:
                         url = disk_overlay_dict.get(chunk, None)
-                    elif overlay_type == VMNetFS.FUSE_TYPE_MEMORY:
+                    elif overlay_type == CloudletFS.FUSE_TYPE_MEMORY:
                         url = memory_overlay_dict.get(chunk, None)
                     else:
                         msg = "FUSE type does not match : %s" % overlay_type
-                        raise VMNetFSError(msg)
+                        raise CloudletFSError(msg)
 
                     if url == None:
                         msg = "Cannot find matching blob with chunk(%ld)" % chunk
-                        raise VMNetFSError(msg)
+                        raise CloudletFSError(msg)
                     #LOG.debug("requesting chunk(%ld) at %s" % (chunk, url))
                     self.demanding_queue.put(url)
                 elif (len(request_split) > 0) and (request_split[0].find("STATISTICS-WAIT") > 0):
@@ -122,7 +122,7 @@ class VMNetFS(threading.Thread):
     def launch(self):
         read, write = os.pipe()
         try:
-            self.proc = subprocess.Popen([self.vmnetfs_path], stdin=read,
+            self.proc = subprocess.Popen([self.cloudletfs_path], stdin=read,
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                     close_fds=True)
             self._pipe = os.fdopen(write, 'w')
@@ -144,7 +144,7 @@ class VMNetFS(threading.Thread):
             msg += "  1. Check FUSE permission of /dev/fuse to have '666'\n"
             msg += "  2. Check FUSE configuration at /etc/fuse.conf to have 'allow_others' option\n"
             msg += "     and permission of '422'\n"
-            raise VMNetFSError(msg)
+            raise CloudletFSError(msg)
     # pylint: enable=E1103
 
     def terminate(self):

@@ -1004,15 +1004,6 @@ class SynthesisServer(SocketServer.TCPServer):
 
         # This is cloudlet discovery related part and separated out
         '''
-        try:
-            self.upnp_server = UPnPServer()
-            self.upnp_server.start()
-        except UPnPError as e:
-            LOG.info(str(e))
-            LOG.info("[Warning] Cannot start UPnP Server")
-            self.upnp_server = None
-        LOG.info("[INFO] Start UPnP Server")
-
         if settings.register_server:
             try:
                 self.register_client = RegisterThread(

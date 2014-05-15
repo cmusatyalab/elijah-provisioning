@@ -27,7 +27,7 @@ import subprocess
 from optparse import OptionParser
 from hashlib import sha256
 
-import vmnetx
+import memory_util
 from Configuration import Const
 from progressbar import AnimatedProgressBar
 from delta import DeltaItem
@@ -218,7 +218,7 @@ class Memory(object):
         # Sanity check
         fin = open(filepath, "rb")
         file_size = os.path.getsize(filepath)
-        libvirt_mem_hdr = vmnetx._QemuMemoryHeader(fin)
+        libvirt_mem_hdr = memory_util._QemuMemoryHeader(fin)
         libvirt_mem_hdr.seek_body(fin)
         libvirt_header_len = fin.tell()
         if ((libvirt_header_len %  Memory.RAM_PAGE_SIZE) != 0):
