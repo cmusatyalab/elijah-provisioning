@@ -174,12 +174,14 @@ How to use
   > INFO     --------------------------------------------------  
   > INFO     [INFO] Start UPnP Server  
 
-  Then, you can perform VM synthesis using a sample **VM overlay URL** for
-  Fluid simulation's back-end server. The demo video of this application is at
-  <a href=https://www.youtube.com/watch?v=f9MN-kvG_ko
-  target="_blank">YouTube</a>. The URL for the Fluid VM overlay is  <a
-  href=https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip
-  target="_blank">https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip</a>.
+  Then, you can test VM synthesis using a sample **VM overlay URL** for Fluid
+  simulation's back-end server. The demo video of this application is at <a
+  href=https://www.youtube.com/watch?v=f9MN-kvG_ko target="_blank">YouTube</a>.
+  ~~The URL for the Fluid VM overlay is~~
+  ~~[https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip](https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip)~~
+  Sample VM overlay of Fluid application is temporarily unavailable. Instead,
+  you can create your own VM overlay following [How To Create VM Overlay](#how-to-create-vm-overlay).
+  
   You can perform VM synthesis like
 
   > $ synthesis_client -s localhost -u https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip  
