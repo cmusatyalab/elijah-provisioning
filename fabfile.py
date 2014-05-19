@@ -45,9 +45,11 @@ def install():
     # install dependent packages
     sudo("apt-get update")
     if sudo("apt-get install -y qemu-kvm libvirt-bin gvncviewer " +
-            "python-dev python-libvirt python-xdelta3 python-lzma " +
+            "python-dev python-libvirt python-xdelta3 python-lxml python-lzma " +
             "apparmor-utils libc6-i386 python-pip libxml2-dev " +
             "libxslt1-dev").failed:
+        # Python-xdelta3 is no longer supported in Ubuntu 14.04 LTS.
+        # But you can install deb of Ubunutu 12.04 at Ubuntu 14.04.
         abort("Failed to install libraries")
     with cd(current_dir):
         if sudo("pip install -r requirements.txt").failed:

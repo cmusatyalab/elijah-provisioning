@@ -1,5 +1,4 @@
 python-dateutil>=1.5
 requests>=1.1.0
-lxml>=2.3.5
 msgpack-python==0.1.13  # Use this version for OpenStack(Grizzly) compatibility
 SQLAlchemy==0.8.2       # Use this version for OpenStack(Grizzly) compatibility

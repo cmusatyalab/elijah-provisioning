@@ -185,8 +185,8 @@ How to use
   
   You can perform VM synthesis like
 
-  > $ synthesis_client -s localhost -o [path to your VM overlay file]
-  > OR
+  > $ synthesis_client -s localhost -o [path to your VM overlay file]  
+  > OR  
   > $ synthesis_client -s localhost -u [URL to your VM overlay]
 
   If VM synthesis is successful, you will see a screen-shot like
