@@ -164,7 +164,7 @@ How to use
 
   > $ synthesis_server  
   > INFO     --------------------------------------------------  
-> INFO     * Base VM Configuration  
+  > INFO     * Base VM Configuration  
   > INFO      0 : /home/krha/cloudlet/image/ubuntu-12.04.1-server-i386/precise.raw (Disk 8192 MB, Memory 1040 MB)  
   > INFO      1 : /home/krha/.cloudlet/406ed612a6a8b8a03fbbc5f45cceb0408a1c1d947f09d3b8a5352973d77d01f5/precise.raw (Disk 8192 MB, Memory 1040 MB)  
   > INFO     --------------------------------------------------  
@@ -175,19 +175,19 @@ How to use
   > INFO     [INFO] Start UPnP Server  
 
   Then, you can test VM synthesis using a sample **VM overlay URL** for Fluid
-  simulation's back-end server. The demo video of this application is at <a
-  href=https://www.youtube.com/watch?v=f9MN-kvG_ko target="_blank">YouTube</a>.
+  simulation's back-end server. The demo video of this application is at
+  [YouTube](https://www.youtube.com/watch?v=f9MN-kvG_ko).
   ~~The URL for the Fluid VM overlay is~~
   ~~[https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip](https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip)~~
   Sample VM overlay of Fluid application is temporarily unavailable. Instead,
-  you can create your own VM overlay following [How To Create VM Overlay](#how-to-create-vm-overlay).
+  you can create your own VM overlay following [How To Create VM
+  Overlay](#how-to-create-vm-overlay).
   
   You can perform VM synthesis like
 
-  > $ synthesis_client -s localhost -u https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip  
-  > Synthesis SUCCESS  
-  > SUCCESS in Provisioning  
-  > $
+  > $ synthesis_client -s localhost -o [path to your VM overlay file]
+  > OR
+  > $ synthesis_client -s localhost -u [URL to your VM overlay]
 
   If VM synthesis is successful, you will see a screen-shot like
 
