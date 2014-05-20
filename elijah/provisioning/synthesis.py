@@ -1076,7 +1076,7 @@ class MemoryReadProcess(multiprocessing.Process):
             # write rest of the memory data
             prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
-                data = self.in_fd.read(1024 * 1024)
+                data = self.in_fd.read(1024 * 10)
                 if data == None or len(data) <= 0:
                     break
                 self.out_fd.write(data)
