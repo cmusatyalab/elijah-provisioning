@@ -240,7 +240,6 @@ class VM_Overlay(threading.Thread):
     def terminate(self):
         if hasattr(self, 'fuse_stream_monitor'):
             self.fuse_stream_monitor.terminate()
-            self.fuse_stream_monitor.join()
         if hasattr(self, 'fuse'):
             self.fuse.terminate()
             self.fuse.join()
