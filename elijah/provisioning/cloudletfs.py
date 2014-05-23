@@ -111,6 +111,7 @@ class CloudletFS(threading.Thread):
         else:
             LOG.info("NO chunks has been waited at FUSE")
         self._running = False
+        self.proc.wait()
         LOG.info("close Fuse Exec thread")
 
     def fuse_write(self, data):
@@ -153,7 +154,6 @@ class CloudletFS(threading.Thread):
             LOG.info("Fuse close pipe")
             # invalid formated string will shutdown fuse
             self.fuse_write("terminate")
-            self.proc.wait()
             self._pipe.close()
             self._pipe = None
 

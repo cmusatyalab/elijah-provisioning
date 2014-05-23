@@ -242,7 +242,6 @@ class VM_Overlay(threading.Thread):
             self.fuse_stream_monitor.terminate()
         if hasattr(self, 'fuse'):
             self.fuse.terminate()
-            self.fuse.join()
         if hasattr(self, 'qemu_monitor'):
             self.qemu_monitor.terminate()
             self.qemu_monitor.join()
@@ -417,10 +416,8 @@ class SynthesizedVM(threading.Thread):
 
         # terminate
         self.monitor.terminate()
-        self.monitor.join()
         self.fuse.terminate()
         self.qemu_monitor.terminate()
-        self.qemu_monitor.join()
 
         # delete all temporary file
         if os.path.exists(self.launch_disk):
