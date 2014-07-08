@@ -208,7 +208,7 @@ def main(argv):
     elif mode == CMD_SYNTEHSIS:
         if len(left_args) < 2:
             sys.stderr.write("\nSynthesis requires path to VM disk and overlay-meta\n \
-                    Ex) ./cloudlet synthesis [VM disk] /path/to/precise.overlay-meta [options]\n")
+                    Ex) ./cloudlet synthesis /path/to/VM_disk /path/to/precise.overlay-meta [options]\n")
             return 1
         disk_image_path = left_args[0]
         overlay_meta = left_args[1]
