@@ -20,6 +20,7 @@
 
 import os
 import subprocess
+import errno
 import select
 import threading
 import multiprocessing
@@ -72,8 +73,9 @@ class CloudletFS(threading.Thread):
                 for chunk in disk_chunks:
                     disk_overlay_dict[chunk] = overlay_url
 
-        while(not self.stop.wait(0.0001)):
+        while(not self.stop.wait(0.001)):
             self._running = True
+            select.select([self.proc.stdout],[],[])
             oneline = self.proc.stdout.readline()
             if len(oneline.strip()) > 0:
                 request_split = oneline.split(",")
@@ -101,6 +103,9 @@ class CloudletFS(threading.Thread):
                     wait_name, wait_time = request_split[3].split(":")
                     data = {type_name:overlay_type, chunk_name:long(chunk.strip()), wait_name:float(wait_time.strip())}
                     wait_statistics.append(data)
+            else:
+                LOG.info("FUSE pipe is closed")
+                break
 
         if len(wait_statistics) > 0:
             total_wait_time = 0.0
@@ -111,7 +116,6 @@ class CloudletFS(threading.Thread):
         else:
             LOG.info("NO chunks has been waited at FUSE")
         self._running = False
-        self.proc.wait()
         LOG.info("close Fuse Exec thread")
 
     def fuse_write(self, data):
@@ -154,6 +158,7 @@ class CloudletFS(threading.Thread):
             LOG.info("Fuse close pipe")
             # invalid formated string will shutdown fuse
             self.fuse_write("terminate")
+            self.proc.wait()
             self._pipe.close()
             self._pipe = None
 
@@ -167,7 +172,9 @@ class StreamMonitor(threading.Thread):
         self.epoll = select.epoll()
         self.stream_dict = dict()
         self._running = False
-        self.stop = threading.Event()
+        self.stop = False   # use boolean instead of thread to minimize 
+                            # Condition.wait() overhead in green thread 
+                            # of Openstack
         self.modified_chunk_dict = dict()
         self.disk_access_chunk_list = list()
         self.mem_access_chunk_list = list()
@@ -194,9 +201,9 @@ class StreamMonitor(threading.Thread):
                 del self.stream_dict[fileno]
 
     def io_watch(self):
-        while(not self.stop.wait(0.0001)):
+        while(not self.stop):
             self._running = True
-            events = self.epoll.poll(0.0001)
+            events = self.epoll.poll(1)
             for fileno, event in events:
                 self._handle(fileno, event)
         
@@ -206,12 +213,16 @@ class StreamMonitor(threading.Thread):
         LOG.info("close Stream monitoring thread")
 
     def _handle(self, fd, event):
+        #print("%d, %s" % (fd, self.stream_dict[fd]['path']))
         if event & select.EPOLLIN:
-            #LOG.debug("%d, %s" % (fd, self.stream_dict[fd]['name']))
             try:
-                buf = os.read(fd, 1024)
+                buf = os.read(fd, 1024*1024)
             except OSError as e:
-                # TODO: "Resource temporarily unavailable" Error
+                if e.errno == errno.EAGAIN or e.errno == errno.EWOULDBLOCK:
+                    time.sleep(0.1)
+                else:
+                    # TODO: handle this case
+                    pass
                 return
 
             # We got some output
@@ -254,7 +265,7 @@ class StreamMonitor(threading.Thread):
         self.mem_access_chunk_list.append(chunk)
 
     def terminate(self):
-        self.stop.set()
+        self.stop = True
 
 
 class FileMonitor(threading.Thread):
@@ -263,14 +274,16 @@ class FileMonitor(threading.Thread):
     def __init__(self, path, name):
         self.stream_dict = dict()
         self._running = False
-        self.stop = threading.Event()
+        self.stop = False   # use boolean instead of thread to minimize 
+                            # Condition.wait() overhead in green thread 
+                            # of Openstack
         self.fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
         self.buf = ''
         threading.Thread.__init__(self, target=self.io_watch)
         LOG.info("start monitoring at %s" % path)
 
     def io_watch(self):
-        while(not self.stop.wait(0.0001)):
+        while(not self.stop):
             self._running = True
             line = os.read(self.fd, 1024)
             lines = (self.buf+line).split('\n')
@@ -278,7 +291,7 @@ class FileMonitor(threading.Thread):
             for line in lines:
                 self._handle_qemu_log(line)
             else:
-                time.sleep(0.001)
+                time.sleep(1)
         self._running = False
         LOG.info("close File monitoring thread")
 
@@ -297,7 +310,7 @@ class FileMonitor(threading.Thread):
             sys.stdout.write("invalid log: (%s)(%s)(%s)\n" % (event_time, header, data))
 
     def terminate(self):
-        self.stop.set()
+        self.stop = True
 
 
 class FuseFeedingProc(multiprocessing.Process):
@@ -313,7 +326,7 @@ class FuseFeedingProc(multiprocessing.Process):
     def feeding_thread(self):
         self.input_pipe = open(self.input_pipename, "r")
         start_time = time.time()
-        while(not self.stop.wait(0.0000001)):
+        while(not self.stop.wait(0.00001)):
             self._running = True
             try:
                 #chunks = self.input_pipe.recv()

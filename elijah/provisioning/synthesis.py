@@ -238,11 +238,13 @@ class VM_Overlay(threading.Thread):
         self.terminate()
 
     def terminate(self):
-        if hasattr(self, 'fuse_stream_monitor'):
+        if hasattr(self, 'fuse_stream_monitor') and self.fuse_stream_monitor != None:
             self.fuse_stream_monitor.terminate()
-        if hasattr(self, 'fuse'):
+            self.fuse_stream_monitor.join()
+        if hasattr(self, 'fuse') and self.fuse != None:
             self.fuse.terminate()
-        if hasattr(self, 'qemu_monitor'):
+            self.fuse.join()
+        if hasattr(self, 'qemu_monitor') and self.qemu_monitor != None:
             self.qemu_monitor.terminate()
             self.qemu_monitor.join()
         if hasattr(self, "cache_manager") and self.cache_manager != None:
@@ -250,7 +252,6 @@ class VM_Overlay(threading.Thread):
             self.cache_manager.join()
         if hasattr(self, "mount_point") and self.mount_point != None and os.path.lexists(self.mount_point):
             os.unlink(self.mount_point)
-
         if self.options.MEMORY_SAVE_PATH:
             LOG.debug("moving memory sansphost to %s" % self.options.MEMORY_SAVE_PATH)
             shutil.move(self.modified_mem.name, self.options.MEMORY_SAVE_PATH)
@@ -416,8 +417,10 @@ class SynthesizedVM(threading.Thread):
 
         # terminate
         self.monitor.terminate()
+        self.monitor.join()
         self.fuse.terminate()
         self.qemu_monitor.terminate()
+        self.qemu_monitor.join()
 
         # delete all temporary file
         if os.path.exists(self.launch_disk):
@@ -747,6 +750,9 @@ def _get_monitoring_info(conn, machine, options,
         import xray
         used_blocks_dict = xray.get_used_blocks(modified_disk)
 
+    # make sure to get all the modification
+    fuse_stream_monitor.terminate()
+    fuse_stream_monitor.join()
     m_chunk_dict = fuse_stream_monitor.modified_chunk_dict
 
     info_dict = dict()
@@ -1033,7 +1039,6 @@ def run_vm(conn, domain_xml, **kwargs):
 
 
 class MemoryReadProcess(multiprocessing.Process):
-    #class MemoryReadProcess(threading.Thread):
     RET_SUCCESS = 1
     RET_ERRROR = 2
 
@@ -1044,12 +1049,16 @@ class MemoryReadProcess(multiprocessing.Process):
         self.output_queue = output_queue
         self.machine_memory_size = machine_memory_size*1024
         multiprocessing.Process.__init__(self, target=self.read_mem_snapshot)
-        #threading.Thread.__init__(self, target=self.read_mem_snapshot)
 
     def read_mem_snapshot(self):
-        if os.path.isfile(self.input_path) != False:
-            self.output_queue.put(self.RET_ERRROR)
-            self.output_queue.put("Cannot open named pipe")
+        retry_counter = 0
+        while os.path.isfile(self.input_path) == False:
+            retry_counter += 1
+            sleep(1)
+            if retry_counter > 10:
+                self.output_queue.put(self.RET_ERRROR)
+                self.output_queue.put("Cannot open named pipe")
+                return
 
         # create memory snapshot aligned with 4KB
         try:
@@ -1109,22 +1118,29 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
         memory_element = xml.find('memory')
         if memory_element is not None:
             machine_memory_size = long(memory_element.text)
-    
 
     #Save memory state
-    LOG.info("save VM memory state at %s" % fout_path)
-    LOG.info("This could take up to minute depend on VM's memory size")
-    LOG.info("(Check file at %s)" % fout_path)
     try:
-        named_pipe_output = fout_path + ".fifo"
         output_queue = multiprocessing.Queue()
-        if os.path.exists(named_pipe_output):
-            os.remove(named_pipe_output)
-        os.mkfifo(named_pipe_output)
-        memory_read_proc = MemoryReadProcess(named_pipe_output, fout_path, 
+        fout_path_intermediate = fout_path + ".inter"
+        if os.path.exists(fout_path_intermediate):
+            os.remove(fout_path_intermediate)
+        # wait until libvirt finishes its operation 
+        LOG.info("save VM memory state at %s" % fout_path)
+        LOG.info("This could take up to minute depend on VM's memory size")
+        LOG.info("(Check file at %s)" % fout_path_intermediate)
+        ret = machine.save(fout_path_intermediate) 
+        if nova_util != None:
+            # OpenStack runs VM with nova account and snapshot 
+            # is generated from system connection
+            nova_util.chown(fout_path_intermediate, os.getuid())
+
+        LOG.info("Start post processing of memory snapshot at %s" % fout_path)
+        # TODO: no reason to use multiprocess
+        # but somehow, using process for post process expedites save operation
+        memory_read_proc = MemoryReadProcess(fout_path_intermediate, fout_path, 
                 machine_memory_size, output_queue)
         memory_read_proc.start()
-        ret = machine.save(named_pipe_output)
         memory_read_proc.join()
     except libvirt.libvirtError, e:
         # we intentionally ignore seek error from libvirt since we have cause
@@ -1132,8 +1148,8 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
         if str(e).startswith('unable to seek') == False:
             raise CloudletGenerationError("libvirt memory save : " + str(e))
     finally:
-        if os.path.exists(named_pipe_output):
-            os.remove(named_pipe_output)
+        if os.path.exists(fout_path_intermediate):
+            os.remove(fout_path_intermediate)
         if machine is not None:
             _terminate_vm(conn, machine)
             machine = None
@@ -1217,7 +1233,7 @@ def rettach_nic(machine, old_xml, new_xml, **kwargs):
     #           You should use nova_util in OpenStack, or subprocess
     #           will be returned without finishing their work
     # get xml info of running xml
-    
+
     old_xml = ElementTree.fromstring(old_xml)
     old_nic = old_xml.find('devices/interface')
     filter_element = old_nic.find("filterref")
@@ -1232,21 +1248,25 @@ def rettach_nic(machine, old_xml, new_xml, **kwargs):
     #attach
     new_xml = ElementTree.fromstring(new_xml)
     new_nic = new_xml.find('devices/interface')
-    new_nic_xml = ElementTree.tostring(new_nic)
-
     filter_element = new_nic.find("filterref")
     if filter_element != None:
         new_nic.remove(filter_element)
+    new_nic_xml = ElementTree.tostring(new_nic)
 
-    try:
-        ret = machine.attachDevice(new_nic_xml)
-        if ret != 0:
-            LOG.warning("failed to attach device")
-    except libvirt.libvirtError, e:
-        LOG.info("Failed to rettach NIC")
-        return
+    retry_count = 1
+    while retry_count <= 3:
+        try:
+            ret = machine.attachDevice(new_nic_xml)
+            if ret != 0:
+                LOG.warning("failed to attach device (trying..%d)" % retry_count)
+            LOG.info("success to rettach nic device")
+            break
+        except libvirt.libvirtError, e:
+            LOG.info("Failed to rettach NIC")
+            LOG.info(str(e))
+            sleep(2)
+        retry_count += 1
 
-    LOG.info("success to rettach nic device")
 
 
 def restore_with_config(conn, mem_snapshot, xml):
@@ -1733,6 +1753,8 @@ def synthesis(base_disk, meta, **kwargs):
     connect_vnc(synthesized_VM.machine)
 
     # statistics
+    synthesized_VM.monitor.terminate()
+    synthesized_VM.monitor.join()
     mem_access_list = synthesized_VM.monitor.mem_access_chunk_list
     disk_access_list = synthesized_VM.monitor.disk_access_chunk_list
     synthesis_statistics(meta_info, overlay_filename.name, \
