@@ -90,6 +90,7 @@ def install():
                 abort("Failed to download %s" % package_name)
             if sudo("dpkg -i %s" % package_name).failed:
                 abort("Failed to install %s" % package_name)
+            sudo("rm -rf %s" % package_name)
 
     # install python-packages
     with cd(current_dir):

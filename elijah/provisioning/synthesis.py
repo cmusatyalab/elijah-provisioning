@@ -725,11 +725,10 @@ def _get_monitoring_info(conn, machine, options,
         3) freed memory page
     '''
 
-    # 1-2. Stop monitoring for memory access (snapshot will create a lot of access)
-    fuse_stream_monitor.del_path(cloudletfs.StreamMonitor.MEMORY_ACCESS)
     # TODO: support stream of modified memory rather than tmp file
     if not options.DISK_ONLY:
-        save_mem_snapshot(conn, machine, modified_mem, nova_util=nova_util)
+        save_mem_snapshot(conn, machine, modified_mem, nova_util=nova_util,
+                fuse_stream_monitor=fuse_stream_monitor)
 
     # 1-3. get hashlist of base memory and disk
     basemem_hashlist = Memory.base_hashlist(base_memmeta)
@@ -750,16 +749,12 @@ def _get_monitoring_info(conn, machine, options,
         import xray
         used_blocks_dict = xray.get_used_blocks(modified_disk)
 
-    # make sure to get all the modification
-    fuse_stream_monitor.terminate()
-    fuse_stream_monitor.join()
-    m_chunk_dict = fuse_stream_monitor.modified_chunk_dict
-
     info_dict = dict()
     info_dict[_MonitoringInfo.BASEDISK_HASHLIST] = basedisk_hashlist
     info_dict[_MonitoringInfo.BASEMEM_HASHLIST] = basemem_hashlist
     info_dict[_MonitoringInfo.DISK_USED_BLOCKS] = used_blocks_dict
-    info_dict[_MonitoringInfo.DISK_MODIFIED_BLOCKS] = m_chunk_dict
+    info_dict[_MonitoringInfo.DISK_MODIFIED_BLOCKS] =\
+            fuse_stream_monitor.modified_chunk_dict
     info_dict[_MonitoringInfo.DISK_FREE_BLOCKS] = trim_dict
     info_dict[_MonitoringInfo.MEMORY_FREE_BLOCKS] = free_memory_dict
     monitoring_info = _MonitoringInfo(info_dict)
@@ -1103,12 +1098,19 @@ class MemoryReadProcess(multiprocessing.Process):
 def save_mem_snapshot(conn, machine, fout_path, **kwargs):
     #Set migration speed
     nova_util = kwargs.get('nova_util', None)
+    fuse_stream_monitor = kwargs.get('fuse_stream_monitor', None)
     ret = machine.migrateSetMaxSpeed(1000000, 0)   # 1000 Gbps, unlimited
     if ret != 0:
         raise CloudletGenerationError("Cannot set migration speed : %s", machine.name())
 
     # Pause VM
     machine.suspend()
+
+    # Stop monitoring for memory access (snapshot will create a lot of access)
+    fuse_stream_monitor.del_path(cloudletfs.StreamMonitor.MEMORY_ACCESS)
+    if fuse_stream_monitor is not None:
+        fuse_stream_monitor.terminate()
+        fuse_stream_monitor.join()
 
     # get VM information
     machine_memory_size = machine.memoryStats().get('actual', None)

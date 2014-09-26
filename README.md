@@ -368,6 +368,20 @@ Directories
 </pre>
 
 
+Troubleshooing
+-----------------
+1. KVM permission error at the first run
+
+    > failed to initialize KVM: Permission denied
+    > No accelerator found!
+    > 
+    > Error, make sure previous VM is closed and check QEMU_ARGUMENT
+    > 
+    > Failed to create overlay
+
+  Please logout your session and re-login.
+
+
 
 Ubuntu 14.04 Porting
 ----------------------
