@@ -8,6 +8,7 @@ from fabric.api import sudo
 from fabric.api import task
 from fabric.api import abort
 from fabric.context_managers import cd
+from fabric.context_managers import settings
 
 import os
 import sys
@@ -16,6 +17,27 @@ import sys
 def check_support():
     if run("egrep '^flags.*(vmx|svm)' /proc/cpuinfo > /dev/null").failed:
         abort("Need hardware VM support (vmx)")
+
+
+def check_os_distribution():
+    cmd = "cat /etc/lsb-release | grep DISTRIB_CODENAME | awk -F'=' '{print $2}'"
+    with settings(hide('everything'), warn_only=True):
+        result = run(cmd)
+        return result
+
+
+def package_installed(pkg_name):
+    """ref: http:superuser.com/questions/427318/#comment490784_427339"""
+    cmd_f = 'dpkg-query -l "%s" | grep -q ^.i'
+    cmd = cmd_f % (pkg_name)
+    with settings(warn_only=True):
+        result = run(cmd)
+        return result.succeeded
+
+
+def yes_install(pkg_name):
+    """ref: http://stackoverflow.com/a/10439058/1093087"""
+    run('apt-get --force-yes -yes install %s' % (pkg_name))
 
 
 def disable_EPT():
@@ -41,16 +63,35 @@ def localhost():
 def install():
     #check_support()
     current_dir = os.path.abspath(os.curdir)
+    dist = check_os_distribution()
+    if dist != 'precise' and dist != "trusty":
+        msg = "Only support Ubuntu Precise (12.04) or ubuntu Trusty (14.04)"
+        import pdb;pdb.set_trace()
+        abort(msg)
 
     # install dependent packages
     sudo("apt-get update")
-    if sudo("apt-get install -y qemu-kvm libvirt-bin gvncviewer " +
-            "python-dev python-libvirt python-xdelta3 python-lxml python-lzma " +
-            "apparmor-utils libc6-i386 python-pip libxml2-dev " +
-            "libxslt1-dev").failed:
+    cmd = "apt-get install --force-yes -y qemu-kvm libvirt-bin gvncviewer "
+    cmd += "python-dev python-libvirt python-lxml python-lzma "
+    cmd += "apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev"
+    if dist == "precise":
+        cmd += " python-xdelta3"
+        if sudo(cmd).failed:
+            abort("Failed to install libraries")
+    elif dist == "trusty":
+        if sudo(cmd).failed:
+            abort("Failed to install libraries")
         # Python-xdelta3 is no longer supported in Ubuntu 14.04 LTS.
         # But you can install deb of Ubunutu 12.04 at Ubuntu 14.04.
-        abort("Failed to install libraries")
+        with cd(current_dir):
+            package_name = "python-xdelta3.deb"
+            cmd = "wget http://mirrors.kernel.org/ubuntu/pool/universe/x/xdelta3/python-xdelta3_3.0.0.dfsg-1build1_amd64.deb -O %s" % package_name
+            if sudo(cmd).failed:
+                abort("Failed to download %s" % package_name)
+            if sudo("dpkg -i %s" % package_name).failed:
+                abort("Failed to install %s" % package_name)
+
+    # install python-packages
     with cd(current_dir):
         if sudo("pip install -r requirements.txt").failed:
             # Use old-version of msgpack library due to OpenStack compatibility

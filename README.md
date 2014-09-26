@@ -81,12 +81,22 @@ To install, you either
   
   > $ sudo apt-get install fabric openssh-server  
   > $ fab localhost install
-  > (Password here is ssh password for your account)
+  > *(Type your account password when it is asked)*
 
 * install manually
   - install required package  
 
       > $ sudo apt-get install qemu-kvm libvirt-bin gvncviewer python-libvirt python-xdelta3 python-lzma python-dev liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev
+    - At Ubuntu 14.04 python-xdelta3 package is no longer supported. But, old version
+    of 13.10 still works without issue. Therefore, at Ubuntu 12.04
+      > $ sudo apt-get install python-xdelta3
+
+      And Ubuntu 14.04
+      > $ wget http://mirrors.kernel.org/ubuntu/pool/universe/x/xdelta3/python-xdelta3_3.0.0.dfsg-1build1_amd64.deb
+      > $ sudo dpkg -i python-xdelta3_3.0.0.dfsg-1build1_amd64.deb
+
+  - install python libraries
+
       > $ sudo pip install -r requirements.txt
 
   - Disable security module. This is for allowing custom KVM. Example at Ubuntu 12  
@@ -118,7 +128,8 @@ To install, you either
 Tested platforms
 ---------------------
 
-We have tested at __Ubuntu 12.04 LTS 64-bit__ and it's derivatives such as Kubuntu.
+We have tested at __Ubuntu 12.04 LTS 64-bit__ and __Ubuntu 14.04 LTS 64-bit__
+(as well as their derivatives such as Kubuntu).
 
 This version of Cloudlet has several dependencies on other projects for further
 optimization, and currently we include this dependency as a binary.  Therefore,
@@ -357,3 +368,9 @@ Directories
 </pre>
 
 
+
+Ubuntu 14.04 Porting
+----------------------
+1. python-xdelta3 does not exist
+  --> install http://mirrors.kernel.org/ubuntu/pool/universe/x/xdelta3/python-xdelta3_3.0.0.dfsg-1build1_amd64.deb
+2. 
