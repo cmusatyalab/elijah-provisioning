@@ -84,29 +84,29 @@ To install, you either
   > *(Type your account password when it is asked)*
 
 * install manually
-  - install required package  
 
-      > $ sudo apt-get install qemu-kvm libvirt-bin gvncviewer python-libvirt python-xdelta3 python-lzma python-dev liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev
-    - At Ubuntu 14.04 python-xdelta3 package is no longer supported. But, old version
-    of 13.10 still works without issue. Therefore, at Ubuntu 12.04
-      > $ sudo apt-get install python-xdelta3
+  - install required package  (Ubuntu 12.04)
 
-      And Ubuntu 14.04
-      > $ wget http://mirrors.kernel.org/ubuntu/pool/universe/x/xdelta3/python-xdelta3_3.0.0.dfsg-1build1_amd64.deb
-      > $ sudo dpkg -i python-xdelta3_3.0.0.dfsg-1build1_amd64.deb
+          > $ sudo apt-get install qemu-kvm libvirt-bin gvncviewer python-libvirt python-xdelta3 python-lzma python-dev liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev python-xdelta3
+  
+      At Ubuntu 14.04 python-xdelta3 package is no longer supported. But, old
+      version of 13.10 still works without issue. Therefore, at Ubuntu 14.04
+
+          > $ wget http://mirrors.kernel.org/ubuntu/pool/universe/x/xdelta3/python-xdelta3_3.0.0.dfsg-1build1_amd64.deb
+          > $ sudo dpkg -i python-xdelta3_3.0.0.dfsg-1build1_amd64.deb
 
   - install python libraries
 
-      > $ sudo pip install -r requirements.txt
+          > $ sudo pip install -r requirements.txt
 
   - Disable security module. This is for allowing custom KVM. Example at Ubuntu 12  
     
-      > $ sudo aa-complain /usr/sbin/libvirtd  
+          > $ sudo aa-complain /usr/sbin/libvirtd  
 
   - Add current user to kvm, libvirtd group.  
 
-      > $ sudo adduser [your_account_name] kvm  
-      > $ sudo adduser [your_account_name] libvirtd  
+          > $ sudo adduser [your_account_name] kvm  
+          > $ sudo adduser [your_account_name] libvirtd  
 
   - Make sure the current user to have fuse permission. The qemu-kvm library
   changes fuse access permission while it's being installed, and the permission
@@ -116,12 +116,12 @@ To install, you either
   either reboot the machine to have valid fuse permission of just revert the
   permission manually as bellow.
 
-      > $ sudo chmod 644 /etc/fuse.conf  
-      > $ sod sed -i 's/#user_allow_other/user_allow_other/g' /etc/fuse.conf  
+          > $ sudo chmod 644 /etc/fuse.conf  
+          > $ sod sed -i 's/#user_allow_other/user_allow_other/g' /etc/fuse.conf  
 	
   - Finally, install cloudlet package using python setup tool
 
-      > $ sudo python setup.py install
+          > $ sudo python setup.py install
 
 
 
@@ -148,43 +148,57 @@ How to use
   base VM__ of Ubuntu 12.04 32-bit server for easy	bootstrapping.  Download
   sample ``base VM`` at:
 
-	[Base VM for Ubuntu-12.04.01-i386-Server](https://storage.cmusatyalab.org/cloudlet-vm/ubuntu-12.04-32bit.zip)
-	(Ubuntu account: cloudlet, password: cloudlet)
+  For Ubuntu 12.04:
+  [Base VM for Ubuntu-12.04.01-i386-Server](https://storage.cmusatyalab.org/cloudlet-vm/ubuntu-12.04-32bit.zip)  
+  (Ubuntu account: cloudlet, password: cloudlet)
+
+  For Ubuntu 14.04:
+  [Base VM for Ubuntu-12.04.01-i386-Server](https://storage.cmusatyalab.org/cloudlet-vm/precise-baseVM.zip)  
+  (Ubuntu account: cloudlet, password: cloudlet)
+
+        Note: We have been carefully updated code to maintain compatibility of
+        Base VM across different physical machine as well as different version
+        of hypervisor. However, there were significant changes at QEMU between
+        1.x (Ubuntu 12.04) and 2.x (Ubuntu 14.04). In short, QEMU has updated
+        firmware of some of emulated HW, which causes inconsistency in memory
+        snapshot. To handle that we can ship out custom QEMU with firmwares,
+        but we haven't implemented yet.
+        
 
   Then, you can import this ``base VM`` using command line tool, _cloudlet_.
 
-  > $ cloudlet import-base ./ubuntu-12.04-32bit.zip  
-  > INFO     create directory for base VM  
-  > INFO     Decompressing Base VM to temp directory at /tmp/cloudlet-base-k7ANqB  
-  > INFO     Place base VM to the right directory  
-  > INFO     Register New Base to DB  
-  > INFO     ID for the new Base VM:   406ed612a6a8b8a03fbbc5f45cceb0408a1c1d947f09d3b8a5352973d77d01f5  
-  > INFO     Success
+    > $ cloudlet import-base ./ubuntu-12.04-32bit.zip  
+    > INFO     create directory for base VM  
+    > INFO     Decompressing Base VM to temp directory at /tmp/cloudlet-base-k7ANqB  
+    > INFO     Place base VM to the right directory  
+    > INFO     Register New Base to DB  
+    > INFO     ID for the new Base VM:   406ed612a6a8b8a03fbbc5f45cceb0408a1c1d947f09d3b8a5352973d77d01f5  
+    > INFO     Success
 
   You can check the imported ``base VM`` by
 
-  > $ cloudlet list-base  
-  > hash value<code>&nbsp;&nbsp;&nbsp;&nbsp;</code>path  
-  > \------------------------------------------------------------------------------------------  
-  > 406ed6<code>&nbsp;&nbsp;&nbsp;&nbsp;</code>/home/krha/.cloudlet/406ed6/precise.raw  
-  > \------------------------------------------------------------------------------------------
+    > $ cloudlet list-base  
+    > hash value<code>&nbsp;&nbsp;&nbsp;&nbsp;</code>path  
+    > \------------------------------------------------------------------------------------------  
+    > 406ed6<code>&nbsp;&nbsp;&nbsp;&nbsp;</code>/home/krha/.cloudlet/406ed6/precise.raw  
+    > \------------------------------------------------------------------------------------------
 
 
 2. Perform __VM synthesis__ using a sample ``VM overlay``.
 
   First, launch the VM synthesis server at Cloudlet.
 
-  > $ synthesis_server  
-  > INFO     --------------------------------------------------  
-  > INFO     * Base VM Configuration  
-  > INFO      0 : /home/krha/cloudlet/image/ubuntu-12.04.1-server-i386/precise.raw (Disk 8192 MB, Memory 1040 MB)  
-  > INFO      1 : /home/krha/.cloudlet/406ed612a6a8b8a03fbbc5f45cceb0408a1c1d947f09d3b8a5352973d77d01f5/precise.raw (Disk 8192 MB, Memory 1040 MB)  
-  > INFO     --------------------------------------------------  
-  > INFO     * Server configuration  
-  > INFO      - Open TCP Server at ('0.0.0.0', 8021)  
-  > INFO      - Disable Nagle(No TCP delay)  : 1  
-  > INFO     --------------------------------------------------  
-  > INFO     [INFO] Start UPnP Server  
+    > $ synthesis_server  
+    > INFO     --------------------------------------------------  
+    > INFO     * Base VM Configuration  
+    > INFO      0 : /home/krha/cloudlet/image/ubuntu-12.04.1-server-i386/precise.raw (Disk 8192 MB, Memory 1040 MB)  
+    > INFO      1 : /home/krha/.cloudlet/406ed612a6a8b8a03fbbc5f45cceb0408a1c1d947f09d3b8a5352973d77d01f5/precise.raw (Disk 8192 MB, Memory 1040 MB)  
+    > INFO     --------------------------------------------------  
+    > INFO     * Server configuration  
+    > INFO      - Open TCP Server at ('0.0.0.0', 8021)  
+    > INFO      - Disable Nagle(No TCP delay)  : 1  
+    > INFO     --------------------------------------------------  
+    > INFO     [INFO] Start UPnP Server  
 
   Then, you can test VM synthesis using a sample **VM overlay URL** for Fluid
   simulation's back-end server. The demo video of this application is at
@@ -197,9 +211,9 @@ How to use
   
   You can perform VM synthesis like
 
-  > $ synthesis_client -s localhost -o [path to your VM overlay file]  
-  > OR  
-  > $ synthesis_client -s localhost -u [URL to your VM overlay]
+    > $ synthesis_client -s localhost -o [path to your VM overlay file]  
+    > OR  
+    > $ synthesis_client -s localhost -u [URL to your VM overlay]
 
   If VM synthesis is successful, you will see a screen-shot like
 
@@ -232,24 +246,25 @@ How to use
     
     2) Android client
 
-	We have sample Android client at $HOME/android/android and you can import
-	it to ``Eclipse`` as an Android project. This client program will
-	automatically find nearby Cloudlet using UPnP if both client and Cloudlet
-	are located in same broadcasting domain (e.g. sharing WiFi access point).
-	Otherwise, you can manually specify IP address of the Cloudlet by clicking
-	cancel in discovery pop-up.
+    We have sample Android client at $HOME/android/android and you can import
+    it to ``Eclipse`` as an Android project. This client program will
+    automatically find nearby Cloudlet using UPnP if both client and Cloudlet
+    are located in same broadcasting domain (e.g. sharing WiFi access point).
+    Otherwise, you can manually specify IP address of the Cloudlet by clicking
+    cancel in discovery pop-up.
+    
+    Once installing application at your phone, you have to copy your VM overlay
+    to Android phone. For example with Fluid overlay example, download VM
+    overlay from <a
+    href=https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip
+    target="_blank">https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip</a>
+    and **unzip it**, then copy both overlay-meta and overlay-blob_1.xz file to
+    /sdcard/Cloudlet/overlay/fluid/ directory. This directory name, _fluid_,
+    will be appeared to your Android application when you're asked to select
+    ``Overlay VM``. Right directory name is important since the directory name
+    will be	saved as appName in internal data structure and being used to
+    launch associated mobile application after finishing ``VM synthesis``. 
 
-	Once installing application at your phone, you have to copy your VM overlay
-	to Android phone. For example with Fluid overlay example, download VM
-	overlay from <a
-	href=https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip
-	target="_blank">https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip</a>
-	and **unzip it**, then copy both overlay-meta and overlay-blob_1.xz file to
-	/sdcard/Cloudlet/overlay/fluid/ directory. This directory name, _fluid_,
-	will be appeared to your Android application when you're asked to select
-	``Overlay VM``. Right directory name is important since the directory name
-	will be	saved as appName in internal data structure and being used to
-	launch associated mobile application after finishing ``VM synthesis``. 
 
   Please recall that this VM synthesis client is for **provisioning custom
   back-end server VM at arbitrary 	computer** and you need to launch your
@@ -291,9 +306,9 @@ You can also create your own ``base VM`` from a regular VM disk image. Here the
 _regular VM disk image_ means a raw format virtual disk image you normally use
 for KVM/QEMU or Xen. 
 
-  > $ cloudlet base /path/to/base_disk.img  
-  > % Use raw file format virtual disk
-        
+    > $ cloudlet base /path/to/base_disk.img
+    > % Use raw file format virtual disk
+
 This command will launch GUI (VNC) connecting to your guest OS and the code
 will start creating ``base VM`` right after you close VNC window. So, please
 close the VNC window when you think it's right point to snapshot the VM as a
@@ -301,16 +316,16 @@ base VM (typically you close it after booting up).  Then, it will generate
 snapshot of the current states for both memory and disk and save that
 information to DB. You can check list of ``base VM`` by
 
-  > $ cloudlet list-base
+    > $ cloudlet list-base
 	
 
 ### How to create VM overlay
 
 Now you can create your customized VM based on top of ``base VM``  
   
-  > $ cloudlet overlay /path/to/base\_disk.img  
-  > % Path to base_disk is the path for virtual disk you used earlier  
-  > % You can check the path by "cloudlet list-base"  
+    > $ cloudlet overlay /path/to/base\_disk.img  
+    > % Path to base_disk is the path for virtual disk you used earlier  
+    > % You can check the path by "cloudlet list-base"  
 
 This will launch VNC again with resumed ``base VM``. Now you can start making
 any customizations on top of this ``base VM``. For example, if you're a
@@ -327,7 +342,7 @@ types of files; 1) ``overlay-meta file`` ends with .overlay-meta, 2) compressed
 **If your application need specific TCP/UDP port to communicate with a client,
 then you can make a port forwarding using -redir parameter as below.** 
 
-  > $ cloudlet overlay /path/to/base_disk.img -- -redir tcp:2222::22 -redir tcp:8080::80
+    > $ cloudlet overlay /path/to/base_disk.img -- -redir tcp:2222::22 -redir tcp:8080::80
 
   This will forward client connection at host port 2222 to VM's 22 and 8080 to 80, respectively.
 
