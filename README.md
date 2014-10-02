@@ -396,10 +396,3 @@ Troubleshooing
 
   Please logout your session and re-login.
 
-
-
-Ubuntu 14.04 Porting
-----------------------
-1. python-xdelta3 does not exist
-  --> install http://mirrors.kernel.org/ubuntu/pool/universe/x/xdelta3/python-xdelta3_3.0.0.dfsg-1build1_amd64.deb
-2. 
