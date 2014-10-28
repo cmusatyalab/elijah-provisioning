@@ -155,7 +155,7 @@ def main(argv):
             sys.stderr.write("\nNeed path to base disk\n")
             sys.stderr.write("Check your base VM list './cloudet %s'\n" % (CMD_LIST_BASE))
             return 1
-        disk_image_path = left_args[0] 
+        disk_image_path = left_args[0]
         qemu_args = left_args[1:]
         options = Options()
         options.TRIM_SUPPORT = not settings.disable_trim_support

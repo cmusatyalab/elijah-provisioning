@@ -912,7 +912,7 @@ def residue_merge_deltalist(old_deltalist, new_deltalist):
             # overwrite existing one
             referred_deltalist = reference_dict.get(old_item, None)
             if referred_deltalist != None:
-                #msg = "Currently RESONCSTRUCT ALL SELF_REF pointer to RAW\n"
+                #msg = "Currently RECONSTRUCT ALL SELF_REF pointer to RAW\n"
                 #msg += "Windows makes kernel panic with below code"
                 #raise DeltaError(msg)
 
@@ -957,13 +957,12 @@ def residue_merge_deltalist(old_deltalist, new_deltalist):
                 count_overwrite_disk += 1
             else:
                 count_overwrite_mem += 1
-        
+
     LOG.debug("merge residue with previous :")
     LOG.debug("    add new disk   : %d" % (count_new_disk))
     LOG.debug("    add new mem    : %d" % (count_new_mem))
     LOG.debug("    overwrite disk : %d" % (count_overwrite_disk))
     LOG.debug("    overwrite mem  : %d" % (count_overwrite_mem))
-    
     return ret_deltalist
 
 
