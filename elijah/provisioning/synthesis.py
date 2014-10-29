@@ -1128,7 +1128,7 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
         if os.path.exists(named_pipe_output):
             os.remove(named_pipe_output)
         os.mkfifo(named_pipe_output)
-        memory_read_proc = MemoryReadProcess(named_pipe_output, fout_path, 
+        memory_read_proc = MemoryReadProcess(named_pipe_output, fout_path,
                 machine_memory_size, output_queue)
         memory_read_proc.start()
         ret = machine.save(named_pipe_output)

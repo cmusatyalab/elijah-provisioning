@@ -130,6 +130,10 @@ def install():
 
     # install cloudlet package
     with cd(current_dir):
+        # remove previous build directory
+        with settings(hide('everything')):
+            sudo("rm -rf ./build")
+            sudo("pip uninstall --y elijah-provisioning")
         if sudo("python setup.py install").failed:
             abort("cannot install cloudlet library")
 
