@@ -121,6 +121,7 @@ def main(argv):
     CMD_LIST_SESSION        = "list-session"
     CMD_CLEAR_SESSION       = "clear-session"
     CMD_LIST_OVERLAY        = "list-overlay"
+    CMD_INFO_OVERLAY        = "info-overlay"
 
     commands = {
             CMD_BASE_CREATION: "create new base VM",
@@ -133,6 +134,7 @@ def main(argv):
             CMD_IMPORT_BASE: "import base VM from a exported file",
             CMD_LIST_SESSION: "list all the session history",
             CMD_LIST_OVERLAY: "list all the overlay history",
+            CMD_INFO_OVERLAY: "show information of the VM overlay",
             }
     mode, left_args, settings = process_command_line(sys.argv[1:], commands)
 
@@ -225,6 +227,20 @@ def main(argv):
         except Exception, e:
             LOG.warning(str(e))
             LOG.error("%s\nFailed to synthesize" % str(traceback.format_exc()))
+            return 1
+    elif mode == CMD_INFO_OVERLAY:
+        if len(left_args) != 1:
+            sys.stderr.write("\nInfo VM overlay needs a path to the VM overlay\n \
+                    Ex) ./cloudlet info-overlay /path/to/overlay\n")
+            return 1
+        overlay_path = left_args[0]
+        try:
+            output = synthesis.info_vm_overlay(overlay_path)
+            sys.stdout.write("\n")
+            sys.stdout.write(output)
+        except Exception, e:
+            LOG.warning(str(e))
+            LOG.error("%s\nFailed to info VM overlay" % str(traceback.format_exc()))
             return 1
     elif mode == CMD_LIST_BASE:
         dbconn = get_database()

@@ -1841,6 +1841,34 @@ def synthesis(base_disk, meta, **kwargs):
     synthesized_VM.terminate()
 
 
+def info_vm_overlay(overlay_path):
+    overlay_path = os.path.abspath(overlay_path)
+    if os.path.exists(overlay_path) == False:
+        msg = "VM overlay does not exist at %s" % overlay_path
+        raise IOError(msg)
+    overlay_package = VMOverlayPackage("file://%s" % overlay_path)
+    meta_raw = overlay_package.read_meta()
+    meta_info = msgpack.unpackb(meta_raw)
+    baseVMsha256 = meta_info[Const.META_BASE_VM_SHA256]
+    vm_disk_size = meta_info[Const.META_RESUME_VM_DISK_SIZE]
+    vm_memory_size = meta_info[Const.META_RESUME_VM_MEMORY_SIZE]
+
+    modified_disk_chunk_count = 0
+    modified_memory_chunk_count = 0
+    comp_overlay_files = meta_info[Const.META_OVERLAY_FILES]
+    comp_overlay_files = [item for item in comp_overlay_files]
+    for comp_filename in comp_overlay_files:
+        modified_disk_chunk_count += len(item[Const.META_OVERLAY_FILE_DISK_CHUNKS])
+        modified_memory_chunk_count += len(item[Const.META_OVERLAY_FILE_MEMORY_CHUNKS])
+    output = "VM overlay\t\t\t: %s\n" % overlay_path
+    output += "Base VM ID\t\t\t: %s\n" % baseVMsha256
+    output += "# of modified disk chunk\t: %s\n" % modified_disk_chunk_count
+    output += "# of modified memory chunk\t: %s\n" % modified_memory_chunk_count
+    output += "VM disk size\t\t\t: %s bytes\n" % vm_disk_size
+    output += "VM memory size\t\t\t: %s bytes\n" % vm_memory_size
+    return  output
+
+
 '''External API End
 '''
 
