@@ -39,7 +39,6 @@ def getLogger(name='unknown'):
         if os.path.exists(log_filepath) == False:
             # make this log file can be access by anyone
             # because it will be shared by nova and primary user
-            import grp
             open(log_filepath, "w+").close()
             gid = grp.getgrnam("nogroup").gr_gid
             os.chmod(log_filepath, 0o666)
@@ -56,7 +55,7 @@ def getLogger(name='unknown'):
 
         # add stdout logging with INFO level
         console = logging.StreamHandler(sys.stdout)
-        console.setLevel(logging.INFO)
+        console.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(levelname)-8s %(message)s')
         console.setFormatter(formatter)
         logger.addHandler(console)

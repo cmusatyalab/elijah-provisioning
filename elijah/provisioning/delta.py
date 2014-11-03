@@ -850,7 +850,7 @@ def divide_blobs(delta_list, overlay_path, blob_size_kb,
     end_time = time.time()
     LOG.debug("Overlay Compression time: %f, delta_item: %ld" % 
             ((end_time-start_time), comp_counter))
-    LOG.debug("Total OVerlay Size : %ld" % blob_output_size)
+    LOG.debug("Total Overlay Size : %ld" % blob_output_size)
     return overlay_list 
 
 
