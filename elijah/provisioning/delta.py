@@ -851,7 +851,7 @@ def divide_blobs(delta_list, overlay_path, blob_size_kb,
     LOG.debug("Overlay Compression time: %f, delta_item: %ld" % 
             ((end_time-start_time), comp_counter))
     LOG.debug("Total Overlay Size : %ld" % blob_output_size)
-    return overlay_list 
+    return overlay_list
 
 
 def discard_free_chunks(merged_modified_list, chunk_size, disk_discard, memory_discard):

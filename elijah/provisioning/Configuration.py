@@ -63,6 +63,10 @@ class Const(object):
     VERSION = str("0.9.1")
     HOME_DIR = os.path.abspath(os.path.expanduser("~"))
     CONFIGURATION_DIR = os.path.join('/', 'var', 'lib', 'cloudlet', 'conf')
+    QUEUE_SUCCESS_MESSAGE       = "!!MemorySnapshot Transfer SUCCESS Marker"
+    QUEUE_FAILED_MESSAGE       = "!!MemorySnapshot Transfer FAILED Marker"
+    QUEUE_SUCCESS_MESSAGE_LEN   = len(QUEUE_SUCCESS_MESSAGE)
+    QUEUE_FAILED_MESSAGE_LEN    = len(QUEUE_FAILED_MESSAGE)
 
     BASE_DISK               = ".base-img"
     BASE_MEM                = ".base-mem"

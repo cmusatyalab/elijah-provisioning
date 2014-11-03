@@ -213,11 +213,11 @@ class VM_Overlay(threading.Thread):
         overlay_prefix = os.path.join(temp_dir, Const.OVERLAY_FILE_PREFIX)
         overlay_metapath = os.path.join(temp_dir, Const.OVERLAY_META)
 
-        self.overlay_metafile, self.overlay_files = \
-                generate_overlayfile(overlay_deltalist, self.options, 
-                self.base_hashvalue, os.path.getsize(self.modified_disk), 
-                os.path.getsize(self.modified_mem.name),
-                overlay_metapath, overlay_prefix)
+        self.overlay_files, overlay_info = _generate_overlayfile(overlay_deltalist, overlay_prefix)
+        self.overlay_metafile = _generate_overlaymeta(overlay_metapath, overlay_info,
+                                                      self.base_hashvalue,
+                                                      os.path.getsize(self.modified_disk),
+                                                      os.path.getsize(self.modified_mem.name))
 
         # packaging VM overlay into a single zip file
         if self.options.ZIP_CONTAINER == True:
@@ -441,20 +441,6 @@ def _terminate_vm(conn, machine):
                     each_machine.destroy()
     except libvirt.libvirtError, e:
         pass
-
-def _create_overlay_meta(overlay_metafile, base_hash, modified_disksize, modified_memsize,
-        blob_info):
-    fout = open(overlay_metafile, "wrb")
-
-    meta_dict = dict()
-    meta_dict[Const.META_BASE_VM_SHA256] = base_hash
-    meta_dict[Const.META_RESUME_VM_DISK_SIZE] = long(modified_disksize)
-    meta_dict[Const.META_RESUME_VM_MEMORY_SIZE] = long(modified_memsize)
-    meta_dict[Const.META_OVERLAY_FILES] = blob_info
-
-    serialized = msgpack.packb(meta_dict)
-    fout.write(serialized)
-    fout.close()
 
 
 def _update_overlay_meta(original_meta, new_path, blob_info=None):
@@ -717,7 +703,7 @@ def _get_monitoring_info(conn, machine, options,
         base_memmeta, base_diskmeta,
         fuse_stream_monitor,
         base_disk, base_mem,
-        modified_disk, modified_mem,
+        modified_disk, memory_snapshot_queue,
         qemu_logfile, nova_util=None):
     ''' return montioring information including
         1) base vm hash list
@@ -726,12 +712,18 @@ def _get_monitoring_info(conn, machine, options,
     '''
     time_start = time()
 
-    # TODO: support stream of modified memory rather than tmp file
     if not options.DISK_ONLY:
-        save_mem_snapshot(conn, machine, modified_mem, nova_util=nova_util,
-                fuse_stream_monitor=fuse_stream_monitor)
+        snapshot_thread = threading.Thread(target=save_mem_snapshot,
+                                           args=(conn, machine,
+                                                 memory_snapshot_queue),
+                                           kwargs={
+                                               'nova_util':nova_util,
+                                               'fuse_stream_monitor':fuse_stream_monitor
+                                           },
+                                           )
+        snapshot_thread.start()
+        snapshot_thread.join()
     time_memory_snapshot = time()
-
 
     # 1-3. get hashlist of base memory and disk
     basemem_hashlist = Memory.base_hashlist(base_memmeta)
@@ -763,9 +755,8 @@ def _get_monitoring_info(conn, machine, options,
     info_dict[_MonitoringInfo.MEMORY_FREE_BLOCKS] = free_memory_dict
     monitoring_info = _MonitoringInfo(info_dict)
     time_end = time()
-    LOG.debug("Memory snapshotting time: %f" % (time_end-time_start))
-    LOG.debug("  memory snapshotting: %f" % (time_memory_snapshot-time_start))
-    LOG.debug("  parsing trim log: %f" % (time_parse_trim_log-time_memory_snapshot))
+    LOG.debug("Memory snapshotting time at get_monitor (%f ~ %f): %f" % (time_start, time_end,
+                                                          (time_end-time_start)))
     return monitoring_info
 
 
@@ -784,9 +775,11 @@ def get_libvirt_connection():
 
 
 def get_overlay_deltalist(monitoring_info, options,
-        base_image, base_mem, base_memmeta, 
-        modified_disk, modified_mem,
-        old_deltalist=None):
+                          base_image, base_mem, base_memmeta, 
+                          modified_disk,
+                          modified_mem_queue,
+                          deltalist_queue,
+                          old_deltalist=None):
     '''return overlay deltalist
     Get difference between base vm (base_image, base_mem) and 
     launch vm (modified_disk, modified_mem) using monitoring information
@@ -808,17 +801,28 @@ def get_overlay_deltalist(monitoring_info, options,
     dma_dict = dict()
 
     LOG.info("Get memory delta")
-    if options.DISK_ONLY:
-        mem_deltalist = list()
-    else:
-        mem_deltalist = Memory.create_memory_deltalist(modified_mem,
-                basemem_meta=base_memmeta, basemem_path=base_mem,
-                apply_free_memory=options.FREE_SUPPORT,
-                free_memory_info=free_memory_dict)
+    time_s = time()
+    mem_deltalist = list()
+    if not options.DISK_ONLY:
+        deltalist_thread = threading.Thread(target=Memory.create_memory_deltalist,
+                                            args=(modified_mem_queue,
+                                                  deltalist_queue,
+                                                  base_memmeta, base_mem,
+                                                  options.FREE_SUPPORT,
+                                                  free_memory_dict))
+        deltalist_thread.start()
+        deltalist_thread.join()
+        while True:
+            deltaitem = deltalist_queue.get()
+            if deltaitem == Const.QUEUE_SUCCESS_MESSAGE:
+                break
+            mem_deltalist.append(deltaitem)
+
         if old_deltalist and len(old_deltalist) > 0:
             diff_deltalist = delta.residue_diff_deltalists(old_deltalist,
                     mem_deltalist, base_mem)
             mem_deltalist = diff_deltalist
+    time_mem_delta = time()
 
     LOG.info("Get disk delta")
     disk_statistics = dict()
@@ -830,52 +834,63 @@ def get_overlay_deltalist(monitoring_info, options,
         dma_dict=dma_dict,
         used_blocks_dict=used_blocks_dict,
         ret_statistics=disk_statistics)
-        
+    time_disk_delta = time()
+
     LOG.info("Generate VM overlay using deduplication")
     merged_deltalist = delta.create_overlay(
             mem_deltalist, Memory.Memory.RAM_PAGE_SIZE,
             disk_deltalist, Const.CHUNK_SIZE,
             basedisk_hashlist=basedisk_hashlist,
             basemem_hashlist=basemem_hashlist)
-            
+    time_merge_delta = time()
+
     LOG.info("Print statistics")
     free_memory_dict = getattr(monitoring_info, _MonitoringInfo.MEMORY_FREE_BLOCKS, None)
     free_pfn_counter = long(free_memory_dict.get("freed_counter", 0))
     disk_discarded_count = disk_statistics.get('trimed', 0)
-    DeltaList.statistics(merged_deltalist, 
+    DeltaList.statistics(merged_deltalist,
             mem_discarded=free_pfn_counter,
             disk_discarded=disk_discarded_count)
-
+    time_e = time()
+    LOG.debug("Total time for getting deltalist: %f" % (time_e-time_s))
+    LOG.debug("  memory deltalist: %f" % (time_mem_delta-time_s))
+    LOG.debug("  disk deltalist: %f" % (time_disk_delta-time_mem_delta))
+    LOG.debug("  merge deltalist: %f" % (time_merge_delta-time_disk_delta))
     return merged_deltalist
 
 
-def generate_overlayfile(overlay_deltalist, options, 
-        base_hashvalue, launchdisk_size, launchmem_size,
-        overlay_metapath, overlayfile_prefix):
+def _generate_overlayfile(overlay_deltalist, overlayfile_prefix):
     ''' generate overlay metafile and file
-    Return:
-        [overlay_metapath, [overlayfilepath1, overlayfilepath2]]
     '''
 
     # Compression
-    LOG.info("[LZMA] Compressing overlay blobs (%s)", overlay_metapath)
-    blob_list = delta.divide_blobs(overlay_deltalist, overlayfile_prefix,
+    LOG.info("[LZMA] Compressing overlay blobs")
+    overlay_info = delta.divide_blobs(overlay_deltalist, overlayfile_prefix,
             Const.OVERLAY_BLOB_SIZE_KB, Const.CHUNK_SIZE,
             Memory.Memory.RAM_PAGE_SIZE)
-
-    # create metadata
-    if not options.DISK_ONLY:
-        _create_overlay_meta(overlay_metapath, base_hashvalue,
-                launchdisk_size, launchmem_size, blob_list)
-    else:
-        _create_overlay_meta(overlay_metapath, base_hashvalue,
-                launchdisk_size, launchmem_size, blob_list)
-
-    overlay_files = [item[Const.META_OVERLAY_FILE_NAME] for item in blob_list]
+    overlay_files = [item[Const.META_OVERLAY_FILE_NAME] for item in overlay_info]
     dirpath = os.path.dirname(overlayfile_prefix)
     overlay_files = [os.path.join(dirpath, item) for item in overlay_files]
 
-    return overlay_metapath, overlay_files
+    return overlay_files, overlay_info
+
+
+def _generate_overlaymeta(overlay_metapath, overlay_info, base_hashvalue,
+                          launchdisk_size, launchmem_size):
+    # create metadata
+    fout = open(overlay_metapath, "wrb")
+
+    meta_dict = dict()
+    meta_dict[Const.META_BASE_VM_SHA256] = base_hashvalue
+    meta_dict[Const.META_RESUME_VM_DISK_SIZE] = long(launchdisk_size)
+    meta_dict[Const.META_RESUME_VM_MEMORY_SIZE] = long(launchmem_size)
+    meta_dict[Const.META_OVERLAY_FILES] = overlay_info
+
+    serialized = msgpack.packb(meta_dict)
+    fout.write(serialized)
+    fout.close()
+
+    return overlay_metapath
 
 
 def run_delta_compression(output_list, **kwargs):
@@ -1042,27 +1057,14 @@ def run_vm(conn, domain_xml, **kwargs):
 
 
 class MemoryReadProcess(multiprocessing.Process):
-    RET_SUCCESS = 1
-    RET_ERRROR = 2
 
-    def __init__(self, input_path, machine_memory_size, 
-                 data_pipe, result_queue):
+    def __init__(self, input_path, machine_memory_size, result_queue):
         self.input_path = input_path
-        self.data_pipe = data_pipe
         self.result_queue = result_queue
         self.machine_memory_size = machine_memory_size*1024
         multiprocessing.Process.__init__(self, target=self.read_mem_snapshot)
 
     def read_mem_snapshot(self):
-        retry_counter = 0
-        if os.path.exists(self.input_path) == False:
-            self.result_queue.put(self.RET_ERRROR)
-            self.result_queue.put("Cannot open named pipe")
-            return
-
-        recv_pipe, send_pipe = self.data_pipe
-        recv_pipe.close()
-
         # create memory snapshot aligned with 4KB
         try:
             self.in_fd = open(self.input_path, 'rb')
@@ -1073,32 +1075,32 @@ class MemoryReadProcess(multiprocessing.Process):
             original_header = libvirt_header.get_header()
             align_size = Memory.Memory.RAM_PAGE_SIZE*2
             new_header = libvirt_header.get_aligned_header(align_size)
-            send_pipe.send(new_header)
+            self.result_queue.put(new_header)
             total_read_size += len(new_header)
-            send_pipe.send(data[len(original_header):])
+            self.result_queue.put(data[len(original_header):])
             total_read_size += len(data[len(original_header):])
             LOG.info("Header size of memory snapshot is %s" % len(new_header))
 
             # write rest of the memory data
             time_s = time()
-            prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
+            #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
                 data = self.in_fd.read(1024 * 1024 * 1)
                 if data == None or len(data) <= 0:
                     break
-                send_pipe.send(data)
+                self.result_queue.put(data)
                 total_read_size += len(data)
-                prog_bar.set_percent(100.0*total_read_size/self.machine_memory_size)
-                prog_bar.show_progress()
-            prog_bar.finish()
-            send_pipe.close()
+                #prog_bar.set_percent(100.0*total_read_size/self.machine_memory_size)
+                #prog_bar.show_progress()
+            #prog_bar.finish()
+            LOG.debug("Memory size of launch VM: %ld" % (total_read_size))
             LOG.debug("memory snapshotting: %f GBps" % (total_read_size/(time()-time_s)/1024/1024/1024))
         except Exception, e:
             LOG.error(str(e))
             self.result_queue.put(self.RET_ERRROR)
-            self.result_queue.put(str(e))
+            self.result_queue.put(Const.QUEUE_FAILED_MESSAGE)
         else:
-            self.result_queue.put(self.RET_SUCCESS)
+            self.result_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
 
 class ProcessingProcess(multiprocessing.Process):
@@ -1123,8 +1125,9 @@ class ProcessingProcess(multiprocessing.Process):
         self.out_fd.close()
 
 
-def save_mem_snapshot(conn, machine, fout_path, **kwargs):
+def save_mem_snapshot(conn, machine, output_queue, **kwargs):
     #Set migration speed
+    time_start = time()
     nova_util = kwargs.get('nova_util', None)
     fuse_stream_monitor = kwargs.get('fuse_stream_monitor', None)
     ret = machine.migrateSetMaxSpeed(1000000, 0)   # 1000 Gbps, unlimited
@@ -1150,29 +1153,19 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
             machine_memory_size = long(memory_element.text)
 
     #Save memory state
-    LOG.info("save VM memory state at %s" % fout_path)
-    LOG.info("This could take up to minute depend on VM's memory size")
-    LOG.info("(Check file at %s)" % fout_path)
+    LOG.info("save VM memory state")
     try:
-        named_pipe_output = fout_path + ".fifo"
-        (recv_data_pipe, send_data_pipe) = multiprocessing.Pipe()
-        result_queue = multiprocessing.Queue()
+        fifo_path = NamedTemporaryFile(prefix="cloudlet-memory-snapshot-",
+                                       delete=True)
+        named_pipe_output = fifo_path.name + ".fifo"
         if os.path.exists(named_pipe_output):
             os.remove(named_pipe_output)
         os.mkfifo(named_pipe_output)
         memory_read_proc = MemoryReadProcess(named_pipe_output,
                                              machine_memory_size,
-                                             (recv_data_pipe, send_data_pipe),
-                                             result_queue)
-        processing_proc = ProcessingProcess((recv_data_pipe, send_data_pipe),
-                                            fout_path)
-        processing_proc.start()
+                                             output_queue)
         memory_read_proc.start()
-
         ret = machine.save(named_pipe_output)
-        memory_read_proc.join()
-        send_data_pipe.close()
-        processing_proc.join()
     except libvirt.libvirtError, e:
         # we intentionally ignore seek error from libvirt since we have cause
         # that by using named pipe
@@ -1185,16 +1178,9 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
             _terminate_vm(conn, machine)
             machine = None
 
+    # TODO: update this to work with streaming
     try:
-        proc_ret = result_queue.get()
-        if proc_ret != MemoryReadProcess.RET_SUCCESS:
-            error_reason = result_queue.get()
-            msg = "Failed to create memory snapshot : %s" % str(error_reason)
-            LOG.error(msg)
-            raise CloudletGenerationError(msg)
         if nova_util != None:
-            # OpenStack runs VM with nova account and snapshot 
-            # is generated from system connection
             nova_util.chown(fout_path, os.getuid())
     except memory_util.MachineGenerationError, e:
         raise CloudletGenerationError("Machine Generation Error: " + str(e))
@@ -1205,6 +1191,10 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
 
     if ret != 0:
         raise CloudletGenerationError("libvirt: Cannot save memory state")
+
+    time_end = time()
+    LOG.debug("  save_memory_snapshot (%f ~ %f): %f" % (time_start, time_end,
+                                                       (time_end-time_start)))
 
 
 def run_snapshot(conn, disk_image, mem_snapshot, new_xml_string, resume_time=None):
@@ -1355,20 +1345,24 @@ def create_residue(base_disk, base_hashvalue,
     qemu_logfile = resumed_vm.qemu_logfile
 
     # 2. suspend VM and get monitoring information
-    residue_mem = NamedTemporaryFile(prefix="cloudlet-residue-mem-", delete=False)
-    monitoring_info = _get_monitoring_info(resumed_vm.conn, resumed_vm.machine, options,
-            base_memmeta, base_diskmeta,
-            resumed_vm.monitor,
-            base_disk, base_mem,
-            resumed_vm.resumed_disk, residue_mem.name,
-            qemu_logfile)
+    memory_snapshot_queue = multiprocessing.Queue()
+    deltalist_queue = multiprocessing.Queue()
+    monitoring_info = _get_monitoring_info(resumed_vm.conn,
+                                           resumed_vm.machine, options,
+                                           base_memmeta, base_diskmeta,
+                                           resumed_vm.monitor,
+                                           base_disk, base_mem,
+                                           resumed_vm.resumed_disk,
+                                           memory_snapshot_queue,
+                                           qemu_logfile)
     time_memory_snapshot = time()
-
     # 3. get overlay VM (semantic gap + deduplication)
     residue_deltalist = get_overlay_deltalist(monitoring_info, options,
-            base_disk, base_mem, base_memmeta,
-            resumed_vm.resumed_disk, residue_mem.name,
-            old_deltalist=original_deltalist)  # this is for getting diff with previous overlay
+                                              base_disk, base_mem, base_memmeta,
+                                              resumed_vm.resumed_disk,
+                                              memory_snapshot_queue,
+                                              deltalist_queue,
+                                              old_deltalist=original_deltalist)
     time_dedup = time()
 
     # 3-1. save residue overlay only for measurement
@@ -1385,6 +1379,7 @@ def create_residue(base_disk, base_hashvalue,
             residue_metapath, residue_prefix)
     '''
 
+
     # 4. merge with previous deltalist
     merged_list = delta.residue_merge_deltalist(original_deltalist, \
             residue_deltalist)
@@ -1393,12 +1388,11 @@ def create_residue(base_disk, base_hashvalue,
     # 5. create_overlayfile
     overlay_prefix = os.path.join(os.getcwd(), Const.OVERLAY_FILE_PREFIX)
     overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
-    overlay_metafile, overlay_files = \
-            generate_overlayfile(merged_list, options, 
-            base_hashvalue, os.path.getsize(resumed_vm.resumed_disk), 
-            os.path.getsize(residue_mem.name),
-            overlay_metapath, overlay_prefix)
-
+    overlay_files, overlay_info = _generate_overlayfile(merged_list, overlay_prefix)
+    overlay_metafile = _generate_overlaymeta(overlay_metapath, overlay_info,
+                                         base_hashvalue, os.path.getsize(resumed_vm.resumed_disk),
+                                         os.path.getsize(base_mem))
+    LOG.debug("base VM memory size: %ld" % os.path.getsize(base_mem))
     # 6. packaging VM overlay into a single zip file
     temp_dir = mkdtemp(prefix="cloudlet-overlay-")
     overlay_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
@@ -1412,16 +1406,20 @@ def create_residue(base_disk, base_hashvalue,
     for overlay_file in overlay_files:
         if os.path.exists(overlay_file) == True:
             os.remove(overlay_file)
-    if os.path.exists(residue_mem.name):
-        os.unlink(residue_mem.name);
 
     time_end = time()
-    LOG.debug("Total residue creation time: %f" % (time_end-time_start))
-    LOG.debug("  memory_snapshotting: %f" % (time_memory_snapshot-time_start))
-    LOG.debug("  deduplication (and semantic gap): %f" % (time_dedup-time_memory_snapshot))
-    LOG.debug("  merge with prev overlay: %f" % (time_merge_with_prev-time_dedup))
-    LOG.debug("  compression: %f" % (time_compression-time_merge_with_prev))
-    LOG.debug("  deallocation: %f" % (time_end-time_compression))
+    LOG.debug("Total residue creation tim (%f ~ %f): %f" % (time_start, time_end,
+                                                            (time_end-time_start)))
+    LOG.debug("  memory_snapshotting (%f ~ %f): %f" % (time_start, time_memory_snapshot,
+                                                       (time_memory_snapshot-time_start)))
+    LOG.debug("  deduplication (and semantic gap) (%f ~ %f): %f" % (time_memory_snapshot, time_dedup,
+                                                                    (time_dedup-time_memory_snapshot)))
+    LOG.debug("  merge with prev overlay (%f ~ %f): %f" % (time_dedup, time_merge_with_prev,
+                                                           (time_merge_with_prev-time_dedup)))
+    LOG.debug("  compression (%f ~ %f): %f" % (time_merge_with_prev, time_compression,
+                                               (time_compression-time_merge_with_prev)))
+    LOG.debug("  deallocation (%f ~ %f): %f" % (time_compression, time_end,
+                                                (time_end-time_compression)))
     return overlay_zipfile
 
 
