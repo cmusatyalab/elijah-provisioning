@@ -206,7 +206,7 @@ class StreamMonitor(threading.Thread):
             events = self.epoll.poll(1)
             for fileno, event in events:
                 self._handle(fileno, event)
-        
+
         for fileno, item in self.stream_dict.items():
             self.del_path(item['name'])
         self._running = False

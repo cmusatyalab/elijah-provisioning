@@ -32,6 +32,7 @@ from delta import DeltaItem
 from delta import DeltaList
 from delta import Recovered_delta
 from progressbar import AnimatedProgressBar
+from Configuration import Const
 import log as logging
 
 LOG = logging.getLogger(__name__)
@@ -171,12 +172,13 @@ def parse_qemu_log(qemu_logfile, chunk_size):
 
 
 def create_disk_deltalist(modified_disk, 
-            modified_chunk_dict, chunk_size,
-            basedisk_hashlist=None, basedisk_path=None,
-            trim_dict=None, dma_dict=None,
-            apply_discard=True,
-            used_blocks_dict=None,
-            ret_statistics=None):
+                          modified_chunk_dict, chunk_size,
+                          disk_deltalist_queue,
+                          basedisk_path=None,
+                          trim_dict=None, dma_dict=None,
+                          apply_discard=True,
+                          used_blocks_dict=None,
+                          ret_statistics=None):
     # get disk delta
     # base_diskmeta : hash list of base disk
     # base_disk: path to base VM disk
@@ -200,8 +202,8 @@ def create_disk_deltalist(modified_disk,
     xrayed_list = []
 
     # 1. get modified page
-    LOG.debug("1.get modified disk page")
-    delta_list = list()
+    LOG.debug("1. Get modified disk page")
+    counter = 0
     for index, chunk in enumerate(modified_chunk_dict.keys()):
         offset = chunk * chunk_size
         ctime = modified_chunk_dict[chunk]
@@ -254,7 +256,11 @@ def create_disk_deltalist(modified_disk,
                     ref_id=DeltaItem.REF_RAW,
                     data_len=len(data),
                     data=data)
-        delta_list.append(delta_item)
+        disk_deltalist_queue.put(delta_item)
+        counter += 1
+    disk_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+    LOG.debug("# of modified disk delta item: %ld" % counter)
+
     if ret_statistics != None:
         ret_statistics['trimed'] = trim_counter
         ret_statistics['xrayed'] = xray_counter
@@ -262,8 +268,6 @@ def create_disk_deltalist(modified_disk,
         ret_statistics['xrayed_list'] = xrayed_list
     LOG.debug("1-1. Trim(%d, overwritten after trim(%d)), Xray(%d)" % \
             (trim_counter, overwritten_after_trim, xray_counter))
-
-    return delta_list
 
 
 def recover_disk(base_disk, base_mem, overlay_mem, overlay_disk, recover_path, chunk_size):
@@ -301,8 +305,8 @@ def recover_disk(base_disk, base_mem, overlay_mem, overlay_disk, recover_path, c
     return ','.join(chunk_list)
 
 
-def base_hashlist(base_meta):
-    hash_list = list()
+def base_hashdict(base_meta):
+    hash_dict = dict()
     fd = open(base_meta, "rb")
     while True:
         header = fd.read(8+4)
@@ -310,8 +314,9 @@ def base_hashlist(base_meta):
             break
         offset, length = struct.unpack("!QI", header)
         sha256 = fd.read(32)
-        hash_list.append((offset, length, sha256))
-    return hash_list
+        item = (offset, length, sha256)
+        hash_dict[sha256] = item
+    return hash_dict
 
 
 if __name__ == "__main__":

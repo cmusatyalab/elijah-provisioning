@@ -25,7 +25,10 @@ import mmap
 import tool
 import os
 import random
-import multiprocessing 
+import select
+import threading
+import multiprocessing
+import Queue
 from operator import itemgetter
 from hashlib import sha256
 from lzma import LZMACompressor
@@ -612,32 +615,106 @@ class Recovered_delta(multiprocessing.Process):
         LOG.debug("Recover finishes")
 
 
-def create_overlay(memory_deltalist, memory_chunk_size,
-        disk_deltalist, disk_chunk_size,
-        basedisk_hashlist=None, basemem_hashlist=None):
+def deduplicate_deltaitem(hash_dict, delta_item, ref_id):
+    dict_element = hash_dict.get(delta_item.hash_value, None)
+    if dict_element is not None:
+        (start, length, hash_value) = dict_element
+        if ((delta_item.ref_id == DeltaItem.REF_XDELTA) or (delta_item.ref_id == DeltaItem.REF_RAW)):
+            #LOG.debug("ref_id: %d, page %ld is matching base %ld" % (ref_id, delta_item.offset, start))
+            delta_item.ref_id = ref_id
+            delta_item.data_len = 8
+            delta_item.data = long(start)
+            return True
+    return False
 
-    if memory_chunk_size != disk_chunk_size:
-        raise DeltaError("Expect same chunk size for Disk and Memory")
-    chunk_size = disk_chunk_size
-    delta_list = memory_deltalist+disk_deltalist
 
-    #Memory
-    # Create Base Memory from meta file
-    LOG.debug("2-1.Find zero page")
-    zero_hash = sha256(struct.pack("!s", chr(0x00))*chunk_size).digest()
-    zero_hash_list = [(-1, chunk_size, zero_hash)]
-    diff_with_hashlist(zero_hash_list, delta_list, ref_id=DeltaItem.REF_ZEROS)
+class DeltaDedup(threading.Thread):
+    def __init__(self, memory_deltalist_queue, memory_chunk_size,
+                   disk_deltalist_queue, disk_chunk_size,
+                   merged_deltalist_queue,
+                   basedisk_hashdict=None, basemem_hashdict=None):
+        self.memory_deltalist_queue = memory_deltalist_queue
+        self.memory_chunk_size = memory_chunk_size
+        self.disk_deltalist_queue = disk_deltalist_queue
+        self.disk_chunk_size = disk_chunk_size
+        self.merged_deltalist_queue = merged_deltalist_queue
+        self.basedisk_hashdict = basedisk_hashdict
+        self.basemem_hashdict = basemem_hashdict
 
-    LOG.debug("2-2.get delta from base Memory")
-    diff_with_hashlist(basemem_hashlist, delta_list, ref_id=DeltaItem.REF_BASE_MEM)
-    LOG.debug("2-3.get delta from base Disk")
-    diff_with_hashlist(basedisk_hashlist, delta_list, ref_id=DeltaItem.REF_BASE_DISK)
+        self.self_hashdict = dict()
+        self.number_of_zero_page = 0
+        self.number_of_base_mem = 0
+        self.number_of_base_disk = 0
+        self.number_of_self_ref = 0
+        self.delta_disk_chunks = list()
+        self.delta_memory_chunks = list()
+        threading.Thread.__init__(self, target=self.perform_dedup)
 
-    # 3.find shared within self
-    LOG.debug("3.get delta from itself")
-    DeltaList.get_self_delta(delta_list)
 
-    return delta_list
+    def perform_dedup(self):
+        if self.memory_chunk_size != self.disk_chunk_size:
+            raise DeltaError("Expect same chunk size for Disk and Memory")
+        chunk_size = self.disk_chunk_size
+
+        zero_hash_dict = dict()
+        zero_hash = sha256(struct.pack("!s", chr(0x00))*chunk_size).digest()
+        zero_hash_list = (-1, chunk_size, zero_hash)
+        zero_hash_dict[zero_hash] = zero_hash_list
+        LOG.debug("2-1.Find zero page")
+        LOG.debug("2-2.get delta from base Memory")
+        LOG.debug("2-3.get delta from base Disk")
+        LOG.debug("3.get delta from itself")
+        is_memory_finished = False
+        is_disk_finished = False
+        while is_memory_finished == False or is_disk_finished == False:
+            #(input_ready, [], []) = select.select([self.memory_deltalist_queue, self.disk_deltalist_queue], [], [])
+            # select only works for multiprocessing.Queue not for Queue.Queue
+
+            # process memory delta
+            delta_item = None
+            if is_memory_finished == False:
+                try:
+                    delta_item = self.memory_deltalist_queue.get_nowait()
+                    if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
+                        is_memory_finished = True
+                        delta_item = None   # To check diskdelta
+                except Queue.Empty:
+                    pass
+            if delta_item == None and is_disk_finished == False:
+                try:
+                    delta_item = self.disk_deltalist_queue.get_nowait()
+                    if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
+                        is_disk_finished = True
+                        continue    # end of the loop
+                except Queue.Empty:
+                    continue
+            if delta_item == None:
+                continue
+
+            if deduplicate_deltaitem(zero_hash_dict, delta_item, DeltaItem.REF_ZEROS) == True:
+                self.number_of_zero_page += 1
+            elif deduplicate_deltaitem(self.basemem_hashdict, delta_item, DeltaItem.REF_BASE_MEM) == True:
+                self.number_of_base_mem += 1
+            elif deduplicate_deltaitem(self.basedisk_hashdict, delta_item, DeltaItem.REF_BASE_DISK) == True:
+                self.number_of_base_disk += 1
+            else:
+                # chunk that are not deduplicated yet
+                if ((delta_item.ref_id == DeltaItem.REF_XDELTA) or (delta_item.ref_id == DeltaItem.REF_RAW)):
+                    ret = deduplicate_deltaitem(self.self_hashdict, delta_item, DeltaItem.REF_SELF)
+                    if ret == True:
+                        self.number_of_self_ref += 1
+                    else:
+                        ref_offset = long(delta_item.index)
+                        offset_length = 8
+                        self.self_hashdict[delta_item.hash_value] = (ref_offset, offset_length, delta_item.hash_value)
+            self.merged_deltalist_queue.put(delta_item)
+            if delta_item.delta_type == DeltaItem.DELTA_DISK:
+                self.delta_disk_chunks.append(delta_item.offset)
+            elif delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+                self.delta_memory_chunks.append(delta_item.offset)
+            #LOG.debug("number of deltalist at merged_deltalist_queue: %d" % self.merged_deltalist_queue.qsize())
+        self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+        LOG.debug("number of deltalist at merged_deltalist_queue: %d" % self.merged_deltalist_queue.qsize())
 
 
 def reorder_deltalist_linear(chunk_size, delta_list):
@@ -727,6 +804,7 @@ def reorder_deltalist(access_list, chunk_size, delta_list):
     LOG.info("[DEBUG][REORDER] changed %d deltaitem (total access pattern: %d)" % (count, len(access_list)))
 
 
+
 def _save_blob(start_index, delta_list, self_ref_dict, blob_name, blob_size, statistics=None):
     # mode = 2 indicates LZMA_SYNC_FLUSH, which show all output right after input
     comp_option = {'format':'xz', 'level':9}
@@ -802,6 +880,38 @@ def _save_blob(start_index, delta_list, self_ref_dict, blob_name, blob_size, sta
         return index, memory_offset_list, disk_offset_list
     else:
         raise DeltaError("LZMA compression is zero")
+
+
+def compress_stream(delta_list_queue, comp_delta_queue):
+    start_time = time.time()
+    # mode = 2 indicates LZMA_SYNC_FLUSH, which show all output right after input
+    comp = LZMACompressor(options={'format':'xz', 'level':9})
+    original_length = 0
+    comp_data_length = 0
+    comp_delta_bytes = ''
+    LOG.debug("start compression")
+
+    count = 0
+    while True:
+        delta_item = delta_list_queue.get()
+        if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
+            break
+        delta_bytes = delta_item.get_serialized()
+        original_length += len(delta_bytes)
+        comp_delta_bytes = comp.compress(delta_bytes)
+        comp_data_length += len(comp_delta_bytes)
+        comp_delta_queue.put(comp_delta_bytes)
+        count += 1
+
+    comp_delta_bytes = comp.flush()
+    if comp_delta_bytes is not None and len(comp_delta_bytes) > 0:
+        comp_data_length += len(comp_delta_bytes)
+        comp_delta_queue.put(comp_delta_bytes)
+    comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+    end_time = time.time()
+
+    LOG.debug("Overlay size: %d, # of deltaitem: %ld" % (comp_data_length, count))
+    LOG.debug("[time] Overlay compression time (%f ~ %f): %f" % (start_time, end_time, (end_time-start_time)))
 
 
 def divide_blobs(delta_list, overlay_path, blob_size_kb, 

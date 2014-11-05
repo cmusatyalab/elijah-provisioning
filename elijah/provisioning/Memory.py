@@ -24,6 +24,7 @@ import struct
 import tool
 import mmap
 import subprocess
+import time
 from optparse import OptionParser
 from hashlib import sha256
 
@@ -98,27 +99,29 @@ class Memory(object):
         ram_offset = 0
         freed_page_counter = 0
         base_hashlist_length = len(self.hash_list)
-        # krha
-        fd = open("./test_mem", "wrb")
-        while True:
+        is_end_of_stream = False
+        time_s = time.time()
+        while is_end_of_stream == False and len(memory_page_list) != 0:
             # get data from the stream
             if len(memory_page_list) < 2: # empty or partial data
                 recved_data = memory_data_queue.get()
                 if len(recved_data) == Const.QUEUE_SUCCESS_MESSAGE_LEN and recved_data == Const.QUEUE_SUCCESS_MESSAGE:
                     # End of the stream
-                    break
-                required_length = 0
-                if len(memory_page_list) == 1: # handle partial data
-                    last_data = memory_page_list.pop(0)
-                    required_length = Memory.RAM_PAGE_SIZE-len(last_data)
-                    last_data += recved_data[0:required_length]
-                    memory_page_list.append(last_data)
-                memory_page_list += chunks(recved_data[required_length:], Memory.RAM_PAGE_SIZE)
+                    is_end_of_stream = True
+                else:
+                    required_length = 0
+                    if len(memory_page_list) == 1: # handle partial data
+                        last_data = memory_page_list.pop(0)
+                        required_length = Memory.RAM_PAGE_SIZE-len(last_data)
+                        last_data += recved_data[0:required_length]
+                        memory_page_list.append(last_data)
+                    memory_page_list += chunks(recved_data[required_length:], Memory.RAM_PAGE_SIZE)
             data = memory_page_list.pop(0)
-            fd.write(data)  # krha
 
             # compare input with hash or corresponding base memory, save only when it is different
             hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
+            #if hash_list_index%10000 == 0:
+            #    print "%d: # of memory chunk at queue: %d" % (ram_offset, memory_data_queue.qsize())
             if hash_list_index < base_hashlist_length:
                 self_hash_value = self.hash_list[hash_list_index][2]
             else:
@@ -159,6 +162,7 @@ class Memory(object):
                                 data_len=len(data),
                                 data=data)
                     deltalist_queue.put(delta_item)
+                    #print "# of delta chunk at queue: %d" % deltalist_queue.qsize()
 
             # memory over-usage protection
             ram_offset += len(data)
@@ -169,6 +173,8 @@ class Memory(object):
                 prog_bar.show_progress()
             '''
         #prog_bar.finish()
+        time_e = time.time()
+        LOG.debug("time for hashing memory snapshot (%f ~ %f): %f" % (time_s, time_e, time_e-time_s))
         deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
         return freed_page_counter
 
@@ -281,6 +287,23 @@ class Memory(object):
             hash_list.append(value)
         fd.close()
         return hash_list
+
+    @staticmethod
+    def import_hashdict(meta_path):
+        fd = open(meta_path, "rb")
+
+        # Read Hash Item List
+        hash_dict = dict()
+        count = 0
+        while True:
+            count += 1
+            data = fd.read(8+4+32) # start_offset, length, hash
+            if not data:
+                break
+            item = tuple(struct.unpack("!qI32s", data))
+            hash_dict[item[2]] = item
+        fd.close()
+        return hash_dict
 
     @staticmethod
     def pack_hashlist(hash_list):
@@ -399,7 +422,6 @@ def create_memory_deltalist(modified_mem_queue, deltalist_queue,
     # freed_counter_ret : return pointer for freed counter
 
     # Create Base Memory from meta file
-    from old_mem import Memory as OldMemory
     base = Memory.import_from_metafile(basemem_meta, basemem_path)
 
     # 1.get modified page
@@ -409,33 +431,6 @@ def create_memory_deltalist(modified_mem_queue, deltalist_queue,
                       deltalist_queue,
                       apply_free_memory=apply_free_memory,
                       free_memory_info=free_memory_info)
-
-    # krha: compare deltalist
-    mem_deltalist = list()
-    while True:
-        deltaitem = deltalist_queue.get()
-        if deltaitem == Const.QUEUE_SUCCESS_MESSAGE:
-            break
-        mem_deltalist.append(deltaitem)
-    old_base = OldMemory.import_from_metafile(basemem_meta, basemem_path)
-    old_deltalist = old_base.get_modified("./test_mem",
-                          apply_free_memory=False,
-                          free_memory_info=free_memory_info)
-    for index, item in enumerate(mem_deltalist):
-        old_item = old_deltalist[index]
-        if item.index != old_item.index:
-            import pdb;pdb.set_trace()
-            print "different"
-        if item.hash_value != old_item.hash_value:
-            import pdb;pdb.set_trace()
-            print "hashvalue diff"
-        if item.data != old_item.data:
-            import pdb;pdb.set_trace()
-            print "data diff"
-        if item.get_serialized() != old_item.get_serialized():
-            import pdb;pdb.set_trace()
-            print "diff"
-    import pdb;pdb.set_trace()
 
 
 def recover_memory(base_disk, base_mem, delta_path, out_path, verify_with_original=None):
@@ -494,10 +489,10 @@ def recover_memory(base_disk, base_mem, delta_path, out_path, verify_with_origin
     return ','.join(chunk_list)
 
 
-def base_hashlist(base_memmeta_path):
+def base_hashdict(base_memmeta_path):
     # get the hash list from the meta file
-    hashlist = Memory.import_hashlist(base_memmeta_path)
-    return hashlist
+    hash_dict = Memory.import_hashdict(base_memmeta_path)
+    return hash_dict
 
 
 def get_free_pfn_dict(snapshot_path, mem_size, mem_offset):
