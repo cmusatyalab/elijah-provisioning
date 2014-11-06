@@ -1176,7 +1176,7 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
         if os.path.exists(named_pipe_output):
             os.remove(named_pipe_output)
         os.mkfifo(named_pipe_output)
-        manager = multiprocessing.Manager()
+        #manager = multiprocessing.Manager()
         #memory_snapshot_size = manager.list()
         memory_read_proc = MemoryReadProcess(named_pipe_output,
                                              machine_memory_size,
