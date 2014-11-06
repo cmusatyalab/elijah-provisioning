@@ -86,6 +86,9 @@ class Memory(object):
 
     def _get_mem_hash(self, fin, deltalist_queue,
                       apply_free_memory, free_pfn_dict):
+        #import yappi
+        #yappi.start()
+
         LOG.info("Get hash list of memory page")
         #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
 
@@ -139,7 +142,6 @@ class Memory(object):
                 else:
                     #get xdelta comparing self.raw
                     source_data = self.get_raw_data(ram_offset, len(data))
-                    #save xdelta as DeltaItem only when it gives smaller
                     try:
                         if source_data == None:
                             raise IOError("launch memory snapshot is bigger than base vm")
@@ -174,8 +176,8 @@ class Memory(object):
             '''
         #prog_bar.finish()
         time_e = time.time()
-        LOG.debug("time for hashing memory snapshot (%f ~ %f): %f" % (time_s, time_e, time_e-time_s))
         deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+        #yappi.get_func_stats().print_all()
         return freed_page_counter
 
     @staticmethod

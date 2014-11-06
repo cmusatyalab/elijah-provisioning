@@ -895,7 +895,7 @@ def _save_blob(start_index, delta_list, self_ref_dict, blob_name, blob_size, sta
 def compress_stream(delta_list_queue, comp_delta_queue):
     start_time = time.time()
     # mode = 2 indicates LZMA_SYNC_FLUSH, which show all output right after input
-    comp = LZMACompressor(options={'format':'xz', 'level':9})
+    comp = LZMACompressor(options={'format':'xz', 'level':1})
     original_length = 0
     comp_data_length = 0
     comp_delta_bytes = ''

@@ -726,15 +726,11 @@ class VMMonitor(threading.Thread):
         threading.Thread.__init__(self, target=self.get_memory_snapshot)
 
     def get_memory_snapshot(self):
-        time_start = time()
         if not self.options.DISK_ONLY:
             self.memory_snapshot_size = save_mem_snapshot(self.conn, self.machine,
                                                           self.memory_snapshot_queue,
                                                           nova_util=self.nova_util,
                                                           fuse_stream_monitor=self.fuse_stream_monitor)
-        time_end = time()
-        LOG.debug("Memory snapshotting time at get_monitor (%f ~ %f): %f" % (time_start, time_end,
-                                                            (time_end-time_start)))
         return self.memory_snapshot_size
 
 
@@ -833,13 +829,14 @@ def get_overlay_deltalist(monitoring_info, options,
     time_s = time()
     if not options.DISK_ONLY:
         memory_deltalist_queue = multiprocessing.Queue()
-        memory_deltalist_thread = threading.Thread(target=Memory.create_memory_deltalist,
-                                                   args=(modified_mem_queue,
-                                                         memory_deltalist_queue,
-                                                         base_memmeta, base_mem,
-                                                         options.FREE_SUPPORT,
-                                                         free_memory_dict)
-                                                   )
+        #memory_deltalist_thread = threading.Thread(target=Memory.create_memory_deltalist,
+        memory_deltalist_thread = multiprocessing.Process(target=Memory.create_memory_deltalist,
+                                                          args=(modified_mem_queue,
+                                                                memory_deltalist_queue,
+                                                                base_memmeta, base_mem,
+                                                                options.FREE_SUPPORT,
+                                                                free_memory_dict)
+                                                          )
         memory_deltalist_thread.start()
     time_mem_delta = time()
 
@@ -1391,8 +1388,8 @@ def create_residue(base_disk, base_hashvalue,
 
     # 5. compression
     LOG.info("[LZMA] Compressing overlay blobs")
-    #comp_thread = multiprocessing.Process(target=delta.compress_stream,
-    comp_thread = threading.Thread(target=delta.compress_stream,
+    comp_thread = multiprocessing.Process(target=delta.compress_stream,
+    #comp_thread = threading.Thread(target=delta.compress_stream,
                                           args=(residue_deltalist_queue, compdata_queue))
     comp_thread.start()
 
