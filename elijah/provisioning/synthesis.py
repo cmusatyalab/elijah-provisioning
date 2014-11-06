@@ -1391,8 +1391,8 @@ def create_residue(base_disk, base_hashvalue,
 
     # 5. compression
     LOG.info("[LZMA] Compressing overlay blobs")
-    comp_thread = multiprocessing.Process(target=delta.compress_stream,
-    #comp_thread = threading.Thread(target=delta.compress_stream,
+    #comp_thread = multiprocessing.Process(target=delta.compress_stream,
+    comp_thread = threading.Thread(target=delta.compress_stream,
                                           args=(residue_deltalist_queue, compdata_queue))
     comp_thread.start()
 
@@ -1791,6 +1791,12 @@ def _reconstruct_mem_deltalist(base_disk, base_mem, overlay_filepath):
 
     base_disk_fd.close()
     base_mem_fd.close()
+    raw_disk.close()
+    raw_disk = None
+    raw_mem.close()
+    raw_mem = None
+    recovered_data_dict = None
+
     return ret_deltalist
 
 

@@ -485,19 +485,19 @@ class Recovered_delta(multiprocessing.Process):
         self.zero_data = struct.pack("!s", chr(0x00)) * chunk_size
         self.recovered_delta_dict = dict()
         self.delta_list = list()
-        
-        # initialize reference data to use mmap
-        self.base_disk_fd = open(base_disk, "rb")
-        self.raw_disk = mmap.mmap(self.base_disk_fd.fileno(), 0, prot=mmap.PROT_READ)
-        self.base_mem_fd = open(base_mem, "rb")
-        self.raw_mem = mmap.mmap(self.base_mem_fd.fileno(), 0, prot=mmap.PROT_READ)
 
         multiprocessing.Process.__init__(self)
 
     def run(self):
         start_time = time.time()
-        self.out_pipe = open(self.out_pipename, "w")
+
+        # initialize reference data to use mmap
         count = 0
+        self.base_disk_fd = open(self.base_disk, "rb")
+        self.raw_disk = mmap.mmap(self.base_disk_fd.fileno(), 0, prot=mmap.PROT_READ)
+        self.base_mem_fd = open(self.base_mem, "rb")
+        self.raw_mem = mmap.mmap(self.base_mem_fd.fileno(), 0, prot=mmap.PROT_READ)
+        self.out_pipe = open(self.out_pipename, "w")
         self.recover_mem_fd = open(self.output_mem_path, "wrb")
         self.recover_disk_fd = open(self.output_disk_path, "wrb")
         overlay_stream = open(self.overlay_path, "r")
@@ -542,16 +542,18 @@ class Recovered_delta(multiprocessing.Process):
         self.out_pipe.write(str(Recovered_delta.END_OF_PIPE) + "\n")
         self.out_pipe.close()
         self.recover_mem_fd.close()
+        self.recover_mem_fd = None
         self.recover_disk_fd.close()
+        self.recover_disk_fd = None
         end_time = time.time()
 
         if self.time_queue != None: 
             self.time_queue.put({'start_time':start_time, 'end_time':end_time})
         LOG.info("[Delta] : (%s)-(%s)=(%s), delta %ld chunks" % \
                 (start_time, end_time, (end_time-start_time), count))
-
         if self.deltalist_savepath:
             DeltaList.tofile(self.delta_list, self.deltalist_savepath, with_hashvalue=True)
+        self.finish()
 
     def recover_item(self, delta_item):
         if type(delta_item) != DeltaItem:
@@ -602,16 +604,21 @@ class Recovered_delta(multiprocessing.Process):
         return delta_item
 
     def finish(self):
-        if self.base_disk_fd:
+        if self.base_disk_fd is not None:
             self.base_disk_fd.close()
-        if self.base_mem_fd:
+            self.base_disk_fd = None
+        if self.base_mem_fd is not None:
             self.base_mem_fd.close()
-        if self.raw_disk:
+            self.base_mem_fd = None
+        if self.raw_disk is not None:
             self.raw_disk.close()
-        if self.raw_mem:
+            self.raw_disk = None
+        if self.raw_mem is not None:
             self.raw_mem.close()
-        if self.raw_mem_overlay:
+            self.raw_mem = None
+        if self.raw_mem_overlay is not None:
             self.raw_mem_overlay.close()
+            self.raw_mem_overlay = None
         LOG.debug("Recover finishes")
 
 
