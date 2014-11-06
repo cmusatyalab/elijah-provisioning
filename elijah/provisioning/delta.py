@@ -652,6 +652,7 @@ class DeltaDedup(threading.Thread):
 
 
     def perform_dedup(self):
+        time_s = time.time()
         if self.memory_chunk_size != self.disk_chunk_size:
             raise DeltaError("Expect same chunk size for Disk and Memory")
         chunk_size = self.disk_chunk_size
@@ -715,6 +716,8 @@ class DeltaDedup(threading.Thread):
             #LOG.debug("number of deltalist at merged_deltalist_queue: %d" % self.merged_deltalist_queue.qsize())
         self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
         LOG.debug("number of deltalist at merged_deltalist_queue: %d" % self.merged_deltalist_queue.qsize())
+        time_e = time.time()
+        LOG.debug("[time] Deduplication time (%f ~ %f): %f" % (time_s, time_e, (time_e-time_s)))
 
 
 def reorder_deltalist_linear(chunk_size, delta_list):

@@ -422,6 +422,7 @@ def create_memory_deltalist(modified_mem_queue, deltalist_queue,
     # freed_counter_ret : return pointer for freed counter
 
     # Create Base Memory from meta file
+    time_s = time.time()
     base = Memory.import_from_metafile(basemem_meta, basemem_path)
 
     # 1.get modified page
@@ -431,6 +432,8 @@ def create_memory_deltalist(modified_mem_queue, deltalist_queue,
                       deltalist_queue,
                       apply_free_memory=apply_free_memory,
                       free_memory_info=free_memory_info)
+    time_e = time.time()
+    LOG.debug("[time] Memory hashing and diff time (%f ~ %f): %f" % (time_s, time_e, (time_e-time_s)))
 
 
 def recover_memory(base_disk, base_mem, delta_path, out_path, verify_with_original=None):

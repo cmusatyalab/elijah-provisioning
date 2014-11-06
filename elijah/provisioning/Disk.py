@@ -21,6 +21,7 @@
 import struct
 import os
 import sys
+import time
 import mmap
 from math import ceil
 from hashlib import sha256
@@ -187,6 +188,7 @@ def create_disk_deltalist(modified_disk,
     # overlay_path : path to destination of overlay disk
     # dma_dict : dma information, 
     #           dma_dict[disk_chunk] = {'time':time, 'memory_chunk':memory chunk number, 'read': True if read from disk'}
+    time_s = time.time()
     base_fd = open(basedisk_path, "rb")
     base_mmap = mmap.mmap(base_fd.fileno(), 0, prot=mmap.PROT_READ)
     modified_fd = open(modified_disk, "rb")
@@ -268,6 +270,8 @@ def create_disk_deltalist(modified_disk,
         ret_statistics['xrayed_list'] = xrayed_list
     LOG.debug("1-1. Trim(%d, overwritten after trim(%d)), Xray(%d)" % \
             (trim_counter, overwritten_after_trim, xray_counter))
+    time_e = time.time()
+    LOG.debug("[time] Disk hashing and diff time (%f ~ %f): %f" % (time_s, time_e, (time_e-time_s)))
 
 
 def recover_disk(base_disk, base_mem, overlay_mem, overlay_disk, recover_path, chunk_size):

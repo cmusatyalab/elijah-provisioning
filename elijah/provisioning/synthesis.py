@@ -1211,8 +1211,9 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
         raise CloudletGenerationError("libvirt: Cannot save memory state")
 
     time_end = time()
-    LOG.debug("  save_memory_snapshot (%f ~ %f): %f" % (time_start, time_end,
-                                                       (time_end-time_start)))
+    LOG.debug("[time] save_memory_snapshot (%f ~ %f): %f" % (
+        time_start, time_end,
+        (time_end-time_start)))
     return memory_read_proc.total_read_size
 
 
@@ -1390,8 +1391,9 @@ def create_residue(base_disk, base_hashvalue,
 
     # 5. compression
     LOG.info("[LZMA] Compressing overlay blobs")
-    comp_thread = multiprocessing.Process(target = delta.compress_stream,
-                                   args = (residue_deltalist_queue, compdata_queue))
+    comp_thread = multiprocessing.Process(target=delta.compress_stream,
+    #comp_thread = threading.Thread(target=delta.compress_stream,
+                                          args=(residue_deltalist_queue, compdata_queue))
     comp_thread.start()
 
     # to be deleted
