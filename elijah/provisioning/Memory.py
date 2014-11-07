@@ -291,23 +291,6 @@ class Memory(object):
         return hash_list
 
     @staticmethod
-    def import_hashdict(meta_path):
-        fd = open(meta_path, "rb")
-
-        # Read Hash Item List
-        hash_dict = dict()
-        count = 0
-        while True:
-            count += 1
-            data = fd.read(8+4+32) # start_offset, length, hash
-            if not data:
-                break
-            item = tuple(struct.unpack("!qI32s", data))
-            hash_dict[item[2]] = item
-        fd.close()
-        return hash_dict
-
-    @staticmethod
     def pack_hashlist(hash_list):
         # pack hash list
         original_length = len(hash_list)
@@ -492,12 +475,6 @@ def recover_memory(base_disk, base_mem, delta_path, out_path, verify_with_origin
         LOG.debug("Pass all varification - Successfully recovered")
 
     return ','.join(chunk_list)
-
-
-def base_hashdict(base_memmeta_path):
-    # get the hash list from the meta file
-    hash_dict = Memory.import_hashdict(base_memmeta_path)
-    return hash_dict
 
 
 def get_free_pfn_dict(snapshot_path, mem_size, mem_offset):

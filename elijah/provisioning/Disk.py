@@ -308,20 +308,5 @@ def recover_disk(base_disk, base_mem, overlay_mem, overlay_disk, recover_path, c
     # overlay chunk format: chunk_1:1,chunk_2:1,...
     return ','.join(chunk_list)
 
-
-def base_hashdict(base_meta):
-    hash_dict = dict()
-    fd = open(base_meta, "rb")
-    while True:
-        header = fd.read(8+4)
-        if not header:
-            break
-        offset, length = struct.unpack("!QI", header)
-        sha256 = fd.read(32)
-        item = (offset, length, sha256)
-        hash_dict[sha256] = item
-    return hash_dict
-
-
 if __name__ == "__main__":
     parse_qemu_log("log", 4096)

@@ -639,14 +639,14 @@ class DeltaDedup(threading.Thread):
     def __init__(self, memory_deltalist_queue, memory_chunk_size,
                    disk_deltalist_queue, disk_chunk_size,
                    merged_deltalist_queue,
-                   basedisk_hashdict=None, basemem_hashdict=None):
+                   base_memmeta=None, base_diskmeta=None):
         self.memory_deltalist_queue = memory_deltalist_queue
         self.memory_chunk_size = memory_chunk_size
         self.disk_deltalist_queue = disk_deltalist_queue
         self.disk_chunk_size = disk_chunk_size
         self.merged_deltalist_queue = merged_deltalist_queue
-        self.basedisk_hashdict = basedisk_hashdict
-        self.basemem_hashdict = basemem_hashdict
+        self.base_memmeta = base_memmeta
+        self.base_diskmeta = base_diskmeta
 
         self.self_hashdict = dict()
         self.number_of_zero_page = 0
@@ -660,6 +660,10 @@ class DeltaDedup(threading.Thread):
 
     def perform_dedup(self):
         time_s = time.time()
+        # get hashtable
+        self.basemem_hashdict= self.memory_import_hashdict(self.base_memmeta)
+        self.basedisk_hashdict = self.disk_import_hashdict(self.base_diskmeta)
+
         if self.memory_chunk_size != self.disk_chunk_size:
             raise DeltaError("Expect same chunk size for Disk and Memory")
         chunk_size = self.disk_chunk_size
@@ -725,6 +729,38 @@ class DeltaDedup(threading.Thread):
         LOG.debug("number of deltalist at merged_deltalist_queue: %d" % self.merged_deltalist_queue.qsize())
         time_e = time.time()
         LOG.debug("[time] Deduplication time (%f ~ %f): %f" % (time_s, time_e, (time_e-time_s)))
+
+    @staticmethod
+    def memory_import_hashdict(meta_path):
+        fd = open(meta_path, "rb")
+
+        # Read Hash Item List
+        hash_dict = dict()
+        count = 0
+        while True:
+            count += 1
+            data = fd.read(8+4+32) # start_offset, length, hash
+            if not data:
+                break
+            item = tuple(struct.unpack("!qI32s", data))
+            hash_dict[item[2]] = item
+        fd.close()
+        return hash_dict
+
+    @staticmethod
+    def disk_import_hashdict(base_meta):
+        hash_dict = dict()
+        fd = open(base_meta, "rb")
+        while True:
+            header = fd.read(8+4)
+            if not header:
+                break
+            offset, length = struct.unpack("!QI", header)
+            sha256 = fd.read(32)
+            item = (offset, length, sha256)
+            hash_dict[sha256] = item
+        return hash_dict
+
 
 
 def reorder_deltalist_linear(chunk_size, delta_list):

@@ -206,7 +206,8 @@ class VM_Overlay(threading.Thread):
 
         # 3. get overlay VM
         overlay_deltalist = get_overlay_deltalist(monitoring_info, self.options,
-                                                  self.base_disk, self.base_mem, self.base_memmeta, 
+                                                  self.base_disk, self.base_mem, 
+                                                  self.base_diskmeta, self.base_memmeta, 
                                                   self.modified_disk, self.modified_mem.name)
 
         # 4. create_overlayfile
@@ -316,7 +317,6 @@ class VM_Overlay(threading.Thread):
 
 
 class _MonitoringInfo(object):
-    BASEDISK_HASHDICT       = "basedisk_hash_dict"
     BASEMEM_HASHDICT        = "basemem_hash_dict"
     DISK_MODIFIED_BLOCKS    = "disk_modified_block" # from fuse monitoring
     DISK_USED_BLOCKS        = "disk_used_block" # from xray support
@@ -702,7 +702,6 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
 
 class VMMonitor(object):
     def __init__(self, conn, machine, options,
-                 base_memmeta, base_diskmeta,
                  fuse_stream_monitor,
                  base_disk, base_mem,
                  modified_disk,
@@ -712,8 +711,6 @@ class VMMonitor(object):
         self.conn = conn
         self.machine = machine
         self.options = options
-        self.base_memmeta = base_memmeta
-        self.base_diskmeta = base_diskmeta
         self.fuse_stream_monitor = fuse_stream_monitor
         self.base_disk = base_disk
         self.base_mem = base_mem
@@ -722,6 +719,7 @@ class VMMonitor(object):
         self.original_deltalist = original_deltalist
         self.nova_util = nova_util
         self.memory_snapshot_size = -1
+        #threading.Thread.__init__(self, target=self.load_monitoring_info)
 
     def get_monitoring_info(self):
         ''' return montioring information including
@@ -733,10 +731,6 @@ class VMMonitor(object):
         vm_state, reason = self.machine.state(0)
         if vm_state != libvirt.VIR_DOMAIN_PAUSED:
             self.machine.suspend()
-
-        # 1. get hashlist of base memory and disk
-        basemem_hashdict= Memory.base_hashdict(self.base_memmeta)
-        basedisk_hashdict = Disk.base_hashdict(self.base_diskmeta)
 
         # 2. get dma & discard information
         if self.options.TRIM_SUPPORT:
@@ -755,8 +749,6 @@ class VMMonitor(object):
             used_blocks_dict = xray.get_used_blocks(modified_disk)
 
         info_dict = dict()
-        info_dict[_MonitoringInfo.BASEDISK_HASHDICT] = basedisk_hashdict
-        info_dict[_MonitoringInfo.BASEMEM_HASHDICT] = basemem_hashdict
         info_dict[_MonitoringInfo.DISK_USED_BLOCKS] = used_blocks_dict
         info_dict[_MonitoringInfo.DISK_FREE_BLOCKS] = trim_dict
         info_dict[_MonitoringInfo.MEMORY_FREE_BLOCKS] = free_memory_dict
@@ -770,8 +762,8 @@ class VMMonitor(object):
         m_chunk_dict.update(self.fuse_stream_monitor.modified_chunk_dict)
         info_dict[_MonitoringInfo.DISK_MODIFIED_BLOCKS] = m_chunk_dict
 
-        monitoring_info = _MonitoringInfo(info_dict)
-        return monitoring_info
+        self.monitoring_info = _MonitoringInfo(info_dict)
+        return self.monitoring_info
 
 
 def copy_disk(in_path, out_path):
@@ -789,7 +781,8 @@ def get_libvirt_connection():
 
 
 def get_overlay_deltalist(monitoring_info, options,
-                          base_image, base_mem, base_memmeta, 
+                          base_image, base_mem, 
+                          base_diskmeta, base_memmeta, 
                           modified_disk,
                           modified_mem_queue,
                           merged_deltalist_queue):
@@ -805,8 +798,6 @@ def get_overlay_deltalist(monitoring_info, options,
     '''
 
     INFO = _MonitoringInfo
-    basedisk_hashdict = getattr(monitoring_info, INFO.BASEDISK_HASHDICT, None)
-    basemem_hashdict = getattr(monitoring_info, INFO.BASEMEM_HASHDICT, None)
     free_memory_dict = getattr(monitoring_info, INFO.MEMORY_FREE_BLOCKS, None)
     m_chunk_dict = getattr(monitoring_info, INFO.DISK_MODIFIED_BLOCKS, dict())
     trim_dict = getattr(monitoring_info, INFO.DISK_FREE_BLOCKS, None)
@@ -818,7 +809,6 @@ def get_overlay_deltalist(monitoring_info, options,
     time_s = time()
     if not options.DISK_ONLY:
         memory_deltalist_queue = multiprocessing.Queue()
-        #memory_deltalist_thread = threading.Thread(target=Memory.create_memory_deltalist,
         memory_deltalist_thread = multiprocessing.Process(target=Memory.create_memory_deltalist,
                                                           args=(modified_mem_queue,
                                                                 memory_deltalist_queue,
@@ -847,11 +837,12 @@ def get_overlay_deltalist(monitoring_info, options,
 
     time_disk_delta = time()
     LOG.info("Generate VM overlay using deduplication")
+
     dedup_thread = delta.DeltaDedup(memory_deltalist_queue, Memory.Memory.RAM_PAGE_SIZE,
-                                  disk_deltalist_queue, Const.CHUNK_SIZE,
-                                  merged_deltalist_queue,
-                                  basedisk_hashdict=basedisk_hashdict,
-                                  basemem_hashdict=basemem_hashdict)
+                                    disk_deltalist_queue, Const.CHUNK_SIZE,
+                                    merged_deltalist_queue,
+                                    base_memmeta=base_memmeta,
+                                    base_diskmeta=base_diskmeta)
     dedup_thread.start()
     time_merge_delta = time()
 
@@ -1109,7 +1100,7 @@ class MemoryReadProcess(multiprocessing.Process):
         time_e = time()
         LOG.debug("Memory size of launch VM: %ld" % (self.total_read_size))
         LOG.debug("memory snapshotting (%f ~ %f): %f, %f GBps" % (
-            time_s, time_s, (time_e-time_s),
+            time_s, time_e, (time_e-time_s),
             (self.total_read_size/(time_e-time_s)/1024/1024/1024)))
         self.memory_snapshot_size.append(self.total_read_size)
 
@@ -1157,9 +1148,9 @@ class LibvirtThread(threading.Thread):
     def save_mem(self):
         self.machine.save(self.outputpath)
 
+
 def save_mem_snapshot(conn, machine, output_queue, **kwargs):
     #Set migration speed
-    time_start = time()
     nova_util = kwargs.get('nova_util', None)
     fuse_stream_monitor = kwargs.get('fuse_stream_monitor', None)
     ret = machine.migrateSetMaxSpeed(1000000, 0)   # 1000 Gbps, unlimited
@@ -1223,10 +1214,6 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
     if ret != 0:
         raise CloudletGenerationError("libvirt: Cannot save memory state")
 
-    time_end = time()
-    LOG.debug("[time] save_memory_snapshot (%f ~ %f): %f" % (
-        time_start, time_end,
-        (time_end-time_start)))
     return memory_read_proc
 
 
@@ -1383,13 +1370,18 @@ def create_residue(base_disk, base_hashvalue,
     compdata_queue = multiprocessing.Queue()
 
     vm_monitor = VMMonitor(resumed_vm.conn, resumed_vm.machine, options,
-                           base_memmeta, base_diskmeta,
                            resumed_vm.monitor,
                            base_disk, base_mem,
                            resumed_vm.resumed_disk,
                            qemu_logfile,
                            original_deltalist=original_deltalist)
     monitoring_info = vm_monitor.get_monitoring_info()
+
+    time_ss = time()
+    LOG.debug("[time] serialization step (%f ~ %f): %f" % (time_start,
+                                                           time_ss,
+                                                           (time_ss-time_start)))
+
     memory_read_proc = save_mem_snapshot(resumed_vm.conn,
                                          resumed_vm.machine,
                                          memory_snapshot_queue,
@@ -1408,7 +1400,8 @@ def create_residue(base_disk, base_hashvalue,
 
     # 3. get overlay VM (semantic gap + deduplication)
     dedup_thread = get_overlay_deltalist(monitoring_info, options,
-                                         base_disk, base_mem, base_memmeta,
+                                         base_disk, base_mem, 
+                                         base_diskmeta, base_memmeta,
                                          resumed_vm.resumed_disk,
                                          memory_snapshot_queue,
                                          residue_deltalist_queue)
@@ -1901,12 +1894,16 @@ def synthesis(base_disk, overlay_path, **kwargs):
             # but that does not generate hash value
             (base_diskmeta, base_mem, base_memmeta) = \
                     Const.get_basepath(base_disk, check_exist=True)
+            time_a = time()
             prev_mem_deltalist = _reconstruct_mem_deltalist( \
                     base_disk, base_mem, overlay_filename.name)
-            residue_overlay = create_residue(base_disk, \
-                    meta_info[Const.META_BASE_VM_SHA256],
-                    synthesized_VM, options, 
-                    prev_mem_deltalist)
+            time_b = time()
+            LOG.debug("[time] Time for reconstructing previous deltalist (%f ~ %f): %f" %
+                      (time_b, time_a, (time_b-time_a)))
+            residue_overlay = create_residue(base_disk,
+                                             meta_info[Const.META_BASE_VM_SHA256],
+                                             synthesized_VM, options, 
+                                             prev_mem_deltalist)
             LOG.info("[RESULT] Residue")
             LOG.info("[RESULT]   Metafile : %s" % \
                     (os.path.abspath(residue_overlay)))

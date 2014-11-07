@@ -101,7 +101,7 @@ class CompressProc(multiprocessing.Process):
             _comp_lzma(self.delta_list_queue, self.comp_delta_queue, 1, 1)
         elif self.comp_type == Const.COMPRESSION_BZIP2:
             speed = 1
-            num_cores = 2
+            num_cores = 3
             self._comp_bzip2(speed, num_cores)
 
         elif self.comp_type == Const.COMPRESSION_GZIP:
