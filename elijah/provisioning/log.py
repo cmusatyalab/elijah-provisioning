@@ -59,7 +59,6 @@ def getLogger(name='unknown'):
         formatter = logging.Formatter('%(levelname)-8s %(message)s')
         console.setFormatter(formatter)
         logger.addHandler(console)
-        
 
         loggers[name] = logger
 

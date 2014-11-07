@@ -56,7 +56,6 @@ from optparse import OptionParser
 
 from tool import comp_lzma
 from tool import diff_files
-from tool import decomp_overlay
 import compression
 import log as logging
 
@@ -1109,8 +1108,11 @@ class MemoryReadProcess(threading.Thread):  # Multiprocessor can cause close_fd 
             self.result_queue.put(Const.QUEUE_FAILED_MESSAGE)
         else:
             self.result_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+        time_e = time()
         LOG.debug("Memory size of launch VM: %ld" % (self.total_read_size))
-        LOG.debug("memory snapshotting: %f GBps" % (self.total_read_size/(time()-time_s)/1024/1024/1024))
+        LOG.debug("memory snapshotting (%f ~ %f): %f, %f GBps" % (
+            time_s, time_s, (time_e-time_s),
+            (self.total_read_size/(time_e-time_s)/1024/1024/1024)))
         #self.memory_snapshot_size.append(self.total_read_size)
 
 
@@ -1390,13 +1392,13 @@ def create_residue(base_disk, base_hashvalue,
     # 5. compression
     LOG.info("Compressing overlay blobs")
     comp_type = Const.COMPRESSION_BZIP2
-    comp_option = {}
-    comp_thread = multiprocessing.Process(target=compression.compress_stream,
-                                          args=(residue_deltalist_queue,
-                                                compdata_queue,
-                                                comp_type,
-                                                comp_option))
-    comp_thread.start()
+    # processing cause some wierd error at launching pbzip2 process
+    #comp_proc = threading.Thread(target=compression.compress_stream,
+    compress_proc = compression.CompressProc(residue_deltalist_queue,
+                                             compdata_queue,
+                                             comp_type,
+                                             comp_option={})
+    compress_proc.start()
 
     # to be deleted
     overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
@@ -1407,6 +1409,9 @@ def create_residue(base_disk, base_hashvalue,
     while True:
         compdata = compdata_queue.get()
         if compdata == Const.QUEUE_SUCCESS_MESSAGE:
+            break
+        if compdata == Const.QUEUE_FAILED_MESSAGE:
+            LOG.error("Failed to get compressed data")
             break
         comp_data_size += len(compdata)
         output_fd.write(compdata)
@@ -1428,6 +1433,7 @@ def create_residue(base_disk, base_hashvalue,
     LOG.debug("# of delta disk: %d" % len(disk_chunks))
     blob_dict = {
         Const.META_OVERLAY_FILE_NAME:os.path.basename(blob_filename),
+        Const.META_OVERLAY_FILE_COMPRESSION: comp_type,
         Const.META_OVERLAY_FILE_SIZE:os.path.getsize(blob_filename),
         Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
         Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
@@ -1800,10 +1806,10 @@ def _reconstruct_mem_deltalist(base_disk, base_mem, overlay_filepath):
     return ret_deltalist
 
 
-def synthesis(base_disk, meta, **kwargs):
+def synthesis(base_disk, overlay_path, **kwargs):
     # VM Synthesis and run recoverd VM
     # param base_disk : path to base disk
-    # param meta : path to meta file for overlay
+    # param overlay_path: path to VM overlay file
     # param disk_only: synthesis size VM with only disk image
     # param return_residue: return residue of changed portion
     if os.path.exists(base_disk) == False:
@@ -1823,27 +1829,14 @@ def synthesis(base_disk, meta, **kwargs):
     overlay_filename = NamedTemporaryFile(prefix="cloudlet-overlay-file-")
     decompe_time_s = time()
     if zip_container == False:
-        if os.path.exists(meta) == False:
-            msg = "Meta file for VM overlay does not exist at %s" % meta
+        if os.path.exists(overlay_path) == False:
+            msg = "VM overlay does not exist at %s" % overlay_path
             raise CloudletGenerationError(msg)
         LOG.info("Decompressing VM overlay")
-        meta_info = decomp_overlay(meta, overlay_filename.name)
+        meta_info = compression.decomp_overlay(overlay_path, overlay_filename.name)
     else:
-        # download VM overlay at local
-        from lzma import LZMADecompressor
-        overlay_package = VMOverlayPackage(meta)
-        meta_raw = overlay_package.read_meta()
-        meta_info = msgpack.unpackb(meta_raw)
-        comp_overlay_files = meta_info[Const.META_OVERLAY_FILES]
-        comp_overlay_files = [item[Const.META_OVERLAY_FILE_NAME] for item in comp_overlay_files]
-        overlay_fd = open(overlay_filename.name, "w+b")
-        for comp_filename in comp_overlay_files:
-            comp_data = overlay_package.read_blob(comp_filename)
-            decompressor = LZMADecompressor()
-            decomp_data = decompressor.decompress(comp_data)
-            decomp_data += decompressor.flush()
-            overlay_fd.write(decomp_data)
-        overlay_fd.close()
+        meta_info = compression.decomp_overlayzip(overlay_path, overlay_filename.name)
+
     LOG.info("Decompression time : %f (s)" % (time()-decompe_time_s))
     LOG.info("Recovering launch VM")
     launch_disk, launch_mem, fuse, delta_proc, fuse_thread = \
@@ -1981,7 +1974,7 @@ def main(argv):
             os.makedirs(output_dir)
 
         overlay_path = NamedTemporaryFile(prefix="cloudlet-qemu-log-")
-        meta_info = decomp_overlay(meta, overlay_path.name)
+        meta_info = compression.decomp_overlay(meta, overlay_path.name)
 
         comp_overlay_files = meta_info[Const.META_OVERLAY_FILES]
         comp_overlay_files = [item[Const.META_OVERLAY_FILE_NAME] for item in comp_overlay_files]
@@ -2094,7 +2087,7 @@ def main(argv):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         overlay_path = os.path.join(output_dir, "overlay")
-        meta_info = decomp_overlay(meta, overlay_path)
+        meta_info = compression.decomp_overlay(meta, overlay_path)
 
         blob_size_list = [32, 64, 1024, 1024*1024]
         for order_type in ("access", "linear"):
@@ -2138,7 +2131,7 @@ def main(argv):
         # decomp
         overlay_path = os.path.join(output_dir, "precise.overlay")
         new_meta_path = os.path.join(output_dir, "precise.overlay-meta")
-        meta_info = decomp_overlay(meta, overlay_path)
+        meta_info = compression.decomp_overlay(meta, overlay_path)
         delta_list = DeltaList.fromfile(overlay_path)
         # reorder
         if access_pattern_file == "linear":

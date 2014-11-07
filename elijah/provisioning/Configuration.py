@@ -90,6 +90,7 @@ class Const(object):
     META_RESUME_VM_MEMORY_SIZE          = "resumed_vm_memory_size"
     META_OVERLAY_FILES                  = "overlay_files"
     META_OVERLAY_FILE_NAME              = "overlay_name"
+    META_OVERLAY_FILE_COMPRESSION       = "overlay_compression"
     META_OVERLAY_FILE_SIZE              = "overlay_size"
     META_OVERLAY_FILE_DISK_CHUNKS       = "disk_chunk"
     META_OVERLAY_FILE_MEMORY_CHUNKS     = "memory_chunk"
