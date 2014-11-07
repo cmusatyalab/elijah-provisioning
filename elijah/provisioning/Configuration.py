@@ -81,6 +81,10 @@ class Const(object):
     LOG_PATH                = "/var/tmp/cloudlet/log-synthesis"
     OVERLAY_BLOB_SIZE_KB    = 1024*1024 # 1G
 
+    COMPRESSION_LZMA        = 1
+    COMPRESSION_BZIP2       = 2
+    COMPRESSION_GZIP        = 3
+
     META_BASE_VM_SHA256                 = "base_vm_sha256"
     META_RESUME_VM_DISK_SIZE            = "resumed_vm_disk_size"
     META_RESUME_VM_MEMORY_SIZE          = "resumed_vm_memory_size"

@@ -892,38 +892,6 @@ def _save_blob(start_index, delta_list, self_ref_dict, blob_name, blob_size, sta
         raise DeltaError("LZMA compression is zero")
 
 
-def compress_stream(delta_list_queue, comp_delta_queue):
-    start_time = time.time()
-    # mode = 2 indicates LZMA_SYNC_FLUSH, which show all output right after input
-    comp = LZMACompressor(options={'format':'xz', 'level':1})
-    original_length = 0
-    comp_data_length = 0
-    comp_delta_bytes = ''
-    LOG.debug("start compression")
-
-    count = 0
-    while True:
-        delta_item = delta_list_queue.get()
-        if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
-            break
-        delta_bytes = delta_item.get_serialized()
-        original_length += len(delta_bytes)
-        comp_delta_bytes = comp.compress(delta_bytes)
-        comp_data_length += len(comp_delta_bytes)
-        comp_delta_queue.put(comp_delta_bytes)
-        count += 1
-
-    comp_delta_bytes = comp.flush()
-    if comp_delta_bytes is not None and len(comp_delta_bytes) > 0:
-        comp_data_length += len(comp_delta_bytes)
-        comp_delta_queue.put(comp_delta_bytes)
-    comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-    end_time = time.time()
-
-    LOG.debug("Overlay size: %d, # of deltaitem: %ld" % (comp_data_length, count))
-    LOG.debug("[time] Overlay compression time (%f ~ %f): %f" % (start_time, end_time, (end_time-start_time)))
-
-
 def divide_blobs(delta_list, overlay_path, blob_size_kb, 
         disk_chunk_size, memory_chunk_size):
     # save delta list into multiple files with LZMA compression

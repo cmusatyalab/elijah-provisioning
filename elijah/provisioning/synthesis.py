@@ -57,6 +57,7 @@ from optparse import OptionParser
 from tool import comp_lzma
 from tool import diff_files
 from tool import decomp_overlay
+import compression
 import log as logging
 
 LOG = logging.getLogger(__name__)
@@ -1387,10 +1388,14 @@ def create_residue(base_disk, base_hashvalue,
     time_dedup = time()
 
     # 5. compression
-    LOG.info("[LZMA] Compressing overlay blobs")
-    comp_thread = multiprocessing.Process(target=delta.compress_stream,
-    #comp_thread = threading.Thread(target=delta.compress_stream,
-                                          args=(residue_deltalist_queue, compdata_queue))
+    LOG.info("Compressing overlay blobs")
+    comp_type = Const.COMPRESSION_BZIP2
+    comp_option = {}
+    comp_thread = multiprocessing.Process(target=compression.compress_stream,
+                                          args=(residue_deltalist_queue,
+                                                compdata_queue,
+                                                comp_type,
+                                                comp_option))
     comp_thread.start()
 
     # to be deleted
@@ -1408,7 +1413,7 @@ def create_residue(base_disk, base_hashvalue,
     output_fd.close()
     LOG.debug("comp data size: %d" % comp_data_size)
 
-    time_compression = time()
+    time_compression_end = time()
 
 
 
@@ -1456,20 +1461,18 @@ def create_residue(base_disk, base_hashvalue,
         os.remove(blob_filename)
     time_end = time()
 
-    LOG.debug("Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
+    LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
                                                             (time_end-time_start)))
-    LOG.debug("  memory_snapshotting (%f ~ %f): %f" % (time_snapshot_start, time_snapshot_end,
-                                                       (time_snapshot_end-time_snapshot_start)))
-    LOG.debug("  deduplication (and semantic gap) (%f ~ %f): %f" % (time_snapshot_end, time_dedup,
-                                                                    (time_dedup-time_snapshot_end)))
-    LOG.debug("  compression (%f ~ %f): %f" % (time_dedup, time_compression,
-                                                           (time_compression-time_dedup)))
-    LOG.debug("  creating metadata (%f ~ %f): %f" % (time_meta_start, time_meta_end,
-                                                           (time_meta_end-time_meta_start)))
-    LOG.debug("  packaging (%f ~ %f): %f" % (time_packaing_start, time_packaing_end,
-                                                           (time_packaing_end-time_packaing_start)))
-    LOG.debug("  deallocation (%f ~ %f): %f" % (time_compression, time_end,
-                                                (time_end-time_compression)))
+    #LOG.debug("  memory_snapshotting (%f ~ %f): %f" % (time_snapshot_start, time_snapshot_end,
+    #                                                   (time_snapshot_end-time_snapshot_start)))
+    #LOG.debug("  deduplication (and semantic gap) (%f ~ %f): %f" % (time_snapshot_end, time_dedup,
+    #                                                                (time_dedup-time_snapshot_end)))
+    #LOG.debug("  compression (%f ~ %f): %f" % (time_dedup, time_compression_end,
+    #                                                       (time_compression_end-time_dedup)))
+    #LOG.debug("  creating metadata (%f ~ %f): %f" % (time_meta_start, time_meta_end,
+    #                                                       (time_meta_end-time_meta_start)))
+    #LOG.debug("  packaging (%f ~ %f): %f" % (time_packaing_start, time_packaing_end,
+    #                                                       (time_packaing_end-time_packaing_start)))
     return overlay_zipfile
 
 
@@ -2075,7 +2078,7 @@ def main(argv):
         machine = vm_overlay.resume_basevm()
         connect_vnc(machine)
         vm_overlay.create_overlay()
-        
+
         LOG.info("overlay metafile : %s" % vm_overlay.overlay_metafile)
         LOG.info("overlay : %s" % str(vm_overlay.overlay_files[0]))
         LOG.info("overlay creation time: %f" % (time()-start_time()))
