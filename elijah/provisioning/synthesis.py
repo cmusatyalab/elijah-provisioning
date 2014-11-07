@@ -20,6 +20,7 @@
 
 import sys
 import os
+import select
 import functools
 import subprocess
 import Memory
@@ -699,12 +700,12 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
     return original_xml_backup, new_xml_str
 
 
-class VMMonitor(threading.Thread):
+class VMMonitor(object):
     def __init__(self, conn, machine, options,
                  base_memmeta, base_diskmeta,
                  fuse_stream_monitor,
                  base_disk, base_mem,
-                 modified_disk, memory_snapshot_queue,
+                 modified_disk,
                  qemu_logfile, 
                  original_deltalist=None,
                  nova_util=None):
@@ -717,22 +718,10 @@ class VMMonitor(threading.Thread):
         self.base_disk = base_disk
         self.base_mem = base_mem
         self.modified_disk = modified_disk
-        self.memory_snapshot_queue = memory_snapshot_queue
         self.qemu_logfile = qemu_logfile
         self.original_deltalist = original_deltalist
         self.nova_util = nova_util
         self.memory_snapshot_size = -1
-
-        threading.Thread.__init__(self, target=self.get_memory_snapshot)
-
-    def get_memory_snapshot(self):
-        if not self.options.DISK_ONLY:
-            self.memory_snapshot_size = save_mem_snapshot(self.conn, self.machine,
-                                                          self.memory_snapshot_queue,
-                                                          nova_util=self.nova_util,
-                                                          fuse_stream_monitor=self.fuse_stream_monitor)
-        return self.memory_snapshot_size
-
 
     def get_monitoring_info(self):
         ''' return montioring information including
@@ -1063,19 +1052,27 @@ def run_vm(conn, domain_xml, **kwargs):
     return machine
 
 
-#class MemoryReadProcess(multiprocessing.Process):
-class MemoryReadProcess(threading.Thread):  # Multiprocessor can cause close_fd issue
-    def __init__(self, input_path, machine_memory_size, result_queue):
+class MemoryReadProcess(multiprocessing.Process):
+    def __init__(self, input_path, machine_memory_size,
+                 conn, machine, result_queue):
         self.input_path = input_path
         self.result_queue = result_queue
         self.machine_memory_size = machine_memory_size*1024
         self.total_read_size = 0
-        #self.memory_snapshot_size = memory_snapshot_size
-        #multiprocessing.Process.__init__(self, target=self.read_mem_snapshot)
-        threading.Thread.__init__(self, target=self.read_mem_snapshot)
+        self.conn = conn
+        self.machine = machine
+
+        self.manager = multiprocessing.Manager()
+        self.memory_snapshot_size = self.manager.list()
+        multiprocessing.Process.__init__(self, target=self.read_mem_snapshot)
 
     def read_mem_snapshot(self):
         # create memory snapshot aligned with 4KB
+        time_s = time()
+        for repeat in xrange(10):
+            if os.path.exists(self.input_path) == False:
+                print "waiting for %s: " % self.input_path
+                sleep(0.1)
         try:
             self.in_fd = open(self.input_path, 'rb')
             self.total_read_size = 0
@@ -1092,9 +1089,9 @@ class MemoryReadProcess(threading.Thread):  # Multiprocessor can cause close_fd 
             LOG.info("Header size of memory snapshot is %s" % len(new_header))
 
             # write rest of the memory data
-            time_s = time()
             prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
+                select.select([self.in_fd], [], [])
                 data = self.in_fd.read(1024 * 1024 * 1)
                 if data == None or len(data) <= 0:
                     break
@@ -1108,12 +1105,25 @@ class MemoryReadProcess(threading.Thread):  # Multiprocessor can cause close_fd 
             self.result_queue.put(Const.QUEUE_FAILED_MESSAGE)
         else:
             self.result_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+
         time_e = time()
         LOG.debug("Memory size of launch VM: %ld" % (self.total_read_size))
         LOG.debug("memory snapshotting (%f ~ %f): %f, %f GBps" % (
             time_s, time_s, (time_e-time_s),
             (self.total_read_size/(time_e-time_s)/1024/1024/1024)))
-        #self.memory_snapshot_size.append(self.total_read_size)
+        self.memory_snapshot_size.append(self.total_read_size)
+
+    def get_memory_snapshot_size(self):
+        if len(self.memory_snapshot_size) > 0:
+            return long(self.memory_snapshot_size[0])
+        return long(-1)
+
+    def finish(self):
+        if os.path.exists(self.input_path) == True:
+            os.remove(self.input_path)
+        if self.machine is not None:
+            _terminate_vm(self.conn, self.machine)
+            self.machine = None
 
 
 class ProcessingProcess(multiprocessing.Process):
@@ -1137,6 +1147,15 @@ class ProcessingProcess(multiprocessing.Process):
         LOG.debug("finish receiving: %ld bytes" % total_bytes)
         self.out_fd.close()
 
+
+class LibvirtThread(threading.Thread):
+    def __init__(self, machine, outputpath):
+        self.machine = machine
+        self.outputpath = outputpath
+        threading.Thread.__init__(self, target=self.save_mem)
+
+    def save_mem(self):
+        self.machine.save(self.outputpath)
 
 def save_mem_snapshot(conn, machine, output_queue, **kwargs):
     #Set migration speed
@@ -1176,25 +1195,21 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
         if os.path.exists(named_pipe_output):
             os.remove(named_pipe_output)
         os.mkfifo(named_pipe_output)
-        #manager = multiprocessing.Manager()
-        #memory_snapshot_size = manager.list()
         memory_read_proc = MemoryReadProcess(named_pipe_output,
                                              machine_memory_size,
+                                             conn,
+                                             machine,
                                              output_queue)
         memory_read_proc.start()
-        ret = machine.save(named_pipe_output)
-        memory_read_proc.join()
+        libvirt_thread = LibvirtThread(machine, named_pipe_output)
+        libvirt_thread.start()
     except libvirt.libvirtError, e:
         # we intentionally ignore seek error from libvirt since we have cause
         # that by using named pipe
         if str(e).startswith('unable to seek') == False:
             raise CloudletGenerationError("libvirt memory save : " + str(e))
     finally:
-        if os.path.exists(named_pipe_output):
-            os.remove(named_pipe_output)
-        if machine is not None:
-            _terminate_vm(conn, machine)
-            machine = None
+        pass
 
     # TODO: update this to work with streaming
     try:
@@ -1203,9 +1218,7 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
     except memory_util.MachineGenerationError, e:
         raise CloudletGenerationError("Machine Generation Error: " + str(e))
     finally:
-        if machine is not None:
-            _terminate_vm(conn, machine)
-            machine = None
+        pass
 
     if ret != 0:
         raise CloudletGenerationError("libvirt: Cannot save memory state")
@@ -1214,7 +1227,7 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
     LOG.debug("[time] save_memory_snapshot (%f ~ %f): %f" % (
         time_start, time_end,
         (time_end-time_start)))
-    return memory_read_proc.total_read_size
+    return memory_read_proc
 
 
 def run_snapshot(conn, disk_image, mem_snapshot, new_xml_string, resume_time=None):
@@ -1368,17 +1381,29 @@ def create_residue(base_disk, base_hashvalue,
     memory_snapshot_queue = multiprocessing.Queue()
     residue_deltalist_queue = multiprocessing.Queue()
     compdata_queue = multiprocessing.Queue()
+
     vm_monitor = VMMonitor(resumed_vm.conn, resumed_vm.machine, options,
                            base_memmeta, base_diskmeta,
                            resumed_vm.monitor,
                            base_disk, base_mem,
                            resumed_vm.resumed_disk,
-                           memory_snapshot_queue,
                            qemu_logfile,
                            original_deltalist=original_deltalist)
     monitoring_info = vm_monitor.get_monitoring_info()
+    memory_read_proc = save_mem_snapshot(resumed_vm.conn,
+                                         resumed_vm.machine,
+                                         memory_snapshot_queue,
+                                         fuse_stream_monitor=resumed_vm.monitor)
+
     time_snapshot_start = time()
-    vm_monitor.start()
+    # to be deleted
+    #while True:
+    #    print "getting data"
+    #    data = memory_snapshot_queue.get()
+    #    if data == Const.QUEUE_SUCCESS_MESSAGE:
+    #        break
+    #import pdb;pdb.set_trace()
+
     time_snapshot_end = time()
 
     # 3. get overlay VM (semantic gap + deduplication)
@@ -1442,8 +1467,9 @@ def create_residue(base_disk, base_hashvalue,
 
     # wait until vm snapshotting finishes to get final VM memory snapshot size
     # (for fuse)
-    vm_monitor.join()
-    memory_snapshot_size = vm_monitor.memory_snapshot_size
+    memory_read_proc.join()
+    memory_read_proc.finish()   # deallocate resources such as VM
+    memory_snapshot_size = memory_read_proc.get_memory_snapshot_size()
     LOG.debug("Memory Snapshot size: %ld" % memory_snapshot_size)
     overlay_metafile = _generate_overlaymeta(overlay_metapath,
                                              overlay_info,
