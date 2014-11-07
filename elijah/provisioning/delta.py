@@ -619,7 +619,6 @@ class Recovered_delta(multiprocessing.Process):
         if self.raw_mem_overlay is not None:
             self.raw_mem_overlay.close()
             self.raw_mem_overlay = None
-        LOG.debug("Recover finishes")
 
 
 def deduplicate_deltaitem(hash_dict, delta_item, ref_id):

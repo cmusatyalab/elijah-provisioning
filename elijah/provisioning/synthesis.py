@@ -1389,8 +1389,8 @@ def create_residue(base_disk, base_hashvalue,
 
     time_snapshot_start = time()
     # to be deleted
+    #memory_read_proc.join()
     #while True:
-    #    print "getting data"
     #    data = memory_snapshot_queue.get()
     #    if data == Const.QUEUE_SUCCESS_MESSAGE:
     #        break

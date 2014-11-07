@@ -129,8 +129,8 @@ class Memory(object):
                 self_hash_value = self.hash_list[hash_list_index][2]
             else:
                 self_hash_value = None
-
-            if self_hash_value != sha256(data).digest():
+            chunk_hashvalue = sha256(data).digest()
+            if self_hash_value != chunk_hashvalue:
                 is_free_memory = False
                 if (free_pfn_dict != None) and \
                         (free_pfn_dict.get(long(ram_offset/Memory.RAM_PAGE_SIZE), None) == 1):
@@ -149,7 +149,7 @@ class Memory(object):
                         if len(patch) < len(data):
                             delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
                                     ram_offset, len(data),
-                                    hash_value=sha256(data).digest(),
+                                    hash_value=chunk_hashvalue,
                                     ref_id=DeltaItem.REF_XDELTA,
                                     data_len=len(patch),
                                     data=patch)
@@ -159,12 +159,19 @@ class Memory(object):
                         #LOG.info("xdelta failed, so save it as raw (%s)" % str(e))
                         delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
                                 ram_offset, len(data),
-                                hash_value=sha256(data).digest(),
+                                hash_value=chunk_hashvalue,
                                 ref_id=DeltaItem.REF_RAW,
                                 data_len=len(data),
                                 data=data)
+                    '''
+                    delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
+                            ram_offset, len(data),
+                            hash_value=chunk_hashvalue,
+                            ref_id=DeltaItem.REF_RAW,
+                            data_len=len(data),
+                            data=data)
+                    '''
                     deltalist_queue.put(delta_item)
-                    #print "# of delta chunk at queue: %d" % deltalist_queue.qsize()
 
             # memory over-usage protection
             ram_offset += len(data)

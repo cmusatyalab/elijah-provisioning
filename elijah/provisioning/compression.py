@@ -13,7 +13,6 @@ from lzma import LZMACompressor
 from lzma import LZMADecompressor
 from Configuration import Const
 from package import VMOverlayPackage
-import log as logging
 
 
 BLOCK_SIZE = 1024*1024*1
@@ -161,11 +160,6 @@ def decomp_overlay(meta, output_path):
     return meta_dict
 
 
-
-def _decomp_bzip2(overlay_file):
-    pass
-
-
 def decomp_overlayzip(overlay_path, outfilename):
     overlay_package = VMOverlayPackage(overlay_path)
     meta_raw = overlay_package.read_meta()
@@ -176,6 +170,7 @@ def decomp_overlayzip(overlay_path, outfilename):
     for blob_info in comp_overlay_files:
         comp_filename = blob_info[Const.META_OVERLAY_FILE_NAME]
         comp_type = blob_info.get(Const.META_OVERLAY_FILE_COMPRESSION, Const.COMPRESSION_LZMA)
+        sys.stdout.write("Decompression type: %d\n" % comp_type)
         if comp_type == Const.COMPRESSION_LZMA:
             comp_data = overlay_package.read_blob(comp_filename)
             decompressor = LZMADecompressor()
@@ -183,14 +178,24 @@ def decomp_overlayzip(overlay_path, outfilename):
             decomp_data += decompressor.flush()
             out_fd.write(decomp_data)
         elif comp_type == Const.COMPRESSION_BZIP2:
-            _decomp_bzip2(overlay_path)
+            comp_data = overlay_package.read_blob(comp_filename)
+            _PIPE = subprocess.PIPE
+            proc = subprocess.Popen("pbzip2 -d".split(" "), close_fds=True,
+                                    stdin=_PIPE, stdout=_PIPE, stderr=_PIPE)
+            decomp_data, err = proc.communicate(input=comp_data)
+            if err:
+                sys.stderr.write("Error in getting free memory : %s\n" % str(err))
+            out_fd.write(decomp_data)
         elif comp_type == Const.COMPRESSION_GZIP:
             raise CompressionError("Not implemented")
         else:
             raise CompressionError("Not valid compression option")
     out_fd.close()
-
     return meta_info
+
+
+def _decomp_bzip2(overlay_file):
+    pass
 
 
 
