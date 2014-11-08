@@ -258,6 +258,14 @@ def create_disk_deltalist(modified_disk,
                     ref_id=DeltaItem.REF_RAW,
                     data_len=len(data),
                     data=data)
+        '''
+        delta_item = DeltaItem(DeltaItem.DELTA_DISK,
+                offset, len(data),
+                hash_value=sha256(data).digest(),
+                ref_id=DeltaItem.REF_RAW,
+                data_len=len(data),
+                data=data)
+        '''
         disk_deltalist_queue.put(delta_item)
         counter += 1
     disk_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)

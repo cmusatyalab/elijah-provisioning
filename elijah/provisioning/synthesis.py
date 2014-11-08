@@ -728,9 +728,10 @@ class VMMonitor(object):
             3) freed memory page
         '''
         # puase the VM if it's not yet
-        vm_state, reason = self.machine.state(0)
-        if vm_state != libvirt.VIR_DOMAIN_PAUSED:
-            self.machine.suspend()
+        if self.machine is not None:
+            vm_state, reason = self.machine.state(0)
+            if vm_state != libvirt.VIR_DOMAIN_PAUSED:
+                self.machine.suspend()
 
         # 2. get dma & discard information
         if self.options.TRIM_SUPPORT:
@@ -809,41 +810,41 @@ def get_overlay_deltalist(monitoring_info, options,
     time_s = time()
     if not options.DISK_ONLY:
         memory_deltalist_queue = multiprocessing.Queue()
-        memory_deltalist_thread = multiprocessing.Process(target=Memory.create_memory_deltalist,
+        memory_deltalist_proc = multiprocessing.Process(target=Memory.create_memory_deltalist,
                                                           args=(modified_mem_queue,
                                                                 memory_deltalist_queue,
                                                                 base_memmeta, base_mem,
                                                                 options.FREE_SUPPORT,
-                                                                free_memory_dict)
+                                                                free_memory_dict) # this won't be updated in multiprocess
                                                           )
-        memory_deltalist_thread.start()
+        memory_deltalist_proc.start()
     time_mem_delta = time()
 
     LOG.info("Get disk delta")
     disk_statistics = dict()
     disk_deltalist_queue = multiprocessing.Queue()
-    disk_deltalist_thread = threading.Thread(target=Disk.create_disk_deltalist,
-                                             args=(modified_disk,
-                                                   m_chunk_dict, Const.CHUNK_SIZE,
-                                                   disk_deltalist_queue,
-                                                   base_image,
-                                                   trim_dict,
-                                                   apply_discard,
-                                                   dma_dict,
-                                                   used_blocks_dict,
-                                                   disk_statistics)
-                                             )
-    disk_deltalist_thread.start()
+    disk_deltalist_proc = multiprocessing.Process(target=Disk.create_disk_deltalist,
+                                                  args=(modified_disk,
+                                                        m_chunk_dict, Const.CHUNK_SIZE,
+                                                        disk_deltalist_queue,
+                                                        base_image,
+                                                        trim_dict,
+                                                        apply_discard,
+                                                        dma_dict,
+                                                        used_blocks_dict,
+                                                        disk_statistics) # this won't be updated in multiprocess
+                                                  )
+    disk_deltalist_proc.start()
 
     time_disk_delta = time()
     LOG.info("Generate VM overlay using deduplication")
 
-    dedup_thread = delta.DeltaDedup(memory_deltalist_queue, Memory.Memory.RAM_PAGE_SIZE,
+    dedup_proc = delta.DeltaDedup(memory_deltalist_queue, Memory.Memory.RAM_PAGE_SIZE,
                                     disk_deltalist_queue, Const.CHUNK_SIZE,
                                     merged_deltalist_queue,
                                     base_memmeta=base_memmeta,
                                     base_diskmeta=base_diskmeta)
-    dedup_thread.start()
+    dedup_proc.start()
     time_merge_delta = time()
 
     #LOG.info("Print statistics")
@@ -859,7 +860,7 @@ def get_overlay_deltalist(monitoring_info, options,
     LOG.debug("  memory deltalist: %f" % (time_mem_delta-time_s))
     LOG.debug("  disk deltalist: %f" % (time_disk_delta-time_mem_delta))
     LOG.debug("  merge deltalist: %f" % (time_merge_delta-time_disk_delta))
-    return dedup_thread
+    return dedup_proc
 
 
 def _generate_overlaymeta(overlay_metapath, overlay_info, base_hashvalue,
@@ -1387,7 +1388,6 @@ def create_residue(base_disk, base_hashvalue,
                                          memory_snapshot_queue,
                                          fuse_stream_monitor=resumed_vm.monitor)
 
-    time_snapshot_start = time()
     # to be deleted
     #memory_read_proc.join()
     #while True:
@@ -1396,10 +1396,8 @@ def create_residue(base_disk, base_hashvalue,
     #        break
     #import pdb;pdb.set_trace()
 
-    time_snapshot_end = time()
-
     # 3. get overlay VM (semantic gap + deduplication)
-    dedup_thread = get_overlay_deltalist(monitoring_info, options,
+    dedup_proc = get_overlay_deltalist(monitoring_info, options,
                                          base_disk, base_mem, 
                                          base_diskmeta, base_memmeta,
                                          resumed_vm.resumed_disk,
@@ -1443,9 +1441,9 @@ def create_residue(base_disk, base_hashvalue,
     time_meta_start = time()
     # wait until we know all chunk number of disk and memory to create overlay
     # metadata
-    dedup_thread.join()
-    memory_chunks = [item/Const.CHUNK_SIZE for item in dedup_thread.delta_memory_chunks]
-    disk_chunks = [item/Const.CHUNK_SIZE for item in dedup_thread.delta_disk_chunks]
+    dedup_proc.join()
+    memory_chunks = [item/Const.CHUNK_SIZE for item in dedup_proc.delta_memory_chunks]
+    disk_chunks = [item/Const.CHUNK_SIZE for item in dedup_proc.delta_disk_chunks]
     overlay_info = list()
     LOG.debug("# of delta memory: %d" % len(memory_chunks))
     LOG.debug("# of delta disk: %d" % len(disk_chunks))
@@ -1488,10 +1486,6 @@ def create_residue(base_disk, base_hashvalue,
 
     LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
                                                             (time_end-time_start)))
-    #LOG.debug("  memory_snapshotting (%f ~ %f): %f" % (time_snapshot_start, time_snapshot_end,
-    #                                                   (time_snapshot_end-time_snapshot_start)))
-    #LOG.debug("  deduplication (and semantic gap) (%f ~ %f): %f" % (time_snapshot_end, time_dedup,
-    #                                                                (time_dedup-time_snapshot_end)))
     #LOG.debug("  compression (%f ~ %f): %f" % (time_dedup, time_compression_end,
     #                                                       (time_compression_end-time_dedup)))
     #LOG.debug("  creating metadata (%f ~ %f): %f" % (time_meta_start, time_meta_end,

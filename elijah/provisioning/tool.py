@@ -84,24 +84,6 @@ def diff_data(source_data, modi_data, buf_len):
         msg = "Error while xdelta3: %d" % result
         raise IOError(msg)
     return patch
-    '''
-    s_fd, s_path = tempfile.mkstemp(prefix="xdelta-")
-    m_fd, m_path = tempfile.mkstemp(prefix="xdelta-")
-    d_fd, d_path = tempfile.mkstemp(prefix="xdelta-")
-    os.write(s_fd, source_data)
-    os.write(m_fd, modi_data)
-    diff_files(s_path, m_path, d_path)
-    patch = open(d_path, "rb").read()
-    os.close(s_fd)
-    os.close(m_fd)
-    os.close(d_fd)
-    os.remove(s_path)
-    os.remove(m_path)
-    os.remove(d_path)
-
-    return patch
-
-    '''
 
 
 def diff_files_custom(source_file, target_file, output_file, **kwargs):

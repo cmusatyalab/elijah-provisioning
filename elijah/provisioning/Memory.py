@@ -171,6 +171,7 @@ class Memory(object):
                             data_len=len(data),
                             data=data)
                     '''
+
                     deltalist_queue.put(delta_item)
 
             # memory over-usage protection
