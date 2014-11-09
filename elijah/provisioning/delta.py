@@ -33,6 +33,7 @@ from operator import itemgetter
 from hashlib import sha256
 from lzma import LZMACompressor
 
+import process_manager
 from Configuration import Const
 import log as logging
 
@@ -634,7 +635,7 @@ def deduplicate_deltaitem(hash_dict, delta_item, ref_id):
     return False
 
 
-class DeltaDedup(multiprocessing.Process):
+class DeltaDedup(process_manager.ProcWorker):
     def __init__(self, memory_deltalist_queue, memory_chunk_size,
                    disk_deltalist_queue, disk_chunk_size,
                    merged_deltalist_queue,
@@ -659,10 +660,16 @@ class DeltaDedup(multiprocessing.Process):
         self.delta_disk_chunks = self.manager.list()
         self.delta_memory_chunks = self.manager.list()
         self.memory_snapshot_size = self.manager.list()
-        multiprocessing.Process.__init__(self, target=self.perform_dedup)
+        super(DeltaDedup, self).__init__(target=self.perform_dedup)
 
     def perform_dedup(self):
-        time_s = time.time()
+        time_start = time.time()
+        time_process_finish = 0
+        time_process_start = 0
+        time_prev_report = 0
+        processed_datasize = 0
+        processed_duration = float(0)
+        UPDATE_PERIOD = self.process_info['update_period']
 
         # get hashtable
         self.basemem_hashdict= DeltaDedup.memory_import_hashdict(self.base_memmeta)
@@ -687,6 +694,7 @@ class DeltaDedup(multiprocessing.Process):
         is_memory_finished = False
         is_disk_finished = False
         while is_memory_finished == False or is_disk_finished == False:
+            time_process_start = time.time()
             #(input_ready, [], []) = select.select([self.memory_deltalist_queue, self.disk_deltalist_queue], [], [])
             # select only works for multiprocessing.Queue not for Queue.Queue
 
@@ -732,15 +740,24 @@ class DeltaDedup(multiprocessing.Process):
                 self.delta_disk_chunks.append(delta_item.offset)
             elif delta_item.delta_type == DeltaItem.DELTA_MEMORY:
                 self.delta_memory_chunks.append(delta_item.offset)
-            #LOG.debug("number of deltalist at merged_deltalist_queue: %d" % self.merged_deltalist_queue.qsize())
+            # measurement
+            time_process_finish = time.time()
+            processed_datasize += chunk_size
+            processed_duration += (time_process_finish - time_process_start)
+            if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
+                print "aaaaa: %f" % (processed_datasize/processed_duration/1024.0/1024)
+                time_prev_report = time_process_finish
+                self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
+                processed_datasize = 0
+                processed_duration = float(0)
         self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         self.statistics['number_of_zero_page'] = number_of_zero_page
         self.statistics['number_of_base_disk'] = number_of_base_disk
         self.statistics['number_of_base_mem'] = number_of_base_mem
         self.statistics['number_of_self_ref'] = number_of_self_ref
-        time_e = time.time()
-        LOG.debug("[time] Deduplication time (%f ~ %f): %f" % (time_s, time_e, (time_e-time_s)))
+        time_end = time.time()
+        LOG.debug("[time] Deduplication time (%f ~ %f): %f" % (time_start, time_end, (time_end-time_start)))
 
     @staticmethod
     def memory_import_hashdict(meta_path):
