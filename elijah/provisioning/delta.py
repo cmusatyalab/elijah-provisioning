@@ -658,18 +658,15 @@ class DeltaDedup(multiprocessing.Process):
         self.statistics['number_of_self_ref'] = 0
         self.delta_disk_chunks = self.manager.list()
         self.delta_memory_chunks = self.manager.list()
-
         self.memory_snapshot_size = self.manager.list()
-
         multiprocessing.Process.__init__(self, target=self.perform_dedup)
-        #threading.Thread.__init__(self, target=self.perform_dedup)
 
     def perform_dedup(self):
         time_s = time.time()
 
         # get hashtable
-        basemem_hashdict= self.memory_import_hashdict(self.base_memmeta)
-        basedisk_hashdict = self.disk_import_hashdict(self.base_diskmeta)
+        self.basemem_hashdict= DeltaDedup.memory_import_hashdict(self.base_memmeta)
+        self.basedisk_hashdict = self.disk_import_hashdict(self.base_diskmeta)
         number_of_zero_page = 0
         number_of_base_disk = 0
         number_of_base_mem = 0
@@ -716,9 +713,9 @@ class DeltaDedup(multiprocessing.Process):
 
             if deduplicate_deltaitem(zero_hash_dict, delta_item, DeltaItem.REF_ZEROS) == True:
                 number_of_zero_page += 1
-            elif deduplicate_deltaitem(basemem_hashdict, delta_item, DeltaItem.REF_BASE_MEM) == True:
+            elif deduplicate_deltaitem(self.basemem_hashdict, delta_item, DeltaItem.REF_BASE_MEM) == True:
                 number_of_base_mem += 1
-            elif deduplicate_deltaitem(basedisk_hashdict, delta_item, DeltaItem.REF_BASE_DISK) == True:
+            elif deduplicate_deltaitem(self.basedisk_hashdict, delta_item, DeltaItem.REF_BASE_DISK) == True:
                 number_of_base_disk += 1
             else:
                 # chunk that are not deduplicated yet

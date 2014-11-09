@@ -43,6 +43,7 @@ from delta import DeltaItem
 import msgpack
 from progressbar import AnimatedProgressBar
 from package import VMOverlayPackage
+import process_manager
 
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
@@ -808,15 +809,15 @@ def get_overlay_deltalist(monitoring_info, options,
 
     LOG.info("Get memory delta")
     time_s = time()
+
+    # memory hashdict is neede at memory deltaand dedup
     if not options.DISK_ONLY:
         memory_deltalist_queue = multiprocessing.Queue()
-        memory_deltalist_proc = multiprocessing.Process(target=Memory.create_memory_deltalist,
-                                                          args=(modified_mem_queue,
-                                                                memory_deltalist_queue,
-                                                                base_memmeta, base_mem,
-                                                                options.FREE_SUPPORT,
-                                                                free_memory_dict) # this won't be updated in multiprocess
-                                                          )
+        memory_deltalist_proc = Memory.CreateMemoryDeltalist(modified_mem_queue,
+                                                             memory_deltalist_queue,
+                                                             base_memmeta, base_mem,
+                                                             options.FREE_SUPPORT,
+                                                             free_memory_dict)
         memory_deltalist_proc.start()
     time_mem_delta = time()
 
@@ -840,10 +841,10 @@ def get_overlay_deltalist(monitoring_info, options,
     LOG.info("Generate VM overlay using deduplication")
 
     dedup_proc = delta.DeltaDedup(memory_deltalist_queue, Memory.Memory.RAM_PAGE_SIZE,
-                                    disk_deltalist_queue, Const.CHUNK_SIZE,
-                                    merged_deltalist_queue,
-                                    base_memmeta=base_memmeta,
-                                    base_diskmeta=base_diskmeta)
+                                  disk_deltalist_queue, Const.CHUNK_SIZE,
+                                  merged_deltalist_queue,
+                                  base_memmeta=base_memmeta,
+                                  base_diskmeta=base_diskmeta)
     dedup_proc.start()
     time_merge_delta = time()
 
@@ -1044,7 +1045,7 @@ def run_vm(conn, domain_xml, **kwargs):
     return machine
 
 
-class MemoryReadProcess(multiprocessing.Process):
+class MemoryReadProcess(process_manager.ProcWorker):
     def __init__(self, input_path, machine_memory_size,
                  conn, machine, result_queue):
         self.input_path = input_path
@@ -1056,12 +1057,17 @@ class MemoryReadProcess(multiprocessing.Process):
 
         self.manager = multiprocessing.Manager()
         self.memory_snapshot_size = self.manager.list()
-        multiprocessing.Process.__init__(self, target=self.read_mem_snapshot)
+        super(MemoryReadProcess, self).__init__(target=self.read_mem_snapshot)
 
     def read_mem_snapshot(self):
         # create memory snapshot aligned with 4KB
         time_s = time()
-        for repeat in xrange(10):
+        UPDATE_SIZE  = 1024*1024*10 # 1MB
+        prev_processed_size = 0
+        prev_processed_time = time()
+        cur_processed_size = 0
+
+        for repeat in xrange(100):
             if os.path.exists(self.input_path) == False:
                 print "waiting for %s: " % self.input_path
                 sleep(0.1)
@@ -1087,10 +1093,20 @@ class MemoryReadProcess(multiprocessing.Process):
                 data = self.in_fd.read(1024 * 1024 * 1)
                 if data == None or len(data) <= 0:
                     break
+                current_size = len(data)
                 self.result_queue.put(data)
-                self.total_read_size += len(data)
+                self.total_read_size += current_size
                 prog_bar.set_percent(100.0*self.total_read_size/self.machine_memory_size)
                 prog_bar.show_progress()
+
+                if self.total_read_size - prev_processed_size > UPDATE_SIZE:
+                    cur_time = time()
+                    current_bw = float((self.total_read_size-prev_processed_size)/(cur_time-prev_processed_time))
+                    prev_processed_size = self.total_read_size
+                    prev_processed_time = cur_time
+                    #print "processing bw: %f MBps" % (current_bw/1024.0/1024)
+                    self.process_info['current_bw'] = (current_bw/1024.0/1024)
+
             prog_bar.finish()
         except Exception, e:
             LOG.error(str(e))
@@ -1355,6 +1371,8 @@ def create_residue(base_disk, base_hashvalue,
     return overlay_metafile, overlay_files
     '''
     time_start = time()
+    process_controller = process_manager.get_instance()
+
     LOG.info("* Overlay creation configuration")
     LOG.info("  - %s" % str(options))
 
@@ -1398,18 +1416,16 @@ def create_residue(base_disk, base_hashvalue,
 
     # 3. get overlay VM (semantic gap + deduplication)
     dedup_proc = get_overlay_deltalist(monitoring_info, options,
-                                         base_disk, base_mem, 
-                                         base_diskmeta, base_memmeta,
-                                         resumed_vm.resumed_disk,
-                                         memory_snapshot_queue,
-                                         residue_deltalist_queue)
+                                       base_disk, base_mem,
+                                       base_diskmeta, base_memmeta,
+                                       resumed_vm.resumed_disk,
+                                       memory_snapshot_queue,
+                                       residue_deltalist_queue)
     time_dedup = time()
 
-    # 5. compression
+    # 4. compression
     LOG.info("Compressing overlay blobs")
     comp_type = Const.COMPRESSION_BZIP2
-    # processing cause some wierd error at launching pbzip2 process
-    #comp_proc = threading.Thread(target=compression.compress_stream,
     compress_proc = compression.CompressProc(residue_deltalist_queue,
                                              compdata_queue,
                                              comp_type,
@@ -1434,13 +1450,7 @@ def create_residue(base_disk, base_hashvalue,
     output_fd.close()
     LOG.debug("comp data size: %d" % comp_data_size)
 
-    time_compression_end = time()
-
-
-
-    time_meta_start = time()
-    # wait until we know all chunk number of disk and memory to create overlay
-    # metadata
+    # 5. wait until we get all chunk offset of disk and memory (for FUSE)
     dedup_proc.join()
     memory_chunks = [item/Const.CHUNK_SIZE for item in dedup_proc.delta_memory_chunks]
     disk_chunks = [item/Const.CHUNK_SIZE for item in dedup_proc.delta_disk_chunks]
@@ -1456,10 +1466,9 @@ def create_residue(base_disk, base_hashvalue,
         }
     overlay_info.append(blob_dict)
 
-    # wait until vm snapshotting finishes to get final VM memory snapshot size
-    # (for fuse)
+    # wait until VM snapshotting finishes to get final VM memory snapshot size
     memory_read_proc.join()
-    memory_read_proc.finish()   # deallocate resources such as VM
+    memory_read_proc.finish()   # deallocate resources for snapshotting
     memory_snapshot_size = memory_read_proc.get_memory_snapshot_size()
     LOG.debug("Memory Snapshot size: %ld" % memory_snapshot_size)
     overlay_metafile = _generate_overlaymeta(overlay_metapath,
@@ -1468,15 +1477,12 @@ def create_residue(base_disk, base_hashvalue,
                                              os.path.getsize(resumed_vm.resumed_disk),
                                              memory_snapshot_size)
 
-    time_meta_end = time()
-    time_packaing_start = time()
     # 6. packaging VM overlay into a single zip file
     temp_dir = mkdtemp(prefix="cloudlet-overlay-")
     overlay_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
     VMOverlayPackage.create(overlay_zipfile, overlay_metafile, [blob_filename])
-    time_packaing_end = time()
 
-    # 6. terminting
+    # 7. terminting
     resumed_vm.machine = None   # protecting malaccess to machine 
     if os.path.exists(overlay_metafile) == True:
         os.remove(overlay_metafile)
@@ -1486,12 +1492,6 @@ def create_residue(base_disk, base_hashvalue,
 
     LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
                                                             (time_end-time_start)))
-    #LOG.debug("  compression (%f ~ %f): %f" % (time_dedup, time_compression_end,
-    #                                                       (time_compression_end-time_dedup)))
-    #LOG.debug("  creating metadata (%f ~ %f): %f" % (time_meta_start, time_meta_end,
-    #                                                       (time_meta_end-time_meta_start)))
-    #LOG.debug("  packaging (%f ~ %f): %f" % (time_packaing_start, time_packaing_end,
-    #                                                       (time_packaing_end-time_packaing_start)))
     return overlay_zipfile
 
 
