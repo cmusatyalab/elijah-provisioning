@@ -46,11 +46,11 @@ class ProcessManager(threading.Thread):
         while (not self.stop.wait(1)):
             for worker_name in self.process_infos.keys():
                 value = self.process_infos[worker_name]
-                #print "%s: %s" % (worker_name, value)
             #print "monitoring: %s" % str(self.process_infos)
 
     def register(self, worker):
         process_info = self.manager.dict()
+        process_info['update_period'] = 0.1 # seconds
         worker_name = getattr(worker, "worker_name", "NoName")
         self.process_infos[worker_name] = process_info
         return process_info

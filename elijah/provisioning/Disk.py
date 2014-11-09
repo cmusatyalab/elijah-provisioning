@@ -205,7 +205,14 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         super(CreateDiskDeltalist, self).__init__(target=self.create_disk_deltalist)
 
     def create_disk_deltalist(self):
-        time_s = time.time()
+        time_start = time.time()
+        time_process_finish = 0
+        time_process_start = 0
+        time_prev_report = 0
+        processed_datasize = 0
+        processed_duration = float(0)
+        UPDATE_PERIOD = self.process_info['update_period']
+
         base_fd = open(self.basedisk_path, "rb")
         base_mmap = mmap.mmap(base_fd.fileno(), 0, prot=mmap.PROT_READ)
         modified_fd = open(self.modified_disk, "rb")
@@ -222,8 +229,9 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
 
         # 1. get modified page
         LOG.debug("1. Get modified disk page")
-        counter = 0
+        modified_chunk_counter = 0
         for index, chunk in enumerate(self.modified_chunk_dict.keys()):
+            time_process_start = time.time()
             offset = chunk * self.chunk_size
             ctime = self.modified_chunk_dict[chunk]
 
@@ -284,9 +292,19 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                     data=data)
             '''
             self.disk_deltalist_queue.put(delta_item)
-            counter += 1
+
+            # measurement
+            modified_chunk_counter += 1
+            time_process_finish = time.time()
+            processed_datasize += self.chunk_size
+            processed_duration += (time_process_finish - time_process_start)
+            if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
+                time_prev_report = time_process_finish
+                self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
+                processed_datasize = 0
+                processed_duration = float(0)
         self.disk_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-        LOG.debug("# of modified disk delta item: %ld" % counter)
+        LOG.debug("# of modified disk delta item: %ld" % modified_chunk_counter)
 
         if self.ret_statistics != None:
             self.ret_statistics['trimed'] = trim_counter
@@ -295,8 +313,8 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             self.ret_statistics['xrayed_list'] = xrayed_list
         LOG.debug("1-1. Trim(%d, overwritten after trim(%d)), Xray(%d)" % \
                 (trim_counter, overwritten_after_trim, xray_counter))
-        time_e = time.time()
-        LOG.debug("[time] Disk hashing and diff time (%f ~ %f): %f" % (time_s, time_e, (time_e-time_s)))
+        time_end = time.time()
+        LOG.debug("[time] Disk hashing and diff time (%f ~ %f): %f" % (time_start, time_end, (time_end-time_start)))
 
 
 def recover_disk(base_disk, base_mem, overlay_mem, overlay_disk, recover_path, chunk_size):

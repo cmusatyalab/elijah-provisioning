@@ -87,9 +87,6 @@ class Memory(object):
 
     def _get_mem_hash(self, fin, deltalist_queue,
                       apply_free_memory, free_pfn_dict):
-        #import yappi
-        #yappi.start()
-
         LOG.info("Get hash list of memory page")
         #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
 
@@ -184,7 +181,6 @@ class Memory(object):
         #prog_bar.finish()
         time_e = time.time()
         deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-        #yappi.get_func_stats().print_all()
         return freed_page_counter
 
     @staticmethod
@@ -473,16 +469,15 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         LOG.debug("[time] Memory hashing and diff time (%f ~ %f): %f" % (time_s, time_e, (time_e-time_s)))
 
     def _get_modified_memory_page(self, fin):
-        #import yappi
-        #yappi.start()
-
         LOG.info("Get hash list of memory page")
-        processed_data_size = 0
+
+        # measurement
+        processed_datasize = 0
+        processed_duration = 0
         time_process_finish = 0
         time_process_start = 0
         time_prev_report = 0
-        UPDATE_PERIOD = 1 # seconds
-        #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
+        UPDATE_PERIOD = self.process_info['update_period']
 
         # data structure to handle pipelined data
         def chunks(l, n):
@@ -492,6 +487,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         memory_page_list = chunks(memory_data, Memory.RAM_PAGE_SIZE)
 
         ram_offset = 0
+        recved_data_size = 0
         freed_page_counter = 0
         base_hashlist_length = len(self.memory_hashlist)
         is_end_of_stream = False
@@ -499,16 +495,19 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         while is_end_of_stream == False and len(memory_page_list) != 0:
             # get data from the stream
             if len(memory_page_list) < 2: # empty or partial data
-                if processed_data_size > 0:
+                # measurement
+                if recved_data_size > 0:
+                    processed_datasize += recved_data_size
                     time_process_finish = time.time()
-                    processing_duration = time_process_finish - time_process_start
-                    current_bw = processed_data_size/processing_duration
+                    processed_duration += (time_process_finish - time_process_start)
                     if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
                         time_prev_report = time_process_finish
-                        self.process_info['current_bw'] = (current_bw/1024.0/1024)
+                        self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
+                        processed_datasize = 0
+                        processed_duration = float(0)
 
                 recved_data = memory_data_queue.get()
-                processed_data_size = len(recved_data)
+                recved_data_size = len(recved_data)
                 time_process_start = time.time()
                 if recved_data == Const.QUEUE_SUCCESS_MESSAGE:
                     # End of the stream
@@ -574,16 +573,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
             # memory over-usage protection
             ram_offset += len(data)
-            # print progress bar for every 100 page
-            '''
-            if (ram_offset % (Memory.RAM_PAGE_SIZE*100)) == 0:
-                prog_bar.set_percent(100.0*ram_offset/total_size)
-                prog_bar.show_progress()
-            '''
-        #prog_bar.finish()
         time_e = time.time()
         self.deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-        #yappi.get_func_stats().print_all()
         return freed_page_counter
 
     def get_raw_data(self, offset, length):
