@@ -695,60 +695,62 @@ class DeltaDedup(process_manager.ProcWorker):
         is_disk_finished = False
         while is_memory_finished == False or is_disk_finished == False:
             time_process_start = time.time()
-            #(input_ready, [], []) = select.select([self.memory_deltalist_queue, self.disk_deltalist_queue], [], [])
-            # select only works for multiprocessing.Queue not for Queue.Queue
-
-            # process memory delta
-            delta_item = None
-            if is_memory_finished == False:
-                try:
-                    delta_item = self.memory_deltalist_queue.get_nowait()
+            input_list = [self.memory_deltalist_queue._reader.fileno(),
+                          self.disk_deltalist_queue._reader.fileno()]
+            (input_ready, [], []) = select.select(input_list, [], [])
+            for input_queue in input_ready:
+                delta_item = None
+                if input_queue == self.memory_deltalist_queue._reader.fileno():
+                    delta_item = self.memory_deltalist_queue.get()
                     if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
                         is_memory_finished = True
-                        delta_item = None   # To check diskdelta
-                except Queue.Empty:
-                    pass
-            if delta_item == None and is_disk_finished == False:
-                try:
-                    delta_item = self.disk_deltalist_queue.get_nowait()
+                        continue
+                elif input_queue == self.disk_deltalist_queue._reader.fileno():
+                    delta_item = self.disk_deltalist_queue.get()
                     if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
                         is_disk_finished = True
-                        continue    # end of the loop
-                except Queue.Empty:
-                    continue
-            if delta_item == None:
-                continue
+                        continue
 
-            if deduplicate_deltaitem(zero_hash_dict, delta_item, DeltaItem.REF_ZEROS) == True:
-                number_of_zero_page += 1
-            elif deduplicate_deltaitem(self.basemem_hashdict, delta_item, DeltaItem.REF_BASE_MEM) == True:
-                number_of_base_mem += 1
-            elif deduplicate_deltaitem(self.basedisk_hashdict, delta_item, DeltaItem.REF_BASE_DISK) == True:
-                number_of_base_disk += 1
-            else:
-                # chunk that are not deduplicated yet
-                if ((delta_item.ref_id == DeltaItem.REF_XDELTA) or (delta_item.ref_id == DeltaItem.REF_RAW)):
-                    ret = deduplicate_deltaitem(self.self_hashdict, delta_item, DeltaItem.REF_SELF)
-                    if ret == True:
-                        number_of_self_ref += 1
-                    else:
-                        ref_offset = long(delta_item.index)
-                        offset_length = 8
-                        self.self_hashdict[delta_item.hash_value] = (ref_offset, offset_length, delta_item.hash_value)
-            self.merged_deltalist_queue.put(delta_item)
-            if delta_item.delta_type == DeltaItem.DELTA_DISK:
-                self.delta_disk_chunks.append(delta_item.offset)
-            elif delta_item.delta_type == DeltaItem.DELTA_MEMORY:
-                self.delta_memory_chunks.append(delta_item.offset)
-            # measurement
-            time_process_finish = time.time()
-            processed_datasize += chunk_size
-            processed_duration += (time_process_finish - time_process_start)
-            if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
-                time_prev_report = time_process_finish
-                self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
-                processed_datasize = 0
-                processed_duration = float(0)
+                if deduplicate_deltaitem(zero_hash_dict, delta_item,
+                                         DeltaItem.REF_ZEROS) == True:
+                    number_of_zero_page += 1
+                elif deduplicate_deltaitem(self.basemem_hashdict, delta_item,
+                                           DeltaItem.REF_BASE_MEM) == True:
+                    number_of_base_mem += 1
+                elif deduplicate_deltaitem(self.basedisk_hashdict, delta_item,
+                                           DeltaItem.REF_BASE_DISK) == True:
+                    number_of_base_disk += 1
+                else:
+                    # chunk that are not deduplicated yet
+                    # comparison with other delta_item within itself
+                    if ((delta_item.ref_id == DeltaItem.REF_XDELTA)
+                        or (delta_item.ref_id == DeltaItem.REF_RAW)):
+                        ret = deduplicate_deltaitem(self.self_hashdict,
+                                                    delta_item,
+                                                    DeltaItem.REF_SELF)
+                        if ret == True:
+                            number_of_self_ref += 1
+                        else:
+                            ref_offset = long(delta_item.index)
+                            offset_length = 8
+                            self.self_hashdict[delta_item.hash_value] =\
+                                (ref_offset, offset_length, delta_item.hash_value)
+
+                self.merged_deltalist_queue.put(delta_item)
+                if delta_item.delta_type == DeltaItem.DELTA_DISK:
+                    self.delta_disk_chunks.append(delta_item.offset)
+                elif delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+                    self.delta_memory_chunks.append(delta_item.offset)
+
+                # measurement
+                time_process_finish = time.time()
+                processed_datasize += chunk_size
+                processed_duration += (time_process_finish - time_process_start)
+                if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
+                    time_prev_report = time_process_finish
+                    self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
+                    processed_datasize = 0
+                    processed_duration = float(0)
         self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         self.statistics['number_of_zero_page'] = number_of_zero_page

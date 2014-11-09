@@ -20,6 +20,7 @@
 
 import os
 import sys
+import select
 import struct
 import tool
 import mmap
@@ -105,6 +106,7 @@ class Memory(object):
         while is_end_of_stream == False and len(memory_page_list) != 0:
             # get data from the stream
             if len(memory_page_list) < 2: # empty or partial data
+                select.select([memory_data_queue._reader.fileno()], [], [])
                 recved_data = memory_data_queue.get()
                 if len(recved_data) == Const.QUEUE_SUCCESS_MESSAGE_LEN and recved_data == Const.QUEUE_SUCCESS_MESSAGE:
                     # End of the stream
@@ -701,6 +703,7 @@ class SeekablePipe(object):
 
     def seek(self, abs_offset):
         while abs_offset > self.current_data_size:
+            select.select([self.data_queue._reader.fileno()], [], [])
             data = self.data_queue.get()
             if len(data) == Const.QUEUE_SUCCESS_MESSAGE_LEN and data == Const.QUEUE_SUCCESS_MESSAGE:
                 self.closed = True
@@ -712,6 +715,7 @@ class SeekablePipe(object):
     def read(self, read_size):
         read_offset = self.current_seek_offset + read_size
         while self.current_data_size < read_offset:
+            select.select([self.data_queue._reader.fileno()], [], [])
             data = self.data_queue.get()
             if len(data) == Const.QUEUE_SUCCESS_MESSAGE_LEN and data == Const.QUEUE_SUCCESS_MESSAGE:
                 self.closed == True

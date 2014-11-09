@@ -48,8 +48,8 @@ def _bzip2_read_data(fd, result_queue, process_info_dict):
                 #print "aa: %f %f" % (processed_datasize, processed_duration)
                 if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
                     time_prev_report = time_process_finish
-                    print "compression BW: %f MBps" % \
-                        (processed_datasize/processed_duration/1024.0/1024)
+                    #print "compression BW: %f MBps" % \
+                    #    (processed_datasize/processed_duration/1024.0/1024)
                     process_info_dict['current_bw'] = \
                         processed_datasize/processed_duration/1024.0/1024
                     processed_datasize = 0
@@ -66,6 +66,7 @@ def _bzip2_read_data(fd, result_queue, process_info_dict):
 def _bzip2_write_data(input_data_queue, fd, process_info_dict):
     try:
         while True:
+            select.select([input_data_queue._reader.fileno()], [], [])
             delta_item = input_data_queue.get()
             if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
                 break
@@ -87,6 +88,7 @@ def _comp_lzma(delta_list_queue, comp_delta_queue, speed, num_cores):
 
     count = 0
     while True:
+        select.select([delta_list_queue._reader.fileno()], [], [])
         delta_item = delta_list_queue.get()
         if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
             break

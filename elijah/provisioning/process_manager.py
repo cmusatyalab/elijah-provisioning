@@ -44,8 +44,9 @@ class ProcessManager(threading.Thread):
 
     def start_managing(self):
         while (not self.stop.wait(1)):
-            for worker_name in self.process_infos.keys():
-                value = self.process_infos[worker_name]
+            pass
+            #for worker_name in self.process_infos.keys():
+            #    value = self.process_infos[worker_name]
             #print "monitoring: %s" % str(self.process_infos)
 
     def register(self, worker):

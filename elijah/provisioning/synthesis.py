@@ -1060,7 +1060,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
     def read_mem_snapshot(self):
         # create memory snapshot aligned with 4KB
         time_s = time()
-        UPDATE_SIZE  = 1024*1024*10 # 1MB
+        UPDATE_SIZE  = 1024*1024*10 # 10MB
         prev_processed_size = 0
         prev_processed_time = time()
         cur_processed_size = 0
