@@ -124,8 +124,6 @@ class Memory(object):
 
             # compare input with hash or corresponding base memory, save only when it is different
             hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
-            #if hash_list_index%10000 == 0:
-            #    print "%d: # of memory chunk at queue: %d" % (ram_offset, memory_data_queue.qsize())
             if hash_list_index < base_hashlist_length:
                 self_hash_value = self.hash_list[hash_list_index][2]
             else:
@@ -479,6 +477,11 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         #yappi.start()
 
         LOG.info("Get hash list of memory page")
+        processed_data_size = 0
+        time_process_finish = 0
+        time_process_start = 0
+        time_prev_report = 0
+        UPDATE_PERIOD = 1 # seconds
         #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
 
         # data structure to handle pipelined data
@@ -496,9 +499,18 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         while is_end_of_stream == False and len(memory_page_list) != 0:
             # get data from the stream
             if len(memory_page_list) < 2: # empty or partial data
+                if processed_data_size > 0:
+                    time_process_finish = time.time()
+                    processing_duration = time_process_finish - time_process_start
+                    current_bw = processed_data_size/processing_duration
+                    if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
+                        time_prev_report = time_process_finish
+                        self.process_info['current_bw'] = (current_bw/1024.0/1024)
+
                 recved_data = memory_data_queue.get()
-                if len(recved_data) == Const.QUEUE_SUCCESS_MESSAGE_LEN \
-                        and recved_data == Const.QUEUE_SUCCESS_MESSAGE:
+                processed_data_size = len(recved_data)
+                time_process_start = time.time()
+                if recved_data == Const.QUEUE_SUCCESS_MESSAGE:
                     # End of the stream
                     is_end_of_stream = True
                 else:
@@ -511,11 +523,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     memory_page_list += chunks(recved_data[required_length:], Memory.RAM_PAGE_SIZE)
             data = memory_page_list.pop(0)
 
-            # compare input with hash or corresponding base memory, save only when it is different
-            #chunk_hashvalue = sha256(data).digest()
-            #(base_offset, base_length, base_hash_value) = \
-            #    self.memory_hashdict.get(chunk_hashvalue, (-1, -1, None))
-            #if base_offset != ram_offset: # cannot find matching data at Base memory
             hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
             self_hash_value = None
             if hash_list_index < base_hashlist_length:
