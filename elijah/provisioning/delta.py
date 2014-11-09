@@ -745,7 +745,6 @@ class DeltaDedup(process_manager.ProcWorker):
             processed_datasize += chunk_size
             processed_duration += (time_process_finish - time_process_start)
             if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
-                print "aaaaa: %f" % (processed_datasize/processed_duration/1024.0/1024)
                 time_prev_report = time_process_finish
                 self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
                 processed_datasize = 0

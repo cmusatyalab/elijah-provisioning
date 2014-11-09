@@ -13,6 +13,7 @@ from lzma import LZMACompressor
 from lzma import LZMADecompressor
 from Configuration import Const
 from package import VMOverlayPackage
+import process_manager
 
 
 BLOCK_SIZE = 1024*1024*1
@@ -23,15 +24,36 @@ class CompressionError(Exception):
     pass
 
 
-def _bzip2_read_data(fd, result_queue):
+def _bzip2_read_data(fd, result_queue, process_info_dict):
+    time_process_finish = 0
+    time_process_start = 0
+    time_prev_report = 0
+    processed_datasize = 0
+    processed_duration = float(0)
+    UPDATE_PERIOD = process_info_dict['update_period']
     try:
         while True:
+            time_process_start = time.time()
             rlist, wlist, xlist = select.select([fd], [fd], [fd])
             if fd in rlist:
                 data = os.read(fd.fileno(), BLOCK_SIZE)
                 if not data:
                     break
                 result_queue.put(data)
+
+                # measurement
+                time_process_finish = time.time()
+                processed_datasize += len(data)
+                processed_duration += (time_process_finish - time_process_start)
+                #print "aa: %f %f" % (processed_datasize, processed_duration)
+                if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
+                    time_prev_report = time_process_finish
+                    print "compression BW: %f MBps" % \
+                        (processed_datasize/processed_duration/1024.0/1024)
+                    process_info_dict['current_bw'] = \
+                        processed_datasize/processed_duration/1024.0/1024
+                    processed_datasize = 0
+                    processed_duration = float(0)
         result_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
     except Exception, e:
         sys.stderr.write("%s\n" % str(e))
@@ -41,7 +63,7 @@ def _bzip2_read_data(fd, result_queue):
         fd.close()
 
 
-def _bzip2_write_data(input_data_queue, fd):
+def _bzip2_write_data(input_data_queue, fd, process_info_dict):
     try:
         while True:
             delta_item = input_data_queue.get()
@@ -82,7 +104,7 @@ def _comp_lzma(delta_list_queue, comp_delta_queue, speed, num_cores):
     comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
 
-class CompressProc(multiprocessing.Process):
+class CompressProc(process_manager.ProcWorker):
     def __init__(self, delta_list_queue, comp_delta_queue, comp_type, comp_option=dict()):
         """
         comparisons of compression algorithm
@@ -92,24 +114,25 @@ class CompressProc(multiprocessing.Process):
         self.comp_delta_queue = comp_delta_queue
         self.comp_type = comp_type
         self.comp_option = comp_option
-        multiprocessing.Process.__init__(self, target=self.compress_stream)
+        super(CompressProc, self).__init__(target=self.compress_stream)
 
     def compress_stream(self):
-        start_time = time.time()
+        time_start = time.time()
+
         if self.comp_type == Const.COMPRESSION_LZMA:
             _comp_lzma(self.delta_list_queue, self.comp_delta_queue, 1, 1)
         elif self.comp_type == Const.COMPRESSION_BZIP2:
-            speed = 1
-            num_cores = 3
+            speed = 5
+            num_cores = 4
             self._comp_bzip2(speed, num_cores)
-
         elif self.comp_type == Const.COMPRESSION_GZIP:
             raise CompressionError("Not implemented")
         else:
             raise CompressionError("Not valid compression option")
-        end_time = time.time()
+        time_end = time.time()
 
-        sys.stdout.write("[time] Overlay compression time (%f ~ %f): %f\n" % (start_time, end_time, (end_time-start_time)))
+        sys.stdout.write("[time] Overlay compression time (%f ~ %f): %f\n" % (
+            time_start, time_end, (time_end-time_start)))
 
 
     def _comp_bzip2(self, speed, num_cores):
@@ -120,9 +143,13 @@ class CompressProc(multiprocessing.Process):
             _PIPE = subprocess.PIPE
             proc = subprocess.Popen(cmd.split(" "), stdin=_PIPE, stdout=_PIPE, close_fds=True)
             write_t = threading.Thread(target=_bzip2_write_data,
-                                    args=(self.delta_list_queue, proc.stdin))
+                                    args=(self.delta_list_queue,
+                                          proc.stdin,
+                                          self.process_info))
             read_t = threading.Thread(target=_bzip2_read_data,
-                                    args=(proc.stdout, self.comp_delta_queue))
+                                    args=(proc.stdout,
+                                          self.comp_delta_queue,
+                                          self.process_info))
             write_t.start()
             read_t.start()
             sys.stdout.write("[compression] waiting to fininsh compression proc\n")
