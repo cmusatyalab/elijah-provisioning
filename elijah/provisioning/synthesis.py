@@ -822,19 +822,16 @@ def get_overlay_deltalist(monitoring_info, options,
     time_mem_delta = time()
 
     LOG.info("Get disk delta")
-    disk_statistics = dict()
     disk_deltalist_queue = multiprocessing.Queue()
-    disk_deltalist_proc = multiprocessing.Process(target=Disk.create_disk_deltalist,
-                                                  args=(modified_disk,
-                                                        m_chunk_dict, Const.CHUNK_SIZE,
-                                                        disk_deltalist_queue,
-                                                        base_image,
-                                                        trim_dict,
-                                                        apply_discard,
-                                                        dma_dict,
-                                                        used_blocks_dict,
-                                                        disk_statistics) # this won't be updated in multiprocess
-                                                  )
+    disk_deltalist_proc = Disk.CreateDiskDeltalist(modified_disk,
+                                                   m_chunk_dict,
+                                                   Const.CHUNK_SIZE,
+                                                   disk_deltalist_queue,
+                                                   base_image,
+                                                   trim_dict,
+                                                   apply_discard,
+                                                   dma_dict,
+                                                   used_blocks_dict)
     disk_deltalist_proc.start()
 
     time_disk_delta = time()
@@ -849,7 +846,8 @@ def get_overlay_deltalist(monitoring_info, options,
     time_merge_delta = time()
 
     #LOG.info("Print statistics")
-    #disk_deltalist_thread.join()   # to fill out disk_statistics
+    #disk_deltalist_proc.join()   # to fill out disk_statistics
+    #disk_statistics = disk_deltalist_proc.ret_statistics
     #free_memory_dict = getattr(monitoring_info, _MonitoringInfo.MEMORY_FREE_BLOCKS, None)
     #free_pfn_counter = long(free_memory_dict.get("freed_counter", 0))
     #disk_discarded_count = disk_statistics.get('trimed', 0)
