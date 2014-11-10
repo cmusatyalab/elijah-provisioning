@@ -125,7 +125,7 @@ class CompressProc(process_manager.ProcWorker):
             _comp_lzma(self.delta_list_queue, self.comp_delta_queue, 1, 1)
         elif self.comp_type == Const.COMPRESSION_BZIP2:
             speed = 5
-            num_cores = 4
+            num_cores = 2
             self._comp_bzip2(speed, num_cores)
         elif self.comp_type == Const.COMPRESSION_GZIP:
             raise CompressionError("Not implemented")

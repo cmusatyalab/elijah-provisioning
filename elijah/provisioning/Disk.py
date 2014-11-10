@@ -263,6 +263,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             # check file system 
             modified_fd.seek(offset)
             data = modified_fd.read(self.chunk_size)
+
             source_data = base_mmap[offset:offset+len(data)]
             try:
                 patch = tool.diff_data(source_data, data, 2*len(source_data))

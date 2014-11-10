@@ -1429,6 +1429,9 @@ def create_residue(base_disk, base_hashvalue,
                                              comp_type,
                                              comp_option={})
     compress_proc.start()
+    time_dedup = time()
+
+    time_packaging_start = time()
 
     # to be deleted
     overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
@@ -1479,6 +1482,11 @@ def create_residue(base_disk, base_hashvalue,
     temp_dir = mkdtemp(prefix="cloudlet-overlay-")
     overlay_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
     VMOverlayPackage.create(overlay_zipfile, overlay_metafile, [blob_filename])
+    time_packaging_end = time()
+    LOG.debug("[time] Time for overlay packaging (%f ~ %f): %f" % (time_packaging_start,
+                                                                   time_packaging_end,
+                                                                   (time_packaging_end-time_packaging_start)))
+
 
     # 7. terminting
     resumed_vm.machine = None   # protecting malaccess to machine 
