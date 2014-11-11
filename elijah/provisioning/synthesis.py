@@ -784,7 +784,9 @@ def get_libvirt_connection():
 
 def get_overlay_deltalist(monitoring_info, options,
                           base_image, base_mem, 
-                          base_diskmeta, base_memmeta, 
+                          base_memmeta, 
+                          basedisk_hashdict, 
+                          basemem_hashdict,
                           modified_disk,
                           modified_mem_queue,
                           merged_deltalist_queue):
@@ -829,8 +831,8 @@ def get_overlay_deltalist(monitoring_info, options,
                                                    disk_deltalist_queue,
                                                    base_image,
                                                    trim_dict,
-                                                   apply_discard,
                                                    dma_dict,
+                                                   apply_discard,
                                                    used_blocks_dict)
     disk_deltalist_proc.start()
 
@@ -840,8 +842,8 @@ def get_overlay_deltalist(monitoring_info, options,
     dedup_proc = delta.DeltaDedup(memory_deltalist_queue, Memory.Memory.RAM_PAGE_SIZE,
                                   disk_deltalist_queue, Const.CHUNK_SIZE,
                                   merged_deltalist_queue,
-                                  base_memmeta=base_memmeta,
-                                  base_diskmeta=base_diskmeta)
+                                  basedisk_hashdict=basedisk_hashdict,
+                                  basemem_hashdict=basemem_hashdict)
     dedup_proc.start()
     time_merge_delta = time()
 
@@ -1370,8 +1372,9 @@ def copy_with_xml(in_path, out_path, xml):
     fout.write(fin.read())
 
 
-def create_residue(base_disk, base_hashvalue, 
-        resumed_vm, options, original_deltalist):
+def create_residue(base_disk, base_hashvalue,
+                   basedisk_hashdict, basemem_hashdict,
+                   resumed_vm, options, original_deltalist):
     '''Get residue
     return overlay_metafile, overlay_files
     '''
@@ -1422,7 +1425,9 @@ def create_residue(base_disk, base_hashvalue,
     # 3. get overlay VM (semantic gap + deduplication)
     dedup_proc = get_overlay_deltalist(monitoring_info, options,
                                        base_disk, base_mem,
-                                       base_diskmeta, base_memmeta,
+                                       base_memmeta,
+                                       basedisk_hashdict,
+                                       basemem_hashdict,
                                        resumed_vm.resumed_disk,
                                        memory_snapshot_queue,
                                        residue_deltalist_queue)
@@ -1749,6 +1754,20 @@ def create_baseVM(disk_image_path):
 
     return disk_image_path, base_mempath
 
+
+class PreloadResidueData(threading.Thread):
+    def __init__(self, base_diskmeta, base_memmeta):
+        self.base_diskmeta = base_diskmeta
+        self.base_memmeta = base_memmeta
+        self.basedisk_hashdict = None
+        self.basmem_hashdict = None
+        threading.Thread.__init__(self, target=self.preloading)
+
+    def preloading(self):
+        self.basedisk_hashdict = delta.DeltaDedup.disk_import_hashdict(self.base_diskmeta)
+        self.basemem_hashdict = delta.DeltaDedup.memory_import_hashdict(self.base_memmeta)
+
+
 def _reconstruct_mem_deltalist(base_disk, base_mem, overlay_filepath):
     ret_deltalist = list()
     deltalist = DeltaList.fromfile(overlay_filepath)
@@ -1863,6 +1882,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
     else:
         meta_info = compression.decomp_overlayzip(overlay_path, overlay_filename.name)
 
+    import pdb;pdb.set_trace()
     LOG.info("Decompression time : %f (s)" % (time()-decompe_time_s))
     LOG.info("Recovering launch VM")
     launch_disk, launch_mem, fuse, delta_proc, fuse_thread = \
@@ -1882,7 +1902,11 @@ def synthesis(base_disk, overlay_path, **kwargs):
     synthesized_VM.resume()
     if return_residue == True:
         # preload basevm hash dictionary for creating residue
-        pass
+        (base_diskmeta, base_mem, base_memmeta) = \
+                Const.get_basepath(base_disk, check_exist=True)
+        preload_thread = PreloadResidueData(base_diskmeta, base_memmeta)
+        preload_thread.daemon = True
+        preload_thread.start()
     connect_vnc(synthesized_VM.machine)
 
     # statistics
@@ -1910,9 +1934,16 @@ def synthesis(base_disk, overlay_path, **kwargs):
             time_b = time()
             LOG.debug("[time] Time for reconstructing previous deltalist (%f ~ %f): %f" %
                       (time_b, time_a, (time_b-time_a)))
+            preload_thread.join()
+            time_c = time()
+            LOG.debug("[time] Time for waiting to build hashdict: %f" %
+                      (time_c-time_b))
             residue_overlay = create_residue(base_disk,
                                              meta_info[Const.META_BASE_VM_SHA256],
-                                             synthesized_VM, options, 
+                                             preload_thread.basedisk_hashdict,
+                                             preload_thread.basemem_hashdict,
+                                             synthesized_VM,
+                                             options,
                                              prev_mem_deltalist)
             LOG.info("[RESULT] Residue")
             LOG.info("[RESULT]   Metafile : %s" % \

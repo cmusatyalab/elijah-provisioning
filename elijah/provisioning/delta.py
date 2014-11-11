@@ -637,14 +637,14 @@ class DeltaDedup(process_manager.ProcWorker):
     def __init__(self, memory_deltalist_queue, memory_chunk_size,
                    disk_deltalist_queue, disk_chunk_size,
                    merged_deltalist_queue,
-                   base_memmeta=None, base_diskmeta=None):
+                   basedisk_hashdict=None, basemem_hashdict=None):
         self.memory_deltalist_queue = memory_deltalist_queue
         self.memory_chunk_size = memory_chunk_size
         self.disk_deltalist_queue = disk_deltalist_queue
         self.disk_chunk_size = disk_chunk_size
         self.merged_deltalist_queue = merged_deltalist_queue
-        self.base_memmeta = base_memmeta
-        self.base_diskmeta = base_diskmeta
+        self.basedisk_hashdict = basedisk_hashdict
+        self.basemem_hashdict= basemem_hashdict
 
         self.self_hashdict = dict()
 
@@ -672,10 +672,7 @@ class DeltaDedup(process_manager.ProcWorker):
         UPDATE_PERIOD = self.process_info['update_period']
 
         # get hashtable
-        self.basemem_hashdict= DeltaDedup.memory_import_hashdict(self.base_memmeta)
         time_memory_hashdict_end = time.time()
-        self.basedisk_hashdict = self.disk_import_hashdict(self.base_diskmeta)
-        time_disk_hashdict_end = time.time()
         number_of_zero_page = 0
         number_of_base_disk = 0
         number_of_base_mem = 0
@@ -766,9 +763,6 @@ class DeltaDedup(process_manager.ProcWorker):
                                                                      time_memory_hashdict_end,
                                                                      (time_memory_hashdict_end-time_start)))
 
-        LOG.debug("[time] Dedup: loading base disk hashdic (%f ~ %f): %f" % (time_memory_hashdict_end,
-                                                                   time_disk_hashdict_end,
-                                                                   (time_disk_hashdict_end-time_memory_hashdict_end)))
         LOG.debug("[time] Dedup: first input at : %f" % (time_first_recv))
         LOG.debug("[time] Dedup: time (%f ~ %f): %f" % (time_start, time_end, (time_end-time_start)))
 

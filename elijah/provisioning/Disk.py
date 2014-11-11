@@ -256,7 +256,6 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                     xrayed_list.append(chunk)
                     xray_counter +=1
                     is_discarded = True
-
             if is_discarded == True:
                 # only apply when it is true
                 if self.apply_discard:
