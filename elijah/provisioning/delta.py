@@ -664,6 +664,8 @@ class DeltaDedup(process_manager.ProcWorker):
 
     def perform_dedup(self):
         time_start = time.time()
+        is_first_recv = False
+        time_first_recv = 0
         time_process_finish = 0
         time_process_start = 0
         time_prev_report = 0
@@ -673,7 +675,9 @@ class DeltaDedup(process_manager.ProcWorker):
 
         # get hashtable
         self.basemem_hashdict= DeltaDedup.memory_import_hashdict(self.base_memmeta)
+        time_memory_hashdict_end = time.time()
         self.basedisk_hashdict = self.disk_import_hashdict(self.base_diskmeta)
+        time_disk_hashdict_end = time.time()
         number_of_zero_page = 0
         number_of_base_disk = 0
         number_of_base_mem = 0
@@ -710,6 +714,10 @@ class DeltaDedup(process_manager.ProcWorker):
                     if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
                         is_disk_finished = True
                         continue
+
+                if is_first_recv == False:
+                    is_first_recv = True
+                    time_first_recv = time.time()
 
                 if deduplicate_deltaitem(zero_hash_dict, delta_item,
                                          DeltaItem.REF_ZEROS) == True:
@@ -758,7 +766,15 @@ class DeltaDedup(process_manager.ProcWorker):
         self.statistics['number_of_base_mem'] = number_of_base_mem
         self.statistics['number_of_self_ref'] = number_of_self_ref
         time_end = time.time()
-        LOG.debug("[time] Deduplication time (%f ~ %f): %f" % (time_start, time_end, (time_end-time_start)))
+        LOG.debug("[time] Dedup: loading base memory hashdic (%f ~ %f): %f" % (time_start,
+                                                                     time_memory_hashdict_end,
+                                                                     (time_memory_hashdict_end-time_start)))
+
+        LOG.debug("[time] Dedup: loading base disk hashdic (%f ~ %f): %f" % (time_memory_hashdict_end,
+                                                                   time_disk_hashdict_end,
+                                                                   (time_disk_hashdict_end-time_memory_hashdict_end)))
+        LOG.debug("[time] Dedup: first input at : %f" % (time_first_recv))
+        LOG.debug("[time] Dedup: time (%f ~ %f): %f" % (time_start, time_end, (time_end-time_start)))
 
     @staticmethod
     def memory_import_hashdict(meta_path):

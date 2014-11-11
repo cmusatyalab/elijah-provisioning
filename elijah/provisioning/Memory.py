@@ -86,104 +86,103 @@ class Memory(object):
                     return position
             start_index += len(memdata)
 
-    def _get_mem_hash(self, fin, deltalist_queue,
-                      apply_free_memory, free_pfn_dict):
-        LOG.info("Get hash list of memory page")
-        #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
+    #def _get_mem_hash(self, fin, deltalist_queue,
+    #                  apply_free_memory, free_pfn_dict):
+    #    LOG.info("Get hash list of memory page")
+    #    #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
 
-        # data structure to handle pipelined data
-        def chunks(l, n):
-            return [l[i:i + n] for i in range(0, len(l), n)]
-        memory_data = fin.data_buffer
-        memory_data_queue = fin.data_queue
-        memory_page_list = chunks(memory_data, Memory.RAM_PAGE_SIZE)
+    #    # data structure to handle pipelined data
+    #    def chunks(l, n):
+    #        return [l[i:i + n] for i in range(0, len(l), n)]
+    #    memory_data = fin.data_buffer
+    #    memory_data_queue = fin.data_queue
+    #    memory_page_list = chunks(memory_data, Memory.RAM_PAGE_SIZE)
 
-        ram_offset = 0
-        freed_page_counter = 0
-        base_hashlist_length = len(self.hash_list)
-        is_end_of_stream = False
-        time_s = time.time()
-        while is_end_of_stream == False and len(memory_page_list) != 0:
-            # get data from the stream
-            if len(memory_page_list) < 2: # empty or partial data
-                select.select([memory_data_queue._reader.fileno()], [], [])
-                recved_data = memory_data_queue.get()
-                if len(recved_data) == Const.QUEUE_SUCCESS_MESSAGE_LEN and recved_data == Const.QUEUE_SUCCESS_MESSAGE:
-                    # End of the stream
-                    is_end_of_stream = True
-                else:
-                    required_length = 0
-                    if len(memory_page_list) == 1: # handle partial data
-                        last_data = memory_page_list.pop(0)
-                        required_length = Memory.RAM_PAGE_SIZE-len(last_data)
-                        last_data += recved_data[0:required_length]
-                        memory_page_list.append(last_data)
-                    memory_page_list += chunks(recved_data[required_length:], Memory.RAM_PAGE_SIZE)
-            data = memory_page_list.pop(0)
+    #    ram_offset = 0
+    #    freed_page_counter = 0
+    #    base_hashlist_length = len(self.hash_list)
+    #    is_end_of_stream = False
+    #    time_s = time.time()
+    #    while is_end_of_stream == False and len(memory_page_list) != 0:
+    #        # get data from the stream
+    #        if len(memory_page_list) < 2: # empty or partial data
+    #            recved_data = memory_data_queue.get()
+    #            if len(recved_data) == Const.QUEUE_SUCCESS_MESSAGE_LEN and recved_data == Const.QUEUE_SUCCESS_MESSAGE:
+    #                # End of the stream
+    #                is_end_of_stream = True
+    #            else:
+    #                required_length = 0
+    #                if len(memory_page_list) == 1: # handle partial data
+    #                    last_data = memory_page_list.pop(0)
+    #                    required_length = Memory.RAM_PAGE_SIZE-len(last_data)
+    #                    last_data += recved_data[0:required_length]
+    #                    memory_page_list.append(last_data)
+    #                memory_page_list += chunks(recved_data[required_length:], Memory.RAM_PAGE_SIZE)
+    #        data = memory_page_list.pop(0)
 
-            # compare input with hash or corresponding base memory, save only when it is different
-            hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
-            if hash_list_index < base_hashlist_length:
-                self_hash_value = self.hash_list[hash_list_index][2]
-            else:
-                self_hash_value = None
-            chunk_hashvalue = sha256(data).digest()
-            if self_hash_value != chunk_hashvalue:
-                is_free_memory = False
-                if (free_pfn_dict != None) and \
-                        (free_pfn_dict.get(long(ram_offset/Memory.RAM_PAGE_SIZE), None) == 1):
-                    is_free_memory = True
+    #        # compare input with hash or corresponding base memory, save only when it is different
+    #        hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
+    #        if hash_list_index < base_hashlist_length:
+    #            self_hash_value = self.hash_list[hash_list_index][2]
+    #        else:
+    #            self_hash_value = None
+    #        chunk_hashvalue = sha256(data).digest()
+    #        if self_hash_value != chunk_hashvalue:
+    #            is_free_memory = False
+    #            if (free_pfn_dict != None) and \
+    #                    (free_pfn_dict.get(long(ram_offset/Memory.RAM_PAGE_SIZE), None) == 1):
+    #                is_free_memory = True
 
-                if is_free_memory and apply_free_memory:
-                    # Do not compare. It is free memory
-                    freed_page_counter += 1
-                else:
-                    #get xdelta comparing self.raw
-                    source_data = self.get_raw_data(ram_offset, len(data))
-                    try:
-                        if source_data == None:
-                            raise IOError("launch memory snapshot is bigger than base vm")
-                        patch = tool.diff_data(source_data, data, 2*len(source_data))
-                        if len(patch) < len(data):
-                            delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
-                                    ram_offset, len(data),
-                                    hash_value=chunk_hashvalue,
-                                    ref_id=DeltaItem.REF_XDELTA,
-                                    data_len=len(patch),
-                                    data=patch)
-                        else:
-                            raise IOError("xdelta3 patch is bigger than origianl")
-                    except IOError as e:
-                        #LOG.info("xdelta failed, so save it as raw (%s)" % str(e))
-                        delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
-                                ram_offset, len(data),
-                                hash_value=chunk_hashvalue,
-                                ref_id=DeltaItem.REF_RAW,
-                                data_len=len(data),
-                                data=data)
-                    '''
-                    delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
-                            ram_offset, len(data),
-                            hash_value=chunk_hashvalue,
-                            ref_id=DeltaItem.REF_RAW,
-                            data_len=len(data),
-                            data=data)
-                    '''
+    #            if is_free_memory and apply_free_memory:
+    #                # Do not compare. It is free memory
+    #                freed_page_counter += 1
+    #            else:
+    #                #get xdelta comparing self.raw
+    #                source_data = self.get_raw_data(ram_offset, len(data))
+    #                try:
+    #                    if source_data == None:
+    #                        raise IOError("launch memory snapshot is bigger than base vm")
+    #                    patch = tool.diff_data(source_data, data, 2*len(source_data))
+    #                    if len(patch) < len(data):
+    #                        delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
+    #                                ram_offset, len(data),
+    #                                hash_value=chunk_hashvalue,
+    #                                ref_id=DeltaItem.REF_XDELTA,
+    #                                data_len=len(patch),
+    #                                data=patch)
+    #                    else:
+    #                        raise IOError("xdelta3 patch is bigger than origianl")
+    #                except IOError as e:
+    #                    #LOG.info("xdelta failed, so save it as raw (%s)" % str(e))
+    #                    delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
+    #                            ram_offset, len(data),
+    #                            hash_value=chunk_hashvalue,
+    #                            ref_id=DeltaItem.REF_RAW,
+    #                            data_len=len(data),
+    #                            data=data)
+    #                '''
+    #                delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
+    #                        ram_offset, len(data),
+    #                        hash_value=chunk_hashvalue,
+    #                        ref_id=DeltaItem.REF_RAW,
+    #                        data_len=len(data),
+    #                        data=data)
+    #                '''
 
-                    deltalist_queue.put(delta_item)
+    #                deltalist_queue.put(delta_item)
 
-            # memory over-usage protection
-            ram_offset += len(data)
-            # print progress bar for every 100 page
-            '''
-            if (ram_offset % (Memory.RAM_PAGE_SIZE*100)) == 0:
-                prog_bar.set_percent(100.0*ram_offset/total_size)
-                prog_bar.show_progress()
-            '''
-        #prog_bar.finish()
-        time_e = time.time()
-        deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-        return freed_page_counter
+    #        # memory over-usage protection
+    #        ram_offset += len(data)
+    #        # print progress bar for every 100 page
+    #        '''
+    #        if (ram_offset % (Memory.RAM_PAGE_SIZE*100)) == 0:
+    #            prog_bar.set_percent(100.0*ram_offset/total_size)
+    #            prog_bar.show_progress()
+    #        '''
+    #    #prog_bar.finish()
+    #    time_e = time.time()
+    #    deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+    #    return freed_page_counter
 
     @staticmethod
     def _seek_to_end_of_ram(fin):
@@ -472,6 +471,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
     def _get_modified_memory_page(self, fin):
         LOG.info("Get hash list of memory page")
+        is_first_recv = False
+        time_first_recv = 0
 
         # measurement
         processed_datasize = 0
@@ -508,7 +509,12 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                         processed_datasize = 0
                         processed_duration = float(0)
 
+                select.select([memory_data_queue._reader.fileno()], [], [])
                 recved_data = memory_data_queue.get()
+                if is_first_recv == False:
+                    is_first_recv = True
+                    time_first_recv = time.time()
+
                 recved_data_size = len(recved_data)
                 time_process_start = time.time()
                 if recved_data == Const.QUEUE_SUCCESS_MESSAGE:
@@ -577,6 +583,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             ram_offset += len(data)
         time_e = time.time()
         self.deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+        LOG.debug("[time] Memory xdelta first input at : %f" % (time_first_recv))
         return freed_page_counter
 
     def get_raw_data(self, offset, length):

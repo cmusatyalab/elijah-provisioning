@@ -206,6 +206,8 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
 
     def create_disk_deltalist(self):
         time_start = time.time()
+        is_first_recv = False
+        time_first_recv = 0
         time_process_finish = 0
         time_process_start = 0
         time_prev_report = 0
@@ -263,6 +265,9 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             # check file system 
             modified_fd.seek(offset)
             data = modified_fd.read(self.chunk_size)
+            if is_first_recv == False:
+                is_first_recv = True
+                time_first_recv = time.time()
 
             source_data = base_mmap[offset:offset+len(data)]
             try:
@@ -315,6 +320,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         LOG.debug("1-1. Trim(%d, overwritten after trim(%d)), Xray(%d)" % \
                 (trim_counter, overwritten_after_trim, xray_counter))
         time_end = time.time()
+        LOG.debug("[time] Disk first input at : %f" % (time_first_recv))
         LOG.debug("[time] Disk hashing and diff time (%f ~ %f): %f" % (time_start, time_end, (time_end-time_start)))
 
 

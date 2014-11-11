@@ -1060,6 +1060,8 @@ class MemoryReadProcess(process_manager.ProcWorker):
     def read_mem_snapshot(self):
         # create memory snapshot aligned with 4KB
         time_s = time()
+        is_first_recv = False
+        time_first_recv = 0
         UPDATE_SIZE  = 1024*1024*10 # 10MB
         prev_processed_size = 0
         prev_processed_time = time()
@@ -1074,6 +1076,10 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.total_read_size = 0
             # read first 40KB and aligen header with 4KB
             data = self.in_fd.read(Memory.Memory.RAM_PAGE_SIZE*10)
+            if is_first_recv == False:
+                is_first_recv = True
+                time_first_recv = time()
+
             libvirt_header = memory_util._QemuMemoryHeaderData(data)
             original_header = libvirt_header.get_header()
             align_size = Memory.Memory.RAM_PAGE_SIZE*2
@@ -1085,7 +1091,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             LOG.info("Header size of memory snapshot is %s" % len(new_header))
 
             # write rest of the memory data
-            prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
+            #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
                 select.select([self.in_fd], [], [])
                 data = self.in_fd.read(1024 * 1024 * 1)
@@ -1094,8 +1100,8 @@ class MemoryReadProcess(process_manager.ProcWorker):
                 current_size = len(data)
                 self.result_queue.put(data)
                 self.total_read_size += current_size
-                prog_bar.set_percent(100.0*self.total_read_size/self.machine_memory_size)
-                prog_bar.show_progress()
+                #prog_bar.set_percent(100.0*self.total_read_size/self.machine_memory_size)
+                #prog_bar.show_progress()
 
                 if self.total_read_size - prev_processed_size > UPDATE_SIZE:
                     cur_time = time()
@@ -1105,7 +1111,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     #print "processing bw: %f MBps" % (current_bw/1024.0/1024)
                     self.process_info['current_bw'] = (current_bw/1024.0/1024)
 
-            prog_bar.finish()
+            #prog_bar.finish()
         except Exception, e:
             LOG.error(str(e))
             self.result_queue.put(Const.QUEUE_FAILED_MESSAGE)
@@ -1113,8 +1119,9 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.result_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         time_e = time()
-        LOG.debug("Memory size of launch VM: %ld" % (self.total_read_size))
-        LOG.debug("memory snapshotting (%f ~ %f): %f, %f GBps" % (
+        LOG.debug("[time] Memory size of launch VM: %ld" % (self.total_read_size))
+        LOG.debug("[time] Memory snapshotting first input at : %f" % (time_first_recv))
+        LOG.debug("[time] memory snapshotting (%f ~ %f): %f, %f GBps" % (
             time_s, time_e, (time_e-time_s),
             (self.total_read_size/(time_e-time_s)/1024/1024/1024)))
         self.memory_snapshot_size.append(self.total_read_size)

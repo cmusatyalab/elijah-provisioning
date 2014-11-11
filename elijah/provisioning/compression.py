@@ -25,6 +25,8 @@ class CompressionError(Exception):
 
 
 def _bzip2_read_data(fd, result_queue, process_info_dict):
+    is_first_recv = False
+    time_first_recv = 0
     time_process_finish = 0
     time_process_start = 0
     time_prev_report = 0
@@ -39,6 +41,9 @@ def _bzip2_read_data(fd, result_queue, process_info_dict):
                 data = os.read(fd.fileno(), BLOCK_SIZE)
                 if not data:
                     break
+                if is_first_recv == False:
+                    is_first_recv = True
+                    time_first_recv = time.time()
                 result_queue.put(data)
 
                 # measurement
@@ -60,6 +65,7 @@ def _bzip2_read_data(fd, result_queue, process_info_dict):
         result_queue.put(Const.QUEUE_FAILED_MESSAGE)
         sys.exit(1)
     finally:
+        sys.stdout.write("[time] compression first input at : %f" % (time_first_recv))
         fd.close()
 
 
