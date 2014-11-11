@@ -1402,7 +1402,7 @@ def create_residue(base_disk, base_hashvalue,
     monitoring_info = vm_monitor.get_monitoring_info()
 
     time_ss = time()
-    LOG.debug("[time] serialization step (%f ~ %f): %f" % (time_start,
+    LOG.debug("[time] serialized step (%f ~ %f): %f" % (time_start,
                                                            time_ss,
                                                            (time_ss-time_start)))
 
@@ -1880,6 +1880,9 @@ def synthesis(base_disk, overlay_path, **kwargs):
     fuse_thread.join()
 
     synthesized_VM.resume()
+    if return_residue == True:
+        # preload basevm hash dictionary for creating residue
+        pass
     connect_vnc(synthesized_VM.machine)
 
     # statistics
@@ -1890,7 +1893,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
     synthesis_statistics(meta_info, overlay_filename.name, \
             mem_access_list, disk_access_list)
 
-    if return_residue == True:        
+    if return_residue == True:
         options = Options()
         options.TRIM_SUPPORT = True
         options.FREE_SUPPORT = True

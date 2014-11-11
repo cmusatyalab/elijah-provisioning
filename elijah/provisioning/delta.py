@@ -623,14 +623,12 @@ class Recovered_delta(multiprocessing.Process):
 
 
 def deduplicate_deltaitem(hash_dict, delta_item, ref_id):
-    dict_element = hash_dict.get(delta_item.hash_value, None)
-    if dict_element is not None:
-        (start, length, hash_value) = dict_element
+    ref_offset = hash_dict.get(delta_item.hash_value, None)
+    if ref_offset is not None:
         if ((delta_item.ref_id == DeltaItem.REF_XDELTA) or (delta_item.ref_id == DeltaItem.REF_RAW)):
-            #LOG.debug("ref_id: %d, page %ld is matching base %ld" % (ref_id, delta_item.offset, start))
             delta_item.ref_id = ref_id
             delta_item.data_len = 8
-            delta_item.data = long(start)
+            delta_item.data = ref_offset
             return True
     return False
 
@@ -689,8 +687,7 @@ class DeltaDedup(process_manager.ProcWorker):
 
         zero_hash_dict = dict()
         zero_hash = sha256(struct.pack("!s", chr(0x00))*chunk_size).digest()
-        zero_hash_list = (-1, chunk_size, zero_hash)
-        zero_hash_dict[zero_hash] = zero_hash_list
+        zero_hash_dict[zero_hash] = long(-1)
         LOG.debug("2-1.Find zero page")
         LOG.debug("2-2.get delta from base Memory")
         LOG.debug("2-3.get delta from base Disk")
@@ -741,8 +738,7 @@ class DeltaDedup(process_manager.ProcWorker):
                         else:
                             ref_offset = long(delta_item.index)
                             offset_length = 8
-                            self.self_hashdict[delta_item.hash_value] =\
-                                (ref_offset, offset_length, delta_item.hash_value)
+                            self.self_hashdict[delta_item.hash_value] = ref_offset
 
                 self.merged_deltalist_queue.put(delta_item)
                 if delta_item.delta_type == DeltaItem.DELTA_DISK:
@@ -789,7 +785,7 @@ class DeltaDedup(process_manager.ProcWorker):
             if not data:
                 break
             item = tuple(struct.unpack("!qI32s", data))
-            hash_dict[item[2]] = item
+            hash_dict[item[2]] = item[0]
         fd.close()
         return hash_dict
 
@@ -798,13 +794,12 @@ class DeltaDedup(process_manager.ProcWorker):
         hash_dict = dict()
         fd = open(base_meta, "rb")
         while True:
-            header = fd.read(8+4)
-            if not header:
+            data = fd.read(8+4+32) # start_offset, length, hash
+            if not data:
                 break
-            offset, length = struct.unpack("!QI", header)
-            sha256 = fd.read(32)
-            item = (offset, length, sha256)
-            hash_dict[sha256] = item
+            item = tuple(struct.unpack("!qI32s", data))
+            hash_dict[item[2]] = item[0]
+        fd.close()
         return hash_dict
 
 
