@@ -510,25 +510,30 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                         processed_datasize = 0
                         processed_duration = float(0)
 
-                select.select([memory_data_queue._reader.fileno()], [], [])
-                recved_data = memory_data_queue.get()
-                if is_first_recv == False:
-                    is_first_recv = True
-                    time_first_recv = time.time()
+                input_fd = [self.control_queue._reader.fileno(), memory_data_queue._reader.fileno()]
+                input_ready, out_ready, err_ready = select.select(input_fd, [], [])
+                if self.control_queue._reader.fileno() in input_ready:
+                    control_msg = self.control_queue.get()
+                    self._handle_control_msg(control_msg)
+                if memory_data_queue._reader.fileno() in input_ready:
+                    recved_data = memory_data_queue.get()
+                    if is_first_recv == False:
+                        is_first_recv = True
+                        time_first_recv = time.time()
 
-                recved_data_size = len(recved_data)
-                time_process_start = time.time()
-                if recved_data == Const.QUEUE_SUCCESS_MESSAGE:
-                    # End of the stream
-                    is_end_of_stream = True
-                else:
-                    required_length = 0
-                    if len(memory_page_list) == 1: # handle partial data
-                        last_data = memory_page_list.pop(0)
-                        required_length = Memory.RAM_PAGE_SIZE-len(last_data)
-                        last_data += recved_data[0:required_length]
-                        memory_page_list.append(last_data)
-                    memory_page_list += chunks(recved_data[required_length:], Memory.RAM_PAGE_SIZE)
+                    recved_data_size = len(recved_data)
+                    time_process_start = time.time()
+                    if recved_data == Const.QUEUE_SUCCESS_MESSAGE:
+                        # End of the stream
+                        is_end_of_stream = True
+                    else:
+                        required_length = 0
+                        if len(memory_page_list) == 1: # handle partial data
+                            last_data = memory_page_list.pop(0)
+                            required_length = Memory.RAM_PAGE_SIZE-len(last_data)
+                            last_data += recved_data[0:required_length]
+                            memory_page_list.append(last_data)
+                        memory_page_list += chunks(recved_data[required_length:], Memory.RAM_PAGE_SIZE)
             data = memory_page_list.pop(0)
 
             hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE

@@ -18,6 +18,9 @@
 #
 import multiprocessing
 import threading
+import time
+import sys
+import traceback
 
 
 _process_controller = None
@@ -38,31 +41,71 @@ def get_instance():
 class ProcessManager(threading.Thread):
     def __init__(self):
         self.manager = multiprocessing.Manager()
+        self.process_list = dict()
         self.process_infos = self.manager.dict()
+        self.process_control = dict()
         self.stop = threading.Event()
         super(ProcessManager, self).__init__(target=self.start_managing)
 
     def start_managing(self):
-        while (not self.stop.wait(1)):
-            pass
-            #for worker_name in self.process_infos.keys():
-            #    value = self.process_infos[worker_name]
-            #print "monitoring: %s" % str(self.process_infos)
+        try:
+            while (not self.stop.wait(0.1)):
+                # send control query
+                #time_s = time.time()
+                control_query = "current_bw"
+                worker_names = self.process_list.keys() # process_list can change
+                for worker_name in worker_names:
+                    worker = self.process_list.get(worker_name, None)
+                    if worker_name == "MemoryReadProcess":
+                        control_queue, response_queue = self.process_control[worker_name]
+                        if worker.is_alive():
+                            control_queue.put(control_query)
+                #time_send_query = time.time()
+
+                # recv control response
+                for worker_name in worker_names:
+                    worker = self.process_list.get(worker_name, None)
+                    control_queue, response_queue = self.process_control[worker_name]
+                    if worker_name == "MemoryReadProcess":
+                        if worker.is_alive():
+                            response = response_queue.get()
+                            print "[manager] %s, %s: %s" % (control_query, worker_name, response)
+                #time_recv_response = time.time()
+                #print "[time][manager] send_qeury (%f ~ %f): %f, recv_query (%f ~ %f): %f" % (
+                #    time_s, time_send_query, (time_send_query-time_s), time_send_query,
+                #    time_recv_response, (time_recv_response-time_send_query))
+        except Exception as e:
+            sys.stdout.write("[manager] Exception")
+            sys.stderr.write(traceback.format_exc())
+            sys.stderr.write("%s\n" % str(e))
+        print "[manager][closed]"
 
     def register(self, worker):
+        worker_name = getattr(worker, "worker_name", "NoName")
         process_info = self.manager.dict()
         process_info['update_period'] = 0.1 # seconds
-        worker_name = getattr(worker, "worker_name", "NoName")
-        self.process_infos[worker_name] = process_info
-        return process_info
+        control_queue = multiprocessing.Queue()
+        response_queue = multiprocessing.Queue()
+        print "[manager] register new process: %s" % worker_name
+
+        self.process_list[worker_name] = worker
+        self.process_infos[worker_name] = (process_info)
+        self.process_control[worker_name] = (control_queue, response_queue)
+        return process_info, control_queue, response_queue
 
 
 class ProcWorker(multiprocessing.Process):
     def __init__(self, *args, **kwargs):
         self.worker_name = str(kwargs.pop('worker_name', self.__class__.__name__))
         process_manager = get_instance()
-        self.process_info = process_manager.register(self)  # shared dictionary
+        (self.process_info, self.control_queue, self.response_queue) = \
+            process_manager.register(self)  # shared dictionary
         super(ProcWorker, self).__init__(*args, **kwargs)
+
+    def _handle_control_msg(self, control_msg):
+        if control_msg == "current_bw":
+            self.response_queue.put(self.process_info.get('current_bw', 0))
+
 
 
 class TestProc(ProcWorker):

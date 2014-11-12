@@ -1095,27 +1095,34 @@ class MemoryReadProcess(process_manager.ProcWorker):
             # write rest of the memory data
             #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
-                select.select([self.in_fd], [], [])
-                data = self.in_fd.read(1024 * 1024 * 1)
-                if data == None or len(data) <= 0:
-                    break
-                current_size = len(data)
-                self.result_queue.put(data)
-                self.total_read_size += current_size
-                #prog_bar.set_percent(100.0*self.total_read_size/self.machine_memory_size)
-                #prog_bar.show_progress()
+                input_fd = [self.control_queue._reader.fileno(), self.in_fd]
+                input_ready, out_ready, err_ready = select.select(input_fd, [], [])
+                if self.control_queue._reader.fileno() in input_ready:
+                    control_msg = self.control_queue.get()
+                    self._handle_control_msg(control_msg)
+                if self.in_fd in input_ready:
+                    data = self.in_fd.read(1024 * 1024 * 1)
+                    if data == None or len(data) <= 0:
+                        break
+                    current_size = len(data)
+                    self.result_queue.put(data)
+                    self.total_read_size += current_size
+                    #prog_bar.set_percent(100.0*self.total_read_size/self.machine_memory_size)
+                    #prog_bar.show_progress()
 
-                if self.total_read_size - prev_processed_size > UPDATE_SIZE:
-                    cur_time = time()
-                    current_bw = float((self.total_read_size-prev_processed_size)/(cur_time-prev_processed_time))
-                    prev_processed_size = self.total_read_size
-                    prev_processed_time = cur_time
-                    #print "processing bw: %f MBps" % (current_bw/1024.0/1024)
-                    self.process_info['current_bw'] = (current_bw/1024.0/1024)
+                    if self.total_read_size - prev_processed_size > UPDATE_SIZE:
+                        cur_time = time()
+                        current_bw = float((self.total_read_size-prev_processed_size)/(cur_time-prev_processed_time))
+                        prev_processed_size = self.total_read_size
+                        prev_processed_time = cur_time
+                        #print "processing bw: %f MBps" % (current_bw/1024.0/1024)
+                        self.process_info['current_bw'] = (current_bw/1024.0/1024)
 
             #prog_bar.finish()
         except Exception, e:
-            LOG.error(str(e))
+            sys.stdout.write("[compression] Exception1n")
+            sys.stderr.write(traceback.format_exc())
+            sys.stderr.write("%s\n" % str(e))
             self.result_queue.put(Const.QUEUE_FAILED_MESSAGE)
         else:
             self.result_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
