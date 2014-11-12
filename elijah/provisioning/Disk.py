@@ -24,6 +24,7 @@ import sys
 import time
 import mmap
 import multiprocessing
+import Queue
 from math import ceil
 from hashlib import sha256
 from operator import itemgetter
@@ -233,6 +234,12 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         LOG.debug("1. Get modified disk page")
         modified_chunk_counter = 0
         for index, chunk in enumerate(self.modified_chunk_dict.keys()):
+            # check control message
+            try:
+                control_msg = self.control_queue.get_nowait()
+                self._handle_control_msg(control_msg)
+            except Queue.Empty as e:
+                pass
             time_process_start = time.time()
             offset = chunk * self.chunk_size
             ctime = self.modified_chunk_dict[chunk]

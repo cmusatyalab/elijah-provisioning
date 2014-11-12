@@ -1115,8 +1115,8 @@ class MemoryReadProcess(process_manager.ProcWorker):
                         current_bw = float((self.total_read_size-prev_processed_size)/(cur_time-prev_processed_time))
                         prev_processed_size = self.total_read_size
                         prev_processed_time = cur_time
-                        #print "processing bw: %f MBps" % (current_bw/1024.0/1024)
-                        self.process_info['current_bw'] = (current_bw/1024.0/1024)
+                        #self.process_info['current_bw'] = (current_bw/1024.0/1024)
+                        self.monitor_current_bw = (current_bw/1024.0/1024)
 
             #prog_bar.finish()
         except Exception, e:

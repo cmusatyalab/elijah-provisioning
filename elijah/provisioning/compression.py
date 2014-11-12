@@ -24,7 +24,7 @@ class CompressionError(Exception):
     pass
 
 
-def _bzip2_read_data(fd, result_queue, process_info_dict):
+def _bzip2_read_data(fd, result_queue, control_queue, process_info_dict):
     is_first_recv = False
     time_first_recv = 0
     time_process_finish = 0
@@ -69,15 +69,20 @@ def _bzip2_read_data(fd, result_queue, process_info_dict):
         fd.close()
 
 
-def _bzip2_write_data(input_data_queue, fd, process_info_dict):
+def _bzip2_write_data(input_data_queue, fd, control_queue, response_queue):
     try:
         while True:
-            select.select([input_data_queue._reader.fileno()], [], [])
-            delta_item = input_data_queue.get()
-            if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
-                break
-            data = delta_item.get_serialized()
-            fd.write(data)
+            input_list = [control_queue._reader.fileno(), input_data_queue._reader.fileno()]
+            (input_ready, [], []) = select.select(input_list, [], [])
+            if control_queue._reader.fileno() in input_ready:
+                control_msg = control_queue.get()
+                response_queue.put(0)
+            if input_data_queue._reader.fileno() in input_ready:
+                delta_item = input_data_queue.get()
+                if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
+                    break
+                data = delta_item.get_serialized()
+                fd.write(data)
     except Exception, e:
         sys.stderr.write("%s\n" % str(e))
     finally:
@@ -153,10 +158,12 @@ class CompressProc(process_manager.ProcWorker):
             write_t = threading.Thread(target=_bzip2_write_data,
                                     args=(self.delta_list_queue,
                                           proc.stdin,
-                                          self.process_info))
+                                          self.control_queue,
+                                          self.response_queue))
             read_t = threading.Thread(target=_bzip2_read_data,
                                     args=(proc.stdout,
                                           self.comp_delta_queue,
+                                          self.control_queue,
                                           self.process_info))
             write_t.start()
             read_t.start()

@@ -506,7 +506,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     processed_duration += (time_process_finish - time_process_start)
                     if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
                         time_prev_report = time_process_finish
-                        self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
+                        #self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
+                        self.monitor_current_bw = processed_datasize/processed_duration/1024.0/1024
                         processed_datasize = 0
                         processed_duration = float(0)
 

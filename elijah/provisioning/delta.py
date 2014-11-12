@@ -702,8 +702,12 @@ class DeltaDedup(process_manager.ProcWorker):
         while is_memory_finished == False or is_disk_finished == False:
             time_process_start = time.time()
             input_list = [self.memory_deltalist_queue._reader.fileno(),
-                          self.disk_deltalist_queue._reader.fileno()]
+                          self.disk_deltalist_queue._reader.fileno(),
+                          self.control_queue._reader.fileno()]
             (input_ready, [], []) = select.select(input_list, [], [])
+            if self.control_queue._reader.fileno() in input_ready:
+                control_msg = self.control_queue.get()
+                self._handle_control_msg(control_msg)
             for input_queue in input_ready:
                 delta_item = None
                 if input_queue == self.memory_deltalist_queue._reader.fileno():
@@ -716,6 +720,8 @@ class DeltaDedup(process_manager.ProcWorker):
                     if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
                         is_disk_finished = True
                         continue
+                else:   # control message
+                    continue
 
                 if is_first_recv == False:
                     is_first_recv = True
