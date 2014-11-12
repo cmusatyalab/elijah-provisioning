@@ -470,6 +470,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         LOG.debug("[time] Memory hashing and diff time (%f ~ %f): %f" % (time_s, time_e, (time_e-time_s)))
 
     def _get_modified_memory_page(self, fin):
+        time_s = time.time()
         LOG.info("Get hash list of memory page")
         is_first_recv = False
         time_first_recv = 0
@@ -481,6 +482,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         time_process_start = 0
         time_prev_report = 0
         UPDATE_PERIOD = self.process_info['update_period']
+        #dist_fd = open("./measure-distribution", "w+")
 
         # data structure to handle pipelined data
         def chunks(l, n):
@@ -494,7 +496,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         freed_page_counter = 0
         base_hashlist_length = len(self.memory_hashlist)
         is_end_of_stream = False
-        time_s = time.time()
         while is_end_of_stream == False and len(memory_page_list) != 0:
             # get data from the stream
             if len(memory_page_list) < 2: # empty or partial data
@@ -568,6 +569,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                                 ref_id=DeltaItem.REF_RAW,
                                 data_len=len(data),
                                 data=data)
+                    #dist_fd.write("%f\t%ld\n" % (time.time()-time_s, delta_item.offset))
                     '''
                     delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
                             ram_offset, len(data),
@@ -584,6 +586,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         time_e = time.time()
         self.deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
         LOG.debug("[time] Memory xdelta first input at : %f" % (time_first_recv))
+        #dist_fd.close()
         return freed_page_counter
 
     def get_raw_data(self, offset, length):

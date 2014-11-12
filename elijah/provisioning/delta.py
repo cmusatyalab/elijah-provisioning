@@ -651,10 +651,14 @@ class DeltaDedup(process_manager.ProcWorker):
         # shared data with other process
         self.manager = multiprocessing.Manager()
         self.statistics = self.manager.dict()
-        self.statistics['number_of_zero_page'] = 0
-        self.statistics['number_of_base_disk'] = 0
-        self.statistics['number_of_base_mem'] = 0
-        self.statistics['number_of_self_ref'] = 0
+        self.statistics['number_of_zero_page_disk'] = 0
+        self.statistics['number_of_zero_page_memory'] = 0
+        self.statistics['number_of_base_disk_disk'] = 0
+        self.statistics['number_of_base_disk_memory'] = 0
+        self.statistics['number_of_base_mem_disk'] = 0
+        self.statistics['number_of_base_mem_memory'] = 0
+        self.statistics['number_of_self_ref_disk'] = 0
+        self.statistics['number_of_self_ref_memory'] = 0
         self.delta_disk_chunks = self.manager.list()
         self.delta_memory_chunks = self.manager.list()
         self.memory_snapshot_size = self.manager.list()
@@ -673,10 +677,14 @@ class DeltaDedup(process_manager.ProcWorker):
 
         # get hashtable
         time_memory_hashdict_end = time.time()
-        number_of_zero_page = 0
-        number_of_base_disk = 0
-        number_of_base_mem = 0
-        number_of_self_ref = 0
+        number_of_zero_page_disk = 0
+        number_of_zero_page_memory = 0
+        number_of_base_disk_disk = 0
+        number_of_base_disk_memory = 0
+        number_of_base_mem_disk = 0
+        number_of_base_mem_memory = 0
+        number_of_self_ref_disk = 0
+        number_of_self_ref_memory = 0
 
         if self.memory_chunk_size != self.disk_chunk_size:
             raise DeltaError("Expect same chunk size for Disk and Memory")
@@ -715,13 +723,23 @@ class DeltaDedup(process_manager.ProcWorker):
 
                 if deduplicate_deltaitem(zero_hash_dict, delta_item,
                                          DeltaItem.REF_ZEROS) == True:
-                    number_of_zero_page += 1
+                    if delta_item.delta_type == DeltaItem.DELTA_DISK:
+                        number_of_zero_page_disk += 1
+                    else:
+                        number_of_zero_page_memory += 1
                 elif deduplicate_deltaitem(self.basemem_hashdict, delta_item,
                                            DeltaItem.REF_BASE_MEM) == True:
-                    number_of_base_mem += 1
+                    if delta_item.delta_type == DeltaItem.DELTA_DISK:
+                        number_of_base_mem_disk += 1
+                    else:
+                        number_of_base_mem_memory += 1
                 elif deduplicate_deltaitem(self.basedisk_hashdict, delta_item,
                                            DeltaItem.REF_BASE_DISK) == True:
-                    number_of_base_disk += 1
+                    if delta_item.delta_type == DeltaItem.DELTA_DISK:
+                        number_of_base_disk_disk += 1
+                    else:
+                        number_of_base_disk_memory += 1
+
                 else:
                     # chunk that are not deduplicated yet
                     # comparison with other delta_item within itself
@@ -731,7 +749,10 @@ class DeltaDedup(process_manager.ProcWorker):
                                                     delta_item,
                                                     DeltaItem.REF_SELF)
                         if ret == True:
-                            number_of_self_ref += 1
+                            if delta_item.delta_type == DeltaItem.DELTA_DISK:
+                                number_of_self_ref_disk += 1
+                            else:
+                                number_of_self_ref_memory += 1
                         else:
                             ref_offset = long(delta_item.index)
                             offset_length = 8
@@ -754,11 +775,16 @@ class DeltaDedup(process_manager.ProcWorker):
                     processed_duration = float(0)
         self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
-        self.statistics['number_of_zero_page'] = number_of_zero_page
-        self.statistics['number_of_base_disk'] = number_of_base_disk
-        self.statistics['number_of_base_mem'] = number_of_base_mem
-        self.statistics['number_of_self_ref'] = number_of_self_ref
+        self.statistics['number_of_zero_page_disk'] = number_of_zero_page_disk
+        self.statistics['number_of_base_disk_disk'] = number_of_base_disk_disk
+        self.statistics['number_of_base_mem_disk'] = number_of_base_mem_disk
+        self.statistics['number_of_self_ref_disk'] = number_of_self_ref_disk
+        self.statistics['number_of_zero_page_memory'] = number_of_zero_page_memory
+        self.statistics['number_of_base_disk_memory'] = number_of_base_disk_memory
+        self.statistics['number_of_base_mem_memory'] = number_of_base_mem_memory
+        self.statistics['number_of_self_ref_memory'] = number_of_self_ref_memory
         time_end = time.time()
+        LOG.debug("Dedup statistics: %s" % str(self.statistics))
         LOG.debug("[time] Dedup: loading base memory hashdic (%f ~ %f): %f" % (time_start,
                                                                      time_memory_hashdict_end,
                                                                      (time_memory_hashdict_end-time_start)))

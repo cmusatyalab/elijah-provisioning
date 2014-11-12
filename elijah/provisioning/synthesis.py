@@ -1882,7 +1882,6 @@ def synthesis(base_disk, overlay_path, **kwargs):
     else:
         meta_info = compression.decomp_overlayzip(overlay_path, overlay_filename.name)
 
-    import pdb;pdb.set_trace()
     LOG.info("Decompression time : %f (s)" % (time()-decompe_time_s))
     LOG.info("Recovering launch VM")
     launch_disk, launch_mem, fuse, delta_proc, fuse_thread = \
