@@ -8,9 +8,10 @@ import threading
 import msgpack
 import multiprocessing
 import traceback
+from delta import DeltaItem
 
-from lzma import LZMACompressor
-from lzma import LZMADecompressor
+import lzma
+import bz2
 from Configuration import Const
 from package import VMOverlayPackage
 import process_manager
@@ -89,36 +90,10 @@ def _bzip2_write_data(input_data_queue, fd, control_queue, response_queue):
         fd.close()
 
 
-def _comp_lzma(delta_list_queue, comp_delta_queue, speed, num_cores):
-    # mode = 2 indicates LZMA_SYNC_FLUSH, which show all output right after input
-    comp = LZMACompressor(options={'format':'xz', 'level':1})
-    original_length = 0
-    comp_data_length = 0
-    comp_delta_bytes = ''
-    sys.stdout.write("[compression] start LZMA compression\n")
-
-    count = 0
-    while True:
-        select.select([delta_list_queue._reader.fileno()], [], [])
-        delta_item = delta_list_queue.get()
-        if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
-            break
-        delta_bytes = delta_item.get_serialized()
-        original_length += len(delta_bytes)
-        comp_delta_bytes = comp.compress(delta_bytes)
-        comp_data_length += len(comp_delta_bytes)
-        comp_delta_queue.put(comp_delta_bytes)
-        count += 1
-
-    comp_delta_bytes = comp.flush()
-    if comp_delta_bytes is not None and len(comp_delta_bytes) > 0:
-        comp_data_length += len(comp_delta_bytes)
-        comp_delta_queue.put(comp_delta_bytes)
-    comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-
 
 class CompressProc(process_manager.ProcWorker):
-    def __init__(self, delta_list_queue, comp_delta_queue, comp_type, comp_option=dict()):
+    def __init__(self, delta_list_queue, comp_delta_queue, comp_type,
+                 num_threads=4, block_size=1024*1024*8, comp_level=4):
         """
         comparisons of compression algorithm
         http://pokecraft.first-world.info/wiki/Quick_Benchmark:_Gzip_vs_Bzip2_vs_LZMA_vs_XZ_vs_LZ4_vs_LZO
@@ -126,60 +101,110 @@ class CompressProc(process_manager.ProcWorker):
         self.delta_list_queue = delta_list_queue
         self.comp_delta_queue = comp_delta_queue
         self.comp_type = comp_type
-        self.comp_option = comp_option
+        self.num_threads = num_threads
+        self.block_size = block_size
+        self.comp_level = comp_level
+        self.thread_list = list()
         super(CompressProc, self).__init__(target=self.compress_stream)
+
+    def _chunk_blob(self, modified_memory_chunks, modified_disk_chunks):
+        input_size = 0
+        is_last_blob = False
+        input_data = ''
+        while input_size < self.block_size:
+            input_list = [self.control_queue._reader.fileno(),
+                            self.delta_list_queue._reader.fileno()]
+            (input_ready, [], []) = select.select(input_list, [], [])
+            if self.control_queue._reader.fileno() in input_ready:
+                control_msg = control_queue.get()
+                self._handle_control_msg(control_msg)
+            if self.delta_list_queue._reader.fileno() in input_ready:
+                delta_item = self.delta_list_queue.get()
+                if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
+                    is_last_blob = True
+                    break
+                delta_bytes = delta_item.get_serialized()
+                offset = delta_item.offset/Const.CHUNK_SIZE
+                if delta_item.delta_type == DeltaItem.DELTA_DISK:
+                    modified_disk_chunks.append(offset)
+                elif delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+                    modified_memory_chunks.append(offset)
+                input_data += delta_bytes
+                input_size += len(delta_bytes)
+        return is_last_blob, input_data, input_size
+
 
     def compress_stream(self):
         time_start = time.time()
 
-        if self.comp_type == Const.COMPRESSION_LZMA:
-            _comp_lzma(self.delta_list_queue, self.comp_delta_queue, 1, 1)
-        elif self.comp_type == Const.COMPRESSION_BZIP2:
-            speed = 5
-            num_cores = 2
-            self._comp_bzip2(speed, num_cores)
-        elif self.comp_type == Const.COMPRESSION_GZIP:
-            raise CompressionError("Not implemented")
-        else:
-            raise CompressionError("Not valid compression option")
+        is_last_blob = False 
+        total_read_size = 0
+        while is_last_blob == False:
+            # read data
+            modified_memory_chunks = list()
+            modified_disk_chunks = list()
+            is_last_blob, input_data, input_size = self._chunk_blob(modified_memory_chunks, modified_disk_chunks)
+
+            # new thread for data
+            total_read_size += input_size
+            if self.comp_type == Const.COMPRESSION_LZMA:
+                new_thread = LZMAThread(input_data, self.comp_level)
+            elif self.comp_type == Const.COMPRESSION_BZIP2:
+                new_thread = BZIP2thread(input_data, self.comp_level)
+            else:
+                raise CompressionError("Not implemented")
+            new_thread.start()
+            self.thread_list.append((new_thread, modified_memory_chunks, modified_disk_chunks))
+            #sys.stdout.write("[compression] new thread to compress %d data (total thread: %d)\n" % (input_size, len(self.thread_list)))
+            if len(self.thread_list) == self.num_threads:
+                (c_thread, m_memory_chunks, m_disk_chunks) = self.thread_list.pop(0)
+                c_thread.join()
+                data = c_thread.output_data
+                self.comp_delta_queue.put(data)
+                self.comp_delta_queue.put(m_memory_chunks)
+                self.comp_delta_queue.put(m_disk_chunks)
+
+        while len(self.thread_list) > 0:
+            (c_thread, m_memory_chunks, m_disk_chunks) = self.thread_list.pop(0)
+            c_thread.join()
+            data = c_thread.output_data
+            self.comp_delta_queue.put(data)
+            self.comp_delta_queue.put(m_memory_chunks)
+            self.comp_delta_queue.put(m_disk_chunks)
+        self.comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
         time_end = time.time()
 
-        sys.stdout.write("[time] Overlay compression time (%f ~ %f): %f\n" % (
-            time_start, time_end, (time_end-time_start)))
+        sys.stdout.write("[time] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f s, %f MB, %f MBps\n" % (
+            self.num_threads, self.block_size, self.comp_level, time_start, time_end, (time_end-time_start), total_read_size/1024.0/1024, 
+            total_read_size/(time_end-time_start)/1024.0/1024))
 
 
-    def _comp_bzip2(self, speed, num_cores):
-        cmd = "pbzip2 -c -%d -p%d" % (speed, num_cores)
-        proc = None
-        try:
-            sys.stdout.write("[compression] start bzip2 compression %d %d\n" % (speed, num_cores))
-            _PIPE = subprocess.PIPE
-            proc = subprocess.Popen(cmd.split(" "), stdin=_PIPE, stdout=_PIPE, close_fds=True)
-            write_t = threading.Thread(target=_bzip2_write_data,
-                                    args=(self.delta_list_queue,
-                                          proc.stdin,
-                                          self.control_queue,
-                                          self.response_queue))
-            read_t = threading.Thread(target=_bzip2_read_data,
-                                    args=(proc.stdout,
-                                          self.comp_delta_queue,
-                                          self.control_queue,
-                                          self.process_info))
-            write_t.start()
-            read_t.start()
-            sys.stdout.write("[compression] waiting to fininsh compression proc\n")
+class LZMAThread(threading.Thread):
+    def __init__(self, input_data, comp_level):
+        self.input_data = input_data
+        self.output_data = None
+        self.comp_level = comp_level
+        threading.Thread.__init__(self, target=self._comp_lzma)
 
-            write_t.join()
-            read_t.join()
-            ret_code = proc.wait()
-        except Exception as e:
-            sys.stdout.write("[compression] Exception1n")
-            sys.stderr.write(traceback.format_exc())
-            sys.stderr.write("%s\n" % str(e))
-            self.comp_delta_queue.put(Const.QUEUE_FAILED_MESSAGE)
-            if proc is not None:
-                proc.terminate()
-            sys.exit(1)
+    def _comp_lzma(self):
+        # mode = 2 indicates LZMA_SYNC_FLUSH, which show all output right after input
+        #print "start new thread to handle %d data" % len(input_data)
+        comp = lzma.LZMACompressor(options={'format':'xz', 'level':self.comp_level})
+        self.output_data = comp.compress(self.input_data)
+        self.output_data += comp.flush()
+
+
+class BZIP2thread(threading.Thread):
+    def __init__(self, input_data, comp_level):
+        self.input_data = input_data
+        self.output_data = None
+        self.comp_level = comp_level
+        threading.Thread.__init__(self, target=self._comp_bzip2)
+
+    def _comp_bzip2(self):
+        comp = bz2.BZ2Compressor(self.comp_level)
+        self.output_data = comp.compress(self.input_data)
+        self.output_data += comp.flush()
 
 
 def decomp_overlay(meta, output_path):
@@ -190,7 +215,7 @@ def decomp_overlay(meta, output_path):
     comp_overlay_files = [os.path.join(os.path.dirname(meta), item) for item in comp_overlay_files]
     overlay_file = open(output_path, "w+b")
     for comp_file in comp_overlay_files:
-        decompressor = LZMADecompressor()
+        decompressor = lzma.LZMADecompressor()
         comp_data = open(comp_file, "r").read()
         decomp_data = decompressor.decompress(comp_data)
         decomp_data += decompressor.flush()
@@ -215,7 +240,7 @@ def decomp_overlayzip(overlay_path, outfilename):
         sys.stdout.write("Decompression type: %d\n" % comp_type)
         if comp_type == Const.COMPRESSION_LZMA:
             comp_data = overlay_package.read_blob(comp_filename)
-            decompressor = LZMADecompressor()
+            decompressor = lzma.LZMADecompressor()
             decomp_data = decompressor.decompress(comp_data)
             decomp_data += decompressor.flush()
             out_fd.write(decomp_data)

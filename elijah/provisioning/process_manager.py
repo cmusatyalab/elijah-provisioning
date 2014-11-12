@@ -50,28 +50,23 @@ class ProcessManager(threading.Thread):
     def start_managing(self):
         try:
             while (not self.stop.wait(0.1)):
-                # send control query
-                #time_s = time.time()
-                control_query = "current_bw"
-                worker_names = self.process_list.keys() # process_list can change
-                for worker_name in worker_names:
-                    worker = self.process_list.get(worker_name, None)
-                    control_queue, response_queue = self.process_control[worker_name]
-                    if worker.is_alive():
-                        control_queue.put(control_query)
-                #time_send_query = time.time()
+                pass
+                ## send control query
+                #control_query = "current_bw"
+                #worker_names = self.process_list.keys() # process_list can change
+                #for worker_name in worker_names:
+                #    worker = self.process_list.get(worker_name, None)
+                #    control_queue, response_queue = self.process_control[worker_name]
+                #    if worker.is_alive():
+                #        control_queue.put(control_query)
 
-                # recv control response
-                for worker_name in worker_names:
-                    worker = self.process_list.get(worker_name, None)
-                    control_queue, response_queue = self.process_control[worker_name]
-                    if worker.is_alive():
-                        response = response_queue.get()
-                        #print "[manager] %s, %s: %s" % (control_query, worker_name, response)
-                #time_recv_response = time.time()
-                #print "[time][manager] send_qeury (%f ~ %f): %f, recv_query (%f ~ %f): %f" % (
-                #    time_s, time_send_query, (time_send_query-time_s), time_send_query,
-                #    time_recv_response, (time_recv_response-time_send_query))
+                ## recv control response
+                #for worker_name in worker_names:
+                #    worker = self.process_list.get(worker_name, None)
+                #    control_queue, response_queue = self.process_control[worker_name]
+                #    if worker.is_alive():
+                #        response = response_queue.get()
+                #        #print "[manager] %s, %s: %s" % (control_query, worker_name, response)
         except Exception as e:
             sys.stdout.write("[manager] Exception")
             sys.stderr.write(traceback.format_exc())

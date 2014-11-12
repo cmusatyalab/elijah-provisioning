@@ -1442,22 +1442,25 @@ def create_residue(base_disk, base_hashvalue,
 
     # 4. compression
     LOG.info("Compressing overlay blobs")
-    comp_type = Const.COMPRESSION_BZIP2
+    comp_type = Const.COMPRESSION_LZMA
     compress_proc = compression.CompressProc(residue_deltalist_queue,
                                              compdata_queue,
                                              comp_type,
-                                             comp_option={})
+                                             num_threads=2,
+                                             block_size=1024*1024*8,
+                                             comp_level=4)
     compress_proc.start()
     time_dedup = time()
 
     time_packaging_start = time()
 
     # to be deleted
+    overlay_info = list()
+    overlay_files = list()
     overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
     overlay_prefix = os.path.join(os.getcwd(), Const.OVERLAY_FILE_PREFIX)
-    blob_filename = "%s_stream.xz" % (overlay_prefix)
-    output_fd = open(blob_filename, "wb+")
-    comp_data_size = 0
+    comp_file_counter = 0
+    temp_compfile_dir = mkdtemp(prefix="cloudlet-qemu-comp-")
     while True:
         compdata = compdata_queue.get()
         if compdata == Const.QUEUE_SUCCESS_MESSAGE:
@@ -1465,26 +1468,28 @@ def create_residue(base_disk, base_hashvalue,
         if compdata == Const.QUEUE_FAILED_MESSAGE:
             LOG.error("Failed to get compressed data")
             break
-        comp_data_size += len(compdata)
+
+        # next queue data is meta info
+        memory_chunks = compdata_queue.get()
+        disk_chunks = compdata_queue.get()
+
+        blob_filename = os.path.join(temp_compfile_dir, "%s_stream-%d.xz" % (overlay_prefix, comp_file_counter))
+        comp_file_counter += 1
+        #LOG.debug("%s: # of delta memory: %d\t# of delta disk: %d" %\ (blob_filename, len(memory_chunks), len(disk_chunks)))
+        overlay_files.append(blob_filename)
+        output_fd = open(blob_filename, "wb+")
         output_fd.write(compdata)
-    output_fd.close()
-    LOG.debug("comp data size: %d" % comp_data_size)
+        output_fd.close()
+        blob_dict = {
+            Const.META_OVERLAY_FILE_NAME:os.path.basename(blob_filename),
+            Const.META_OVERLAY_FILE_COMPRESSION: comp_type,
+            Const.META_OVERLAY_FILE_SIZE:os.path.getsize(blob_filename),
+            Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
+            Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
+            }
+        overlay_info.append(blob_dict)
 
     # 5. wait until we get all chunk offset of disk and memory (for FUSE)
-    dedup_proc.join()
-    memory_chunks = [item/Const.CHUNK_SIZE for item in dedup_proc.delta_memory_chunks]
-    disk_chunks = [item/Const.CHUNK_SIZE for item in dedup_proc.delta_disk_chunks]
-    overlay_info = list()
-    LOG.debug("# of delta memory: %d" % len(memory_chunks))
-    LOG.debug("# of delta disk: %d" % len(disk_chunks))
-    blob_dict = {
-        Const.META_OVERLAY_FILE_NAME:os.path.basename(blob_filename),
-        Const.META_OVERLAY_FILE_COMPRESSION: comp_type,
-        Const.META_OVERLAY_FILE_SIZE:os.path.getsize(blob_filename),
-        Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
-        Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
-        }
-    overlay_info.append(blob_dict)
 
     # wait until VM snapshotting finishes to get final VM memory snapshot size
     memory_read_proc.join()
@@ -1500,7 +1505,7 @@ def create_residue(base_disk, base_hashvalue,
     # 6. packaging VM overlay into a single zip file
     temp_dir = mkdtemp(prefix="cloudlet-overlay-")
     overlay_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
-    VMOverlayPackage.create(overlay_zipfile, overlay_metafile, [blob_filename])
+    VMOverlayPackage.create(overlay_zipfile, overlay_metafile, overlay_files)
     time_packaging_end = time()
     LOG.debug("[time] Time for overlay packaging (%f ~ %f): %f" % (time_packaging_start,
                                                                    time_packaging_end,
@@ -1511,8 +1516,8 @@ def create_residue(base_disk, base_hashvalue,
     resumed_vm.machine = None   # protecting malaccess to machine 
     if os.path.exists(overlay_metafile) == True:
         os.remove(overlay_metafile)
-    if os.path.exists(blob_filename) == True:
-        os.remove(blob_filename)
+    if os.path.exists(temp_compfile_dir) == True:
+        shutil.rmtree(temp_compfile_dir)
     time_end = time()
 
     LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
