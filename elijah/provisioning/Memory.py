@@ -416,7 +416,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         self.free_memory_info = free_memory_info
         self.basemem_path = basemem_path
         self.proc_list = list()
-        self.num_proc = 1
+        self.num_proc = 4
 
         # output
         self.prev_procssed_size = 0
@@ -558,12 +558,16 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             (proc, task_queue, command_queue) = self.proc_list[proc_rr_index%self.num_proc]
             task_queue.put(task_list)
 
-            #print "put task: offset %ld(%d) at proc %d" % (ram_offset,
-            #                                 len(tasks)*Memory.RAM_PAGE_SIZE,
+            #print "put task: offset %ld~%d at proc %d" % (ram_offset,
+            #                                 ram_offset + len(tasks)*Memory.RAM_PAGE_SIZE,
             #                                 proc_rr_index%self.num_proc)
             ram_offset += (len(tasks) * Memory.RAM_PAGE_SIZE)
             proc_rr_index += 1
 
+        # send last memory page
+        task_list = (ram_offset, memory_page_list)
+        (proc, task_queue, command_queue) = self.proc_list[proc_rr_index%self.num_proc]
+        task_queue.put(task_list)
 
         # send end meesage to every process
         for (proc, t_queue, c_queue) in self.proc_list:
@@ -811,6 +815,7 @@ class DiffProc(multiprocessing.Process):
                         '''
 
                         self.deltalist_queue.put(delta_item)
+                        #print "delta item: %ld, %d" % (delta_item.offset, delta_item.data_len)
                 ram_offset += Memory.RAM_PAGE_SIZE
         LOG.debug("[Memory][Child] child finished. send command queue msg")
         self.command_queue.put("processed everything")
