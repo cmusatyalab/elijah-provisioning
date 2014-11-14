@@ -116,7 +116,7 @@ class CompressProc(process_manager.ProcWorker):
                             self.delta_list_queue._reader.fileno()]
             (input_ready, [], []) = select.select(input_list, [], [])
             if self.control_queue._reader.fileno() in input_ready:
-                control_msg = control_queue.get()
+                control_msg = self.control_queue.get()
                 self._handle_control_msg(control_msg)
             if self.delta_list_queue._reader.fileno() in input_ready:
                 delta_item = self.delta_list_queue.get()
@@ -174,7 +174,7 @@ class CompressProc(process_manager.ProcWorker):
         self.comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
         time_end = time.time()
 
-        sys.stdout.write("[time] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f s, %f MB, %f MBps\n" % (
+        sys.stdout.write("[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f s, %f MB, %f MBps\n" % (
             self.num_threads, self.block_size, self.comp_level, time_start, time_end, (time_end-time_start), total_read_size/1024.0/1024, 
             total_read_size/(time_end-time_start)/1024.0/1024))
 

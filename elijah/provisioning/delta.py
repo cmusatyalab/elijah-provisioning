@@ -676,7 +676,6 @@ class DeltaDedup(process_manager.ProcWorker):
         UPDATE_PERIOD = self.process_info['update_period']
 
         # get hashtable
-        time_memory_hashdict_end = time.time()
         number_of_zero_page_disk = 0
         number_of_zero_page_memory = 0
         number_of_base_disk_disk = 0
@@ -791,10 +790,6 @@ class DeltaDedup(process_manager.ProcWorker):
         self.statistics['number_of_self_ref_memory'] = number_of_self_ref_memory
         time_end = time.time()
         LOG.debug("Dedup statistics: %s" % str(self.statistics))
-        LOG.debug("[time] Dedup: loading base memory hashdic (%f ~ %f): %f" % (time_start,
-                                                                     time_memory_hashdict_end,
-                                                                     (time_memory_hashdict_end-time_start)))
-
         LOG.debug("[time] Dedup: first input at : %f" % (time_first_recv))
         LOG.debug("[time] Dedup: time (%f ~ %f): %f" % (time_start, time_end, (time_end-time_start)))
 

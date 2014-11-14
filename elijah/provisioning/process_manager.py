@@ -47,26 +47,34 @@ class ProcessManager(threading.Thread):
         self.stop = threading.Event()
         super(ProcessManager, self).__init__(target=self.start_managing)
 
+    def _send_query(self, query, worker_names):
+        for worker_name in worker_names:
+            worker = self.process_list.get(worker_name, None)
+            control_queue, response_queue = self.process_control[worker_name]
+            if worker.is_alive():
+                control_queue.put(query)
+
+
+    def _recv_response(self, query, worker_names):
+        for worker_name in worker_names:
+            worker = self.process_list.get(worker_name, None)
+            control_queue, response_queue = self.process_control[worker_name]
+            if worker.is_alive():
+                response = response_queue.get()
+                #print "[manager] %s, %s: %s" % (query, worker_name, response)
+
+
     def start_managing(self):
         try:
             while (not self.stop.wait(0.1)):
                 pass
                 ## send control query
-                #control_query = "current_bw"
-                #worker_names = self.process_list.keys() # process_list can change
-                #for worker_name in worker_names:
-                #    worker = self.process_list.get(worker_name, None)
-                #    control_queue, response_queue = self.process_control[worker_name]
-                #    if worker.is_alive():
-                #        control_queue.put(control_query)
+                #query = "current_bw"
+                #worker_names = self.process_list.keys()
+                #self._send_query(query, worker_names)
 
                 ## recv control response
-                #for worker_name in worker_names:
-                #    worker = self.process_list.get(worker_name, None)
-                #    control_queue, response_queue = self.process_control[worker_name]
-                #    if worker.is_alive():
-                #        response = response_queue.get()
-                #        #print "[manager] %s, %s: %s" % (control_query, worker_name, response)
+                #responses = self._recv_response(query, worker_names)
         except Exception as e:
             sys.stdout.write("[manager] Exception")
             sys.stderr.write(traceback.format_exc())
@@ -95,6 +103,8 @@ class ProcWorker(multiprocessing.Process):
 
         # measurement
         self.monitor_current_bw = float(0)
+        self.monitor_current_inqueue_size = 0
+        self.monitor_current_outqueue_size = 0
         super(ProcWorker, self).__init__(*args, **kwargs)
 
     def _handle_control_msg(self, control_msg):
