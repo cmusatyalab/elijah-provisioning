@@ -75,18 +75,16 @@ class ProcessManager(threading.Thread):
         try:
             while (not self.stop.wait(1)):
                 time_s = time.time()
-                # send control query
-                #query = "current_bw"
-                query = "cpu_usage_accum"
+                query = "cpu_usage_accum"   #"current_bw"
                 worker_names = self.process_list.keys()
                 self._send_query(query, worker_names)
 
-                # recv control response
                 responses = self._recv_response(query, worker_names)
                 for worker_name, (response, duration) in responses.iteritems():
                     sys.stdout.write("[manager] %s:\t%s:\t%s\t(%f s)\n" % (query, worker_name, str(response), duration))
                 time_e = time.time()
                 sys.stdout.write("[manager] querying takes %f s\n\n" % (time_e-time_s))
+                pass
         except Exception as e:
             sys.stdout.write("[manager] Exception")
             sys.stderr.write(traceback.format_exc())

@@ -1396,11 +1396,12 @@ def create_residue(base_disk, base_hashvalue,
     time_start = time()
     process_controller = process_manager.get_instance()
     overlay_mode = VMOverlayCreationMode.get_default()
-    QUEUE_SIZE_MEMORY_SNAPSHOT             = 1 # <0: infinite
-    QUEUE_SIZE_MEMORY_DELTA_LIST           = 1 # <0: infinite
-    QUEUE_SIZE_DISK_DELTA_LIST             = 1 # <0: infinite
-    QUEUE_SIZE_OPTIMIZATION                = 1 # <0: infinite
-    QUEUE_SIZE_COMPRESSION                 = 1 # <0: infinite
+    #overlay_mode.QUEUE_SIZE_MEMORY_SNAPSHOT             = 1 # <0: infinite
+    #overlay_mode.QUEUE_SIZE_MEMORY_DELTA_LIST           = 1 # <0: infinite
+    #overlay_mode.QUEUE_SIZE_DISK_DELTA_LIST             = 1 # <0: infinite
+    #overlay_mode.QUEUE_SIZE_OPTIMIZATION                = 1 # <0: infinite
+    #overlay_mode.QUEUE_SIZE_COMPRESSION                 = 1 # <0: infinite
+    overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_LZMA
 
     process_controller.set_mode(overlay_mode)
     LOG.info("* Overlay creation configuration")
@@ -1462,7 +1463,7 @@ def create_residue(base_disk, base_hashvalue,
     compress_proc = compression.CompressProc(residue_deltalist_queue,
                                              compdata_queue,
                                              comp_type=overlay_mode.COMPRESSION_ALGORITHM_TYPE,
-                                             num_threads=overlay_mode.NUM_PROC_COMPRESSION,
+                                             num_proc=overlay_mode.NUM_PROC_COMPRESSION,
                                              block_size=1024*1024*8,
                                              comp_level=overlay_mode.COMPRESSION_ALGORITHM_SPEED)
     compress_proc.start()
@@ -1478,16 +1479,13 @@ def create_residue(base_disk, base_hashvalue,
     comp_file_counter = 0
     temp_compfile_dir = mkdtemp(prefix="cloudlet-qemu-comp-")
     while True:
-        compdata = compdata_queue.get()
-        if compdata == Const.QUEUE_SUCCESS_MESSAGE:
+        comp_task = compdata_queue.get()
+        if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
             break
-        if compdata == Const.QUEUE_FAILED_MESSAGE:
+        if comp_task == Const.QUEUE_FAILED_MESSAGE:
             LOG.error("Failed to get compressed data")
             break
-
-        # next queue data is meta info
-        memory_chunks = compdata_queue.get()
-        disk_chunks = compdata_queue.get()
+        (compdata, disk_chunks, memory_chunks) = comp_task
 
         blob_filename = os.path.join(temp_compfile_dir, "%s-stream-%d.xz" % (overlay_prefix, comp_file_counter))
         comp_file_counter += 1

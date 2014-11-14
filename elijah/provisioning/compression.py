@@ -25,76 +25,11 @@ class CompressionError(Exception):
     pass
 
 
-def _bzip2_read_data(fd, result_queue, control_queue, process_info_dict):
-    is_first_recv = False
-    time_first_recv = 0
-    time_process_finish = 0
-    time_process_start = 0
-    time_prev_report = 0
-    processed_datasize = 0
-    processed_duration = float(0)
-    UPDATE_PERIOD = process_info_dict['update_period']
-    try:
-        while True:
-            time_process_start = time.time()
-            rlist, wlist, xlist = select.select([fd], [fd], [fd])
-            if fd in rlist:
-                data = os.read(fd.fileno(), BLOCK_SIZE)
-                if not data:
-                    break
-                if is_first_recv == False:
-                    is_first_recv = True
-                    time_first_recv = time.time()
-                result_queue.put(data)
-
-                # measurement
-                time_process_finish = time.time()
-                processed_datasize += len(data)
-                processed_duration += (time_process_finish - time_process_start)
-                #print "aa: %f %f" % (processed_datasize, processed_duration)
-                if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
-                    time_prev_report = time_process_finish
-                    #print "compression BW: %f MBps" % \
-                    #    (processed_datasize/processed_duration/1024.0/1024)
-                    process_info_dict['current_bw'] = \
-                        processed_datasize/processed_duration/1024.0/1024
-                    processed_datasize = 0
-                    processed_duration = float(0)
-        result_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-    except Exception, e:
-        sys.stderr.write("%s\n" % str(e))
-        result_queue.put(Const.QUEUE_FAILED_MESSAGE)
-        sys.exit(1)
-    finally:
-        sys.stdout.write("[time] compression first input at : %f" % (time_first_recv))
-        fd.close()
-
-
-def _bzip2_write_data(input_data_queue, fd, control_queue, response_queue):
-    try:
-        while True:
-            input_list = [control_queue._reader.fileno(), input_data_queue._reader.fileno()]
-            (input_ready, [], []) = select.select(input_list, [], [])
-            if control_queue._reader.fileno() in input_ready:
-                control_msg = control_queue.get()
-                response_queue.put(0)
-            if input_data_queue._reader.fileno() in input_ready:
-                delta_item = input_data_queue.get()
-                if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
-                    break
-                data = delta_item.get_serialized()
-                fd.write(data)
-    except Exception, e:
-        sys.stderr.write("%s\n" % str(e))
-    finally:
-        fd.close()
-
-
 
 class CompressProc(process_manager.ProcWorker):
     def __init__(self, delta_list_queue, comp_delta_queue,
                  comp_type=Const.COMPRESSION_BZIP2,
-                 num_threads=1, block_size=1024*1024*8, comp_level=4):
+                 num_proc=1, block_size=1024*1024*8, comp_level=4):
         """
         comparisons of compression algorithm
         http://pokecraft.first-world.info/wiki/Quick_Benchmark:_Gzip_vs_Bzip2_vs_LZMA_vs_XZ_vs_LZ4_vs_LZO
@@ -102,13 +37,16 @@ class CompressProc(process_manager.ProcWorker):
         self.delta_list_queue = delta_list_queue
         self.comp_delta_queue = comp_delta_queue
         self.comp_type = comp_type
-        self.num_threads = num_threads
+        self.num_proc = num_proc
+        self.proc_list = list()
         self.block_size = block_size
         self.comp_level = comp_level
         self.thread_list = list()
         super(CompressProc, self).__init__(target=self.compress_stream)
 
-    def _chunk_blob(self, modified_memory_chunks, modified_disk_chunks):
+    def _chunk_blob(self):
+        modified_disk_chunks = list()
+        modified_memory_chunks = list()
         input_size = 0
         is_last_blob = False
         input_data = ''
@@ -132,80 +70,119 @@ class CompressProc(process_manager.ProcWorker):
                     modified_memory_chunks.append(offset)
                 input_data += delta_bytes
                 input_size += len(delta_bytes)
-        return is_last_blob, input_data, input_size
+        return is_last_blob, input_data, input_size, modified_disk_chunks, modified_memory_chunks
 
 
     def compress_stream(self):
         time_start = time.time()
 
-        is_last_blob = False 
-        total_read_size = 0
-        while is_last_blob == False:
-            # read data
-            modified_memory_chunks = list()
-            modified_disk_chunks = list()
-            is_last_blob, input_data, input_size = self._chunk_blob(modified_memory_chunks, modified_disk_chunks)
-
-            # new thread for data
-            total_read_size += input_size
+        # launch child processes
+        for i in range(self.num_proc):
+            command_queue = multiprocessing.Queue()
+            task_queue = multiprocessing.Queue()
             if self.comp_type == Const.COMPRESSION_LZMA:
-                new_thread = LZMAThread(input_data, self.comp_level)
+                comp_proc = LZMAProc(command_queue, task_queue,
+                                     self.comp_delta_queue, self.comp_level)
             elif self.comp_type == Const.COMPRESSION_BZIP2:
-                new_thread = BZIP2thread(input_data, self.comp_level)
+                comp_proc = BZIP2Proc(command_queue, task_queue,
+                                      self.comp_delta_queue, self.comp_level)
             else:
                 raise CompressionError("Not implemented")
-            new_thread.start()
-            self.thread_list.append((new_thread, modified_memory_chunks, modified_disk_chunks))
-            #sys.stdout.write("[compression] new thread to compress %d data (total thread: %d)\n" % (input_size, len(self.thread_list)))
-            if len(self.thread_list) == self.num_threads:
-                (c_thread, m_memory_chunks, m_disk_chunks) = self.thread_list.pop(0)
-                c_thread.join()
-                data = c_thread.output_data
-                self.comp_delta_queue.put(data)
-                self.comp_delta_queue.put(m_memory_chunks)
-                self.comp_delta_queue.put(m_disk_chunks)
+            comp_proc.start()
+            self.proc_list.append((comp_proc, task_queue, command_queue))
 
-        while len(self.thread_list) > 0:
-            (c_thread, m_memory_chunks, m_disk_chunks) = self.thread_list.pop(0)
-            c_thread.join()
-            data = c_thread.output_data
-            self.comp_delta_queue.put(data)
-            self.comp_delta_queue.put(m_memory_chunks)
-            self.comp_delta_queue.put(m_disk_chunks)
-        self.comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+        is_last_blob = False
+        total_read_size = 0
+        proc_rr_index = 0
+        while is_last_blob == False:
+            # read data
+            is_last_blob, input_data, input_size, modified_disk_chunks, modified_memory_chunks = self._chunk_blob()
+
+            if input_size > 0:
+                total_read_size += input_size
+                (proc, task_queue, command_queue) = self.proc_list[proc_rr_index%self.num_proc]
+                task_queue.put((input_data, modified_disk_chunks, modified_memory_chunks))
+
+        # send end meesage to every process
+        for (proc, t_queue, c_queue) in self.proc_list:
+            t_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+            sys.stdout.write("[Comp] send end message to each child\n")
+        # after this for loop, all processing finished, but child process still
+        # alive until all data pass to the next step
+        for (proc, t_queue, c_queue) in self.proc_list:
+            sys.stdout.write("[Comp] waiting to finish each child\n")
+            data = c_queue.get()
         time_end = time.time()
+        sys.stdout.write("[Comp] effetively finished\n")
 
-        sys.stdout.write("DEBUG\t[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f MB, %f MBps, %f s\n" % (
-            self.num_threads, self.block_size, self.comp_level, time_start, time_end, total_read_size/1024.0/1024, 
+        for (proc, t_queue, c_queue) in self.proc_list:
+            sys.stdout.write("[Comp] waiting to dump all data to the next stage\n")
+            proc.join()
+        # send end message after the next stage finishes processing
+        self.comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+
+        sys.stdout.write("[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f MB, %f MBps, %f s\n" % (
+            self.num_proc, self.block_size, self.comp_level, time_start, time_end, total_read_size/1024.0/1024, 
             total_read_size/(time_end-time_start)/1024.0/1024, (time_end-time_start)))
 
 
-class LZMAThread(threading.Thread):
-    def __init__(self, input_data, comp_level):
-        self.input_data = input_data
-        self.output_data = None
+class LZMAProc(multiprocessing.Process):
+    def __init__(self, command_queue, task_queue, output_queue, comp_level):
+        self.command_queue = command_queue
+        self.task_queue = task_queue
+        self.output_queue = output_queue
         self.comp_level = comp_level
-        threading.Thread.__init__(self, target=self._comp_lzma)
+        super(LZMAProc, self).__init__(target=self._comp_lzma)
 
     def _comp_lzma(self):
-        # mode = 2 indicates LZMA_SYNC_FLUSH, which show all output right after input
-        #print "start new thread to handle %d data" % len(input_data)
-        comp = lzma.LZMACompressor(options={'format':'xz', 'level':self.comp_level})
-        self.output_data = comp.compress(self.input_data)
-        self.output_data += comp.flush()
+        is_proc_running = True
+        input_list = [self.task_queue._reader.fileno()]
+        while is_proc_running:
+            inready, outread, errready = select.select(input_list, [], [])
+            input_task = self.task_queue.get()
+            if input_task == Const.QUEUE_SUCCESS_MESSAGE:
+                sys.stdout.write("[Comp][Child] LZMA proc get end message\n")
+                is_proc_running = False
+                break
+            # mode = 2 indicates LZMA_SYNC_FLUSH, which show all output right after input
+            #print "start new thread to handle %d data" % len(input_data)
+            (input_data, modified_disk_chunks, modified_memory_chunks) = input_task
+
+            comp = lzma.LZMACompressor(options={'format':'xz', 'level':self.comp_level})
+            output_data = comp.compress(input_data)
+            output_data += comp.flush()
+            self.output_queue.put((output_data, modified_disk_chunks, modified_memory_chunks))
+        sys.stdout.write("[Comp][Child] child finished. send command queue msg\n")
+        self.command_queue.put("processed everything")
 
 
-class BZIP2thread(threading.Thread):
-    def __init__(self, input_data, comp_level):
-        self.input_data = input_data
-        self.output_data = None
+
+class BZIP2Proc(multiprocessing.Process):
+    def __init__(self, command_queue, task_queue, output_queue, comp_level):
+        self.command_queue = command_queue
+        self.task_queue = task_queue
+        self.output_queue = output_queue
         self.comp_level = comp_level
-        threading.Thread.__init__(self, target=self._comp_bzip2)
+        super(BZIP2Proc, self).__init__(target=self._comp_bzip2)
 
     def _comp_bzip2(self):
-        comp = bz2.BZ2Compressor(self.comp_level)
-        self.output_data = comp.compress(self.input_data)
-        self.output_data += comp.flush()
+        is_proc_running = True
+        input_list = [self.task_queue._reader.fileno()]
+        while is_proc_running:
+            inready, outread, errready = select.select(input_list, [], [])
+            input_task = self.task_queue.get()
+            if input_task == Const.QUEUE_SUCCESS_MESSAGE:
+                sys.stdout.write("[Comp][Child] BZip2 proc get end message\n")
+                is_proc_running = False
+                break
+
+            (input_data, modified_disk_chunks, modified_memory_chunks) = input_task
+            comp = bz2.BZ2Compressor(self.comp_level)
+            output_data = comp.compress(input_data)
+            output_data += comp.flush()
+            self.output_queue.put((output_data, modified_disk_chunks, modified_memory_chunks))
+        sys.stdout.write("[Comp][Child] child finished. send command queue msg\n")
+        self.command_queue.put("processed everything")
 
 
 def decomp_overlay(meta, output_path):
