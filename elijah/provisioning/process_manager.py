@@ -40,12 +40,16 @@ def get_instance():
 
 class ProcessManager(threading.Thread):
     def __init__(self):
+        self.overlay_creation_mode = None
         self.manager = multiprocessing.Manager()
         self.process_list = dict()
         self.process_infos = self.manager.dict()
         self.process_control = dict()
         self.stop = threading.Event()
         super(ProcessManager, self).__init__(target=self.start_managing)
+
+    def set_mode(self, new_mode):
+        self.overlay_creation_mode = new_mode
 
     def _send_query(self, query, worker_names):
         for worker_name in worker_names:

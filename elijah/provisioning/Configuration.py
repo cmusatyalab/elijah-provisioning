@@ -41,24 +41,6 @@ def which(program):
     return exe_file
 
 
-class Options(object):
-    TRIM_SUPPORT                        = True
-    FREE_SUPPORT                        = False
-    XRAY_SUPPORT                        = False
-    DISK_ONLY                           = False
-    ZIP_CONTAINER                       = False
-    DATA_SOURCE_URI                     = None
-
-    # see the effect of dedup and reducing semantic by generating two indenpendent overlay
-    SEPERATE_DEDUP_REDUCING_SEMANTICS   = False     
-    # for test purposes, we can optionally save modified memory snapshot
-    MEMORY_SAVE_PATH                    = None
-
-    def __str__(self):
-        import pprint
-        return pprint.pformat(self.__dict__)
-
-
 class Const(object):
     VERSION = str("0.9.1")
     HOME_DIR = os.path.abspath(os.path.expanduser("~"))
@@ -144,6 +126,57 @@ class Const(object):
         image_name = os.path.splitext(os.path.basename(base_disk_path))[0]
         dir_path = os.path.dirname(base_disk_path)
         return os.path.join(dir_path, image_name+Const.BASE_HASH_VALUE)
+
+
+class Options(object):
+    TRIM_SUPPORT                        = True
+    FREE_SUPPORT                        = False
+    XRAY_SUPPORT                        = False
+    DISK_ONLY                           = False
+    ZIP_CONTAINER                       = False
+    DATA_SOURCE_URI                     = None
+
+    # see the effect of dedup and reducing semantic by generating two indenpendent overlay
+    SEPERATE_DEDUP_REDUCING_SEMANTICS   = False
+    # for test purposes, we can optionally save modified memory snapshot
+    MEMORY_SAVE_PATH                    = None
+
+    def __str__(self):
+        import pprint
+        return pprint.pformat(self.__dict__)
+
+
+class VMOverlayCreationMode(object):
+    def __init__(self):
+        self.QUEUE_SIZE_MEMORY_SNAPSHOT              = -1 # <0: infinite
+        self.QUEUE_SIZE_MEMORY_DELTA                 = -1 # <0: infinite
+        self.QUEUE_SIZE_DISK_DELTA                   = -1 # <0: infinite
+        self.QUEUE_SIZE_MEMORY_DELTA                 = -1 # <0: infinite
+        self.QUEUE_SIZE_OPTIMIZATION                 = -1 # <0: infinite
+        self.QUEUE_SIZE_COMPRESSION                  = -1 # <0: infinite
+
+        self.NUM_PROC_MEMORY_DIFF                    = 4
+        self.NUM_PROC_DISK_DIFF                      = 4
+        self.NUM_PROC_OPTIMIZATION                   = 4
+        self.NUM_PROC_COMPRESSION                    = 4
+
+        self.MEMORY_DIFF_ALGORITHM                   = "xdelta3" # "xdelta3", "xor", "none"
+        self.DISK_DIFF_ALGORITHM                     = "xdelta3" # "xdelta3", "xor", "none"
+
+        self.OPTIMIZATION_DEDUP_BASE_DISK            = True
+        self.OPTIMIZATION_DEDUP_BASE_MEMORY          = True
+        self.OPTIMIZATION_DEDUP_BASE_SELF            = True
+
+        self.COMPRESSION_ALGORITHM_TYPE              = Const.COMPRESSION_BZIP2
+        self.COMPRESSION_ALGORITHM_SPEED             = 4 # 1 (fastest) ~ 9
+
+    def __str__(self):
+        import pprint
+        return pprint.pformat(self.__dict__)
+
+    @staticmethod
+    def get_default():
+        return VMOverlayCreationMode()
 
 
 class Synthesis_Const(object):

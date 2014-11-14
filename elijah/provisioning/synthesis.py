@@ -37,6 +37,7 @@ from db import api as db_api
 from db import table_def as db_table
 from Configuration import Const
 from Configuration import Options
+from Configuration import VMOverlayCreationMode
 from Configuration import Caching_Const
 from delta import DeltaList
 from delta import DeltaItem
@@ -783,6 +784,7 @@ def get_libvirt_connection():
 
 
 def get_overlay_deltalist(monitoring_info, options,
+                          overlay_mode,
                           base_image, base_mem, 
                           base_memmeta, 
                           basedisk_hashdict, 
@@ -818,6 +820,8 @@ def get_overlay_deltalist(monitoring_info, options,
         memory_deltalist_proc = Memory.CreateMemoryDeltalist(modified_mem_queue,
                                                              memory_deltalist_queue,
                                                              base_memmeta, base_mem,
+                                                             overlay_mode.NUM_PROC_MEMORY_DIFF,
+                                                             overlay_mode.MEMORY_DIFF_ALGORITHM,
                                                              options.FREE_SUPPORT,
                                                              free_memory_dict)
         memory_deltalist_proc.start()
@@ -830,6 +834,8 @@ def get_overlay_deltalist(monitoring_info, options,
                                                    Const.CHUNK_SIZE,
                                                    disk_deltalist_queue,
                                                    base_image,
+                                                   overlay_mode.NUM_PROC_DISK_DIFF,
+                                                   overlay_mode.DISK_DIFF_ALGORITHM,
                                                    trim_dict,
                                                    dma_dict,
                                                    apply_discard,
@@ -842,6 +848,8 @@ def get_overlay_deltalist(monitoring_info, options,
     dedup_proc = delta.DeltaDedup(memory_deltalist_queue, Memory.Memory.RAM_PAGE_SIZE,
                                   disk_deltalist_queue, Const.CHUNK_SIZE,
                                   merged_deltalist_queue,
+                                  overlay_mode.NUM_PROC_OPTIMIZATION,
+                                  overlay_mode,
                                   basedisk_hashdict=basedisk_hashdict,
                                   basemem_hashdict=basemem_hashdict)
     dedup_proc.start()
@@ -1128,7 +1136,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.result_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         time_e = time()
-        LOG.debug("[time] Memory size of launch VM: %ld" % (self.total_read_size))
+        #LOG.debug("[time] Memory size of launch VM: %ld" % (self.total_read_size))
         LOG.debug("[time] Memory snapshotting first input at : %f" % (time_first_recv))
         LOG.debug("[time] memory snapshotting (%f ~ %f): %f, %f GBps" % (
             time_s, time_e, (time_e-time_s),
@@ -1387,9 +1395,12 @@ def create_residue(base_disk, base_hashvalue,
     '''
     time_start = time()
     process_controller = process_manager.get_instance()
+    overlay_mode = VMOverlayCreationMode.get_default()
+    process_controller.set_mode(overlay_mode)
 
     LOG.info("* Overlay creation configuration")
     LOG.info("  - %s" % str(options))
+    LOG.info("  - %s" % str(overlay_mode))
 
     # 1. sanity check
     if (options == None) or (isinstance(options, Options) == False):
@@ -1431,6 +1442,7 @@ def create_residue(base_disk, base_hashvalue,
 
     # 3. get overlay VM (semantic gap + deduplication)
     dedup_proc = get_overlay_deltalist(monitoring_info, options,
+                                       overlay_mode,
                                        base_disk, base_mem,
                                        base_memmeta,
                                        basedisk_hashdict,
@@ -1442,13 +1454,12 @@ def create_residue(base_disk, base_hashvalue,
 
     # 4. compression
     LOG.info("Compressing overlay blobs")
-    comp_type = Const.COMPRESSION_LZMA
     compress_proc = compression.CompressProc(residue_deltalist_queue,
                                              compdata_queue,
-                                             comp_type,
-                                             num_threads=2,
+                                             comp_type=overlay_mode.COMPRESSION_ALGORITHM_TYPE,
+                                             num_threads=overlay_mode.NUM_PROC_COMPRESSION,
                                              block_size=1024*1024*8,
-                                             comp_level=4)
+                                             comp_level=overlay_mode.COMPRESSION_ALGORITHM_SPEED)
     compress_proc.start()
     time_dedup = time()
 
@@ -1473,7 +1484,7 @@ def create_residue(base_disk, base_hashvalue,
         memory_chunks = compdata_queue.get()
         disk_chunks = compdata_queue.get()
 
-        blob_filename = os.path.join(temp_compfile_dir, "%s_stream-%d.xz" % (overlay_prefix, comp_file_counter))
+        blob_filename = os.path.join(temp_compfile_dir, "%s-stream-%d.xz" % (overlay_prefix, comp_file_counter))
         comp_file_counter += 1
         #LOG.debug("%s: # of delta memory: %d\t# of delta disk: %d" %\ (blob_filename, len(memory_chunks), len(disk_chunks)))
         overlay_files.append(blob_filename)
@@ -1482,7 +1493,7 @@ def create_residue(base_disk, base_hashvalue,
         output_fd.close()
         blob_dict = {
             Const.META_OVERLAY_FILE_NAME:os.path.basename(blob_filename),
-            Const.META_OVERLAY_FILE_COMPRESSION: comp_type,
+            Const.META_OVERLAY_FILE_COMPRESSION: overlay_mode.COMPRESSION_ALGORITHM_TYPE,
             Const.META_OVERLAY_FILE_SIZE:os.path.getsize(blob_filename),
             Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
             Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks

@@ -405,6 +405,8 @@ def _process_cmd(argv):
 class CreateMemoryDeltalist(process_manager.ProcWorker):
     def __init__(self, modified_mem_queue, deltalist_queue, 
                  basemem_meta=None, basemem_path=None,
+                 num_proc = 1,
+                 diff_algorithm = "xdelta3",
                  apply_free_memory=True,
                  free_memory_info=None):
         self.modified_mem_queue = modified_mem_queue
@@ -416,7 +418,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         self.free_memory_info = free_memory_info
         self.basemem_path = basemem_path
         self.proc_list = list()
-        self.num_proc = 4
+        self.num_proc = num_proc
+        self.diff_algorithm = diff_algorithm
 
         # output
         self.prev_procssed_size = 0
@@ -576,13 +579,13 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         # after this for loop, all processing finished, but child process still
         # alive until all data pass to the next step
         for (proc, t_queue, c_queue) in self.proc_list:
-            LOG.debug("[Memory] waiting to finish each child")
+            #LOG.debug("[Memory] waiting to finish each child")
             data = c_queue.get()
         time_e = time.time()
-        LOG.debug("[Memory] effetively finished")
+        #LOG.debug("[Memory] effetively finished")
 
         for (proc, t_queue, c_queue) in self.proc_list:
-            LOG.debug("[Memory] waiting to dump all data to the next stage")
+            #LOG.debug("[Memory] waiting to dump all data to the next stage")
             proc.join()
         # send end message after the next stage finishes processing
         self.deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
@@ -760,7 +763,7 @@ class DiffProc(multiprocessing.Process):
             inready, outread, errready = select.select(input_list, [], [])
             task_list = self.task_queue.get()
             if task_list == Const.QUEUE_SUCCESS_MESSAGE:
-                LOG.debug("[Memory][Child] diff proc get end message")
+                #LOG.debug("[Memory][Child] diff proc get end message")
                 is_proc_running = False
                 break
             (start_ram_offset, memory_chunk_list) = task_list
@@ -817,7 +820,7 @@ class DiffProc(multiprocessing.Process):
                         self.deltalist_queue.put(delta_item)
                         #print "delta item: %ld, %d" % (delta_item.offset, delta_item.data_len)
                 ram_offset += Memory.RAM_PAGE_SIZE
-        LOG.debug("[Memory][Child] child finished. send command queue msg")
+        #LOG.debug("[Memory][Child] child finished. send command queue msg")
         self.command_queue.put("processed everything")
         self.task_queue.put(freed_page_counter)
 

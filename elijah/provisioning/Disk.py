@@ -181,6 +181,8 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                  modified_chunk_dict, chunk_size,
                  disk_deltalist_queue,
                  basedisk_path=None,
+                 num_proc=1,
+                 diff_algorithm="xdelta",
                  trim_dict=None, dma_dict=None,
                  apply_discard=True,
                  used_blocks_dict=None):
@@ -202,7 +204,8 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         self.apply_discard = apply_discard
         self.used_blocks_dict = used_blocks_dict
         self.proc_list = list()
-        self.num_proc = 4
+        self.num_proc = num_proc
+        self.diff_algorithm = diff_algorithm
 
         self.manager = multiprocessing.Manager()
         self.ret_statistics = self.manager.dict()
@@ -309,17 +312,17 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         # send end meesage to every process
         for (proc, t_queue, c_queue) in self.proc_list:
             t_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-            LOG.debug("[Disk] send end message to each child")
+            #LOG.debug("[Disk] send end message to each child")
         # after this for loop, all processing finished, but child process still
         # alive until all data pass to the next step
         for (proc, t_queue, c_queue) in self.proc_list:
-            LOG.debug("[Disk] waiting to finish each child")
+            #LOG.debug("[Disk] waiting to finish each child")
             data = c_queue.get()
         time_e = time.time()
-        LOG.debug("[Disk] effetively finished")
+        #LOG.debug("[Disk] effetively finished")
 
         for (proc, t_queue, c_queue) in self.proc_list:
-            LOG.debug("[Disk] waiting to dump all data to the next stage")
+            #LOG.debug("[Disk] waiting to dump all data to the next stage")
             proc.join()
         # send end message after the next stage finishes processing
         self.disk_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
@@ -394,7 +397,7 @@ class DiskDiffProc(multiprocessing.Process):
             inready, outread, errready = select.select(input_list, [], [])
             task_list = self.task_queue.get()
             if task_list == Const.QUEUE_SUCCESS_MESSAGE:
-                LOG.debug("[Disk][Child] diff proc get end message")
+                #LOG.debug("[Disk][Child] diff proc get end message")
                 is_proc_running = False
                 break
 
@@ -433,7 +436,7 @@ class DiskDiffProc(multiprocessing.Process):
                         data=data)
                 '''
                 self.deltalist_queue.put(delta_item)
-        LOG.debug("[Disk][Child] child finished. send command queue msg")
+        #LOG.debug("[Disk][Child] child finished. send command queue msg")
         self.command_queue.put("processed everything")
 
 

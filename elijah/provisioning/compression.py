@@ -92,8 +92,9 @@ def _bzip2_write_data(input_data_queue, fd, control_queue, response_queue):
 
 
 class CompressProc(process_manager.ProcWorker):
-    def __init__(self, delta_list_queue, comp_delta_queue, comp_type,
-                 num_threads=4, block_size=1024*1024*8, comp_level=4):
+    def __init__(self, delta_list_queue, comp_delta_queue,
+                 comp_type=Const.COMPRESSION_BZIP2,
+                 num_threads=1, block_size=1024*1024*8, comp_level=4):
         """
         comparisons of compression algorithm
         http://pokecraft.first-world.info/wiki/Quick_Benchmark:_Gzip_vs_Bzip2_vs_LZMA_vs_XZ_vs_LZ4_vs_LZO
@@ -174,9 +175,9 @@ class CompressProc(process_manager.ProcWorker):
         self.comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
         time_end = time.time()
 
-        sys.stdout.write("[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f s, %f MB, %f MBps\n" % (
-            self.num_threads, self.block_size, self.comp_level, time_start, time_end, (time_end-time_start), total_read_size/1024.0/1024, 
-            total_read_size/(time_end-time_start)/1024.0/1024))
+        sys.stdout.write("DEBUG\t[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f MB, %f MBps, %f s\n" % (
+            self.num_threads, self.block_size, self.comp_level, time_start, time_end, total_read_size/1024.0/1024, 
+            total_read_size/(time_end-time_start)/1024.0/1024, (time_end-time_start)))
 
 
 class LZMAThread(threading.Thread):
