@@ -16,6 +16,7 @@
 #   see the license for the specific language governing permissions and
 #   limitations under the license.
 #
+import os
 import multiprocessing
 import threading
 import time
@@ -58,27 +59,34 @@ class ProcessManager(threading.Thread):
             if worker.is_alive():
                 control_queue.put(query)
 
-
     def _recv_response(self, query, worker_names):
+        response_dict = dict()
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
             control_queue, response_queue = self.process_control[worker_name]
             if worker.is_alive():
+                time_s = time.time()
                 response = response_queue.get()
-                #print "[manager] %s, %s: %s" % (query, worker_name, response)
-
+                time_e = time.time()
+                response_dict[worker_name] = (response, time_e-time_s)
+        return response_dict
 
     def start_managing(self):
         try:
-            while (not self.stop.wait(0.1)):
-                pass
-                ## send control query
+            while (not self.stop.wait(1)):
+                time_s = time.time()
+                # send control query
                 #query = "current_bw"
-                #worker_names = self.process_list.keys()
-                #self._send_query(query, worker_names)
+                query = "cpu_usage_accum"
+                worker_names = self.process_list.keys()
+                self._send_query(query, worker_names)
 
-                ## recv control response
-                #responses = self._recv_response(query, worker_names)
+                # recv control response
+                responses = self._recv_response(query, worker_names)
+                for worker_name, (response, duration) in responses.iteritems():
+                    sys.stdout.write("[manager] %s:\t%s:\t%s\t(%f s)\n" % (query, worker_name, str(response), duration))
+                time_e = time.time()
+                sys.stdout.write("[manager] querying takes %f s\n\n" % (time_e-time_s))
         except Exception as e:
             sys.stdout.write("[manager] Exception")
             sys.stderr.write(traceback.format_exc())
@@ -114,6 +122,10 @@ class ProcWorker(multiprocessing.Process):
     def _handle_control_msg(self, control_msg):
         if control_msg == "current_bw":
             self.response_queue.put(self.monitor_current_bw)
+        elif control_msg == "cpu_usage_accum":
+            (utime, stime, child_utime, child_stime, elaspe_time) = os.times()
+            all_times = utime+stime+child_utime+child_stime
+            self.response_queue.put(float(all_times))
 
 
 

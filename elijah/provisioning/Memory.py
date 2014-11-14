@@ -575,7 +575,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         # send end meesage to every process
         for (proc, t_queue, c_queue) in self.proc_list:
             t_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-            LOG.debug("[memory] send end message to each child")
+            #LOG.debug("[Memory] send end message to each child")
         # after this for loop, all processing finished, but child process still
         # alive until all data pass to the next step
         for (proc, t_queue, c_queue) in self.proc_list:

@@ -148,20 +148,19 @@ class Options(object):
 
 class VMOverlayCreationMode(object):
     def __init__(self):
-        self.QUEUE_SIZE_MEMORY_SNAPSHOT              = -1 # <0: infinite
-        self.QUEUE_SIZE_MEMORY_DELTA                 = -1 # <0: infinite
-        self.QUEUE_SIZE_DISK_DELTA                   = -1 # <0: infinite
-        self.QUEUE_SIZE_MEMORY_DELTA                 = -1 # <0: infinite
-        self.QUEUE_SIZE_OPTIMIZATION                 = -1 # <0: infinite
-        self.QUEUE_SIZE_COMPRESSION                  = -1 # <0: infinite
+        self.QUEUE_SIZE_MEMORY_SNAPSHOT             = -1 # <0: infinite
+        self.QUEUE_SIZE_MEMORY_DELTA_LIST           = -1 # <0: infinite
+        self.QUEUE_SIZE_DISK_DELTA_LIST             = -1 # <0: infinite
+        self.QUEUE_SIZE_OPTIMIZATION                = -1 # <0: infinite
+        self.QUEUE_SIZE_COMPRESSION                 = -1 # <0: infinite
 
-        self.NUM_PROC_MEMORY_DIFF                    = 4
-        self.NUM_PROC_DISK_DIFF                      = 4
-        self.NUM_PROC_OPTIMIZATION                   = 4
-        self.NUM_PROC_COMPRESSION                    = 4
+        self.NUM_PROC_MEMORY_DIFF                   = 4
+        self.NUM_PROC_DISK_DIFF                     = 4
+        self.NUM_PROC_OPTIMIZATION                  = 4
+        self.NUM_PROC_COMPRESSION                   = 4
 
-        self.MEMORY_DIFF_ALGORITHM                   = "xdelta3" # "xdelta3", "xor", "none"
-        self.DISK_DIFF_ALGORITHM                     = "xdelta3" # "xdelta3", "xor", "none"
+        self.MEMORY_DIFF_ALGORITHM                  = "xdelta3" # "xdelta3", "xor", "none"
+        self.DISK_DIFF_ALGORITHM                    = "xdelta3" # "xdelta3", "xor", "none"
 
         self.OPTIMIZATION_DEDUP_BASE_DISK            = True
         self.OPTIMIZATION_DEDUP_BASE_MEMORY          = True

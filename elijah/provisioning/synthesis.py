@@ -816,7 +816,7 @@ def get_overlay_deltalist(monitoring_info, options,
 
     # memory hashdict is neede at memory deltaand dedup
     if not options.DISK_ONLY:
-        memory_deltalist_queue = multiprocessing.Queue()
+        memory_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_MEMORY_DELTA_LIST)
         memory_deltalist_proc = Memory.CreateMemoryDeltalist(modified_mem_queue,
                                                              memory_deltalist_queue,
                                                              base_memmeta, base_mem,
@@ -828,7 +828,7 @@ def get_overlay_deltalist(monitoring_info, options,
     time_mem_delta = time()
 
     LOG.info("Get disk delta")
-    disk_deltalist_queue = multiprocessing.Queue()
+    disk_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_DISK_DELTA_LIST)
     disk_deltalist_proc = Disk.CreateDiskDeltalist(modified_disk,
                                                    m_chunk_dict,
                                                    Const.CHUNK_SIZE,
@@ -1396,8 +1396,13 @@ def create_residue(base_disk, base_hashvalue,
     time_start = time()
     process_controller = process_manager.get_instance()
     overlay_mode = VMOverlayCreationMode.get_default()
-    process_controller.set_mode(overlay_mode)
+    QUEUE_SIZE_MEMORY_SNAPSHOT             = 1 # <0: infinite
+    QUEUE_SIZE_MEMORY_DELTA_LIST           = 1 # <0: infinite
+    QUEUE_SIZE_DISK_DELTA_LIST             = 1 # <0: infinite
+    QUEUE_SIZE_OPTIMIZATION                = 1 # <0: infinite
+    QUEUE_SIZE_COMPRESSION                 = 1 # <0: infinite
 
+    process_controller.set_mode(overlay_mode)
     LOG.info("* Overlay creation configuration")
     LOG.info("  - %s" % str(options))
     LOG.info("  - %s" % str(overlay_mode))
@@ -1410,9 +1415,9 @@ def create_residue(base_disk, base_hashvalue,
     qemu_logfile = resumed_vm.qemu_logfile
 
     # 2. suspend VM and get monitoring information
-    memory_snapshot_queue = multiprocessing.Queue()
-    residue_deltalist_queue = multiprocessing.Queue()
-    compdata_queue = multiprocessing.Queue()
+    memory_snapshot_queue = multiprocessing.Queue(overlay_mode.QUEUE_SIZE_MEMORY_SNAPSHOT)
+    residue_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_OPTIMIZATION)
+    compdata_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_COMPRESSION)
 
     vm_monitor = VMMonitor(resumed_vm.conn, resumed_vm.machine, options,
                            resumed_vm.monitor,
@@ -1934,10 +1939,10 @@ def synthesis(base_disk, overlay_path, **kwargs):
     # statistics
     synthesized_VM.monitor.terminate()
     synthesized_VM.monitor.join()
-    mem_access_list = synthesized_VM.monitor.mem_access_chunk_list
-    disk_access_list = synthesized_VM.monitor.disk_access_chunk_list
-    synthesis_statistics(meta_info, overlay_filename.name, \
-            mem_access_list, disk_access_list)
+    #mem_access_list = synthesized_VM.monitor.mem_access_chunk_list
+    #disk_access_list = synthesized_VM.monitor.disk_access_chunk_list
+    #synthesis_statistics(meta_info, overlay_filename.name, \
+    #        mem_access_list, disk_access_list)
 
     if return_residue == True:
         options = Options()
