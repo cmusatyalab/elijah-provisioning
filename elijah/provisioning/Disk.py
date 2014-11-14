@@ -24,6 +24,7 @@ import sys
 import time
 import mmap
 import multiprocessing
+import select
 import Queue
 from math import ceil
 from hashlib import sha256
@@ -200,6 +201,8 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         self.dma_dict = dma_dict
         self.apply_discard = apply_discard
         self.used_blocks_dict = used_blocks_dict
+        self.proc_list = list()
+        self.num_proc = 4
 
         self.manager = multiprocessing.Manager()
         self.ret_statistics = self.manager.dict()
@@ -216,10 +219,6 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         processed_duration = float(0)
         UPDATE_PERIOD = self.process_info['update_period']
 
-        base_fd = open(self.basedisk_path, "rb")
-        base_mmap = mmap.mmap(base_fd.fileno(), 0, prot=mmap.PROT_READ)
-        modified_fd = open(self.modified_disk, "rb")
-
         # 0. get info from qemu log file
         # dictionary : (chunk_%, discarded_time)
         trim_counter = 0
@@ -230,9 +229,22 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         trimed_list = []
         xrayed_list = []
 
+        # launch child processes
+        proc_rr_index = 0
+        for i in range(self.num_proc):
+            command_queue = multiprocessing.Queue()
+            task_queue = multiprocessing.Queue()
+            diff_proc = DiskDiffProc(command_queue, task_queue,
+                                     self.disk_deltalist_queue,
+                                     self.basedisk_path, self.modified_disk,
+                                     self.chunk_size)
+            diff_proc.start()
+            self.proc_list.append((diff_proc, task_queue, command_queue))
+
         # 1. get modified page
         LOG.debug("1. Get modified disk page")
         modified_chunk_counter = 0
+        modified_chunk_list = []
         for index, chunk in enumerate(self.modified_chunk_dict.keys()):
             # check control message
             try:
@@ -268,42 +280,16 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 if self.apply_discard:
                     continue
 
-            # check file system 
-            modified_fd.seek(offset)
-            data = modified_fd.read(self.chunk_size)
+            modified_chunk_list.append(chunk)
             if is_first_recv == False:
                 is_first_recv = True
                 time_first_recv = time.time()
 
-            source_data = base_mmap[offset:offset+len(data)]
-            try:
-                patch = tool.diff_data(source_data, data, 2*len(source_data))
-                if len(patch) < len(data):
-                    delta_item = DeltaItem(DeltaItem.DELTA_DISK,
-                            offset, len(data),
-                            hash_value=sha256(data).digest(),
-                            ref_id=DeltaItem.REF_XDELTA,
-                            data_len=len(patch),
-                            data=patch)
-                else:
-                    raise IOError("xdelta3 patch is bigger than origianl")
-            except IOError as e:
-                #LOG.info("xdelta failed, so save it as raw (%s)" % str(e))
-                delta_item = DeltaItem(DeltaItem.DELTA_DISK,
-                        offset, len(data),
-                        hash_value=sha256(data).digest(),
-                        ref_id=DeltaItem.REF_RAW,
-                        data_len=len(data),
-                        data=data)
-            '''
-            delta_item = DeltaItem(DeltaItem.DELTA_DISK,
-                    offset, len(data),
-                    hash_value=sha256(data).digest(),
-                    ref_id=DeltaItem.REF_RAW,
-                    data_len=len(data),
-                    data=data)
-            '''
-            self.disk_deltalist_queue.put(delta_item)
+            if len(modified_chunk_list) > 100:
+                (proc, task_queue, command_queue) = self.proc_list[proc_rr_index%self.num_proc]
+                task_queue.put(modified_chunk_list)
+                modified_chunk_list = []
+                proc_rr_index += 1
 
             # measurement
             modified_chunk_counter += 1
@@ -315,6 +301,27 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
                 processed_datasize = 0
                 processed_duration = float(0)
+        # send last chunks
+        (proc, task_queue, command_queue) = self.proc_list[proc_rr_index%self.num_proc]
+        task_queue.put(modified_chunk_list)
+        modified_chunk_list = []
+
+        # send end meesage to every process
+        for (proc, t_queue, c_queue) in self.proc_list:
+            t_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+            LOG.debug("[Disk] send end message to each child")
+        # after this for loop, all processing finished, but child process still
+        # alive until all data pass to the next step
+        for (proc, t_queue, c_queue) in self.proc_list:
+            LOG.debug("[Disk] waiting to finish each child")
+            data = c_queue.get()
+        time_e = time.time()
+        LOG.debug("[Disk] effetively finished")
+
+        for (proc, t_queue, c_queue) in self.proc_list:
+            LOG.debug("[Disk] waiting to dump all data to the next stage")
+            proc.join()
+        # send end message after the next stage finishes processing
         self.disk_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
         LOG.debug("# of modified disk delta item: %ld" % modified_chunk_counter)
 
@@ -363,6 +370,73 @@ def recover_disk(base_disk, base_mem, overlay_mem, overlay_disk, recover_path, c
 
     # overlay chunk format: chunk_1:1,chunk_2:1,...
     return ','.join(chunk_list)
+
+
+class DiskDiffProc(multiprocessing.Process):
+    def __init__(self, command_queue, task_queue, deltalist_queue,
+                 basedisk_path, modified_disk, chunk_size):
+        self.command_queue = command_queue
+        self.task_queue = task_queue
+        self.deltalist_queue = deltalist_queue
+        self.basedisk_path = basedisk_path
+        self.modified_disk = modified_disk
+        self.chunk_size = chunk_size
+        super(DiskDiffProc, self).__init__(target=self.process_diff)
+
+    def process_diff(self):
+        base_fd = open(self.basedisk_path, "rb")
+        base_mmap = mmap.mmap(base_fd.fileno(), 0, prot=mmap.PROT_READ)
+        modified_fd = open(self.modified_disk, "rb")
+
+        is_proc_running = True
+        input_list = [self.task_queue._reader.fileno()]
+        while is_proc_running:
+            inready, outread, errready = select.select(input_list, [], [])
+            task_list = self.task_queue.get()
+            if task_list == Const.QUEUE_SUCCESS_MESSAGE:
+                LOG.debug("[Disk][Child] diff proc get end message")
+                is_proc_running = False
+                break
+
+            for chunk in task_list:
+                offset = chunk * self.chunk_size
+                # check file system 
+                modified_fd.seek(offset)
+                data = modified_fd.read(self.chunk_size)
+
+                source_data = base_mmap[offset:offset+len(data)]
+                try:
+                    patch = tool.diff_data(source_data, data, 2*len(source_data))
+                    if len(patch) < len(data):
+                        delta_item = DeltaItem(DeltaItem.DELTA_DISK,
+                                offset, len(data),
+                                hash_value=sha256(data).digest(),
+                                ref_id=DeltaItem.REF_XDELTA,
+                                data_len=len(patch),
+                                data=patch)
+                    else:
+                        raise IOError("xdelta3 patch is bigger than origianl")
+                except IOError as e:
+                    #LOG.info("xdelta failed, so save it as raw (%s)" % str(e))
+                    delta_item = DeltaItem(DeltaItem.DELTA_DISK,
+                            offset, len(data),
+                            hash_value=sha256(data).digest(),
+                            ref_id=DeltaItem.REF_RAW,
+                            data_len=len(data),
+                            data=data)
+                '''
+                delta_item = DeltaItem(DeltaItem.DELTA_DISK,
+                        offset, len(data),
+                        hash_value=sha256(data).digest(),
+                        ref_id=DeltaItem.REF_RAW,
+                        data_len=len(data),
+                        data=data)
+                '''
+                self.deltalist_queue.put(delta_item)
+        LOG.debug("[Disk][Child] child finished. send command queue msg")
+        self.command_queue.put("processed everything")
+
+
 
 if __name__ == "__main__":
     parse_qemu_log("log", 4096)
