@@ -22,6 +22,7 @@ import threading
 import time
 import sys
 import traceback
+import Queue
 
 
 _process_controller = None
@@ -56,7 +57,8 @@ class ProcessManager(threading.Thread):
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
             control_queue, response_queue = self.process_control[worker_name]
-            if worker.is_alive():
+            process_info = self.process_infos[worker_name]
+            if process_info['is_alive'] == True:
                 control_queue.put(query)
 
     def _recv_response(self, query, worker_names):
@@ -64,17 +66,24 @@ class ProcessManager(threading.Thread):
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
             control_queue, response_queue = self.process_control[worker_name]
-            if worker.is_alive():
-                time_s = time.time()
-                response = response_queue.get()
-                time_e = time.time()
-                response_dict[worker_name] = (response, time_e-time_s)
+            response_dict[worker_name] = (None, 0)
+            process_info = self.process_infos[worker_name]
+            if process_info['is_alive'] == True:
+                try:
+                    if worker.is_alive():
+                        response = response_queue.get(timeout=1)
+                        response_dict[worker_name] = (response, 0)
+                except Queue.Empty as e:
+                    msg = "Error, Cannot receive response from : %s process\n" % (str(worker_name))
+                    sys.stderr.write(msg)
         return response_dict
 
     def start_managing(self):
+        time_s = time.time()
+        self.cpu_statistics = list()
         try:
             while (not self.stop.wait(1)):
-                time_s = time.time()
+                result = dict()
                 query = "cpu_usage_accum"   #"current_bw"
                 worker_names = self.process_list.keys()
                 self._send_query(query, worker_names)
@@ -82,9 +91,9 @@ class ProcessManager(threading.Thread):
                 responses = self._recv_response(query, worker_names)
                 for worker_name, (response, duration) in responses.iteritems():
                     sys.stdout.write("[manager] %s:\t%s:\t%s\t(%f s)\n" % (query, worker_name, str(response), duration))
+                    result[worker_name] = response
                 time_e = time.time()
-                sys.stdout.write("[manager] querying takes %f s\n\n" % (time_e-time_s))
-                pass
+                self.cpu_statistics.append((time.time()-time_s, result))
         except Exception as e:
             sys.stdout.write("[manager] Exception")
             sys.stderr.write(traceback.format_exc())
@@ -94,6 +103,7 @@ class ProcessManager(threading.Thread):
         worker_name = getattr(worker, "worker_name", "NoName")
         process_info = self.manager.dict()
         process_info['update_period'] = 0.1 # seconds
+        process_info['is_alive'] = True
         control_queue = multiprocessing.Queue()
         response_queue = multiprocessing.Queue()
         #print "[manager] register new process: %s" % worker_name
@@ -102,6 +112,9 @@ class ProcessManager(threading.Thread):
         self.process_infos[worker_name] = (process_info)
         self.process_control[worker_name] = (control_queue, response_queue)
         return process_info, control_queue, response_queue
+
+    def terminate(self):
+        self.stop.set()
 
 
 class ProcWorker(multiprocessing.Process):

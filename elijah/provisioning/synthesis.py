@@ -1136,6 +1136,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.result_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         time_e = time()
+        self.process_info['is_alive'] = False
         #LOG.debug("[time] Memory size of launch VM: %ld" % (self.total_read_size))
         LOG.debug("[time] Memory snapshotting first input at : %f" % (time_first_recv))
         LOG.debug("[time] memory snapshotting (%f ~ %f): %f, %f GBps" % (
@@ -1503,7 +1504,11 @@ def create_residue(base_disk, base_hashvalue,
             }
         overlay_info.append(blob_dict)
 
-    # 5. wait until we get all chunk offset of disk and memory (for FUSE)
+    process_controller.terminate()
+    cpu_stat = process_controller.cpu_statistics
+    import pprint
+    pprint.pprint(cpu_stat)
+
 
     # wait until VM snapshotting finishes to get final VM memory snapshot size
     memory_read_proc.join()

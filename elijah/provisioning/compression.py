@@ -102,28 +102,49 @@ class CompressProc(process_manager.ProcWorker):
                 total_read_size += input_size
                 (proc, task_queue, command_queue) = self.proc_list[proc_rr_index%self.num_proc]
                 task_queue.put((input_data, modified_disk_chunks, modified_memory_chunks))
+                proc_rr_index += 1
 
         # send end meesage to every process
         for (proc, t_queue, c_queue) in self.proc_list:
             t_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-            sys.stdout.write("[Comp] send end message to each child\n")
+            #sys.stdout.write("[Comp] send end message to each child\n")
+
         # after this for loop, all processing finished, but child process still
         # alive until all data pass to the next step
+        finished_proc_dict = dict()
+        input_list = [self.control_queue._reader.fileno()]
         for (proc, t_queue, c_queue) in self.proc_list:
-            sys.stdout.write("[Comp] waiting to finish each child\n")
-            data = c_queue.get()
+            fileno = c_queue._reader.fileno()
+            input_list.append(fileno)
+            finished_proc_dict[fileno] = (c_queue, t_queue)
+        while len(finished_proc_dict.keys()) > 0:
+            #print "left proc number: %s" % (finished_proc_dict.keys())
+            #for ffno, (cq, tq) in finished_proc_dict.iteritems():
+            #    print "task quesize at %d: %d" % (ffno, tq.qsize())
+
+            (input_ready, [], []) = select.select(input_list, [], [])
+            for in_queue in input_ready:
+                if self.control_queue._reader.fileno() == in_queue:
+                    control_msg = self.control_queue.get()
+                    self._handle_control_msg(control_msg)
+                else:
+                    (cq, tq) = finished_proc_dict[in_queue]
+                    cq.get()
+                    del finished_proc_dict[in_queue]
+        self.process_info['is_alive'] = False
+
         time_end = time.time()
-        sys.stdout.write("[Comp] effetively finished\n")
-
-        for (proc, t_queue, c_queue) in self.proc_list:
-            sys.stdout.write("[Comp] waiting to dump all data to the next stage\n")
-            proc.join()
-        # send end message after the next stage finishes processing
-        self.comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-
+        #sys.stdout.write("[Comp] effetively finished\n")
         sys.stdout.write("[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f MB, %f MBps, %f s\n" % (
             self.num_proc, self.block_size, self.comp_level, time_start, time_end, total_read_size/1024.0/1024, 
             total_read_size/(time_end-time_start)/1024.0/1024, (time_end-time_start)))
+
+
+        for (proc, t_queue, c_queue) in self.proc_list:
+            #sys.stdout.write("[Comp] waiting to dump all data to the next stage\n")
+            proc.join()
+        # send end message after the next stage finishes processing
+        self.comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
 
 class LZMAProc(multiprocessing.Process):
@@ -141,7 +162,7 @@ class LZMAProc(multiprocessing.Process):
             inready, outread, errready = select.select(input_list, [], [])
             input_task = self.task_queue.get()
             if input_task == Const.QUEUE_SUCCESS_MESSAGE:
-                sys.stdout.write("[Comp][Child] LZMA proc get end message\n")
+                #sys.stdout.write("[Comp][Child] LZMA proc get end message\n")
                 is_proc_running = False
                 break
             # mode = 2 indicates LZMA_SYNC_FLUSH, which show all output right after input
@@ -152,8 +173,8 @@ class LZMAProc(multiprocessing.Process):
             output_data = comp.compress(input_data)
             output_data += comp.flush()
             self.output_queue.put((output_data, modified_disk_chunks, modified_memory_chunks))
-        sys.stdout.write("[Comp][Child] child finished. send command queue msg\n")
-        self.command_queue.put("processed everything")
+        #sys.stdout.write("[Comp][Child] child finished. send command queue msg\n")
+        self.command_queue.put("LZMA processed everything")
 
 
 
@@ -172,7 +193,7 @@ class BZIP2Proc(multiprocessing.Process):
             inready, outread, errready = select.select(input_list, [], [])
             input_task = self.task_queue.get()
             if input_task == Const.QUEUE_SUCCESS_MESSAGE:
-                sys.stdout.write("[Comp][Child] BZip2 proc get end message\n")
+                #sys.stdout.write("[Comp][Child] BZip2 proc get end message\n")
                 is_proc_running = False
                 break
 
@@ -181,7 +202,7 @@ class BZIP2Proc(multiprocessing.Process):
             output_data = comp.compress(input_data)
             output_data += comp.flush()
             self.output_queue.put((output_data, modified_disk_chunks, modified_memory_chunks))
-        sys.stdout.write("[Comp][Child] child finished. send command queue msg\n")
+        #sys.stdout.write("[Comp][Child] child finished. send command queue msg\n")
         self.command_queue.put("processed everything")
 
 

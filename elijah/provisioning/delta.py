@@ -779,9 +779,11 @@ class DeltaDedup(process_manager.ProcWorker):
                 processed_duration += (time_process_finish - time_process_start)
                 if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
                     time_prev_report = time_process_finish
-                    self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
+                    #self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
                     processed_datasize = 0
                     processed_duration = float(0)
+        self.monitor_is_alive = False
+        self.process_info['is_alive'] = False
         self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         self.statistics['number_of_zero_page_disk'] = number_of_zero_page_disk
