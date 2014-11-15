@@ -135,16 +135,16 @@ class CompressProc(process_manager.ProcWorker):
 
         time_end = time.time()
         #sys.stdout.write("[Comp] effetively finished\n")
-        sys.stdout.write("[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f MB, %f MBps, %f s\n" % (
-            self.num_proc, self.block_size, self.comp_level, time_start, time_end, total_read_size/1024.0/1024, 
-            total_read_size/(time_end-time_start)/1024.0/1024, (time_end-time_start)))
-
 
         for (proc, t_queue, c_queue) in self.proc_list:
             #sys.stdout.write("[Comp] waiting to dump all data to the next stage\n")
             proc.join()
         # send end message after the next stage finishes processing
         self.comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+        sys.stdout.write("[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f MB, %f MBps, %f s\n" % (
+            self.num_proc, self.block_size, self.comp_level, time_start, time_end, total_read_size/1024.0/1024, 
+            total_read_size/(time_end-time_start)/1024.0/1024, (time_end-time_start)))
+
 
 
 class LZMAProc(multiprocessing.Process):

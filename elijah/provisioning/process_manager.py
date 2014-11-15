@@ -83,6 +83,7 @@ class ProcessManager(threading.Thread):
         self.cpu_statistics = list()
         try:
             while (not self.stop.wait(1)):
+                '''
                 result = dict()
                 query = "cpu_usage_accum"   #"current_bw"
                 worker_names = self.process_list.keys()
@@ -94,6 +95,9 @@ class ProcessManager(threading.Thread):
                     result[worker_name] = response
                 time_e = time.time()
                 self.cpu_statistics.append((time.time()-time_s, result))
+                sys.stdout.write("\n")
+                '''
+                pass
         except Exception as e:
             sys.stdout.write("[manager] Exception")
             sys.stderr.write(traceback.format_exc())

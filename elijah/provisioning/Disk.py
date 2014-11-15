@@ -322,13 +322,28 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         for (proc, t_queue, c_queue) in self.proc_list:
             t_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
             #LOG.debug("[Disk] send end message to each child")
+
         # after this for loop, all processing finished, but child process still
         # alive until all data pass to the next step
+        finished_proc_dict = dict()
+        input_list = [self.control_queue._reader.fileno()]
         for (proc, t_queue, c_queue) in self.proc_list:
-            #LOG.debug("[Disk] waiting to finish each child")
-            data = c_queue.get()
-        time_e = time.time()
-        #LOG.debug("[Disk] effetively finished")
+            fileno = c_queue._reader.fileno()
+            input_list.append(fileno)
+            finished_proc_dict[fileno] = (c_queue, t_queue)
+        while len(finished_proc_dict.keys()) > 0:
+            #print "disk left proc number: %s" % (finished_proc_dict.keys())
+            #for ffno, (cq, tq) in finished_proc_dict.iteritems():
+            #    print "task quesize at %d: %d" % (ffno, tq.qsize())
+            (input_ready, [], []) = select.select(input_list, [], [])
+            for in_queue in input_ready:
+                if self.control_queue._reader.fileno() == in_queue:
+                    control_msg = self.control_queue.get()
+                    self._handle_control_msg(control_msg)
+                else:
+                    (cq, tq) = finished_proc_dict[in_queue]
+                    cq.get()
+                    del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
 
         for (proc, t_queue, c_queue) in self.proc_list:

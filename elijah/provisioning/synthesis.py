@@ -1397,11 +1397,6 @@ def create_residue(base_disk, base_hashvalue,
     time_start = time()
     process_controller = process_manager.get_instance()
     overlay_mode = VMOverlayCreationMode.get_default()
-    #overlay_mode.QUEUE_SIZE_MEMORY_SNAPSHOT             = 1 # <0: infinite
-    #overlay_mode.QUEUE_SIZE_MEMORY_DELTA_LIST           = 1 # <0: infinite
-    #overlay_mode.QUEUE_SIZE_DISK_DELTA_LIST             = 1 # <0: infinite
-    #overlay_mode.QUEUE_SIZE_OPTIMIZATION                = 1 # <0: infinite
-    #overlay_mode.QUEUE_SIZE_COMPRESSION                 = 1 # <0: infinite
     overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_LZMA
 
     process_controller.set_mode(overlay_mode)
@@ -1476,9 +1471,8 @@ def create_residue(base_disk, base_hashvalue,
     overlay_info = list()
     overlay_files = list()
     overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
-    overlay_prefix = os.path.join(os.getcwd(), Const.OVERLAY_FILE_PREFIX)
     comp_file_counter = 0
-    temp_compfile_dir = mkdtemp(prefix="cloudlet-qemu-comp-")
+    temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")
     while True:
         comp_task = compdata_queue.get()
         if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
@@ -1488,9 +1482,12 @@ def create_residue(base_disk, base_hashvalue,
             break
         (compdata, disk_chunks, memory_chunks) = comp_task
 
-        blob_filename = os.path.join(temp_compfile_dir, "%s-stream-%d.xz" % (overlay_prefix, comp_file_counter))
+        blob_filename = os.path.join(temp_compfile_dir, "%s-stream-%d.xz" %\
+                                     (Const.OVERLAY_FILE_PREFIX,
+                                      comp_file_counter))
         comp_file_counter += 1
-        #LOG.debug("%s: # of delta memory: %d\t# of delta disk: %d" %\ (blob_filename, len(memory_chunks), len(disk_chunks)))
+        #LOG.debug("%s: # of delta memory: %d\t# of delta disk: %d" %\
+        #          (blob_filename, len(memory_chunks), len(disk_chunks)))
         overlay_files.append(blob_filename)
         output_fd = open(blob_filename, "wb+")
         output_fd.write(compdata)
@@ -1505,9 +1502,7 @@ def create_residue(base_disk, base_hashvalue,
         overlay_info.append(blob_dict)
 
     process_controller.terminate()
-    cpu_stat = process_controller.cpu_statistics
-    import pprint
-    pprint.pprint(cpu_stat)
+    #cpu_stat = process_controller.cpu_statistics
 
 
     # wait until VM snapshotting finishes to get final VM memory snapshot size

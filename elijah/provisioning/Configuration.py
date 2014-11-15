@@ -177,6 +177,15 @@ class VMOverlayCreationMode(object):
     def get_default():
         return VMOverlayCreationMode()
 
+    @staticmethod
+    def get_no_parellel():
+        mode = VMOverlayCreationMode()
+        mode.NUM_PROC_MEMORY_DIFF = 1
+        mode.NUM_PROC_DISK_DIFF = 1
+        mode.NUM_PROC_OPTIMIZATION = 1
+        mode.NUM_PROC_COMPRESSION = 1
+        return mode
+
 
 class Synthesis_Const(object):
     # PIPLINING CONSTANT

@@ -579,12 +579,27 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
         # after this for loop, all processing finished, but child process still
         # alive until all data pass to the next step
+        finished_proc_dict = dict()
+        input_list = [self.control_queue._reader.fileno()]
         for (proc, t_queue, c_queue) in self.proc_list:
-            #LOG.debug("[Memory] waiting to finish each child")
-            data = c_queue.get()
-        time_e = time.time()
-        #LOG.debug("[Memory] effetively finished")
+            fileno = c_queue._reader.fileno()
+            input_list.append(fileno)
+            finished_proc_dict[fileno] = (c_queue, t_queue)
+        while len(finished_proc_dict.keys()) > 0:
+            (input_ready, [], []) = select.select(input_list, [], [])
+            for in_queue in input_ready:
+                if self.control_queue._reader.fileno() == in_queue:
+                    control_msg = self.control_queue.get()
+                    self._handle_control_msg(control_msg)
+                else:
+                    (cq, tq) = finished_proc_dict[in_queue]
+                    cq.get()
+                    del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
+
+
+
+
 
         for (proc, t_queue, c_queue) in self.proc_list:
             #LOG.debug("[Memory] waiting to dump all data to the next stage")
@@ -758,6 +773,10 @@ class DiffProc(multiprocessing.Process):
         self.raw_mmap = mmap.mmap(self.raw_file.fileno(), 0, prot=mmap.PROT_READ)
         self.raw_filesize = os.path.getsize(self.basemem_path)
 
+        # memory distribution measurement 
+        #time_m_start = time.time()
+        #out_fd = open("./memory_dist.txt", "w")
+
         is_proc_running = True
         input_list = [self.task_queue._reader.fileno()]
         freed_page_counter = 0
@@ -818,13 +837,13 @@ class DiffProc(multiprocessing.Process):
                                 data_len=len(data),
                                 data=data)
                         '''
-
                         self.deltalist_queue.put(delta_item)
-                        #print "delta item: %ld, %d" % (delta_item.offset, delta_item.data_len)
+                        #out_fd.write("%f\t%ld\n" % ((time.time()-time_m_start), ram_offset))
                 ram_offset += Memory.RAM_PAGE_SIZE
         #LOG.debug("[Memory][Child] child finished. send command queue msg")
         self.command_queue.put("processed everything")
         self.task_queue.put(freed_page_counter)
+        #out_fd.close()  # measurement
 
 
     def get_raw_data(self, offset, length):

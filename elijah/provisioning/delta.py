@@ -712,6 +712,8 @@ class DeltaDedup(process_manager.ProcWorker):
                 control_msg = self.control_queue.get()
                 self._handle_control_msg(control_msg)
             for input_queue in input_ready:
+                #time.sleep(0.1)
+                #print "bottleneck"
                 delta_item = None
                 if input_queue == self.memory_deltalist_queue._reader.fileno():
                     delta_item = self.memory_deltalist_queue.get()
