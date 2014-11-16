@@ -148,6 +148,8 @@ class Options(object):
 
 class VMOverlayCreationMode(object):
     def __init__(self):
+        self.OUTPUT_DESTINATION                     = "file" # or "network"
+
         self.QUEUE_SIZE_MEMORY_SNAPSHOT             = -1 # <0: infinite
         self.QUEUE_SIZE_MEMORY_DELTA_LIST           = -1 # <0: infinite
         self.QUEUE_SIZE_DISK_DELTA_LIST             = -1 # <0: infinite

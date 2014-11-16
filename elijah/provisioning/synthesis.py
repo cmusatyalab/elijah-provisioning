@@ -1469,75 +1469,79 @@ def create_residue(base_disk, base_hashvalue,
 
     # to be deleted
     #sleep(10000)
-    overlay_info = list()
-    overlay_files = list()
-    overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
-    comp_file_counter = 0
-    temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")
-    while True:
-        comp_task = compdata_queue.get()
-        if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
-            break
-        if comp_task == Const.QUEUE_FAILED_MESSAGE:
-            LOG.error("Failed to get compressed data")
-            break
-        (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
-        blob_filename = os.path.join(temp_compfile_dir, "%s-stream-%d" %\
-                                     (Const.OVERLAY_FILE_PREFIX,
-                                      comp_file_counter))
-        #LOG.debug("%s --> %d" % (blob_filename, blob_comp_type))
-        #LOG.debug("%s: # of delta memory: %d\t# of delta disk: %d" %\
-        #          (blob_filename, len(memory_chunks), len(disk_chunks)))
-        comp_file_counter += 1
-        overlay_files.append(blob_filename)
-        output_fd = open(blob_filename, "wb+")
-        output_fd.write(compdata)
-        output_fd.close()
-        blob_dict = {
-            Const.META_OVERLAY_FILE_NAME:os.path.basename(blob_filename),
-            Const.META_OVERLAY_FILE_COMPRESSION: blob_comp_type,
-            Const.META_OVERLAY_FILE_SIZE:os.path.getsize(blob_filename),
-            Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
-            Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
-            }
-        overlay_info.append(blob_dict)
+    if overlay_mode.OUTPUT_DESTINATION.startswith("network"):
+        from stream_client import StreamSynthesisClient
+        client = StreamSynthesisClient(base_hashvalue, compdata_queue)
+        client.start()  # blocked
+    elif overlay_mode.OUTPUT_DESTINATION.startswith("file"):
+        overlay_info = list()
+        overlay_files = list()
+        overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
+        comp_file_counter = 0
+        temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")
+        while True:
+            comp_task = compdata_queue.get()
+            if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
+                break
+            if comp_task == Const.QUEUE_FAILED_MESSAGE:
+                LOG.error("Failed to get compressed data")
+                break
+            (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
+            blob_filename = os.path.join(temp_compfile_dir, "%s-stream-%d" %\
+                                        (Const.OVERLAY_FILE_PREFIX,
+                                        comp_file_counter))
+            #LOG.debug("%s --> %d" % (blob_filename, blob_comp_type))
+            #LOG.debug("%s: # of delta memory: %d\t# of delta disk: %d" %\
+            #          (blob_filename, len(memory_chunks), len(disk_chunks)))
+            comp_file_counter += 1
+            overlay_files.append(blob_filename)
+            output_fd = open(blob_filename, "wb+")
+            output_fd.write(compdata)
+            output_fd.close()
+            blob_dict = {
+                Const.META_OVERLAY_FILE_NAME:os.path.basename(blob_filename),
+                Const.META_OVERLAY_FILE_COMPRESSION: blob_comp_type,
+                Const.META_OVERLAY_FILE_SIZE:os.path.getsize(blob_filename),
+                Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
+                Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
+                }
+            overlay_info.append(blob_dict)
 
-    process_controller.terminate()
-    #cpu_stat = process_controller.cpu_statistics
+        process_controller.terminate()
+        #cpu_stat = process_controller.cpu_statistics
+
+        # wait until VM snapshotting finishes to get final VM memory snapshot size
+        memory_read_proc.join()
+        memory_read_proc.finish()   # deallocate resources for snapshotting
+        memory_snapshot_size = memory_read_proc.get_memory_snapshot_size()
+        LOG.debug("Memory Snapshot size: %ld" % memory_snapshot_size)
+        overlay_metafile = _generate_overlaymeta(overlay_metapath,
+                                                overlay_info,
+                                                base_hashvalue,
+                                                os.path.getsize(resumed_vm.resumed_disk),
+                                                memory_snapshot_size)
+
+        # 6. packaging VM overlay into a single zip file
+        temp_dir = mkdtemp(prefix="cloudlet-overlay-")
+        overlay_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
+        VMOverlayPackage.create(overlay_zipfile, overlay_metafile, overlay_files)
+        time_packaging_end = time()
+        LOG.debug("[time] Time for overlay packaging (%f ~ %f): %f" % (time_packaging_start,
+                                                                    time_packaging_end,
+                                                                    (time_packaging_end-time_packaging_start)))
 
 
-    # wait until VM snapshotting finishes to get final VM memory snapshot size
-    memory_read_proc.join()
-    memory_read_proc.finish()   # deallocate resources for snapshotting
-    memory_snapshot_size = memory_read_proc.get_memory_snapshot_size()
-    LOG.debug("Memory Snapshot size: %ld" % memory_snapshot_size)
-    overlay_metafile = _generate_overlaymeta(overlay_metapath,
-                                             overlay_info,
-                                             base_hashvalue,
-                                             os.path.getsize(resumed_vm.resumed_disk),
-                                             memory_snapshot_size)
+        # 7. terminting
+        resumed_vm.machine = None   # protecting malaccess to machine 
+        if os.path.exists(overlay_metafile) == True:
+            os.remove(overlay_metafile)
+        if os.path.exists(temp_compfile_dir) == True:
+            shutil.rmtree(temp_compfile_dir)
+        time_end = time()
 
-    # 6. packaging VM overlay into a single zip file
-    temp_dir = mkdtemp(prefix="cloudlet-overlay-")
-    overlay_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
-    VMOverlayPackage.create(overlay_zipfile, overlay_metafile, overlay_files)
-    time_packaging_end = time()
-    LOG.debug("[time] Time for overlay packaging (%f ~ %f): %f" % (time_packaging_start,
-                                                                   time_packaging_end,
-                                                                   (time_packaging_end-time_packaging_start)))
-
-
-    # 7. terminting
-    resumed_vm.machine = None   # protecting malaccess to machine 
-    if os.path.exists(overlay_metafile) == True:
-        os.remove(overlay_metafile)
-    if os.path.exists(temp_compfile_dir) == True:
-        shutil.rmtree(temp_compfile_dir)
-    time_end = time()
-
-    LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
-                                                            (time_end-time_start)))
-    return overlay_zipfile
+        LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
+                                                                (time_end-time_start)))
+        return overlay_zipfile
 
 
 def synthesis_statistics(meta_info, decomp_overlay_file,
