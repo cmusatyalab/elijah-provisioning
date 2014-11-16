@@ -1485,10 +1485,10 @@ def create_residue(base_disk, base_hashvalue,
         blob_filename = os.path.join(temp_compfile_dir, "%s-stream-%d" %\
                                      (Const.OVERLAY_FILE_PREFIX,
                                       comp_file_counter))
-        print "%s --> %d" % (blob_filename, blob_comp_type)
-        comp_file_counter += 1
+        #LOG.debug("%s --> %d" % (blob_filename, blob_comp_type))
         #LOG.debug("%s: # of delta memory: %d\t# of delta disk: %d" %\
         #          (blob_filename, len(memory_chunks), len(disk_chunks)))
+        comp_file_counter += 1
         overlay_files.append(blob_filename)
         output_fd = open(blob_filename, "wb+")
         output_fd.write(compdata)

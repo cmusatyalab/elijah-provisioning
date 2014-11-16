@@ -89,6 +89,20 @@ class ProcessManager(threading.Thread):
                     sys.stderr.write(msg)
         return response_dict
 
+    def _change_comp_mode(self):
+        worker_names = self.process_list.keys()
+        if "CompressProc" in worker_names:
+            self._send_query("change_mode",
+                            ["CompressProc"],
+                            data={"comp_level":9, "comp_type":Const.COMPRESSION_BZIP2})
+
+    def _change_diff_mode(self):
+        worker_names = self.process_list.keys()
+        if "CreateMemoryDeltalist" in worker_names:
+            self._send_query("change_mode",
+                            ["CreateMemoryDeltalist"],
+                            data={"diff_algorithm":"none"})
+
     def start_managing(self):
         time_s = time.time()
         self.cpu_statistics = list()
@@ -108,13 +122,10 @@ class ProcessManager(threading.Thread):
                 self.cpu_statistics.append((time.time()-time_s, result))
                 sys.stdout.write("\n")
                 '''
-                time.sleep(10)
-                worker_names = self.process_list.keys()
-                if "CompressProc" in worker_names:
-                    self._send_query("change_mode",
-                                    ["CompressProc"],
-                                    data={"comp_level":9, "comp_type":Const.COMPRESSION_BZIP2})
-                    break
+                time.sleep(3)
+                #self._change_comp_mode()
+                self._change_diff_mode()
+                break
                 pass
         except Exception as e:
             sys.stdout.write("[manager] Exception")

@@ -478,6 +478,11 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             sys.stderr.write("%s\n" % str(e))
             self.deltalist_queue.put(Const.QUEUE_FAILED_MESSAGE)
 
+    def change_mode(self, new_mode):
+        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
+            if proc.is_alive() == True:
+                m_queue.put(new_mode)
+
     def _get_modified_memory_page(self, fin):
         time_s = time.time()
         LOG.info("Get hash list of memory page")
@@ -504,11 +509,12 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
             task_queue = multiprocessing.Queue()
-            diff_proc = DiffProc(command_queue, task_queue, self.deltalist_queue,
-                                 self.basemem_path, base_hashlist_length, self.memory_hashlist,
-                                 self.free_pfn_dict, self.apply_free_memory)
+            mode_queue = multiprocessing.Queue()
+            diff_proc = DiffProc(command_queue, task_queue, mode_queue, self.deltalist_queue,
+                                 self.diff_algorithm, self.basemem_path, base_hashlist_length,
+                                 self.memory_hashlist, self.free_pfn_dict, self.apply_free_memory)
             diff_proc.start()
-            self.proc_list.append((diff_proc, task_queue, command_queue))
+            self.proc_list.append((diff_proc, task_queue, command_queue, mode_queue))
 
         ram_offset = 0
         recved_data_size = 0
@@ -534,7 +540,11 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 input_ready, out_ready, err_ready = select.select(input_fd, [], [])
                 if self.control_queue._reader.fileno() in input_ready:
                     control_msg = self.control_queue.get()
-                    self._handle_control_msg(control_msg)
+                    ret = self._handle_control_msg(control_msg)
+                    if ret == False:
+                        if control_msg == "change_mode":
+                            new_mode = self.control_queue.get()
+                            self.change_mode(new_mode)
                 if memory_data_queue._reader.fileno() in input_ready:
                     recved_data = memory_data_queue.get()
                     if is_first_recv == False:
@@ -558,7 +568,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             tasks = memory_page_list[0:-1]
             memory_page_list = memory_page_list[-1:]
             task_list = (ram_offset, tasks)
-            (proc, task_queue, command_queue) = self.proc_list[proc_rr_index%self.num_proc]
+            (proc, task_queue, command_queue, mode_queue) = self.proc_list[proc_rr_index%self.num_proc]
             task_queue.put(task_list)
 
             #print "put task: offset %ld~%d at proc %d" % (ram_offset,
@@ -569,11 +579,11 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
         # send last memory page
         task_list = (ram_offset, memory_page_list)
-        (proc, task_queue, command_queue) = self.proc_list[proc_rr_index%self.num_proc]
+        (proc, task_queue, command_queue, mode_queue) = self.proc_list[proc_rr_index%self.num_proc]
         task_queue.put(task_list)
 
         # send end meesage to every process
-        for (proc, t_queue, c_queue) in self.proc_list:
+        for (proc, t_queue, c_queue, mode_queue) in self.proc_list:
             t_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
             #LOG.debug("[Memory] send end message to each child")
 
@@ -581,7 +591,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         # alive until all data pass to the next step
         finished_proc_dict = dict()
         input_list = [self.control_queue._reader.fileno()]
-        for (proc, t_queue, c_queue) in self.proc_list:
+        for (proc, t_queue, c_queue, mode_queue) in self.proc_list:
             fileno = c_queue._reader.fileno()
             input_list.append(fileno)
             finished_proc_dict[fileno] = (c_queue, t_queue)
@@ -597,11 +607,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
 
-
-
-
-
-        for (proc, t_queue, c_queue) in self.proc_list:
+        for (proc, t_queue, c_queue, mode_queue) in self.proc_list:
             #LOG.debug("[Memory] waiting to dump all data to the next stage")
             proc.join()
         # send end message after the next stage finishes processing
@@ -755,12 +761,14 @@ class SeekablePipe(object):
 
 
 class DiffProc(multiprocessing.Process):
-    def __init__(self, command_queue, task_queue, deltalist_queue,
-                 basemem_path, base_hashlist_length, memory_hashlist,
-                 free_pfn_dict, apply_free_memory):
+    def __init__(self, command_queue, task_queue, mode_queue, deltalist_queue,
+                 diff_algorithm, basemem_path, base_hashlist_length, 
+                 memory_hashlist, free_pfn_dict, apply_free_memory):
         self.command_queue = command_queue
         self.task_queue = task_queue
+        self.mode_queue = mode_queue
         self.deltalist_queue = deltalist_queue
+        self.diff_algorithm = diff_algorithm
         self.basemem_path = basemem_path
         self.base_hashlist_length = base_hashlist_length
         self.memory_hashlist = memory_hashlist
@@ -778,68 +786,75 @@ class DiffProc(multiprocessing.Process):
         #out_fd = open("./memory_dist.txt", "w")
 
         is_proc_running = True
-        input_list = [self.task_queue._reader.fileno()]
+        input_list = [self.task_queue._reader.fileno(),
+                      self.mode_queue._reader.fileno()]
         freed_page_counter = 0
         while is_proc_running:
             inready, outread, errready = select.select(input_list, [], [])
-            task_list = self.task_queue.get()
-            if task_list == Const.QUEUE_SUCCESS_MESSAGE:
-                #LOG.debug("[Memory][Child] diff proc get end message")
-                is_proc_running = False
-                break
-            (start_ram_offset, memory_chunk_list) = task_list
-            ram_offset = start_ram_offset
-            for data in memory_chunk_list:
-                hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
+            if self.mode_queue._reader.fileno() in inready:
+                # change mode
+                new_mode = self.mode_queue.get()
+                new_diff_algorithm = new_mode.get("diff_algorithm", None)
+                sys.stdout.write("Change diff algorithm for memory from (%s) to (%s)\n" %
+                                 (self.diff_algorithm, new_diff_algorithm))
+                if new_diff_algorithm is not None:
+                    self.diff_algorithm = new_diff_algorithm
+            if self.task_queue._reader.fileno() in inready:
+                task_list = self.task_queue.get()
+                if task_list == Const.QUEUE_SUCCESS_MESSAGE:
+                    #LOG.debug("[Memory][Child] diff proc get end message")
+                    is_proc_running = False
+                    break
+                (start_ram_offset, memory_chunk_list) = task_list
+                ram_offset = start_ram_offset
+                for data in memory_chunk_list:
+                    hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
 
-                self_hash_value = None
-                if hash_list_index < self.base_hashlist_length:
-                    self_hash_value = self.memory_hashlist[hash_list_index][2]
-                chunk_hashvalue = sha256(data).digest()
-                if self_hash_value != chunk_hashvalue:
-                    is_free_memory = False
-                    if (self.free_pfn_dict != None) and \
-                            (self.free_pfn_dict.get(long(ram_offset/Memory.RAM_PAGE_SIZE), None) == 1):
-                        is_free_memory = True
+                    self_hash_value = None
+                    if hash_list_index < self.base_hashlist_length:
+                        self_hash_value = self.memory_hashlist[hash_list_index][2]
+                    chunk_hashvalue = sha256(data).digest()
+                    if self_hash_value != chunk_hashvalue:
+                        is_free_memory = False
+                        if (self.free_pfn_dict != None) and \
+                                (self.free_pfn_dict.get(long(ram_offset/Memory.RAM_PAGE_SIZE), None) == 1):
+                            is_free_memory = True
 
-                    if is_free_memory and self.apply_free_memory:
-                        # Do not compare. It is free memory
-                        freed_page_counter += 1
-                    else:
-                        #get xdelta comparing self.raw
-                        source_data = self.get_raw_data(ram_offset, len(data))
-                        try:
-                            if source_data == None:
-                                raise IOError("launch memory snapshot is bigger than base vm")
-                            patch = tool.diff_data(source_data, data, 2*len(source_data))
-                            if len(patch) < len(data):
-                                delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
-                                        ram_offset, len(data),
-                                        hash_value=chunk_hashvalue,
-                                        ref_id=DeltaItem.REF_XDELTA,
-                                        data_len=len(patch),
-                                        data=patch)
-                            else:
-                                raise IOError("xdelta3 patch is bigger than origianl")
-                        except IOError as e:
-                            #LOG.info("xdelta failed, so save it as raw (%s)" % str(e))
+                        if is_free_memory and self.apply_free_memory:
+                            # Do not compare. It is free memory
+                            freed_page_counter += 1
+                        else:
+                            try:
+                                # get diff compared to the base VM
+                                source_data = self.get_raw_data(ram_offset, len(data))
+                                if source_data == None:
+                                    msg = "launch memory snapshot is bigger than base vm at %ld (%ld > %ld)" %\
+                                        (ram_offset, ram_offset+len(data), self.raw_filesize)
+                                    raise IOError(msg)
+                                if self.diff_algorithm == "xdelta3":
+                                    diff_data = tool.diff_data(source_data, data, 2*len(source_data))
+                                    diff_type = DeltaItem.REF_XDELTA
+                                    if len(diff_data) > len(data):
+                                        raise IOError("xdelta3 patch is bigger than origianl")
+                                elif self.diff_algorithm == "none":
+                                    diff_data = data
+                                    diff_type = DeltaItem.REF_RAW
+                                else:
+                                    diff_data = data
+                                    diff_type = DeltaItem.REF_RAW
+                            except IOError as e:
+                                diff_data = data
+                                diff_type = DeltaItem.REF_RAW
+
                             delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
                                     ram_offset, len(data),
                                     hash_value=chunk_hashvalue,
-                                    ref_id=DeltaItem.REF_RAW,
-                                    data_len=len(data),
-                                    data=data)
-                        '''
-                        delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
-                                ram_offset, len(data),
-                                hash_value=chunk_hashvalue,
-                                ref_id=DeltaItem.REF_RAW,
-                                data_len=len(data),
-                                data=data)
-                        '''
-                        self.deltalist_queue.put(delta_item)
-                        #out_fd.write("%f\t%ld\n" % ((time.time()-time_m_start), ram_offset))
-                ram_offset += Memory.RAM_PAGE_SIZE
+                                    ref_id=diff_type,
+                                    data_len=len(diff_data),
+                                    data=diff_data)
+                            self.deltalist_queue.put(delta_item)
+                            #out_fd.write("%f\t%ld\n" % ((time.time()-time_m_start), ram_offset))
+                    ram_offset += Memory.RAM_PAGE_SIZE
         #LOG.debug("[Memory][Child] child finished. send command queue msg")
         self.command_queue.put("processed everything")
         self.task_queue.put(freed_page_counter)
