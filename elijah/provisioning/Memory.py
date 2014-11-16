@@ -510,7 +510,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             command_queue = multiprocessing.Queue()
             task_queue = multiprocessing.Queue()
             mode_queue = multiprocessing.Queue()
-            diff_proc = DiffProc(command_queue, task_queue, mode_queue, self.deltalist_queue,
+            diff_proc = MemoryDiffProc(command_queue, task_queue, mode_queue, self.deltalist_queue,
                                  self.diff_algorithm, self.basemem_path, base_hashlist_length,
                                  self.memory_hashlist, self.free_pfn_dict, self.apply_free_memory)
             diff_proc.start()
@@ -760,7 +760,7 @@ class SeekablePipe(object):
         return self.current_seek_offset
 
 
-class DiffProc(multiprocessing.Process):
+class MemoryDiffProc(multiprocessing.Process):
     def __init__(self, command_queue, task_queue, mode_queue, deltalist_queue,
                  diff_algorithm, basemem_path, base_hashlist_length, 
                  memory_hashlist, free_pfn_dict, apply_free_memory):
@@ -774,7 +774,7 @@ class DiffProc(multiprocessing.Process):
         self.memory_hashlist = memory_hashlist
         self.free_pfn_dict = free_pfn_dict
         self.apply_free_memory = apply_free_memory
-        super(DiffProc, self).__init__(target=self.process_diff)
+        super(MemoryDiffProc, self).__init__(target=self.process_diff)
 
     def process_diff(self):
         self.raw_file = open(self.basemem_path, "rb")
@@ -859,6 +859,10 @@ class DiffProc(multiprocessing.Process):
         self.command_queue.put("processed everything")
         self.task_queue.put(freed_page_counter)
         #out_fd.close()  # measurement
+        while self.mode_queue.empty() == False:
+            self.mode_queue.get_nowait()
+            msg = "Empty new compression mode that does not refelected"
+            sys.stdout.write(msg)
 
 
     def get_raw_data(self, offset, length):

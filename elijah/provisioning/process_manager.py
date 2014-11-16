@@ -98,35 +98,39 @@ class ProcessManager(threading.Thread):
 
     def _change_diff_mode(self):
         worker_names = self.process_list.keys()
-        if "CreateMemoryDeltalist" in worker_names:
+        #if "CreateMemoryDeltalist" in worker_names:
+        #    self._send_query("change_mode",
+        #                    ["CreateMemoryDeltalist"],
+        #                    data={"diff_algorithm":"none"})
+        if "CreateDiskDeltalist" in worker_names:
             self._send_query("change_mode",
-                            ["CreateMemoryDeltalist"],
+                            ["CreateDiskDeltalist"],
                             data={"diff_algorithm":"none"})
+
+    def _get_cpu_usage(self):
+        result = dict()
+        query = "cpu_usage_accum"   #"current_bw"
+        worker_names = self.process_list.keys()
+        self._send_query(query, worker_names)
+
+        responses = self._recv_response(query, worker_names)
+        for worker_name, (response, duration) in responses.iteritems():
+            sys.stdout.write("[manager] %s:\t%s:\t%s\t(%f s)\n" % (query, worker_name, str(response), duration))
+            result[worker_name] = response
+        time_e = time.time()
+        self.cpu_statistics.append((time.time()-time_s, result))
+        sys.stdout.write("\n")
 
     def start_managing(self):
         time_s = time.time()
         self.cpu_statistics = list()
         try:
             while (not self.stop.wait(1)):
-                '''
-                result = dict()
-                query = "cpu_usage_accum"   #"current_bw"
-                worker_names = self.process_list.keys()
-                self._send_query(query, worker_names)
-
-                responses = self._recv_response(query, worker_names)
-                for worker_name, (response, duration) in responses.iteritems():
-                    sys.stdout.write("[manager] %s:\t%s:\t%s\t(%f s)\n" % (query, worker_name, str(response), duration))
-                    result[worker_name] = response
-                time_e = time.time()
-                self.cpu_statistics.append((time.time()-time_s, result))
-                sys.stdout.write("\n")
-                '''
-                time.sleep(3)
+                #self._get_cpu_usage()
+                time.sleep(1)
                 #self._change_comp_mode()
-                self._change_diff_mode()
+                #self._change_diff_mode()
                 break
-                pass
         except Exception as e:
             sys.stdout.write("[manager] Exception")
             sys.stderr.write(traceback.format_exc())

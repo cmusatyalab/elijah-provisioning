@@ -212,6 +212,11 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         self.ret_statistics = self.manager.dict()
         super(CreateDiskDeltalist, self).__init__(target=self.create_disk_deltalist)
 
+    def change_mode(self, new_mode):
+        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
+            if proc.is_alive() == True:
+                m_queue.put(new_mode)
+
     def create_disk_deltalist(self):
         time_start = time.time()
         is_first_recv = False
@@ -238,12 +243,15 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
             task_queue = multiprocessing.Queue()
-            diff_proc = DiskDiffProc(command_queue, task_queue,
+            mode_queue = multiprocessing.Queue()
+            diff_proc = DiskDiffProc(command_queue, task_queue, mode_queue,
                                      self.disk_deltalist_queue,
-                                     self.basedisk_path, self.modified_disk,
+                                     self.diff_algorithm,
+                                     self.basedisk_path,
+                                     self.modified_disk,
                                      self.chunk_size)
             diff_proc.start()
-            self.proc_list.append((diff_proc, task_queue, command_queue))
+            self.proc_list.append((diff_proc, task_queue, command_queue, mode_queue))
 
         # 1. get modified page
         LOG.debug("1. Get modified disk page")
@@ -256,7 +264,11 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 input_ready, out_ready, err_ready = select.select(input_fd, [], [], 0.0001)
                 if self.control_queue._reader.fileno() in input_ready:
                     control_msg = self.control_queue.get()
-                    self._handle_control_msg(control_msg)
+                    ret = self._handle_control_msg(control_msg)
+                    if ret == False:
+                        if control_msg == "change_mode":
+                            new_mode = self.control_queue.get()
+                            self.change_mode(new_mode)
             except Queue.Empty as e:
                 pass
             except Exception as e:
@@ -298,7 +310,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 time_first_recv = time.time()
 
             if len(modified_chunk_list) > 100:
-                (proc, task_queue, command_queue) = self.proc_list[proc_rr_index%self.num_proc]
+                (proc, task_queue, command_queue, mode_queue) = self.proc_list[proc_rr_index%self.num_proc]
                 task_queue.put(modified_chunk_list)
                 modified_chunk_list = []
                 proc_rr_index += 1
@@ -314,12 +326,12 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 processed_datasize = 0
                 processed_duration = float(0)
         # send last chunks
-        (proc, task_queue, command_queue) = self.proc_list[proc_rr_index%self.num_proc]
+        (proc, task_queue, command_queue, mode_queue) = self.proc_list[proc_rr_index%self.num_proc]
         task_queue.put(modified_chunk_list)
         modified_chunk_list = []
 
         # send end meesage to every process
-        for (proc, t_queue, c_queue) in self.proc_list:
+        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
             t_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
             #LOG.debug("[Disk] send end message to each child")
 
@@ -327,7 +339,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         # alive until all data pass to the next step
         finished_proc_dict = dict()
         input_list = [self.control_queue._reader.fileno()]
-        for (proc, t_queue, c_queue) in self.proc_list:
+        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
             fileno = c_queue._reader.fileno()
             input_list.append(fileno)
             finished_proc_dict[fileno] = (c_queue, t_queue)
@@ -346,7 +358,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
 
-        for (proc, t_queue, c_queue) in self.proc_list:
+        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
             #LOG.debug("[Disk] waiting to dump all data to the next stage")
             proc.join()
         # send end message after the next stage finishes processing
@@ -401,11 +413,13 @@ def recover_disk(base_disk, base_mem, overlay_mem, overlay_disk, recover_path, c
 
 
 class DiskDiffProc(multiprocessing.Process):
-    def __init__(self, command_queue, task_queue, deltalist_queue,
-                 basedisk_path, modified_disk, chunk_size):
+    def __init__(self, command_queue, task_queue, mode_queue, deltalist_queue,
+                 diff_algorithm, basedisk_path, modified_disk, chunk_size):
         self.command_queue = command_queue
         self.task_queue = task_queue
+        self.mode_queue = mode_queue
         self.deltalist_queue = deltalist_queue
+        self.diff_algorithm = diff_algorithm
         self.basedisk_path = basedisk_path
         self.modified_disk = modified_disk
         self.chunk_size = chunk_size
@@ -417,52 +431,61 @@ class DiskDiffProc(multiprocessing.Process):
         modified_fd = open(self.modified_disk, "rb")
 
         is_proc_running = True
-        input_list = [self.task_queue._reader.fileno()]
+        input_list = [self.task_queue._reader.fileno(),
+                      self.mode_queue._reader.fileno()]
         while is_proc_running:
             inready, outread, errready = select.select(input_list, [], [])
-            task_list = self.task_queue.get()
-            if task_list == Const.QUEUE_SUCCESS_MESSAGE:
-                #LOG.debug("[Disk][Child] diff proc get end message")
-                is_proc_running = False
-                break
+            if self.mode_queue._reader.fileno() in inready:
+                # change mode
+                new_mode = self.mode_queue.get()
+                new_diff_algorithm = new_mode.get("diff_algorithm", None)
+                sys.stdout.write("Change diff algorithm for disk from (%s) to (%s)\n" %
+                                 (self.diff_algorithm, new_diff_algorithm))
+                if new_diff_algorithm is not None:
+                    self.diff_algorithm = new_diff_algorithm
+            if self.task_queue._reader.fileno() in inready:
+                task_list = self.task_queue.get()
+                if task_list == Const.QUEUE_SUCCESS_MESSAGE:
+                    #LOG.debug("[Disk][Child] diff proc get end message")
+                    is_proc_running = False
+                    break
 
-            for chunk in task_list:
-                offset = chunk * self.chunk_size
-                # check file system 
-                modified_fd.seek(offset)
-                data = modified_fd.read(self.chunk_size)
+                for chunk in task_list:
+                    offset = chunk * self.chunk_size
+                    # check file system 
+                    modified_fd.seek(offset)
+                    data = modified_fd.read(self.chunk_size)
+                    source_data = base_mmap[offset:offset+len(data)]
+                    try:
+                        if self.diff_algorithm == "xdelta3":
+                            diff_data = tool.diff_data(source_data, data, 2*len(source_data))
+                            diff_type = DeltaItem.REF_XDELTA
+                            if len(diff_data) > len(data):
+                                raise IOError("xdelta3 patch is bigger than origianl")
+                        elif self.diff_algorithm == "none":
+                            diff_data = data
+                            diff_type = DeltaItem.REF_RAW
+                        else:
+                            diff_data = data
+                            diff_type = DeltaItem.REF_RAW
+                    except IOError as e:
+                        diff_data = data
+                        diff_type = DeltaItem.REF_RAW
 
-                source_data = base_mmap[offset:offset+len(data)]
-                try:
-                    patch = tool.diff_data(source_data, data, 2*len(source_data))
-                    if len(patch) < len(data):
-                        delta_item = DeltaItem(DeltaItem.DELTA_DISK,
-                                offset, len(data),
-                                hash_value=sha256(data).digest(),
-                                ref_id=DeltaItem.REF_XDELTA,
-                                data_len=len(patch),
-                                data=patch)
-                    else:
-                        raise IOError("xdelta3 patch is bigger than origianl")
-                except IOError as e:
-                    #LOG.info("xdelta failed, so save it as raw (%s)" % str(e))
                     delta_item = DeltaItem(DeltaItem.DELTA_DISK,
                             offset, len(data),
                             hash_value=sha256(data).digest(),
-                            ref_id=DeltaItem.REF_RAW,
-                            data_len=len(data),
-                            data=data)
-                '''
-                delta_item = DeltaItem(DeltaItem.DELTA_DISK,
-                        offset, len(data),
-                        hash_value=sha256(data).digest(),
-                        ref_id=DeltaItem.REF_RAW,
-                        data_len=len(data),
-                        data=data)
-                '''
-                self.deltalist_queue.put(delta_item)
+                            ref_id=diff_type,
+                            data_len=len(diff_data),
+                            data=diff_data)
+                    self.deltalist_queue.put(delta_item)
+                    #print "diff mode: %s" % self.diff_algorithm
         #LOG.debug("[Disk][Child] child finished. send command queue msg")
         self.command_queue.put("processed everything")
+        while self.mode_queue.empty() == False:
+            self.mode_queue.get_nowait()
+            msg = "Empty new compression mode that does not refelected"
+            sys.stdout.write(msg)
 
 
 
