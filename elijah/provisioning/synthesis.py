@@ -1481,9 +1481,7 @@ def create_residue(base_disk, base_hashvalue,
         if comp_task == Const.QUEUE_FAILED_MESSAGE:
             LOG.error("Failed to get compressed data")
             break
-        (compdata, disk_chunks, memory_chunks) = comp_task
-        blob_comp_type = overlay_mode.COMPRESSION_ALGORITHM_TYPE
-
+        (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
         blob_filename = os.path.join(temp_compfile_dir, "%s-stream-%d" %\
                                      (Const.OVERLAY_FILE_PREFIX,
                                       comp_file_counter))

@@ -23,6 +23,7 @@ import time
 import sys
 import traceback
 import Queue
+from Configuration import Const
 
 
 _process_controller = None
@@ -40,6 +41,10 @@ def get_instance():
 
 
 
+class ProcessManagerError(Exception):
+    pass
+
+
 class ProcessManager(threading.Thread):
     def __init__(self):
         self.overlay_creation_mode = None
@@ -53,13 +58,18 @@ class ProcessManager(threading.Thread):
     def set_mode(self, new_mode):
         self.overlay_creation_mode = new_mode
 
-    def _send_query(self, query, worker_names):
+    def _send_query(self, query, worker_names, data=None):
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
             control_queue, response_queue = self.process_control[worker_name]
             process_info = self.process_infos[worker_name]
             if process_info['is_alive'] == True:
                 control_queue.put(query)
+                if data is not None:
+                    control_queue.put(data)
+            else:
+                sys.stdout.write("not sending query to %s since it's over" %\
+                                 worker_name)
 
     def _recv_response(self, query, worker_names):
         response_dict = dict()
@@ -74,7 +84,8 @@ class ProcessManager(threading.Thread):
                         response = response_queue.get(timeout=1)
                         response_dict[worker_name] = (response, 0)
                 except Queue.Empty as e:
-                    msg = "Error, Cannot receive response from : %s process\n" % (str(worker_name))
+                    msg = "Error, Cannot receive response from: %s process\n"%\
+                        (str(worker_name))
                     sys.stderr.write(msg)
         return response_dict
 
@@ -97,6 +108,13 @@ class ProcessManager(threading.Thread):
                 self.cpu_statistics.append((time.time()-time_s, result))
                 sys.stdout.write("\n")
                 '''
+                time.sleep(10)
+                worker_names = self.process_list.keys()
+                if "CompressProc" in worker_names:
+                    self._send_query("change_mode",
+                                    ["CompressProc"],
+                                    data={"comp_level":9, "comp_type":Const.COMPRESSION_BZIP2})
+                    break
                 pass
         except Exception as e:
             sys.stdout.write("[manager] Exception")
@@ -137,10 +155,15 @@ class ProcWorker(multiprocessing.Process):
     def _handle_control_msg(self, control_msg):
         if control_msg == "current_bw":
             self.response_queue.put(self.monitor_current_bw)
+            return True
         elif control_msg == "cpu_usage_accum":
             (utime, stime, child_utime, child_stime, elaspe_time) = os.times()
             all_times = utime+stime+child_utime+child_stime
             self.response_queue.put(float(all_times))
+            return True
+        else:
+            #sys.stdout.write("Cannot be handled in super class\n")
+            return False
 
 
 
