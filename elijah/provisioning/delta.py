@@ -503,42 +503,26 @@ class Recovered_delta(multiprocessing.Process):
         self.recover_disk_fd = open(self.output_disk_path, "wrb")
         overlay_stream = open(self.overlay_path, "r")
 
-        overlay_chunk_ids = []
+        unresolved_deltaitem_list = []
         for delta_item in DeltaList.from_stream(overlay_stream):
-            self.recover_item(delta_item)
-            if len(delta_item.data) != delta_item.offset_len:
-                msg = "recovered size is not same as page size, %ld != %ld" % \
-                        (len(delta_item.data), delta_item.offset_len)
-                raise DeltaError(msg)
+            ret = self.recover_item(delta_item)
+            if ret == None:
+                # cannot find self reference point due to the parallel
+                # compression. Save this and do it later
+                unresolved_deltaitem_list.append(delta_item)
+                continue
+            self.process_deltaitem(delta_item)
+            count += 1
 
-            # save it to dictionary to find self_reference easily
-            self.recovered_delta_dict[delta_item.index] = delta_item
-            self.delta_list.append(delta_item)
-
-            # write to output file 
-            overlay_chunk_id = long(delta_item.offset/self.chunk_size)
-            if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
-                self.recover_mem_fd.seek(delta_item.offset)
-                self.recover_mem_fd.write(delta_item.data)
-                overlay_chunk_ids.append("%d:%ld" % 
-                        (Recovered_delta.FUSE_INDEX_MEMORY, overlay_chunk_id))
-            elif delta_item.delta_type == DeltaItem.DELTA_DISK:
-                self.recover_disk_fd.seek(delta_item.offset)
-                self.recover_disk_fd.write(delta_item.data)
-                overlay_chunk_ids.append("%d:%ld" % 
-                        (Recovered_delta.FUSE_INDEX_DISK, overlay_chunk_id))
-
-            if len(overlay_chunk_ids) % 1 == 0:
-                self.recover_mem_fd.flush()
-                self.recover_disk_fd.flush()
-
-                self.out_pipe.write(",".join(overlay_chunk_ids) + '\n')
-                count += len(overlay_chunk_ids)
-                overlay_chunk_ids[:] = []
-
-        if len(overlay_chunk_ids) > 0:
-            self.out_pipe.send(overlay_chunk_ids)
-            count += len(overlay_chunk_ids)
+        LOG.info("[Delta] Handle dangling DeltaItem (%d)" % len(unresolved_deltaitem_list))
+        for delta_item in unresolved_deltaitem_list:
+            ret = self.recover_item(delta_item)
+            if ret == None:
+                msg = "Cannot find self reference: type(%ld), offset(%ld), index(%ld), ref_index(%ld)" % \
+                        (delta_item.delta_type, delta_item.offset, delta_item.index, ref_index)
+                raise MemoryError(msg)
+            self.process_deltaitem(delta_item)
+            count += 1
 
         self.out_pipe.write(str(Recovered_delta.END_OF_PIPE) + "\n")
         self.out_pipe.close()
@@ -575,9 +559,10 @@ class Recovered_delta(multiprocessing.Process):
             ref_index = delta_item.data
             self_ref_delta_item = self.recovered_delta_dict.get(ref_index, None)
             if self_ref_delta_item == None:
-                msg = "Cannot find self reference: type(%ld), offset(%ld), index(%ld), ref_index(%ld)" % \
-                        (delta_item.delta_type, delta_item.offset, delta_item.index, ref_index)
-                raise MemoryError(msg)
+                #msg = "Cannot find self reference: type(%ld), offset(%ld), index(%ld), ref_index(%ld)" % \
+                #        (delta_item.delta_type, delta_item.offset, delta_item.index, ref_index)
+                #raise MemoryError(msg)
+                return None
             recover_data = self_ref_delta_item.data
         elif delta_item.ref_id == DeltaItem.REF_XDELTA:
             patch_data = delta_item.data
@@ -603,6 +588,37 @@ class Recovered_delta(multiprocessing.Process):
         delta_item.data = recover_data
 
         return delta_item
+
+    def process_deltaitem(self, delta_item):
+        overlay_chunk_ids = []
+        if len(delta_item.data) != delta_item.offset_len:
+            msg = "recovered size is not same as page size, %ld != %ld" % \
+                    (len(delta_item.data), delta_item.offset_len)
+            raise DeltaError(msg)
+
+        # save it to dictionary to find self_reference easily
+        self.recovered_delta_dict[delta_item.index] = delta_item
+        self.delta_list.append(delta_item)
+
+        # write to output file 
+        overlay_chunk_id = long(delta_item.offset/self.chunk_size)
+        if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+            self.recover_mem_fd.seek(delta_item.offset)
+            self.recover_mem_fd.write(delta_item.data)
+            overlay_chunk_ids.append("%d:%ld" %
+                    (Recovered_delta.FUSE_INDEX_MEMORY, overlay_chunk_id))
+        elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+            self.recover_disk_fd.seek(delta_item.offset)
+            self.recover_disk_fd.write(delta_item.data)
+            overlay_chunk_ids.append("%d:%ld" %
+                    (Recovered_delta.FUSE_INDEX_DISK, overlay_chunk_id))
+
+        if len(overlay_chunk_ids) % 1 == 0: # to be updated
+            self.recover_mem_fd.flush()
+            self.recover_disk_fd.flush()
+
+            self.out_pipe.write(",".join(overlay_chunk_ids) + '\n')
+            overlay_chunk_ids[:] = []
 
     def finish(self):
         if self.base_disk_fd is not None:

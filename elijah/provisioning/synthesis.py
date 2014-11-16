@@ -1468,6 +1468,7 @@ def create_residue(base_disk, base_hashvalue,
     time_packaging_start = time()
 
     # to be deleted
+    #sleep(10000)
     overlay_info = list()
     overlay_files = list()
     overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
@@ -1481,10 +1482,12 @@ def create_residue(base_disk, base_hashvalue,
             LOG.error("Failed to get compressed data")
             break
         (compdata, disk_chunks, memory_chunks) = comp_task
+        blob_comp_type = overlay_mode.COMPRESSION_ALGORITHM_TYPE
 
-        blob_filename = os.path.join(temp_compfile_dir, "%s-stream-%d.xz" %\
+        blob_filename = os.path.join(temp_compfile_dir, "%s-stream-%d" %\
                                      (Const.OVERLAY_FILE_PREFIX,
                                       comp_file_counter))
+        print "%s --> %d" % (blob_filename, blob_comp_type)
         comp_file_counter += 1
         #LOG.debug("%s: # of delta memory: %d\t# of delta disk: %d" %\
         #          (blob_filename, len(memory_chunks), len(disk_chunks)))
@@ -1494,7 +1497,7 @@ def create_residue(base_disk, base_hashvalue,
         output_fd.close()
         blob_dict = {
             Const.META_OVERLAY_FILE_NAME:os.path.basename(blob_filename),
-            Const.META_OVERLAY_FILE_COMPRESSION: overlay_mode.COMPRESSION_ALGORITHM_TYPE,
+            Const.META_OVERLAY_FILE_COMPRESSION: blob_comp_type,
             Const.META_OVERLAY_FILE_SIZE:os.path.getsize(blob_filename),
             Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
             Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
