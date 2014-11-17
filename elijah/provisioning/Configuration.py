@@ -147,6 +147,8 @@ class Options(object):
 
 
 class VMOverlayCreationMode(object):
+    PIPE_ONE_ELEMENT_SIZE = 4096*100 # 400KB == Max Pipe size is 1MB
+
     def __init__(self):
         self.OUTPUT_DESTINATION                     = "file" # or "network"
         self.PROCESS_PIPELINED                      = True # False: serialized processing
@@ -169,7 +171,7 @@ class VMOverlayCreationMode(object):
         self.OPTIMIZATION_DEDUP_BASE_MEMORY          = True
         self.OPTIMIZATION_DEDUP_BASE_SELF            = True
 
-        self.COMPRESSION_ALGORITHM_TYPE              = Const.COMPRESSION_BZIP2
+        self.COMPRESSION_ALGORITHM_TYPE              = Const.COMPRESSION_LZMA
         self.COMPRESSION_ALGORITHM_SPEED             = 4 # 1 (fastest) ~ 9
 
     def __str__(self):
@@ -211,6 +213,16 @@ class VMOverlayCreationMode(object):
         return mode
 
     @staticmethod
+    def get_pipelined_single_process_finite_queue():
+        mode = VMOverlayCreationMode.get_pipelined_single_process()
+        mode.QUEUE_SIZE_COMPRESSION = 128
+        mode.QUEUE_SIZE_DISK_DELTA_LIST = 128
+        mode.QUEUE_SIZE_MEMORY_DELTA_LIST = 128
+        mode.QUEUE_SIZE_MEMORY_SNAPSHOT = 128
+        mode.QUEUE_SIZE_OPTIMIZATION = 128
+        return mode
+
+    @staticmethod
     def get_pipelined_multi_process():
         mode = VMOverlayCreationMode()
         mode.PROCESS_PIPELINED = True
@@ -218,6 +230,16 @@ class VMOverlayCreationMode(object):
         mode.NUM_PROC_DISK_DIFF = 4
         mode.NUM_PROC_OPTIMIZATION = 4
         mode.NUM_PROC_COMPRESSION = 4
+        return mode
+
+    @staticmethod
+    def get_pipelined_multi_process_finite_queue():
+        mode = VMOverlayCreationMode.get_pipelined_multi_process()
+        mode.QUEUE_SIZE_COMPRESSION = 256
+        mode.QUEUE_SIZE_DISK_DELTA_LIST = 256
+        mode.QUEUE_SIZE_MEMORY_DELTA_LIST = 256
+        mode.QUEUE_SIZE_MEMORY_SNAPSHOT = 256
+        mode.QUEUE_SIZE_OPTIMIZATION = 256
         return mode
 
 

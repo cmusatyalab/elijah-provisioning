@@ -128,8 +128,9 @@ class ProcessManager(threading.Thread):
         self.cpu_statistics = list()
         try:
             while (not self.stop.wait(0.1)):
-                result = self._get_cpu_usage()
-                self.cpu_statistics.append((time.time()-time_s, result))
+                pass
+                #result = self._get_cpu_usage()
+                #self.cpu_statistics.append((time.time()-time_s, result))
                 #time.sleep(1)
                 #self._change_comp_mode()
                 #self._change_diff_mode()
@@ -175,9 +176,9 @@ class ProcWorker(multiprocessing.Process):
             self.response_queue.put(self.monitor_current_bw)
             return True
         elif control_msg == "cpu_usage_accum":
-            (utime, stime, child_utime, child_stime, elaspe_time) = os.times()
-            all_times = utime+stime+child_utime+child_stime
-            self.response_queue.put(float(all_times))
+            #(utime, stime, child_utime, child_stime, elaspe_time) = os.times()
+            #all_times = utime+stime+child_utime+child_stime
+            self.response_queue.put(os.times())
             return True
         else:
             #sys.stdout.write("Cannot be handled in super class\n")

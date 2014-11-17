@@ -1106,7 +1106,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             LOG.info("Header size of memory snapshot is %s" % len(new_header))
 
             # write rest of the memory data
-            #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
+            prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
                 input_fd = [self.control_queue._reader.fileno(), self.in_fd]
                 input_ready, out_ready, err_ready = select.select(input_fd, [], [])
@@ -1114,14 +1114,14 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     control_msg = self.control_queue.get()
                     self._handle_control_msg(control_msg)
                 if self.in_fd in input_ready:
-                    data = self.in_fd.read(1024 * 1024 * 1)
+                    data = self.in_fd.read(VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE)
                     if data == None or len(data) <= 0:
                         break
                     current_size = len(data)
                     self.result_queue.put(data)
                     self.total_read_size += current_size
-                    #prog_bar.set_percent(100.0*self.total_read_size/self.machine_memory_size)
-                    #prog_bar.show_progress()
+                    prog_bar.set_percent(100.0*self.total_read_size/self.machine_memory_size)
+                    prog_bar.show_progress()
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time()
@@ -1130,9 +1130,9 @@ class MemoryReadProcess(process_manager.ProcWorker):
                         prev_processed_time = cur_time
                         self.monitor_current_bw = (throughput/Const.CHUNK_SIZE)
 
-            #prog_bar.finish()
+            prog_bar.finish()
         except Exception, e:
-            sys.stdout.write("[compression] Exception1n")
+            sys.stdout.write("[MemorySnapshotting] Exception1n")
             sys.stderr.write(traceback.format_exc())
             sys.stderr.write("%s\n" % str(e))
             self.result_queue.put(Const.QUEUE_FAILED_MESSAGE)
@@ -1413,7 +1413,9 @@ def create_residue(base_disk, base_hashvalue,
     process_controller = process_manager.get_instance()
     #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
     #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
+    #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process_finite_queue()
     overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
+    #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
 
     process_controller.set_mode(overlay_mode)
     LOG.info("* Overlay creation configuration")
