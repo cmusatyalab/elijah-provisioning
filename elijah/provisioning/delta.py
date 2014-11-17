@@ -783,11 +783,11 @@ class DeltaDedup(process_manager.ProcWorker):
                                 offset_length = 8
                                 self.self_hashdict[delta_item.hash_value] = ref_offset
 
-                    self.merged_deltalist_queue.put(delta_item)
                     if delta_item.delta_type == DeltaItem.DELTA_DISK:
                         self.delta_disk_chunks.append(delta_item.offset)
                     elif delta_item.delta_type == DeltaItem.DELTA_MEMORY:
                         self.delta_memory_chunks.append(delta_item.offset)
+                self.merged_deltalist_queue.put(deltaitem_list)
 
                 # measurement
                 time_process_finish = time.time()

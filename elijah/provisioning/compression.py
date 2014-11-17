@@ -68,18 +68,19 @@ class CompressProc(process_manager.ProcWorker):
                         new_mode = self.control_queue.get()
                         self.change_mode(new_mode)
             if self.delta_list_queue._reader.fileno() in input_ready:
-                delta_item = self.delta_list_queue.get()
-                if delta_item == Const.QUEUE_SUCCESS_MESSAGE:
+                deltaitem_list = self.delta_list_queue.get()
+                if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
                     is_last_blob = True
                     break
-                delta_bytes = delta_item.get_serialized()
-                offset = delta_item.offset/Const.CHUNK_SIZE
-                if delta_item.delta_type == DeltaItem.DELTA_DISK:
-                    modified_disk_chunks.append(offset)
-                elif delta_item.delta_type == DeltaItem.DELTA_MEMORY:
-                    modified_memory_chunks.append(offset)
-                input_data += delta_bytes
-                input_size += len(delta_bytes)
+                for delta_item in deltaitem_list:
+                    delta_bytes = delta_item.get_serialized()
+                    offset = delta_item.offset/Const.CHUNK_SIZE
+                    if delta_item.delta_type == DeltaItem.DELTA_DISK:
+                        modified_disk_chunks.append(offset)
+                    elif delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+                        modified_memory_chunks.append(offset)
+                    input_data += delta_bytes
+                    input_size += len(delta_bytes)
         return is_last_blob, input_data, input_size, modified_disk_chunks, modified_memory_chunks
 
     def compress_stream(self):
