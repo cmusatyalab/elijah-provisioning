@@ -59,6 +59,7 @@ class ProcessManager(threading.Thread):
         self.overlay_creation_mode = new_mode
 
     def _send_query(self, query, worker_names, data=None):
+        sent_worker_name = list()
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
             control_queue, response_queue = self.process_control[worker_name]
@@ -67,9 +68,12 @@ class ProcessManager(threading.Thread):
                 control_queue.put(query)
                 if data is not None:
                     control_queue.put(data)
+                sent_worker_name.append(worker_name)
             else:
-                sys.stdout.write("not sending query to %s since it's over" %\
-                                 worker_name)
+                pass
+                #sys.stdout.write("not sending query to %s since it's over\n" %\
+                #                 worker_name)
+        return sent_worker_name
 
     def _recv_response(self, query, worker_names):
         response_dict = dict()
@@ -111,26 +115,25 @@ class ProcessManager(threading.Thread):
         result = dict()
         query = "cpu_usage_accum"   #"current_bw"
         worker_names = self.process_list.keys()
-        self._send_query(query, worker_names)
+        worker_names = self._send_query(query, worker_names)
 
         responses = self._recv_response(query, worker_names)
         for worker_name, (response, duration) in responses.iteritems():
-            sys.stdout.write("[manager] %s:\t%s:\t%s\t(%f s)\n" % (query, worker_name, str(response), duration))
+            #sys.stdout.write("[manager] %s:\t%s:\t%s\t(%f s)\n" % (query, worker_name, str(response), duration))
             result[worker_name] = response
-        time_e = time.time()
-        self.cpu_statistics.append((time.time()-time_s, result))
-        sys.stdout.write("\n")
+        return result
 
     def start_managing(self):
         time_s = time.time()
         self.cpu_statistics = list()
         try:
-            while (not self.stop.wait(1)):
-                #self._get_cpu_usage()
-                time.sleep(1)
+            while (not self.stop.wait(0.1)):
+                result = self._get_cpu_usage()
+                self.cpu_statistics.append((time.time()-time_s, result))
+                #time.sleep(1)
                 #self._change_comp_mode()
                 #self._change_diff_mode()
-                break
+                #break
         except Exception as e:
             sys.stdout.write("[manager] Exception")
             sys.stderr.write(traceback.format_exc())

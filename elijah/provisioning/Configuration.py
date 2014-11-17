@@ -149,12 +149,13 @@ class Options(object):
 class VMOverlayCreationMode(object):
     def __init__(self):
         self.OUTPUT_DESTINATION                     = "file" # or "network"
+        self.PROCESS_PIPELINED                      = True # False: serialized processing
 
-        self.QUEUE_SIZE_MEMORY_SNAPSHOT             = -1 # <0: infinite
-        self.QUEUE_SIZE_MEMORY_DELTA_LIST           = -1 # <0: infinite
-        self.QUEUE_SIZE_DISK_DELTA_LIST             = -1 # <0: infinite
-        self.QUEUE_SIZE_OPTIMIZATION                = -1 # <0: infinite
-        self.QUEUE_SIZE_COMPRESSION                 = -1 # <0: infinite
+        self.QUEUE_SIZE_MEMORY_SNAPSHOT             = -1 # 10 # -1 for infinite
+        self.QUEUE_SIZE_MEMORY_DELTA_LIST           = -1 # 10 # -1 for infinite
+        self.QUEUE_SIZE_DISK_DELTA_LIST             = -1 # 10 # -1 for infinite
+        self.QUEUE_SIZE_OPTIMIZATION                = -1 # 10*20 # one per DeltaImte
+        self.QUEUE_SIZE_COMPRESSION                 = -1 # 10 # -1 for infinite
 
         self.NUM_PROC_MEMORY_DIFF                   = 4
         self.NUM_PROC_DISK_DIFF                     = 4
@@ -180,13 +181,45 @@ class VMOverlayCreationMode(object):
         return VMOverlayCreationMode()
 
     @staticmethod
-    def get_no_parellel():
+    def get_serial_single_process():
         mode = VMOverlayCreationMode()
+        mode.PROCESS_PIPELINED = False
         mode.NUM_PROC_MEMORY_DIFF = 1
         mode.NUM_PROC_DISK_DIFF = 1
         mode.NUM_PROC_OPTIMIZATION = 1
         mode.NUM_PROC_COMPRESSION = 1
         return mode
+
+    @staticmethod
+    def get_serial_multi_cores():
+        mode = VMOverlayCreationMode()
+        mode.PROCESS_PIPELINED = False
+        mode.NUM_PROC_MEMORY_DIFF = 4
+        mode.NUM_PROC_DISK_DIFF = 4
+        mode.NUM_PROC_OPTIMIZATION = 4
+        mode.NUM_PROC_COMPRESSION = 4
+        return mode
+
+    @staticmethod
+    def get_pipelined_single_process():
+        mode = VMOverlayCreationMode()
+        mode.PROCESS_PIPELINED = True
+        mode.NUM_PROC_MEMORY_DIFF = 1
+        mode.NUM_PROC_DISK_DIFF = 1
+        mode.NUM_PROC_OPTIMIZATION = 1
+        mode.NUM_PROC_COMPRESSION = 1
+        return mode
+
+    @staticmethod
+    def get_pipelined_multi_process():
+        mode = VMOverlayCreationMode()
+        mode.PROCESS_PIPELINED = True
+        mode.NUM_PROC_MEMORY_DIFF = 4
+        mode.NUM_PROC_DISK_DIFF = 4
+        mode.NUM_PROC_OPTIMIZATION = 4
+        mode.NUM_PROC_COMPRESSION = 4
+        return mode
+
 
 
 class Synthesis_Const(object):

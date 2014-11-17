@@ -404,9 +404,7 @@ def _process_cmd(argv):
 
 class CreateMemoryDeltalist(process_manager.ProcWorker):
     def __init__(self, modified_mem_queue, deltalist_queue, 
-                 basemem_meta=None, basemem_path=None,
-                 num_proc = 1,
-                 diff_algorithm = "xdelta3",
+                 basemem_meta, basemem_path, overlay_mode,
                  apply_free_memory=True,
                  free_memory_info=None):
         self.modified_mem_queue = modified_mem_queue
@@ -418,8 +416,9 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         self.free_memory_info = free_memory_info
         self.basemem_path = basemem_path
         self.proc_list = list()
-        self.num_proc = num_proc
-        self.diff_algorithm = diff_algorithm
+        self.overlay_mode = overlay_mode
+        self.num_proc = overlay_mode.NUM_PROC_MEMORY_DIFF
+        self.diff_algorithm = overlay_mode.MEMORY_DIFF_ALGORITHM
 
         # output
         self.prev_procssed_size = 0
@@ -508,7 +507,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         base_hashlist_length = len(self.memory_hashlist)
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
-            task_queue = multiprocessing.Queue()
+            task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.QUEUE_SIZE_MEMORY_DELTA_LIST)
             mode_queue = multiprocessing.Queue()
             diff_proc = MemoryDiffProc(command_queue, task_queue, mode_queue, self.deltalist_queue,
                                  self.diff_algorithm, self.basemem_path, base_hashlist_length,
@@ -814,6 +813,7 @@ class MemoryDiffProc(multiprocessing.Process):
                     if hash_list_index < self.base_hashlist_length:
                         self_hash_value = self.memory_hashlist[hash_list_index][2]
                     chunk_hashvalue = sha256(data).digest()
+                    deltaitem_list = list()
                     if self_hash_value != chunk_hashvalue:
                         is_free_memory = False
                         if (self.free_pfn_dict != None) and \
@@ -852,8 +852,8 @@ class MemoryDiffProc(multiprocessing.Process):
                                     ref_id=diff_type,
                                     data_len=len(diff_data),
                                     data=diff_data)
-                            self.deltalist_queue.put(delta_item)
-                            #out_fd.write("%f\t%ld\n" % ((time.time()-time_m_start), ram_offset))
+                            deltaitem_list.append(delta_item)
+                    self.deltalist_queue.put(deltaitem_list)
                     ram_offset += Memory.RAM_PAGE_SIZE
         #LOG.debug("[Memory][Child] child finished. send command queue msg")
         self.command_queue.put("processed everything")

@@ -28,19 +28,20 @@ class CompressionError(Exception):
 
 class CompressProc(process_manager.ProcWorker):
     def __init__(self, delta_list_queue, comp_delta_queue,
-                 comp_type=Const.COMPRESSION_BZIP2,
-                 num_proc=1, block_size=1024*1024*8, comp_level=4):
+                 overlay_mode,
+                 block_size=1024*1024*8):
         """
         comparisons of compression algorithm
         http://pokecraft.first-world.info/wiki/Quick_Benchmark:_Gzip_vs_Bzip2_vs_LZMA_vs_XZ_vs_LZ4_vs_LZO
         """
         self.delta_list_queue = delta_list_queue
         self.comp_delta_queue = comp_delta_queue
-        self.comp_type = comp_type
-        self.num_proc = num_proc
-        self.proc_list = list()
+        self.overlay_mode = overlay_mode
+        self.comp_type = overlay_mode.COMPRESSION_ALGORITHM_TYPE
+        self.num_proc = overlay_mode.NUM_PROC_COMPRESSION
+        self.comp_level = overlay_mode.COMPRESSION_ALGORITHM_SPEED
         self.block_size = block_size
-        self.comp_level = comp_level
+        self.proc_list = list()
         self.thread_list = list()
         super(CompressProc, self).__init__(target=self.compress_stream)
 
@@ -88,7 +89,7 @@ class CompressProc(process_manager.ProcWorker):
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
             mode_queue = multiprocessing.Queue()
-            task_queue = multiprocessing.Queue()
+            task_queue = multiprocessing.Queue(self.overlay_mode.QUEUE_SIZE_COMPRESSION)
             comp_proc = CompChildProc(command_queue, task_queue, mode_queue,
                                       self.comp_delta_queue,
                                       self.comp_type,

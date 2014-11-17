@@ -181,9 +181,8 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
     def __init__(self, modified_disk, 
                  modified_chunk_dict, chunk_size,
                  disk_deltalist_queue,
-                 basedisk_path=None,
-                 num_proc=1,
-                 diff_algorithm="xdelta",
+                 basedisk_path,
+                 overlay_mode,
                  trim_dict=None, dma_dict=None,
                  apply_discard=True,
                  used_blocks_dict=None):
@@ -205,8 +204,9 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         self.apply_discard = apply_discard
         self.used_blocks_dict = used_blocks_dict
         self.proc_list = list()
-        self.num_proc = num_proc
-        self.diff_algorithm = diff_algorithm
+        self.overlay_mode = overlay_mode
+        self.num_proc = overlay_mode.NUM_PROC_DISK_DIFF
+        self.diff_algorithm = overlay_mode.DISK_DIFF_ALGORITHM
 
         self.manager = multiprocessing.Manager()
         self.ret_statistics = self.manager.dict()
@@ -242,7 +242,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         proc_rr_index = 0
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
-            task_queue = multiprocessing.Queue()
+            task_queue = multiprocessing.Queue(self.overlay_mode.QUEUE_SIZE_DISK_DELTA_LIST)
             mode_queue = multiprocessing.Queue()
             diff_proc = DiskDiffProc(command_queue, task_queue, mode_queue,
                                      self.disk_deltalist_queue,
@@ -450,6 +450,7 @@ class DiskDiffProc(multiprocessing.Process):
                     is_proc_running = False
                     break
 
+                deltaitem_list = list()
                 for chunk in task_list:
                     offset = chunk * self.chunk_size
                     # check file system 
@@ -478,8 +479,8 @@ class DiskDiffProc(multiprocessing.Process):
                             ref_id=diff_type,
                             data_len=len(diff_data),
                             data=diff_data)
-                    self.deltalist_queue.put(delta_item)
-                    #print "diff mode: %s" % self.diff_algorithm
+                    deltaitem_list.append(delta_item)
+                self.deltalist_queue.put(deltaitem_list)
         #LOG.debug("[Disk][Child] child finished. send command queue msg")
         self.command_queue.put("processed everything")
         while self.mode_queue.empty() == False:

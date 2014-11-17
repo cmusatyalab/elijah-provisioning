@@ -32,6 +32,7 @@ import hashlib
 import libvirt
 import shutil
 import multiprocessing
+import json
 
 from db import api as db_api
 from db import table_def as db_table
@@ -791,7 +792,8 @@ def get_overlay_deltalist(monitoring_info, options,
                           basemem_hashdict,
                           modified_disk,
                           modified_mem_queue,
-                          merged_deltalist_queue):
+                          merged_deltalist_queue,
+                          process_controller):
     '''return overlay deltalist
     Get difference between base vm (base_image, base_mem) and 
     launch vm (modified_disk, modified_mem) using monitoring information
@@ -820,8 +822,7 @@ def get_overlay_deltalist(monitoring_info, options,
         memory_deltalist_proc = Memory.CreateMemoryDeltalist(modified_mem_queue,
                                                              memory_deltalist_queue,
                                                              base_memmeta, base_mem,
-                                                             overlay_mode.NUM_PROC_MEMORY_DIFF,
-                                                             overlay_mode.MEMORY_DIFF_ALGORITHM,
+                                                             overlay_mode,
                                                              options.FREE_SUPPORT,
                                                              free_memory_dict)
         memory_deltalist_proc.start()
@@ -834,8 +835,7 @@ def get_overlay_deltalist(monitoring_info, options,
                                                    Const.CHUNK_SIZE,
                                                    disk_deltalist_queue,
                                                    base_image,
-                                                   overlay_mode.NUM_PROC_DISK_DIFF,
-                                                   overlay_mode.DISK_DIFF_ALGORITHM,
+                                                   overlay_mode,
                                                    trim_dict,
                                                    dma_dict,
                                                    apply_discard,
@@ -844,6 +844,11 @@ def get_overlay_deltalist(monitoring_info, options,
 
     time_disk_delta = time()
     LOG.info("Generate VM overlay using deduplication")
+
+    if overlay_mode.PROCESS_PIPELINED == False:
+        _waiting_to_finish(process_controller, "CreateMemoryDeltalist")
+    if overlay_mode.PROCESS_PIPELINED == False:
+        _waiting_to_finish(process_controller, "CreateDiskDeltalist")
 
     dedup_proc = delta.DeltaDedup(memory_deltalist_queue, Memory.Memory.RAM_PAGE_SIZE,
                                   disk_deltalist_queue, Const.CHUNK_SIZE,
@@ -1118,13 +1123,12 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     #prog_bar.set_percent(100.0*self.total_read_size/self.machine_memory_size)
                     #prog_bar.show_progress()
 
-                    if self.total_read_size - prev_processed_size > UPDATE_SIZE:
+                    if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time()
-                        current_bw = float((self.total_read_size-prev_processed_size)/(cur_time-prev_processed_time))
+                        throughput = float((self.total_read_size-prev_processed_size)/(cur_time-prev_processed_time))
                         prev_processed_size = self.total_read_size
                         prev_processed_time = cur_time
-                        #self.process_info['current_bw'] = (current_bw/1024.0/1024)
-                        self.monitor_current_bw = (current_bw/1024.0/1024)
+                        self.monitor_current_bw = (throughput/Const.CHUNK_SIZE)
 
             #prog_bar.finish()
         except Exception, e:
@@ -1388,6 +1392,17 @@ def copy_with_xml(in_path, out_path, xml):
     fout.write(fin.read())
 
 
+def _waiting_to_finish(process_controller, worker_name):
+    while True:
+        process_info = process_controller.process_infos.get(worker_name, None)
+        if process_info == None:
+            raise CloudletGenerationError("Failed to access %s worker" % worker_name)
+        if process_info['is_alive'] == False:
+            break
+        else:
+            sleep(0.01)
+
+
 def create_residue(base_disk, base_hashvalue,
                    basedisk_hashdict, basemem_hashdict,
                    resumed_vm, options, original_deltalist):
@@ -1396,8 +1411,9 @@ def create_residue(base_disk, base_hashvalue,
     '''
     time_start = time()
     process_controller = process_manager.get_instance()
-    overlay_mode = VMOverlayCreationMode.get_default()
-    overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_LZMA
+    #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
+    #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
+    overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
 
     process_controller.set_mode(overlay_mode)
     LOG.info("* Overlay creation configuration")
@@ -1434,6 +1450,9 @@ def create_residue(base_disk, base_hashvalue,
                                          memory_snapshot_queue,
                                          fuse_stream_monitor=resumed_vm.monitor)
 
+    if overlay_mode.PROCESS_PIPELINED == False:
+        _waiting_to_finish(process_controller, "MemoryReadProcess")
+
     # to be deleted
     #memory_read_proc.join()
     #while True:
@@ -1451,22 +1470,24 @@ def create_residue(base_disk, base_hashvalue,
                                        basemem_hashdict,
                                        resumed_vm.resumed_disk,
                                        memory_snapshot_queue,
-                                       residue_deltalist_queue)
+                                       residue_deltalist_queue,
+                                       process_controller)
     time_dedup = time()
+    if overlay_mode.PROCESS_PIPELINED == False:
+        _waiting_to_finish(process_controller, "DeltaDedup")
 
     # 4. compression
     LOG.info("Compressing overlay blobs")
     compress_proc = compression.CompressProc(residue_deltalist_queue,
                                              compdata_queue,
-                                             comp_type=overlay_mode.COMPRESSION_ALGORITHM_TYPE,
-                                             num_proc=overlay_mode.NUM_PROC_COMPRESSION,
-                                             block_size=1024*1024*8,
-                                             comp_level=overlay_mode.COMPRESSION_ALGORITHM_SPEED)
+                                             overlay_mode)
     compress_proc.start()
     time_dedup = time()
+    if overlay_mode.PROCESS_PIPELINED == False:
+        _waiting_to_finish(process_controller, "CompressProc")
+
 
     time_packaging_start = time()
-
     # to be deleted
     #sleep(10000)
     if overlay_mode.OUTPUT_DESTINATION.startswith("network"):
@@ -1508,7 +1529,8 @@ def create_residue(base_disk, base_hashvalue,
             overlay_info.append(blob_dict)
 
         process_controller.terminate()
-        #cpu_stat = process_controller.cpu_statistics
+        cpu_stat = process_controller.cpu_statistics
+        open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
 
         # wait until VM snapshotting finishes to get final VM memory snapshot size
         memory_read_proc.join()
