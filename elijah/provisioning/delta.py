@@ -679,9 +679,6 @@ class DeltaDedup(process_manager.ProcWorker):
         self.statistics['number_of_base_mem_memory'] = 0
         self.statistics['number_of_self_ref_disk'] = 0
         self.statistics['number_of_self_ref_memory'] = 0
-        self.delta_disk_chunks = self.manager.list()
-        self.delta_memory_chunks = self.manager.list()
-        self.memory_snapshot_size = self.manager.list()
         super(DeltaDedup, self).__init__(target=self.perform_dedup)
 
     def perform_dedup(self):
@@ -783,10 +780,6 @@ class DeltaDedup(process_manager.ProcWorker):
                                 offset_length = 8
                                 self.self_hashdict[delta_item.hash_value] = ref_offset
 
-                    if delta_item.delta_type == DeltaItem.DELTA_DISK:
-                        self.delta_disk_chunks.append(delta_item.offset)
-                    elif delta_item.delta_type == DeltaItem.DELTA_MEMORY:
-                        self.delta_memory_chunks.append(delta_item.offset)
                 self.merged_deltalist_queue.put(deltaitem_list)
 
                 # measurement
