@@ -806,6 +806,8 @@ class MemoryDiffProc(multiprocessing.Process):
                     break
                 (start_ram_offset, memory_chunk_list) = task_list
                 ram_offset = start_ram_offset
+                time_process_start = time.time()
+                deltaitem_list = list()
                 for data in memory_chunk_list:
                     hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
 
@@ -813,7 +815,6 @@ class MemoryDiffProc(multiprocessing.Process):
                     if hash_list_index < self.base_hashlist_length:
                         self_hash_value = self.memory_hashlist[hash_list_index][2]
                     chunk_hashvalue = sha256(data).digest()
-                    deltaitem_list = list()
                     if self_hash_value != chunk_hashvalue:
                         is_free_memory = False
                         if (self.free_pfn_dict != None) and \
@@ -853,8 +854,9 @@ class MemoryDiffProc(multiprocessing.Process):
                                     data_len=len(diff_data),
                                     data=diff_data)
                             deltaitem_list.append(delta_item)
-                    self.deltalist_queue.put(deltaitem_list)
                     ram_offset += Memory.RAM_PAGE_SIZE
+                time_process_end = time.time()
+                self.deltalist_queue.put(deltaitem_list)
         #LOG.debug("[Memory][Child] child finished. send command queue msg")
         self.command_queue.put("processed everything")
         self.task_queue.put(freed_page_counter)
