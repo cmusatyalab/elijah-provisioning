@@ -17,9 +17,6 @@ from package import VMOverlayPackage
 import process_manager
 
 
-BLOCK_SIZE = 1024*1024*1
-
-
 
 class CompressionError(Exception):
     pass
@@ -29,7 +26,7 @@ class CompressionError(Exception):
 class CompressProc(process_manager.ProcWorker):
     def __init__(self, delta_list_queue, comp_delta_queue,
                  overlay_mode,
-                 block_size=1024*1024*8):
+                 block_size=1024*1024/4):
         """
         comparisons of compression algorithm
         http://pokecraft.first-world.info/wiki/Quick_Benchmark:_Gzip_vs_Bzip2_vs_LZMA_vs_XZ_vs_LZ4_vs_LZO

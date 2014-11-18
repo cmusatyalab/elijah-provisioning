@@ -238,7 +238,7 @@ class VMOverlayCreationMode(object):
         mode.QUEUE_SIZE_DISK_DELTA_LIST = 128
         mode.QUEUE_SIZE_MEMORY_DELTA_LIST = 128
         mode.QUEUE_SIZE_MEMORY_SNAPSHOT = 128
-        mode.QUEUE_SIZE_OPTIMIZATION = 128
+        mode.QUEUE_SIZE_OPTIMIZATION = 2
         mode.QUEUE_SIZE_COMPRESSION = 128
         return mode
 

@@ -1404,7 +1404,7 @@ def _waiting_to_finish(process_controller, worker_name):
 
 
 class StreamSynthesisFile(multiprocessing.Process):
-    EMULATED_BANDWIDTH_Mbps = 10000 # Mbps
+    EMULATED_BANDWIDTH_Mbps = 10 # Mbps
 
     def __init__(self, basevm_uuid, compdata_queue, temp_compfile_dir):
         self.basevm_uuid = basevm_uuid
@@ -1427,11 +1427,16 @@ class StreamSynthesisFile(multiprocessing.Process):
     def save_to_file(self):
         comp_file_counter = 0
         input_fd = [self.compdata_queue._reader.fileno()]
+        time_sleep_end = time()
+        accu_time = 0
         while True:
             input_ready, out_ready, err_ready = select.select(input_fd, [], [])
-            time_process_start = time()
             if self.compdata_queue._reader.fileno() in input_ready:
                 comp_task = self.compdata_queue.get()
+                time_process_start = time()
+                m_time = (time_process_start-time_sleep_end)
+                accu_time += m_time
+                print "waiting time to get new compressed block: %f, %f" % (m_time, accu_time)
                 if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
                     break
                 if comp_task == Const.QUEUE_FAILED_MESSAGE:
@@ -1457,17 +1462,18 @@ class StreamSynthesisFile(multiprocessing.Process):
                     }
                 self.overlay_files.append(blob_filename)
                 self.overlay_info.append(blob_dict)
-            time_process_end = time()
+                time_process_end = time()
 
-            # wait to emulate network badwidth
-            processed_time = time_process_end-time_process_start
-            processed_size = os.path.getsize(blob_filename)
-            emulated_time = (processed_size*8) / (self.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
-            if emulated_time > processed_time:
-                sleep_time = (emulated_time-processed_time)
-                LOG.debug("Emualting BW of %d Mbps, so wait %f s" %\
-                          (self.EMULATED_BANDWIDTH_Mbps, sleep_time))
-                sleep(sleep_time)
+                # wait to emulate network badwidth
+                processed_time = time_process_end-time_process_start
+                processed_size = os.path.getsize(blob_filename)
+                emulated_time = (processed_size*8) / (self.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
+                if emulated_time > processed_time:
+                    sleep_time = (emulated_time-processed_time)
+                    LOG.debug("Emulating BW of %d Mbps, so wait %f s" %\
+                            (self.EMULATED_BANDWIDTH_Mbps, sleep_time))
+                    sleep(sleep_time)
+                time_sleep_end = time()
 
 
 
@@ -1482,8 +1488,8 @@ def create_residue(base_disk, base_hashvalue,
     #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
     #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
     #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process_finite_queue()
-    overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
-    #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+    #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
+    overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
 
     process_controller.set_mode(overlay_mode)
     LOG.info("* Overlay creation configuration")
