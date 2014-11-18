@@ -1403,6 +1403,74 @@ def _waiting_to_finish(process_controller, worker_name):
             sleep(0.01)
 
 
+class StreamSynthesisFile(multiprocessing.Process):
+    EMULATED_BANDWIDTH_Mbps = 10000 # Mbps
+
+    def __init__(self, basevm_uuid, compdata_queue, temp_compfile_dir):
+        self.basevm_uuid = basevm_uuid
+        self.compdata_queue = compdata_queue
+        self.temp_compfile_dir = temp_compfile_dir
+        self.manager = multiprocessing.Manager()
+        self.overlay_info = self.manager.list()
+        self.overlay_files = self.manager.list()
+        super(StreamSynthesisFile, self).__init__(target=self.save_to_file)
+
+    def get_overlay_info(self):
+        overlay_info_list = list()
+        for overlay_item_dict in self.overlay_info:
+            item_dict = dict()
+            for key, value in overlay_item_dict.iteritems():
+                item_dict[key] = value
+            overlay_info_list.append(item_dict)
+        return overlay_info_list, self.overlay_files
+
+    def save_to_file(self):
+        comp_file_counter = 0
+        input_fd = [self.compdata_queue._reader.fileno()]
+        while True:
+            input_ready, out_ready, err_ready = select.select(input_fd, [], [])
+            time_process_start = time()
+            if self.compdata_queue._reader.fileno() in input_ready:
+                comp_task = self.compdata_queue.get()
+                if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
+                    break
+                if comp_task == Const.QUEUE_FAILED_MESSAGE:
+                    LOG.error("Failed to get compressed data")
+                    break
+                (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
+                blob_filename = os.path.join(self.temp_compfile_dir, "%s-stream-%d" %\
+                                            (Const.OVERLAY_FILE_PREFIX,
+                                            comp_file_counter))
+                #LOG.debug("%s --> %d" % (blob_filename, blob_comp_type))
+                #LOG.debug("%s: # of delta memory: %d\t# of delta disk: %d" %\
+                #          (blob_filename, len(memory_chunks), len(disk_chunks)))
+                comp_file_counter += 1
+                output_fd = open(blob_filename, "wb+")
+                output_fd.write(compdata)
+                output_fd.close()
+                blob_dict = {
+                    Const.META_OVERLAY_FILE_NAME:os.path.basename(blob_filename),
+                    Const.META_OVERLAY_FILE_COMPRESSION: blob_comp_type,
+                    Const.META_OVERLAY_FILE_SIZE:os.path.getsize(blob_filename),
+                    Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
+                    Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
+                    }
+                self.overlay_files.append(blob_filename)
+                self.overlay_info.append(blob_dict)
+            time_process_end = time()
+
+            # wait to emulate network badwidth
+            processed_time = time_process_end-time_process_start
+            processed_size = os.path.getsize(blob_filename)
+            emulated_time = (processed_size*8) / (self.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
+            if emulated_time > processed_time:
+                sleep_time = (emulated_time-processed_time)
+                LOG.debug("Emualting BW of %d Mbps, so wait %f s" %\
+                          (self.EMULATED_BANDWIDTH_Mbps, sleep_time))
+                sleep(sleep_time)
+
+
+
 def create_residue(base_disk, base_hashvalue,
                    basedisk_hashdict, basemem_hashdict,
                    resumed_vm, options, original_deltalist):
@@ -1490,45 +1558,14 @@ def create_residue(base_disk, base_hashvalue,
 
 
     time_packaging_start = time()
-    # to be deleted
-    #sleep(10000)
     if overlay_mode.OUTPUT_DESTINATION.startswith("network"):
         from stream_client import StreamSynthesisClient
         client = StreamSynthesisClient(base_hashvalue, compdata_queue)
         client.start()  # blocked
     elif overlay_mode.OUTPUT_DESTINATION.startswith("file"):
-        overlay_info = list()
-        overlay_files = list()
-        overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
-        comp_file_counter = 0
         temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")
-        while True:
-            comp_task = compdata_queue.get()
-            if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
-                break
-            if comp_task == Const.QUEUE_FAILED_MESSAGE:
-                LOG.error("Failed to get compressed data")
-                break
-            (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
-            blob_filename = os.path.join(temp_compfile_dir, "%s-stream-%d" %\
-                                        (Const.OVERLAY_FILE_PREFIX,
-                                        comp_file_counter))
-            #LOG.debug("%s --> %d" % (blob_filename, blob_comp_type))
-            #LOG.debug("%s: # of delta memory: %d\t# of delta disk: %d" %\
-            #          (blob_filename, len(memory_chunks), len(disk_chunks)))
-            comp_file_counter += 1
-            overlay_files.append(blob_filename)
-            output_fd = open(blob_filename, "wb+")
-            output_fd.write(compdata)
-            output_fd.close()
-            blob_dict = {
-                Const.META_OVERLAY_FILE_NAME:os.path.basename(blob_filename),
-                Const.META_OVERLAY_FILE_COMPRESSION: blob_comp_type,
-                Const.META_OVERLAY_FILE_SIZE:os.path.getsize(blob_filename),
-                Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
-                Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
-                }
-            overlay_info.append(blob_dict)
+        synthesis_file = StreamSynthesisFile(base_hashvalue, compdata_queue, temp_compfile_dir)
+        synthesis_file.start()
 
         process_controller.terminate()
         cpu_stat = process_controller.cpu_statistics
@@ -1538,7 +1575,13 @@ def create_residue(base_disk, base_hashvalue,
         memory_read_proc.join()
         memory_read_proc.finish()   # deallocate resources for snapshotting
         memory_snapshot_size = memory_read_proc.get_memory_snapshot_size()
+
+        # wait to finish creating files
+        synthesis_file.join()
+        overlay_info, overlay_files = synthesis_file.get_overlay_info()
+
         LOG.debug("Memory Snapshot size: %ld" % memory_snapshot_size)
+        overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
         overlay_metafile = _generate_overlaymeta(overlay_metapath,
                                                 overlay_info,
                                                 base_hashvalue,
@@ -1553,7 +1596,6 @@ def create_residue(base_disk, base_hashvalue,
         LOG.debug("[time] Time for overlay packaging (%f ~ %f): %f" % (time_packaging_start,
                                                                     time_packaging_end,
                                                                     (time_packaging_end-time_packaging_start)))
-
 
         # 7. terminting
         resumed_vm.machine = None   # protecting malaccess to machine 

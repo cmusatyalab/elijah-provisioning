@@ -157,7 +157,7 @@ class VMOverlayCreationMode(object):
         self.QUEUE_SIZE_MEMORY_DELTA_LIST           = -1 # 10 # -1 for infinite
         self.QUEUE_SIZE_DISK_DELTA_LIST             = -1 # 10 # -1 for infinite
         self.QUEUE_SIZE_OPTIMIZATION                = -1 # 10*20 # one per DeltaImte
-        self.QUEUE_SIZE_COMPRESSION                 = -1 # 10 # -1 for infinite
+        self.QUEUE_SIZE_COMPRESSION                 = -1 # 10*20 # one per DeltaImte
 
         self.NUM_PROC_MEMORY_DIFF                   = 4
         self.NUM_PROC_DISK_DIFF                     = 4
@@ -215,11 +215,11 @@ class VMOverlayCreationMode(object):
     @staticmethod
     def get_pipelined_single_process_finite_queue():
         mode = VMOverlayCreationMode.get_pipelined_single_process()
-        mode.QUEUE_SIZE_COMPRESSION = 128
         mode.QUEUE_SIZE_DISK_DELTA_LIST = 128
         mode.QUEUE_SIZE_MEMORY_DELTA_LIST = 128
         mode.QUEUE_SIZE_MEMORY_SNAPSHOT = 128
         mode.QUEUE_SIZE_OPTIMIZATION = 128
+        mode.QUEUE_SIZE_COMPRESSION = 128
         return mode
 
     @staticmethod
@@ -235,11 +235,11 @@ class VMOverlayCreationMode(object):
     @staticmethod
     def get_pipelined_multi_process_finite_queue():
         mode = VMOverlayCreationMode.get_pipelined_multi_process()
-        mode.QUEUE_SIZE_COMPRESSION = 256
-        mode.QUEUE_SIZE_DISK_DELTA_LIST = 256
-        mode.QUEUE_SIZE_MEMORY_DELTA_LIST = 256
-        mode.QUEUE_SIZE_MEMORY_SNAPSHOT = 256
-        mode.QUEUE_SIZE_OPTIMIZATION = 256
+        mode.QUEUE_SIZE_DISK_DELTA_LIST = 128
+        mode.QUEUE_SIZE_MEMORY_DELTA_LIST = 128
+        mode.QUEUE_SIZE_MEMORY_SNAPSHOT = 128
+        mode.QUEUE_SIZE_OPTIMIZATION = 128
+        mode.QUEUE_SIZE_COMPRESSION = 128
         return mode
 
 
