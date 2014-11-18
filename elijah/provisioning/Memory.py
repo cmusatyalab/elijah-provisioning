@@ -504,6 +504,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         memory_page_list = chunks(memory_data, Memory.RAM_PAGE_SIZE)
 
         # launch child processes
+        output_fd_list = list()
+        output_fd_dict = dict()
         base_hashlist_length = len(self.memory_hashlist)
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
@@ -514,12 +516,13 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                                  self.memory_hashlist, self.free_pfn_dict, self.apply_free_memory)
             diff_proc.start()
             self.proc_list.append((diff_proc, task_queue, command_queue, mode_queue))
+            output_fd_list.append(task_queue._writer.fileno())
+            output_fd_dict[task_queue._writer.fileno()] = task_queue
 
         ram_offset = 0
         recved_data_size = 0
         freed_page_counter = 0
         is_end_of_stream = False
-        proc_rr_index = 0
         while is_end_of_stream == False and len(memory_page_list) != 0:
             # get data from the stream
             if len(memory_page_list) < 2: # empty or partial data
@@ -566,19 +569,20 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
             tasks = memory_page_list[0:-1]
             memory_page_list = memory_page_list[-1:]
+
+            # put task at child process
+            ([], output_ready, []) = select.select([], output_fd_list, [])
             task_list = (ram_offset, tasks)
-            (proc, task_queue, command_queue, mode_queue) = self.proc_list[proc_rr_index%self.num_proc]
+            task_queue = output_fd_dict[output_ready[0]]
             task_queue.put(task_list)
 
-            #print "put task: offset %ld~%d at proc %d" % (ram_offset,
-            #                                 ram_offset + len(tasks)*Memory.RAM_PAGE_SIZE,
-            #                                 proc_rr_index%self.num_proc)
             ram_offset += (len(tasks) * Memory.RAM_PAGE_SIZE)
-            proc_rr_index += 1
 
         # send last memory page
         task_list = (ram_offset, memory_page_list)
-        (proc, task_queue, command_queue, mode_queue) = self.proc_list[proc_rr_index%self.num_proc]
+        ([], output_ready, []) = select.select([], output_fd_list, [])
+        task_list = (ram_offset, tasks)
+        task_queue = output_fd_dict[output_ready[0]]
         task_queue.put(task_list)
 
         # send end meesage to every process

@@ -153,11 +153,11 @@ class VMOverlayCreationMode(object):
         self.OUTPUT_DESTINATION                     = "file" # or "network"
         self.PROCESS_PIPELINED                      = True # False: serialized processing
 
-        self.QUEUE_SIZE_MEMORY_SNAPSHOT             = -1 # 10 # -1 for infinite
-        self.QUEUE_SIZE_MEMORY_DELTA_LIST           = -1 # 10 # -1 for infinite
-        self.QUEUE_SIZE_DISK_DELTA_LIST             = -1 # 10 # -1 for infinite
-        self.QUEUE_SIZE_OPTIMIZATION                = -1 # 10*20 # one per DeltaImte
-        self.QUEUE_SIZE_COMPRESSION                 = -1 # 10*20 # one per DeltaImte
+        self.QUEUE_SIZE_MEMORY_SNAPSHOT             = -1 # always have infinite queue for communicating with QEMU
+        self.QUEUE_SIZE_MEMORY_DELTA_LIST           = -1 # -1 for infinite
+        self.QUEUE_SIZE_DISK_DELTA_LIST             = -1 # -1 for infinite
+        self.QUEUE_SIZE_OPTIMIZATION                = -1 # one per DeltaImte
+        self.QUEUE_SIZE_COMPRESSION                 = -1 # one per DeltaImte
 
         self.NUM_PROC_MEMORY_DIFF                   = 4
         self.NUM_PROC_DISK_DIFF                     = 4
@@ -217,7 +217,6 @@ class VMOverlayCreationMode(object):
         mode = VMOverlayCreationMode.get_pipelined_single_process()
         mode.QUEUE_SIZE_DISK_DELTA_LIST = 128
         mode.QUEUE_SIZE_MEMORY_DELTA_LIST = 128
-        mode.QUEUE_SIZE_MEMORY_SNAPSHOT = 128
         mode.QUEUE_SIZE_OPTIMIZATION = 128
         mode.QUEUE_SIZE_COMPRESSION = 128
         return mode
@@ -234,12 +233,19 @@ class VMOverlayCreationMode(object):
 
     @staticmethod
     def get_pipelined_multi_process_finite_queue():
-        mode = VMOverlayCreationMode.get_pipelined_multi_process()
-        mode.QUEUE_SIZE_DISK_DELTA_LIST = 128
-        mode.QUEUE_SIZE_MEMORY_DELTA_LIST = 128
-        mode.QUEUE_SIZE_MEMORY_SNAPSHOT = 128
-        mode.QUEUE_SIZE_OPTIMIZATION = 2
-        mode.QUEUE_SIZE_COMPRESSION = 128
+        mode = VMOverlayCreationMode()
+        mode.PROCESS_PIPELINED = True
+        mode.NUM_PROC_MEMORY_DIFF = 4
+        mode.NUM_PROC_DISK_DIFF = 4
+        mode.NUM_PROC_OPTIMIZATION = 4
+        mode.NUM_PROC_COMPRESSION = 4
+
+        mode.QUEUE_SIZE_MEMORY_SNAPSHOT = -1    # always have infinite queue for communicating with QEMU
+                                                # Otherwise, QEMU will be automatically throttled
+        mode.QUEUE_SIZE_DISK_DELTA_LIST = 4
+        mode.QUEUE_SIZE_MEMORY_DELTA_LIST = 4
+        mode.QUEUE_SIZE_OPTIMIZATION = 4
+        mode.QUEUE_SIZE_COMPRESSION = 4
         return mode
 
 

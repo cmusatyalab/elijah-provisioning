@@ -239,10 +239,11 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         xrayed_list = []
 
         # launch child processes
-        proc_rr_index = 0
+        output_fd_list = list()
+        output_fd_dict = dict()
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
-            task_queue = multiprocessing.Queue(self.overlay_mode.QUEUE_SIZE_DISK_DELTA_LIST)
+            task_queue = multiprocessing.Queue(maxsize=1)
             mode_queue = multiprocessing.Queue()
             diff_proc = DiskDiffProc(command_queue, task_queue, mode_queue,
                                      self.disk_deltalist_queue,
@@ -252,6 +253,8 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                                      self.chunk_size)
             diff_proc.start()
             self.proc_list.append((diff_proc, task_queue, command_queue, mode_queue))
+            output_fd_list.append(task_queue._writer.fileno())
+            output_fd_dict[task_queue._writer.fileno()] = task_queue
 
         # 1. get modified page
         LOG.debug("1. Get modified disk page")
@@ -310,10 +313,11 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 time_first_recv = time.time()
 
             if len(modified_chunk_list) > 100:
-                (proc, task_queue, command_queue, mode_queue) = self.proc_list[proc_rr_index%self.num_proc]
+                ([], output_ready, []) = select.select([], output_fd_list, [])
+                task_queue = output_fd_dict[output_ready[0]]
                 task_queue.put(modified_chunk_list)
                 modified_chunk_list = []
-                proc_rr_index += 1
+
 
             # measurement
             modified_chunk_counter += 1
@@ -325,8 +329,10 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 #self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
                 processed_datasize = 0
                 processed_duration = float(0)
+
         # send last chunks
-        (proc, task_queue, command_queue, mode_queue) = self.proc_list[proc_rr_index%self.num_proc]
+        ([], output_ready, []) = select.select([], output_fd_list, [])
+        task_queue = output_fd_dict[output_ready[0]]
         task_queue.put(modified_chunk_list)
         modified_chunk_list = []
 

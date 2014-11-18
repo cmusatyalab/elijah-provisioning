@@ -26,7 +26,7 @@ class CompressionError(Exception):
 class CompressProc(process_manager.ProcWorker):
     def __init__(self, delta_list_queue, comp_delta_queue,
                  overlay_mode,
-                 block_size=1024*1024/4):
+                 block_size=1024*1024*1):
         """
         comparisons of compression algorithm
         http://pokecraft.first-world.info/wiki/Quick_Benchmark:_Gzip_vs_Bzip2_vs_LZMA_vs_XZ_vs_LZ4_vs_LZO
@@ -53,9 +53,9 @@ class CompressProc(process_manager.ProcWorker):
         input_size = 0
         is_last_blob = False
         input_data = ''
+        input_list = [self.control_queue._reader.fileno(),
+                        self.delta_list_queue._reader.fileno()]
         while input_size < self.block_size:
-            input_list = [self.control_queue._reader.fileno(),
-                            self.delta_list_queue._reader.fileno()]
             (input_ready, [], []) = select.select(input_list, [], [])
             if self.control_queue._reader.fileno() in input_ready:
                 control_msg = self.control_queue.get()
@@ -84,29 +84,32 @@ class CompressProc(process_manager.ProcWorker):
         time_start = time.time()
 
         # launch child processes
+        output_fd_list = list()
+        output_fd_dict = dict()
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
             mode_queue = multiprocessing.Queue()
-            task_queue = multiprocessing.Queue(self.overlay_mode.QUEUE_SIZE_COMPRESSION)
+            task_queue = multiprocessing.Queue(maxsize=1)
             comp_proc = CompChildProc(command_queue, task_queue, mode_queue,
                                       self.comp_delta_queue,
                                       self.comp_type,
                                       self.comp_level)
             comp_proc.start()
             self.proc_list.append((comp_proc, task_queue, command_queue, mode_queue))
+            output_fd_list.append(task_queue._writer.fileno())
+            output_fd_dict[task_queue._writer.fileno()] = task_queue
 
         is_last_blob = False
         total_read_size = 0
-        proc_rr_index = 0
         while is_last_blob == False:
             # read data
             is_last_blob, input_data, input_size, modified_disk_chunks, modified_memory_chunks = self._chunk_blob()
 
             if input_size > 0:
+                ([], output_ready, []) = select.select([], output_fd_list, [])
+                task_queue = output_fd_dict[output_ready[0]]
                 total_read_size += input_size
-                (proc, task_queue, command_queue, mode_queue) = self.proc_list[proc_rr_index%self.num_proc]
                 task_queue.put((input_data, modified_disk_chunks, modified_memory_chunks))
-                proc_rr_index += 1
 
         # send end meesage to every process
         for (proc, t_queue, c_queue, m_queue) in self.proc_list:

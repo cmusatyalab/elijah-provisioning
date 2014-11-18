@@ -1106,7 +1106,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             LOG.info("Header size of memory snapshot is %s" % len(new_header))
 
             # write rest of the memory data
-            prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
+            #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
                 input_fd = [self.control_queue._reader.fileno(), self.in_fd]
                 input_ready, out_ready, err_ready = select.select(input_fd, [], [])
@@ -1120,8 +1120,8 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     current_size = len(data)
                     self.result_queue.put(data)
                     self.total_read_size += current_size
-                    prog_bar.set_percent(100.0*self.total_read_size/self.machine_memory_size)
-                    prog_bar.show_progress()
+                    #prog_bar.set_percent(100.0*self.total_read_size/self.machine_memory_size)
+                    #prog_bar.show_progress()
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time()
@@ -1129,8 +1129,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
                         prev_processed_size = self.total_read_size
                         prev_processed_time = cur_time
                         self.monitor_current_bw = (throughput/Const.CHUNK_SIZE)
-
-            prog_bar.finish()
+            #prog_bar.finish()
         except Exception, e:
             sys.stdout.write("[MemorySnapshotting] Exception1n")
             sys.stderr.write(traceback.format_exc())
@@ -1404,7 +1403,7 @@ def _waiting_to_finish(process_controller, worker_name):
 
 
 class StreamSynthesisFile(multiprocessing.Process):
-    EMULATED_BANDWIDTH_Mbps = 10 # Mbps
+    EMULATED_BANDWIDTH_Mbps = 1000 # Mbps
 
     def __init__(self, basevm_uuid, compdata_queue, temp_compfile_dir):
         self.basevm_uuid = basevm_uuid
@@ -1428,15 +1427,11 @@ class StreamSynthesisFile(multiprocessing.Process):
         comp_file_counter = 0
         input_fd = [self.compdata_queue._reader.fileno()]
         time_sleep_end = time()
-        accu_time = 0
         while True:
             input_ready, out_ready, err_ready = select.select(input_fd, [], [])
             if self.compdata_queue._reader.fileno() in input_ready:
                 comp_task = self.compdata_queue.get()
                 time_process_start = time()
-                m_time = (time_process_start-time_sleep_end)
-                accu_time += m_time
-                print "waiting time to get new compressed block: %f, %f" % (m_time, accu_time)
                 if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
                     break
                 if comp_task == Const.QUEUE_FAILED_MESSAGE:
