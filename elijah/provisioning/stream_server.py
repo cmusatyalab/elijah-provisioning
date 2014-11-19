@@ -22,6 +22,7 @@ import os
 import traceback
 import sys
 import time
+import struct
 import SocketServer
 import socket
 import tempfile
@@ -335,7 +336,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         '''
 
         # get header
-        import pdb;pdb.set_trace()
         data = self.request.recv(4)
         if data == None or len(data) != 4:
             raise StreamSynthesisError("Failed to receive first byte of header")
@@ -345,17 +345,19 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         basevm_uuid = message.get("basevm_uuid", None)
 
         # get each blob
+        import pdb;pdb.set_trace()
         while True:
             data = self.request.recv(4)
             if data == None or len(data) != 4:
                 raise StreamSynthesisError("Failed to receive first byte of header")
+                break
             blob_header_size = struct.unpack("!I", data)[0]
             blob_header_raw = self._recv_all(blob_header_size)
             blob_header = NetworkUtil.decoding(blob_header_raw)
-            blob_size = message.get("blob_size", None)
+            blob_size = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_SIZE)
             if blob_size == None:
-                raise StreamSynthesisError("Cannot find blob size information")
-            if blob_size < 0:
+                raise StreamSynthesisError("Failed to receive blob")
+            if blob_size == 0:
                 print "end of stream"
                 break
             compressed_blob = self._recv_all(blob_size)
