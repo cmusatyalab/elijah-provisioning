@@ -64,6 +64,11 @@ class Memory(object):
     RAM_SAVE_FLAG_CONTINUE = 0x20
     BLK_MIG_FLAG_EOS       = 0x02
 
+    # header format for each memory page
+    CHUNK_HEADER_FMT = "=Q"
+    CHUNK_HEADER_SIZE = struct.calcsize("=Q")
+
+
     def __init__(self):
         self.hash_list = []
         self.raw_file = ''
@@ -403,13 +408,14 @@ def _process_cmd(argv):
 
 
 class CreateMemoryDeltalist(process_manager.ProcWorker):
+#import threading
+#class CreateMemoryDeltalist(threading.Thread):
     def __init__(self, modified_mem_queue, deltalist_queue, 
                  basemem_meta, basemem_path, overlay_mode,
                  apply_free_memory=True,
                  free_memory_info=None):
         self.modified_mem_queue = modified_mem_queue
         self.deltalist_queue = deltalist_queue
-        #self.memory_hashdict = memory_hashdict
         self.basemem_meta = basemem_meta
         self.memory_hashlist = Memory.import_hashlist(basemem_meta)
         self.apply_free_memory = apply_free_memory
@@ -447,7 +453,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
         # get memory meta data from snapshot
         self.modified_memory_fd.seek(libvirt_header_len)
-        ram_info = Memory._seek_to_end_of_ram(self.modified_memory_fd)
 
         # TODO: support getting free memory for streaming case
         self.free_pfn_dict = None
@@ -482,7 +487,48 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             if proc.is_alive() == True:
                 m_queue.put(new_mode)
 
+    def _process_libvirt_header(self, libvirt_header_list):
+        base_memory_fd = open(self.basemem_path)
+        delta_list = list()
+        for index, libvirt_header_chunk in enumerate(libvirt_header_list):
+            data = libvirt_header_chunk
+            offset = index*Memory.RAM_PAGE_SIZE
+            base_memory_fd.seek(offset)
+            base_data = base_memory_fd.read(Memory.RAM_PAGE_SIZE)
+            chunk_hashvalue = sha256(data).digest()
+            base_hashvalue = sha256(base_data).digest()
+            if chunk_hashvalue == base_hashvalue:
+                continue
+            try:
+                if self.diff_algorithm == "xdelta3":
+                    diff_data = tool.diff_data(base_data, data, 2*len(base_data))
+                    diff_type = DeltaItem.REF_XDELTA
+                    if len(diff_data) > len(data):
+                        raise IOError("xdelta3 patch is bigger than origianl")
+                elif self.diff_algorithm == "none":
+                    diff_data = data
+                    diff_type = DeltaItem.REF_RAW
+                else:
+                    diff_data = data
+                    diff_type = DeltaItem.REF_RAW
+            except IOError as e:
+                diff_data = data
+                diff_type = DeltaItem.REF_RAW
+
+            delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
+                    offset, len(data),
+                    hash_value=chunk_hashvalue,
+                    ref_id=diff_type,
+                    data_len=len(diff_data),
+                    data=diff_data)
+            delta_list.append(delta_item)
+        base_memory_fd.close()
+        self.deltalist_queue.put(delta_list)
+
     def _get_modified_memory_page(self, fin):
+        def chunks(l, n):
+            return [l[i:i + n] for i in range(0, len(l), n)]
+
         time_s = time.time()
         LOG.info("Get hash list of memory page")
         is_first_recv = False
@@ -495,13 +541,28 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         time_process_start = 0
         time_prev_report = 0
         UPDATE_PERIOD = self.process_info['update_period']
+        #UPDATE_PERIOD = 10
 
-        # data structure to handle pipelined data
-        def chunks(l, n):
-            return [l[i:i + n] for i in range(0, len(l), n)]
-        memory_data = fin.data_buffer
+        # Due to the header of each memory page, memory chunk size is not 4KB +
+        # 8 bytes. Also, we need to follow this format for libvirt header.
+        memory_chunk_size = Memory.CHUNK_HEADER_SIZE + Memory.RAM_PAGE_SIZE
+        fin.seek(Const.LIBVIRT_HEADER_SIZE*2) # make sure to have data bigger than libvirt header
+
+        # process libvirt header first
+        libvirt_header_data = fin.data_buffer[:Const.LIBVIRT_HEADER_SIZE]
+        libvirt_header_list = list()
+        for index in range(0, len(libvirt_header_data), Memory.RAM_PAGE_SIZE):
+            chunked_data = libvirt_header_data[index:index+Memory.RAM_PAGE_SIZE]
+            libvirt_header_list.append(chunked_data)
+        libvirt_header_offset = len(libvirt_header_list)*Memory.RAM_PAGE_SIZE
+        time_header_start = time.time()
+        self._process_libvirt_header(libvirt_header_list)
+        time_header_end = time.time()
+
+        memory_page_list = list()
+        memory_data = fin.data_buffer[Const.LIBVIRT_HEADER_SIZE:]
+        memory_page_list += chunks(memory_data, memory_chunk_size)
         memory_data_queue = fin.data_queue
-        memory_page_list = chunks(memory_data, Memory.RAM_PAGE_SIZE)
 
         # launch child processes
         output_fd_list = list()
@@ -511,15 +572,20 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             command_queue = multiprocessing.Queue()
             task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.QUEUE_SIZE_MEMORY_DELTA_LIST)
             mode_queue = multiprocessing.Queue()
-            diff_proc = MemoryDiffProc(command_queue, task_queue, mode_queue, self.deltalist_queue,
-                                 self.diff_algorithm, self.basemem_path, base_hashlist_length,
-                                 self.memory_hashlist, self.free_pfn_dict, self.apply_free_memory)
+            diff_proc = MemoryDiffProc(command_queue, task_queue, mode_queue,
+                                       self.deltalist_queue,
+                                       self.diff_algorithm,
+                                       self.basemem_path,
+                                       base_hashlist_length,
+                                       self.memory_hashlist,
+                                       libvirt_header_offset,
+                                       self.free_pfn_dict,
+                                       self.apply_free_memory)
             diff_proc.start()
             self.proc_list.append((diff_proc, task_queue, command_queue, mode_queue))
             output_fd_list.append(task_queue._writer.fileno())
             output_fd_dict[task_queue._writer.fileno()] = task_queue
 
-        ram_offset = 0
         recved_data_size = 0
         freed_page_counter = 0
         is_end_of_stream = False
@@ -562,28 +628,23 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                         required_length = 0
                         if len(memory_page_list) == 1: # handle partial data
                             last_data = memory_page_list.pop(0)
-                            required_length = Memory.RAM_PAGE_SIZE-len(last_data)
+                            required_length = memory_chunk_size-len(last_data)
                             last_data += recved_data[0:required_length]
                             memory_page_list.append(last_data)
-                        memory_page_list += chunks(recved_data[required_length:], Memory.RAM_PAGE_SIZE)
+                        memory_page_list += chunks(recved_data[required_length:], memory_chunk_size)
 
             tasks = memory_page_list[0:-1]
             memory_page_list = memory_page_list[-1:]
 
-            # put task at child process
+            # put task to child process
             ([], output_ready, []) = select.select([], output_fd_list, [])
-            task_list = (ram_offset, tasks)
             task_queue = output_fd_dict[output_ready[0]]
-            task_queue.put(task_list)
-
-            ram_offset += (len(tasks) * Memory.RAM_PAGE_SIZE)
+            task_queue.put(tasks)
 
         # send last memory page
-        task_list = (ram_offset, memory_page_list)
         ([], output_ready, []) = select.select([], output_fd_list, [])
-        task_list = (ram_offset, tasks)
         task_queue = output_fd_dict[output_ready[0]]
-        task_queue.put(task_list)
+        task_queue.put(memory_page_list)
 
         # send end meesage to every process
         for (proc, t_queue, c_queue, mode_queue) in self.proc_list:
@@ -766,7 +827,8 @@ class SeekablePipe(object):
 class MemoryDiffProc(multiprocessing.Process):
     def __init__(self, command_queue, task_queue, mode_queue, deltalist_queue,
                  diff_algorithm, basemem_path, base_hashlist_length, 
-                 memory_hashlist, free_pfn_dict, apply_free_memory):
+                 memory_hashlist, libvirt_header_offset,
+                 free_pfn_dict, apply_free_memory):
         self.command_queue = command_queue
         self.task_queue = task_queue
         self.mode_queue = mode_queue
@@ -775,6 +837,7 @@ class MemoryDiffProc(multiprocessing.Process):
         self.basemem_path = basemem_path
         self.base_hashlist_length = base_hashlist_length
         self.memory_hashlist = memory_hashlist
+        self.libvirt_header_offset = libvirt_header_offset
         self.free_pfn_dict = free_pfn_dict
         self.apply_free_memory = apply_free_memory
         super(MemoryDiffProc, self).__init__(target=self.process_diff)
@@ -803,17 +866,19 @@ class MemoryDiffProc(multiprocessing.Process):
                 if new_diff_algorithm is not None:
                     self.diff_algorithm = new_diff_algorithm
             if self.task_queue._reader.fileno() in inready:
-                task_list = self.task_queue.get()
-                if task_list == Const.QUEUE_SUCCESS_MESSAGE:
+                memory_chunk_list = self.task_queue.get()
+                if memory_chunk_list == Const.QUEUE_SUCCESS_MESSAGE:
                     #LOG.debug("[Memory][Child] diff proc get end message")
                     is_proc_running = False
                     break
-                (start_ram_offset, memory_chunk_list) = task_list
-                ram_offset = start_ram_offset
                 time_process_start = time.time()
                 deltaitem_list = list()
                 for data in memory_chunk_list:
+                    ram_offset, = struct.unpack(Memory.CHUNK_HEADER_FMT, data[0:Memory.CHUNK_HEADER_SIZE])
+                    ram_offset += self.libvirt_header_offset    # add libvirt header offset
+                    data = data[Memory.CHUNK_HEADER_SIZE:]
                     hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
+                    #print "%d\t%d\t%d" % (self.libvirt_header_offset, ram_offset, len(data))
 
                     self_hash_value = None
                     if hash_list_index < self.base_hashlist_length:
@@ -858,7 +923,7 @@ class MemoryDiffProc(multiprocessing.Process):
                                     data_len=len(diff_data),
                                     data=diff_data)
                             deltaitem_list.append(delta_item)
-                    ram_offset += Memory.RAM_PAGE_SIZE
+                            #print "deltaitem: %d %d" % (diff_type, len(diff_data))
                 time_process_end = time.time()
                 self.deltalist_queue.put(deltaitem_list)
         #LOG.debug("[Memory][Child] child finished. send command queue msg")

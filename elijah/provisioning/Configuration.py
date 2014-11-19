@@ -93,6 +93,7 @@ class Const(object):
     TEMPLATE_XML            = os.path.join(CONFIGURATION_DIR, "VM_TEMPLATE.xml")
     TEMPLATE_OVF            = os.path.join(CONFIGURATION_DIR, "ovftransport.iso")
     CHUNK_SIZE=4096
+    LIBVIRT_HEADER_SIZE = CHUNK_SIZE*2
 
     @staticmethod
     def _check_path(name, path):

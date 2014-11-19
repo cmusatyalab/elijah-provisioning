@@ -1097,7 +1097,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
 
             libvirt_header = memory_util._QemuMemoryHeaderData(data)
             original_header = libvirt_header.get_header()
-            align_size = Memory.Memory.RAM_PAGE_SIZE*2
+            align_size = Const.LIBVIRT_HEADER_SIZE
             new_header = libvirt_header.get_aligned_header(align_size)
             self.result_queue.put(new_header)
             self.total_read_size += len(new_header)
@@ -1576,18 +1576,24 @@ def create_residue(base_disk, base_hashvalue,
         memory_read_proc.join()
         memory_read_proc.finish()   # deallocate resources for snapshotting
         memory_snapshot_size = memory_read_proc.get_memory_snapshot_size()
+        # substract header size
+        new_chunk_size = (Memory.Memory.RAM_PAGE_SIZE+Memory.Memory.CHUNK_HEADER_SIZE)
+        num_mem_chunks = (memory_snapshot_size-Const.LIBVIRT_HEADER_SIZE)/new_chunk_size
+        last_chunk_size = (memory_snapshot_size-Const.LIBVIRT_HEADER_SIZE)%new_chunk_size - Memory.Memory.CHUNK_HEADER_SIZE
+        resume_memory_size = Const.LIBVIRT_HEADER_SIZE + num_mem_chunks*Memory.Memory.RAM_PAGE_SIZE+last_chunk_size
 
         # wait to finish creating files
         synthesis_file.join()
         overlay_info, overlay_files = synthesis_file.get_overlay_info()
 
-        LOG.debug("Memory Snapshot size: %ld" % memory_snapshot_size)
+        LOG.debug("Memory Snapshot size: %ld --> %ld" % (memory_snapshot_size,
+                                                         resume_memory_size))
         overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
         overlay_metafile = _generate_overlaymeta(overlay_metapath,
                                                 overlay_info,
                                                 base_hashvalue,
                                                 os.path.getsize(resumed_vm.resumed_disk),
-                                                memory_snapshot_size)
+                                                resume_memory_size)
 
         # 6. packaging VM overlay into a single zip file
         temp_dir = mkdtemp(prefix="cloudlet-overlay-")
