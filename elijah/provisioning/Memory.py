@@ -642,9 +642,12 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             task_queue.put(tasks)
 
         # send last memory page
-        ([], output_ready, []) = select.select([], output_fd_list, [])
-        task_queue = output_fd_dict[output_ready[0]]
-        task_queue.put(memory_page_list)
+        # libvirt randomly add string starting with 'LibvirtQemudSave'
+        # Therefore, process the last memory page only when it's aligned
+        if len(memory_page_list[0]) == (Memory.RAM_PAGE_SIZE + Memory.CHUNK_HEADER_SIZE):
+            ([], output_ready, []) = select.select([], output_fd_list, [])
+            task_queue = output_fd_dict[output_ready[0]]
+            task_queue.put(memory_page_list)
 
         # send end meesage to every process
         for (proc, t_queue, c_queue, mode_queue) in self.proc_list:
@@ -900,6 +903,7 @@ class MemoryDiffProc(multiprocessing.Process):
                                 if source_data == None:
                                     msg = "launch memory snapshot is bigger than base vm at %ld (%ld > %ld)" %\
                                         (ram_offset, ram_offset+len(data), self.raw_filesize)
+                                    LOG.debug(msg)
                                     raise IOError(msg)
                                 if self.diff_algorithm == "xdelta3":
                                     diff_data = tool.diff_data(source_data, data, 2*len(source_data))

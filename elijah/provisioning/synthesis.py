@@ -32,6 +32,7 @@ import hashlib
 import libvirt
 import shutil
 import multiprocessing
+import struct
 import json
 
 from db import api as db_api
@@ -1070,6 +1071,8 @@ class MemoryReadProcess(process_manager.ProcWorker):
 
         self.manager = multiprocessing.Manager()
         self.memory_snapshot_size = self.manager.list()
+        self.memory_snapshot_size_est = multiprocessing.Value('d', 0.0)
+        self.memory_snapshot_size_est.value = long(0)
         super(MemoryReadProcess, self).__init__(target=self.read_mem_snapshot)
 
     def read_mem_snapshot(self):
@@ -1101,8 +1104,15 @@ class MemoryReadProcess(process_manager.ProcWorker):
             new_header = libvirt_header.get_aligned_header(align_size)
             self.result_queue.put(new_header)
             self.total_read_size += len(new_header)
-            self.result_queue.put(data[len(original_header):])
-            self.total_read_size += len(data[len(original_header):])
+
+            # get memory snapshot size
+            original_header_len = len(original_header)
+            memory_size_data = data[original_header_len:original_header_len+Memory.Memory.CHUNK_HEADER_SIZE]
+            new_data = data[original_header_len+Memory.Memory.CHUNK_HEADER_SIZE:]
+            memory_snapshot_size, = struct.unpack(Memory.Memory.CHUNK_HEADER_FMT, memory_size_data)
+            self.memory_snapshot_size_est.value = long(memory_snapshot_size + len(new_header))
+            self.result_queue.put(new_data)
+            self.total_read_size += len(new_data)
             LOG.info("Header size of memory snapshot is %s" % len(new_header))
 
             # write rest of the memory data
@@ -1605,7 +1615,7 @@ def create_residue(base_disk, base_hashvalue,
         # wait until VM snapshotting finishes to get final VM memory snapshot size
         memory_read_proc.join()
         memory_read_proc.finish()   # deallocate resources for snapshotting
-        resume_memory_size = memory_read_proc.get_memory_snapshot_size()
+        resume_memory_size = long(memory_read_proc.memory_snapshot_size_est.value)
 
         # wait to finish creating files
         synthesis_file.join()
