@@ -34,6 +34,7 @@ try:
     from elijah.provisioning.server import NetworkUtil
     from elijah.provisioning.Configuration import Const
     from elijah.provisioning.package import VMOverlayPackage
+    from elijah.provisioning.synthesis_protocol import Protocol
 except ImportError as e:
     sys.stderr.write(str(e))
     sys.exit(1)
@@ -54,7 +55,8 @@ class StreamSynthesisClient(object):
 
         # send header
         header_dict = {
-            "basevm_uuid": self.basevm_uuid,
+            Const.META_BASE_VM_SHA256: self.basevm_uuid,
+            Protocol.KEY_SYNTHESIS_OPTION: None,
             }
         header = NetworkUtil.encoding(header_dict)
         sock.sendall(struct.pack("!I", len(header)))
@@ -69,21 +71,39 @@ class StreamSynthesisClient(object):
             if comp_task == Const.QUEUE_FAILED_MESSAGE:
                 LOG.error("Failed to get compressed data")
                 break
-            (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
-            blob_header_dict = {
-                Const.META_OVERLAY_FILE_COMPRESSION: blob_comp_type,
-                Const.META_OVERLAY_FILE_SIZE:len(compdata),
-                Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
-                Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
-                }
-            blob_counter += 1
+            blob_type = comp_task[0]
+            if blob_type == "blob":
+                (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task[1:]
+                blob_header_dict = {
+                    "blob_type": "blob",
+                    Const.META_OVERLAY_FILE_COMPRESSION: blob_comp_type,
+                    Const.META_OVERLAY_FILE_SIZE:len(compdata),
+                    Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
+                    Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
+                    }
+                blob_counter += 1
+                # send
+                header = NetworkUtil.encoding(blob_header_dict)
+                sock.sendall(struct.pack("!I", len(header)))
+                sock.sendall(header)
+                sock.sendall(compdata)
+            elif blob_type == "meta":
+                (metadata) = comp_task[1]
+                disk_size = metadata[Const.META_RESUME_VM_DISK_SIZE]
+                memory_size = metadata[Const.META_RESUME_VM_MEMORY_SIZE]
+                blob_header_dict = {
+                    "blob_type": "meta",
+                    Const.META_RESUME_VM_DISK_SIZE: disk_size,
+                    Const.META_RESUME_VM_MEMORY_SIZE: memory_size
+                    }
+                # send
+                header = NetworkUtil.encoding(blob_header_dict)
+                sock.sendall(struct.pack("!I", len(header)))
+                sock.sendall(header)
 
-            # send
-            header = NetworkUtil.encoding(blob_header_dict)
-            sock.sendall(struct.pack("!I", len(header)))
-            sock.sendall(header)
-            sock.sendall(compdata)
+        # end message
         end_header = {
+            "blob_type": "blob",
             Const.META_OVERLAY_FILE_SIZE:0
         }
         header = NetworkUtil.encoding(end_header)
@@ -105,7 +125,12 @@ def synthesize_data(overlay_path, comp_queue):
         output_data = overlay_package.read_blob(comp_filename)
         modified_disk_chunks = blob_info.get(Const.META_OVERLAY_FILE_DISK_CHUNKS)
         modified_memory_chunks = blob_info.get(Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
-        comp_queue.put((comp_type, output_data, modified_disk_chunks, modified_memory_chunks))
+        comp_queue.put(("blob", comp_type, output_data, modified_disk_chunks, modified_memory_chunks))
+
+    new_meta_info = dict()
+    new_meta_info[Const.META_RESUME_VM_DISK_SIZE] = meta_info[Const.META_RESUME_VM_DISK_SIZE]
+    new_meta_info[Const.META_RESUME_VM_MEMORY_SIZE] = meta_info[Const.META_RESUME_VM_MEMORY_SIZE]
+    comp_queue.put(("meta", new_meta_info))
     comp_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
 
@@ -116,7 +141,8 @@ def main(argv=None):
 
     comp_queue = Queue.Queue()
     synthesize_data(args.overlay_file, comp_queue)
-    stream_client = StreamSynthesisClient("asdasd", comp_queue)
+    basevm_uuid = "406ed612a6a8b8a03fbbc5f45cceb0408a1c1d947f09d3b8a5352973d77d01f5"
+    stream_client = StreamSynthesisClient(basevm_uuid, comp_queue)
     stream_client.start()
 
 

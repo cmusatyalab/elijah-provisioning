@@ -8,6 +8,7 @@ import threading
 import msgpack
 import multiprocessing
 import traceback
+
 from delta import DeltaItem
 
 import lzma
@@ -216,6 +217,56 @@ class CompChildProc(multiprocessing.Process):
             sys.stdout.write(msg)
 
 
+class DecompProc(multiprocessing.Process):
+    def __init__(self, input_queue, output_queue):
+        self.input_queue = input_queue
+        self.output_queue = output_queue
+        multiprocessing.Process.__init__(self, target=self.decompress_blobs)
+
+    def decompress_blobs(self):
+        time_start = time.time()
+        data_size = 0
+        counter = 0
+
+        try:
+            while True:
+                recv_data = self.input_queue.get()
+                if recv_data == Const.QUEUE_SUCCESS_MESSAGE:
+                    print "end of decompression"
+                    break
+                if recv_data == Const.QUEUE_FAILED_MESSAGE:
+                    raise StreamSynthesisError("Failed to compress the blob")
+                    break
+                (comp_type, comp_data) = recv_data
+                data_size += len(comp_data)
+                if comp_type == Const.COMPRESSION_LZMA:
+                    decompressor = lzma.LZMADecompressor()
+                    decomp_data = decompressor.decompress(comp_data)
+                    decomp_data += decompressor.flush()
+                elif comp_type == Const.COMPRESSION_BZIP2:
+                    decompressor = bz2.BZ2Decompressor()
+                    decomp_data = decompressor.decompress(comp_data)
+                    decomp_data += decompressor.flush()
+                elif comp_type == Const.COMPRESSION_GZIP:
+                    raise CompressionError("Not implemented")
+                else:
+                    raise CompressionError("Not valid compression option")
+                self.output_queue.put(decomp_data)
+                counter = counter + 1
+        except Exception as e:
+            sys.stdout.write("[decomp] Exception")
+            sys.stderr.write(traceback.format_exc())
+            sys.stderr.write("%s\n" % str(e))
+            self.output_queue.put(Const.QUEUE_FAILED_MESSAGE)
+        else:
+            self.output_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+
+        time_end = time.time()
+        sys.stdout.write("[Decomp] : %s~%s=%s (%d loop, %d bytes)" % \
+                (time_start, time_end, (time_end-time_start), 
+                counter, data_size))
+
+
 def decomp_overlay(meta, output_path):
     meta_dict = msgpack.unpackb(open(meta, "r").read())
     decomp_start_time = time()
@@ -241,11 +292,16 @@ def decomp_overlayzip(overlay_path, outfilename):
     meta_raw = overlay_package.read_meta()
     meta_info = msgpack.unpackb(meta_raw)
     comp_overlay_files = meta_info[Const.META_OVERLAY_FILES]
+    #disk_chunks = list()
+    #memory_chunks = list()
+
 
     out_fd = open(outfilename, "w+b")
     for blob_info in comp_overlay_files:
         comp_filename = blob_info[Const.META_OVERLAY_FILE_NAME]
         comp_type = blob_info.get(Const.META_OVERLAY_FILE_COMPRESSION, Const.COMPRESSION_LZMA)
+        #disk_chunks += blob_info.get(Const.META_OVERLAY_FILE_DISK_CHUNKS)
+        #memory_chunks += blob_info.get(Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
         sys.stdout.write("Decompression type: %d\n" % comp_type)
         if comp_type == Const.COMPRESSION_LZMA:
             comp_data = overlay_package.read_blob(comp_filename)
@@ -266,6 +322,9 @@ def decomp_overlayzip(overlay_path, outfilename):
             raise CompressionError("Not implemented")
         else:
             raise CompressionError("Not valid compression option")
+    #disk_index = [((item*4096)<<1) | (0x02 & 0x0F) for item in disk_chunks]
+    #memory_index = [((item*4096)<<1) | (0x01 & 0x0F) for item in memory_chunks]
+
     out_fd.close()
     return meta_info
 
