@@ -1572,8 +1572,8 @@ def create_residue(base_disk, base_hashvalue,
 
         # wait until getting the memory snapshot size
         resume_memory_size = -1
+        LOG.debug("waiting to get memory size")
         while resume_memory_size < 0:
-            LOG.debug("waiting to get memory size")
             resume_memory_size = memory_read_proc.get_memory_snapshot_size()
         time_memory_snapshot_size = time()
         LOG.debug("[time] Getting memory snapshot size (%f~%f):%f" % (time_start,
@@ -1611,8 +1611,8 @@ def create_residue(base_disk, base_hashvalue,
         # wait until getting the memory snapshot size
         #memory_read_proc.join()
         resume_memory_size = -1
+        LOG.debug("waiting to get memory size")
         while resume_memory_size < 0:
-            LOG.debug("waiting to get memory size")
             resume_memory_size = memory_read_proc.get_memory_snapshot_size()
         time_memory_snapshot_size = time()
         LOG.debug("[time] Getting memory snapshot size (%f~%f):%f" % (time_start,

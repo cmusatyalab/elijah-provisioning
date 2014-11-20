@@ -43,7 +43,7 @@ from synthesis_protocol import Protocol
 
 
 class StreamSynthesisClient(multiprocessing.Process):
-    EMULATED_BANDWIDTH_Mbps = 100000    # Mbps
+    EMULATED_BANDWIDTH_Mbps = 1 # Mbps
 
     def __init__(self, metadata, compdata_queue):
         self.metadata = metadata
@@ -75,7 +75,7 @@ class StreamSynthesisClient(multiprocessing.Process):
             if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
                 break
             if comp_task == Const.QUEUE_FAILED_MESSAGE:
-                LOG.error("Failed to get compressed data")
+                sys.stderr.write("Failed to get compressed data\n")
                 break
             (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
             blob_header_dict = {
@@ -91,7 +91,7 @@ class StreamSynthesisClient(multiprocessing.Process):
             sock.sendall(header)
             sock.sendall(compdata)
             transfer_size += (4+len(header)+len(compdata))
-            print "transfer: %d" % transfer_size
+            #print "transfer: %d" % transfer_size
             '''
             elif blob_type == "meta":
                 (metadata) = comp_task[1]
@@ -129,5 +129,5 @@ class StreamSynthesisClient(multiprocessing.Process):
         sock.sendall(struct.pack("!I", len(header)))
         sock.sendall(header)
         sock.close()
-        sys.stdout.write("Finish\n")
+        #sys.stdout.write("Finish\n")
 
