@@ -429,6 +429,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         fuse_info_queue = multiprocessing.Queue()
         decomp_proc = DecompProc(network_out_queue, decomp_queue)
         decomp_proc.start()
+        LOG.info("Start Decompression process")
         delta_proc = RecoverDeltaProc(base_diskpath, base_mempath,
                                       decomp_queue,
                                       launch_mem,
@@ -436,6 +437,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                                       Cloudlet_Const.CHUNK_SIZE,
                                       fuse_info_queue)
         delta_proc.start()
+        LOG.info("Start Synthesis process")
 
         # get each blob
         while True:

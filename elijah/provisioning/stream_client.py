@@ -43,7 +43,7 @@ from synthesis_protocol import Protocol
 
 
 class StreamSynthesisClient(multiprocessing.Process):
-    EMULATED_BANDWIDTH_Mbps = 1 # Mbps
+    EMULATED_BANDWIDTH_Mbps = 10 # Mbps
 
     def __init__(self, metadata, compdata_queue):
         self.metadata = metadata

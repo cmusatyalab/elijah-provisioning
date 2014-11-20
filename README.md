@@ -72,7 +72,6 @@ You will need:
 * apparmor-utils (for disable apparmor for libvirt)
 * libc6-i386 (for extracting free memory of 32 bit vm)
 * libxml2-dev libxslt1-dev (for overlay packaging)
-* pbzip2 (for overlay compression)
 * python libraries at requirements.txt
 
 
@@ -88,7 +87,7 @@ To install, you either
 
   - install required package  (Ubuntu 12.04)
 
-          > $ sudo apt-get install qemu-kvm libvirt-bin gvncviewer python-libvirt python-xdelta3 python-lzma python-dev liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev python-xdelta3 pbzip2
+          > $ sudo apt-get install qemu-kvm libvirt-bin gvncviewer python-libvirt python-xdelta3 python-lzma python-dev liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev python-xdelta3
   
       At Ubuntu 14.04 python-xdelta3 package is no longer supported. But, old
       version of 13.10 still works without issue. Therefore, at Ubuntu 14.04

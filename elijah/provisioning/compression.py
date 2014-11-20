@@ -359,12 +359,9 @@ def decomp_overlayzip(overlay_path, outfilename):
             out_fd.write(decomp_data)
         elif comp_type == Const.COMPRESSION_BZIP2:
             comp_data = overlay_package.read_blob(comp_filename)
-            _PIPE = subprocess.PIPE
-            proc = subprocess.Popen("pbzip2 -d".split(" "), close_fds=True,
-                                    stdin=_PIPE, stdout=_PIPE, stderr=_PIPE)
-            decomp_data, err = proc.communicate(input=comp_data)
-            if err:
-                sys.stderr.write("Error in getting free memory : %s\n" % str(err))
+            decompressor = bz2.BZ2Decompressor()
+            decomp_data = decompressor.decompress(comp_data)
+            decomp_data += decompressor.flush()
             out_fd.write(decomp_data)
         elif comp_type == Const.COMPRESSION_GZIP:
             raise CompressionError("Not implemented")

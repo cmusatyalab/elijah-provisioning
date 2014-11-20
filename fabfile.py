@@ -72,7 +72,7 @@ def install():
     # install dependent packages
     sudo("apt-get update")
     cmd = "apt-get install --force-yes -y qemu-kvm libvirt-bin gvncviewer "
-    cmd += "python-dev python-libvirt python-lxml python-lzma pbzip2 "
+    cmd += "python-dev python-libvirt python-lxml python-lzma "
     cmd += "apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev"
     if dist == "precise":
         cmd += " python-xdelta3"
