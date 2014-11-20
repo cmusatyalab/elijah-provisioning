@@ -1565,24 +1565,28 @@ def create_residue(base_disk, base_hashvalue,
 
 
     time_packaging_start = time()
-    overlay_mode.OUTPUT_DESTINATION = "file"
+    overlay_mode.OUTPUT_DESTINATION = "network"
     if overlay_mode.OUTPUT_DESTINATION.startswith("network"):
         from stream_client import StreamSynthesisClient
+        resume_disk_size = os.path.getsize(resumed_vm.resumed_disk)
 
-        # wait until VM snapshotting finishes to get final VM memory snapshot size
-        memory_read_proc.join()
-        memory_read_proc.finish()
-        # --> this join blocking entire pipeline
-
-        resume_memory_size = memory_read_proc.get_memory_snapshot_size()
+        # wait until getting the memory snapshot size
+        resume_memory_size = -1
+        while resume_memory_size < 0:
+            LOG.debug("waiting to get memory size")
+            resume_memory_size = memory_read_proc.get_memory_snapshot_size()
+        time_memory_snapshot_size = time()
+        LOG.debug("[time] Getting memory snapshot size (%f~%f):%f" % (time_start,
+                                                                        time_memory_snapshot_size,
+                                                                        (time_memory_snapshot_size-time_start)))
         LOG.debug("Memory Snapshot size: %ld" % (resume_memory_size))
 
         metadata = dict()
         metadata[Const.META_BASE_VM_SHA256] = base_hashvalue
-        metadata[Const.META_RESUME_VM_DISK_SIZE] = os.path.getsize(resumed_vm.resumed_disk),
+        metadata[Const.META_RESUME_VM_DISK_SIZE] = resume_disk_size
         metadata[Const.META_RESUME_VM_MEMORY_SIZE] = resume_memory_size
         client = StreamSynthesisClient(metadata, compdata_queue)
-        client.start()  # blocked
+        client.start()
         client.join()
 
         process_controller.terminate()
@@ -1604,13 +1608,16 @@ def create_residue(base_disk, base_hashvalue,
         cpu_stat = process_controller.cpu_statistics
         #open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
 
-        # wait until VM snapshotting finishes to get final VM memory snapshot size
+        # wait until getting the memory snapshot size
         #memory_read_proc.join()
         resume_memory_size = -1
         while resume_memory_size < 0:
-            print "wait to get memory size"
+            LOG.debug("waiting to get memory size")
             resume_memory_size = memory_read_proc.get_memory_snapshot_size()
-
+        time_memory_snapshot_size = time()
+        LOG.debug("[time] Getting memory snapshot size (%f~%f):%f" % (time_start,
+                                                                        time_memory_snapshot_size,
+                                                                        (time_memory_snapshot_size-time_start)))
         # wait to finish creating files
         synthesis_file.join()
         overlay_info, overlay_files = synthesis_file.get_overlay_info()
