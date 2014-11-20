@@ -110,7 +110,8 @@ class RecoverDeltaProc(multiprocessing.Process):
 
             overlay_chunk_ids = list()
             # recv_data is a single blob so that it contains whole DeltaItem
-            for delta_item in RecoverDeltaProc.from_stream(recv_data):
+            delta_item_list = RecoverDeltaProc.from_buffer(recv_data)
+            for delta_item in delta_item_list:
                 ret = self.recover_item(delta_item)
                 if ret == None:
                     # cannot find self reference point due to the parallel
@@ -197,16 +198,20 @@ class RecoverDeltaProc(multiprocessing.Process):
 
         return delta_item
 
-
     @staticmethod
-    def from_stream(data):
+    def from_buffer(data):
+        #import yappi
+        #yappi.start()
         cur_offset = 0
+        deltaitem_list = list()
         while True:
             new_item, offset = RecoverDeltaProc.unpack_stream(data[cur_offset:])
             cur_offset += offset
             if len(data) < cur_offset:
-                raise StopIteration()
-            yield new_item
+                break
+            deltaitem_list.append(new_item)
+        #yappi.get_func_stats().print_all()
+        return deltaitem_list
 
     @staticmethod
     def unpack_stream(stream, with_hashvalue=False):

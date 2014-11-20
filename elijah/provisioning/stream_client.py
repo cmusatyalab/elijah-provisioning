@@ -42,7 +42,7 @@ except ImportError as e:
 
 
 class StreamSynthesisClient(object):
-    EMULATED_BANDWIDTH_Mbps = 10# Mbps
+    EMULATED_BANDWIDTH_Mbps = 100000    # Mbps
 
     def __init__(self, basevm_uuid, compdata_queue):
         self.basevm_uuid = basevm_uuid
@@ -127,6 +127,8 @@ class StreamSynthesisClient(object):
         sock.sendall(struct.pack("!I", len(header)))
         sock.sendall(header)
         sock.close()
+        sys.stdout.write("Finish")
+
 
 
 def synthesize_data(overlay_path, comp_queue):

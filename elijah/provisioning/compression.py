@@ -40,7 +40,6 @@ class CompressProc(process_manager.ProcWorker):
         self.comp_level = overlay_mode.COMPRESSION_ALGORITHM_SPEED
         self.block_size = block_size
         self.proc_list = list()
-        self.thread_list = list()
         super(CompressProc, self).__init__(target=self.compress_stream)
 
     def change_mode(self, new_mode):
@@ -218,27 +217,87 @@ class CompChildProc(multiprocessing.Process):
 
 
 class DecompProc(multiprocessing.Process):
-    def __init__(self, input_queue, output_queue):
+    def __init__(self, input_queue, output_queue, num_proc=4):
         self.input_queue = input_queue
         self.output_queue = output_queue
+        self.num_proc = num_proc
+        self.proc_list = list()
         multiprocessing.Process.__init__(self, target=self.decompress_blobs)
 
     def decompress_blobs(self):
         time_start = time.time()
-        data_size = 0
-        counter = 0
+
+        # launch child processes
+        output_fd_list = list()
+        output_fd_dict = dict()
+        for i in range(self.num_proc):
+            command_queue = multiprocessing.Queue()
+            task_queue = multiprocessing.Queue(maxsize=1)
+            comp_proc = DecompChildProc(command_queue, task_queue, self.output_queue)
+            comp_proc.start()
+            self.proc_list.append((comp_proc, task_queue, command_queue))
+            output_fd_list.append(task_queue._writer.fileno())
+            output_fd_dict[task_queue._writer.fileno()] = task_queue
 
         try:
             while True:
                 recv_data = self.input_queue.get()
                 if recv_data == Const.QUEUE_SUCCESS_MESSAGE:
-                    print "end of decompression"
                     break
                 if recv_data == Const.QUEUE_FAILED_MESSAGE:
                     raise StreamSynthesisError("Failed to compress the blob")
                     break
+
                 (comp_type, comp_data) = recv_data
-                data_size += len(comp_data)
+                ([], output_ready, []) = select.select([], output_fd_list, [])
+                task_queue = output_fd_dict[output_ready[0]]
+                task_queue.put(recv_data)
+        except Exception as e:
+            sys.stdout.write("[decomp] Exception")
+            sys.stderr.write(traceback.format_exc())
+            sys.stderr.write("%s\n" % str(e))
+            self.output_queue.put(Const.QUEUE_FAILED_MESSAGE)
+
+        # send end meesage to every process
+        for (proc, t_queue, c_queue) in self.proc_list:
+            t_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+            #sys.stdout.write("[Decomp] send end message to each child\n")
+
+        # after this for loop, all processing finished, but child process still
+        # alive until all data pass to the next step
+        for (proc, t_queue, c_queue) in self.proc_list:
+            c_queue.get()
+        time_end = time.time()
+        #sys.stdout.write("[Decomp] effetively finished\n")
+
+        for (proc, t_queue, c_queue) in self.proc_list:
+            #sys.stdout.write("[Comp] waiting to dump all data to the next stage\n")
+            proc.join()
+        # send end message after the next stage finishes processing
+        self.output_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+        sys.stdout.write("[time] Decomp (%s~%s): %s s\n" % \
+                (time_start, time_end, (time_end-time_start)))
+
+
+class DecompChildProc(multiprocessing.Process):
+    def __init__(self, command_queue, task_queue, output_queue):
+        self.command_queue = command_queue
+        self.task_queue = task_queue
+        self.output_queue = output_queue
+        super(DecompChildProc, self).__init__(target=self._decomp)
+
+    def _decomp(self):
+        is_proc_running = True
+        input_list = [self.task_queue._reader.fileno()]
+        while is_proc_running:
+            inready, outread, errready = select.select(input_list, [], [])
+            if self.task_queue._reader.fileno() in inready:
+                input_task = self.task_queue.get()
+                if input_task == Const.QUEUE_SUCCESS_MESSAGE:
+                    is_proc_running = False
+                    break
+                (comp_type, comp_data) = input_task
+
                 if comp_type == Const.COMPRESSION_LZMA:
                     decompressor = lzma.LZMADecompressor()
                     decomp_data = decompressor.decompress(comp_data)
@@ -252,18 +311,8 @@ class DecompProc(multiprocessing.Process):
                 else:
                     raise CompressionError("Not valid compression option")
                 self.output_queue.put(decomp_data)
-                counter = counter + 1
-        except Exception as e:
-            sys.stdout.write("[decomp] Exception")
-            sys.stderr.write(traceback.format_exc())
-            sys.stderr.write("%s\n" % str(e))
-            self.output_queue.put(Const.QUEUE_FAILED_MESSAGE)
-        else:
-            self.output_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-
-        time_end = time.time()
-        sys.stdout.write("[time] Decomp (%s~%s): %s\n" % \
-                (time_start, time_end, (time_end-time_start)))
+        #sys.stdout.write("[decomp][Child] child finished. send command queue msg\n")
+        self.command_queue.put("Compressed processed everything")
 
 
 def decomp_overlay(meta, output_path):
