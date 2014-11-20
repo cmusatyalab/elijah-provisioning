@@ -1426,7 +1426,6 @@ class StreamSynthesisFile(multiprocessing.Process):
     def save_to_file(self):
         comp_file_counter = 0
         input_fd = [self.compdata_queue._reader.fileno()]
-        time_sleep_end = time()
         while True:
             input_ready, out_ready, err_ready = select.select(input_fd, [], [])
             if self.compdata_queue._reader.fileno() in input_ready:
@@ -1468,7 +1467,6 @@ class StreamSynthesisFile(multiprocessing.Process):
                     LOG.debug("Emulating BW of %d Mbps, so wait %f s" %\
                             (self.EMULATED_BANDWIDTH_Mbps, sleep_time))
                     sleep(sleep_time)
-                time_sleep_end = time()
 
 
 

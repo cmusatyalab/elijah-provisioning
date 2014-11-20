@@ -42,6 +42,8 @@ except ImportError as e:
 
 
 class StreamSynthesisClient(object):
+    EMULATED_BANDWIDTH_Mbps = 10# Mbps
+
     def __init__(self, basevm_uuid, compdata_queue):
         self.basevm_uuid = basevm_uuid
         self.compdata_queue = compdata_queue
@@ -66,6 +68,8 @@ class StreamSynthesisClient(object):
         blob_counter = 0
         while True:
             comp_task = self.compdata_queue.get()
+            time_process_start = time.time()
+            transfer_size = 0
             if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
                 break
             if comp_task == Const.QUEUE_FAILED_MESSAGE:
@@ -87,6 +91,7 @@ class StreamSynthesisClient(object):
                 sock.sendall(struct.pack("!I", len(header)))
                 sock.sendall(header)
                 sock.sendall(compdata)
+                transfer_size += (4+len(header)+len(compdata))
             elif blob_type == "meta":
                 (metadata) = comp_task[1]
                 disk_size = metadata[Const.META_RESUME_VM_DISK_SIZE]
@@ -100,6 +105,18 @@ class StreamSynthesisClient(object):
                 header = NetworkUtil.encoding(blob_header_dict)
                 sock.sendall(struct.pack("!I", len(header)))
                 sock.sendall(header)
+                transfer_size += (4+len(header))
+
+            # wait to emulate network badwidth
+            time_process_end = time.time()
+            processed_time = time_process_end-time_process_start
+            processed_size = transfer_size
+            emulated_time = (processed_size*8) / (self.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
+            if emulated_time > processed_time:
+                sleep_time = (emulated_time-processed_time)
+                sys.stdout.write("Emulating BW of %d Mbps, so wait %f s\n" %\
+                        (self.EMULATED_BANDWIDTH_Mbps, sleep_time))
+                time.sleep(sleep_time)
 
         # end message
         end_header = {

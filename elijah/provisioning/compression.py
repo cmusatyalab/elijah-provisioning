@@ -262,9 +262,8 @@ class DecompProc(multiprocessing.Process):
             self.output_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         time_end = time.time()
-        sys.stdout.write("[Decomp] : %s~%s=%s (%d loop, %d bytes)" % \
-                (time_start, time_end, (time_end-time_start), 
-                counter, data_size))
+        sys.stdout.write("[time] Decomp (%s~%s): %s\n" % \
+                (time_start, time_end, (time_end-time_start)))
 
 
 def decomp_overlay(meta, output_path):
