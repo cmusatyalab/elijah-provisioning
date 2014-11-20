@@ -235,6 +235,7 @@ class VMOverlayCreationMode(object):
     @staticmethod
     def get_pipelined_multi_process_finite_queue():
         mode = VMOverlayCreationMode()
+        #mode.OUTPUT_DESTINATION = "network"
         mode.PROCESS_PIPELINED = True
         mode.NUM_PROC_MEMORY_DIFF = 4
         mode.NUM_PROC_DISK_DIFF = 4

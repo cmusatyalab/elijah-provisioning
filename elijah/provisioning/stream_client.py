@@ -41,14 +41,15 @@ except ImportError as e:
 
 
 
-class StreamSynthesisClient(object):
+class StreamSynthesisClient(multiprocessing.Process):
     EMULATED_BANDWIDTH_Mbps = 100000    # Mbps
 
-    def __init__(self, basevm_uuid, compdata_queue):
-        self.basevm_uuid = basevm_uuid
+    def __init__(self, metadata, compdata_queue):
+        self.metadata = metadata
         self.compdata_queue = compdata_queue
+        super(StreamSynthesisClient, self).__init__(target=self.transfer)
 
-    def start(self):
+    def transfer(self):
         # connect
         address = ("127.0.0.1", 8022)
         print "Connecting to (%s).." % str(address)
@@ -57,9 +58,9 @@ class StreamSynthesisClient(object):
 
         # send header
         header_dict = {
-            Const.META_BASE_VM_SHA256: self.basevm_uuid,
             Protocol.KEY_SYNTHESIS_OPTION: None,
             }
+        header_dict.update(self.metadata)
         header = NetworkUtil.encoding(header_dict)
         sock.sendall(struct.pack("!I", len(header)))
         sock.sendall(header)
@@ -75,23 +76,22 @@ class StreamSynthesisClient(object):
             if comp_task == Const.QUEUE_FAILED_MESSAGE:
                 LOG.error("Failed to get compressed data")
                 break
-            blob_type = comp_task[0]
-            if blob_type == "blob":
-                (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task[1:]
-                blob_header_dict = {
-                    "blob_type": "blob",
-                    Const.META_OVERLAY_FILE_COMPRESSION: blob_comp_type,
-                    Const.META_OVERLAY_FILE_SIZE:len(compdata),
-                    Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
-                    Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
-                    }
-                blob_counter += 1
-                # send
-                header = NetworkUtil.encoding(blob_header_dict)
-                sock.sendall(struct.pack("!I", len(header)))
-                sock.sendall(header)
-                sock.sendall(compdata)
-                transfer_size += (4+len(header)+len(compdata))
+            (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
+            blob_header_dict = {
+                Const.META_OVERLAY_FILE_COMPRESSION: blob_comp_type,
+                Const.META_OVERLAY_FILE_SIZE:len(compdata),
+                Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
+                Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
+                }
+            blob_counter += 1
+            # send
+            header = NetworkUtil.encoding(blob_header_dict)
+            sock.sendall(struct.pack("!I", len(header)))
+            sock.sendall(header)
+            sock.sendall(compdata)
+            transfer_size += (4+len(header)+len(compdata))
+            print "transfer: %d" % transfer_size
+            '''
             elif blob_type == "meta":
                 (metadata) = comp_task[1]
                 disk_size = metadata[Const.META_RESUME_VM_DISK_SIZE]
@@ -106,6 +106,7 @@ class StreamSynthesisClient(object):
                 sock.sendall(struct.pack("!I", len(header)))
                 sock.sendall(header)
                 transfer_size += (4+len(header))
+            '''
 
             # wait to emulate network badwidth
             time_process_end = time.time()
@@ -127,7 +128,7 @@ class StreamSynthesisClient(object):
         sock.sendall(struct.pack("!I", len(header)))
         sock.sendall(header)
         sock.close()
-        sys.stdout.write("Finish")
+        sys.stdout.write("Finish\n")
 
 
 
@@ -144,13 +145,14 @@ def synthesize_data(overlay_path, comp_queue):
         output_data = overlay_package.read_blob(comp_filename)
         modified_disk_chunks = blob_info.get(Const.META_OVERLAY_FILE_DISK_CHUNKS)
         modified_memory_chunks = blob_info.get(Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
-        comp_queue.put(("blob", comp_type, output_data, modified_disk_chunks, modified_memory_chunks))
+        comp_queue.put((comp_type, output_data, modified_disk_chunks, modified_memory_chunks))
 
     new_meta_info = dict()
+    new_meta_info[Const.META_BASE_VM_SHA256] = meta_info[Const.META_BASE_VM_SHA256]
     new_meta_info[Const.META_RESUME_VM_DISK_SIZE] = meta_info[Const.META_RESUME_VM_DISK_SIZE]
     new_meta_info[Const.META_RESUME_VM_MEMORY_SIZE] = meta_info[Const.META_RESUME_VM_MEMORY_SIZE]
-    comp_queue.put(("meta", new_meta_info))
     comp_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+    return new_meta_info
 
 
 def main(argv=None):
@@ -159,10 +161,11 @@ def main(argv=None):
     args = parser.parse_args()
 
     comp_queue = Queue.Queue()
-    synthesize_data(args.overlay_file, comp_queue)
+    metadata = synthesize_data(args.overlay_file, comp_queue)
     basevm_uuid = "406ed612a6a8b8a03fbbc5f45cceb0408a1c1d947f09d3b8a5352973d77d01f5"
-    stream_client = StreamSynthesisClient(basevm_uuid, comp_queue)
+    stream_client = StreamSynthesisClient(metadata, comp_queue)
     stream_client.start()
+    stream_client.join()
 
 
 if __name__ == "__main__":

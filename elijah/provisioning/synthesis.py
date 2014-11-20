@@ -1149,7 +1149,13 @@ class MemoryReadProcess(process_manager.ProcWorker):
 
     def get_memory_snapshot_size(self):
         if len(self.memory_snapshot_size) > 0:
-            return long(self.memory_snapshot_size[0])
+            memory_snapshot_size = long(self.memory_snapshot_size[0])
+            # substract header size
+            new_chunk_size = (Memory.Memory.RAM_PAGE_SIZE+Memory.Memory.CHUNK_HEADER_SIZE)
+            num_mem_chunks = (memory_snapshot_size-Const.LIBVIRT_HEADER_SIZE)/new_chunk_size
+            last_chunk_size = (memory_snapshot_size-Const.LIBVIRT_HEADER_SIZE)%new_chunk_size - Memory.Memory.CHUNK_HEADER_SIZE
+            resume_memory_size = Const.LIBVIRT_HEADER_SIZE + num_mem_chunks*Memory.Memory.RAM_PAGE_SIZE+last_chunk_size
+            return resume_memory_size
         return long(-1)
 
     def finish(self):
@@ -1403,7 +1409,7 @@ def _waiting_to_finish(process_controller, worker_name):
 
 
 class StreamSynthesisFile(multiprocessing.Process):
-    EMULATED_BANDWIDTH_Mbps = 1000 # Mbps
+    EMULATED_BANDWIDTH_Mbps = 10000 # Mbps
 
     def __init__(self, basevm_uuid, compdata_queue, temp_compfile_dir):
         self.basevm_uuid = basevm_uuid
@@ -1557,10 +1563,36 @@ def create_residue(base_disk, base_hashvalue,
 
 
     time_packaging_start = time()
+    overlay_mode.OUTPUT_DESTINATION = "file"
     if overlay_mode.OUTPUT_DESTINATION.startswith("network"):
         from stream_client import StreamSynthesisClient
-        client = StreamSynthesisClient(base_hashvalue, compdata_queue)
+
+        # wait until VM snapshotting finishes to get final VM memory snapshot size
+        memory_read_proc.join()
+        memory_read_proc.finish()
+        # --> this join blocking entire pipeline
+
+        resume_memory_size = memory_read_proc.get_memory_snapshot_size()
+        LOG.debug("Memory Snapshot size: %ld" % (resume_memory_size))
+
+        metadata = dict()
+        metadata[Const.META_BASE_VM_SHA256] = base_hashvalue
+        metadata[Const.META_RESUME_VM_DISK_SIZE] = os.path.getsize(resumed_vm.resumed_disk),
+        metadata[Const.META_RESUME_VM_MEMORY_SIZE] = resume_memory_size
+        client = StreamSynthesisClient(metadata, compdata_queue)
         client.start()  # blocked
+        client.join()
+
+        process_controller.terminate()
+        cpu_stat = process_controller.cpu_statistics
+
+        # 7. terminting
+        resumed_vm.machine = None   # protecting malaccess to machine 
+        time_end = time()
+
+        LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
+                                                                (time_end-time_start)))
+        return None
     elif overlay_mode.OUTPUT_DESTINATION.startswith("file"):
         temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")
         synthesis_file = StreamSynthesisFile(base_hashvalue, compdata_queue, temp_compfile_dir)
@@ -1568,24 +1600,18 @@ def create_residue(base_disk, base_hashvalue,
 
         process_controller.terminate()
         cpu_stat = process_controller.cpu_statistics
-        open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
+        #open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
 
         # wait until VM snapshotting finishes to get final VM memory snapshot size
         memory_read_proc.join()
         memory_read_proc.finish()   # deallocate resources for snapshotting
-        memory_snapshot_size = memory_read_proc.get_memory_snapshot_size()
-        # substract header size
-        new_chunk_size = (Memory.Memory.RAM_PAGE_SIZE+Memory.Memory.CHUNK_HEADER_SIZE)
-        num_mem_chunks = (memory_snapshot_size-Const.LIBVIRT_HEADER_SIZE)/new_chunk_size
-        last_chunk_size = (memory_snapshot_size-Const.LIBVIRT_HEADER_SIZE)%new_chunk_size - Memory.Memory.CHUNK_HEADER_SIZE
-        resume_memory_size = Const.LIBVIRT_HEADER_SIZE + num_mem_chunks*Memory.Memory.RAM_PAGE_SIZE+last_chunk_size
+        resume_memory_size = memory_read_proc.get_memory_snapshot_size()
 
         # wait to finish creating files
         synthesis_file.join()
         overlay_info, overlay_files = synthesis_file.get_overlay_info()
 
-        LOG.debug("Memory Snapshot size: %ld --> %ld" % (memory_snapshot_size,
-                                                         resume_memory_size))
+        LOG.debug("Memory Snapshot size: %ld" % (resume_memory_size))
         overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
         overlay_metafile = _generate_overlaymeta(overlay_metapath,
                                                 overlay_info,
@@ -2046,9 +2072,10 @@ def synthesis(base_disk, overlay_path, **kwargs):
                                              synthesized_VM,
                                              options,
                                              prev_mem_deltalist)
-            LOG.info("[RESULT] Residue")
-            LOG.info("[RESULT]   Metafile : %s" % \
-                    (os.path.abspath(residue_overlay)))
+            if residue_overlay is not None:
+                LOG.info("[RESULT] Residue")
+                LOG.info("[RESULT]   Metafile : %s" % \
+                        (os.path.abspath(residue_overlay)))
         except CloudletGenerationError, e:
             LOG.error("Cannot create residue : %s" % (str(e)))
 

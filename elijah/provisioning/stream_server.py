@@ -404,8 +404,11 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             raise StreamSynthesisError("Failed to receive first byte of header")
         message_size = struct.unpack("!I", data)[0]
         msgpack_data = self._recv_all(message_size)
-        message = NetworkUtil.decoding(msgpack_data)
-        synthesis_option, base_diskpath = self._check_validity(message)
+        metadata = NetworkUtil.decoding(msgpack_data)
+        launch_disk_size = metadata[Cloudlet_Const.META_RESUME_VM_DISK_SIZE]
+        launch_memory_size = metadata[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
+
+        synthesis_option, base_diskpath = self._check_validity(metadata)
         if base_diskpath == None:
             raise StreamSynthesisError("No matching base VM")
         (base_diskmeta, base_mempath, base_memmeta) = \
@@ -415,8 +418,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
 
         # variables for FUSE
         temp_synthesis_dir = tempfile.mkdtemp(prefix="cloudlet-comp-")
-        launch_disk_size = 0
-        launch_memory_size = 0
         launch_disk = os.path.join(temp_synthesis_dir, "launch-disk")
         launch_mem = os.path.join(temp_synthesis_dir, "launch-mem")
         disk_chunk_list = list()
@@ -445,27 +446,23 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             blob_header_size = struct.unpack("!I", data)[0]
             blob_header_raw = self._recv_all(blob_header_size)
             blob_header = NetworkUtil.decoding(blob_header_raw)
-            blob_type = blob_header.get("blob_type", None)
-            if blob_type == "blob":
-                blob_size = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_SIZE)
-                if blob_size == None:
-                    raise StreamSynthesisError("Failed to receive blob")
-                if blob_size == 0:
-                    print "end of stream"
-                    break
-                blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
-                blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
-                blob_memory_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
-                disk_chunk_list += ["%ld:1" % item for item in blob_disk_chunk]
-                memory_chunk_list += ["%ld:1" % item for item in blob_memory_chunk]
-                compressed_blob = self._recv_all(blob_size)
-                network_out_queue.put((blob_comp_type, compressed_blob))
-            elif blob_type == "meta":
-                print blob_header
-                launch_disk_size = blob_header[Cloudlet_Const.META_RESUME_VM_DISK_SIZE]
-                launch_memory_size = blob_header[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
-            else:
-                raise StreamSynthesisError("need blob type")
+            blob_size = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_SIZE)
+            if blob_size == None:
+                raise StreamSynthesisError("Failed to receive blob")
+            if blob_size == 0:
+                print "end of stream"
+                break
+            blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
+            blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
+            blob_memory_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
+            disk_chunk_list += ["%ld:1" % item for item in blob_disk_chunk]
+            memory_chunk_list += ["%ld:1" % item for item in blob_memory_chunk]
+            compressed_blob = self._recv_all(blob_size)
+            network_out_queue.put((blob_comp_type, compressed_blob))
+            #elif blob_type == "meta":
+            #    print blob_header
+            #else:
+            #    raise StreamSynthesisError("need blob type")
         network_out_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
         delta_proc.join()
         # We told FUSE that we have everything ready, so we need to wait until
