@@ -59,8 +59,7 @@ class StreamSynthesisError(Exception):
 import mmap
 import tool
 from delta import DeltaItem
-class RecoverDeltaProc(threading.Thread):
-#class RecoverDeltaProc(multiprocessing.Process):
+class RecoverDeltaProc(multiprocessing.Process):
     FUSE_INDEX_DISK = 1
     FUSE_INDEX_MEMORY = 2
 
@@ -89,8 +88,7 @@ class RecoverDeltaProc(threading.Thread):
         self.recovered_delta_dict = dict()
         self.delta_list = list()
 
-        #multiprocessing.Process.__init__(self)
-        threading.Thread.__init__(self, target=self.recover_deltaitem)
+        multiprocessing.Process.__init__(self, target=self.recover_deltaitem)
 
     def recover_deltaitem(self):
         time_start = time.time()
@@ -124,8 +122,7 @@ class RecoverDeltaProc(threading.Thread):
 
             self.recover_mem_fd.flush()
             self.recover_disk_fd.flush()
-            self.fuse_info_queue.put(overlay_chunk_ids)
-
+            #self.fuse_info_queue.put(overlay_chunk_ids)
 
         LOG.info("[Delta] Handle dangling DeltaItem (%d)" % len(unresolved_deltaitem_list))
         overlay_chunk_ids = list()
@@ -142,8 +139,8 @@ class RecoverDeltaProc(threading.Thread):
         self.recover_mem_fd = None
         self.recover_disk_fd.close()
         self.recover_disk_fd = None
-        self.fuse_info_queue.put(overlay_chunk_ids)
-        self.fuse_info_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
+        #self.fuse_info_queue.put(overlay_chunk_ids)
+        #self.fuse_info_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
         time_end = time.time()
 
         LOG.info("[time] Delta delta %ld chunks, (%s~%s): %s" % \
@@ -303,9 +300,9 @@ class FuseFeedingProc(multiprocessing.Process):
                 chunks = self.fuse_info_queue.get()
                 if chunks == Cloudlet_Const.QUEUE_SUCCESS_MESSAGE:
                     break
-                for chunk in chunks:
-                    self.fuse.fuse_write(chunk)
-                    #sys.stdout.write(chunk)
+                chunk_str = ','.join(chunks)
+                #sys.stdout.write(chunk_str)
+                self.fuse.fuse_write(chunk_str)
             except EOFError:
                 break
 
@@ -454,8 +451,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
                 blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
                 blob_memory_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
-                disk_chunk_list += ["%ld:0" % item for item in blob_disk_chunk]
-                memory_chunk_list += ["%ld:0" % item for item in blob_memory_chunk]
+                disk_chunk_list += ["%ld:1" % item for item in blob_disk_chunk]
+                memory_chunk_list += ["%ld:1" % item for item in blob_memory_chunk]
                 compressed_blob = self._recv_all(blob_size)
                 network_out_queue.put((blob_comp_type, compressed_blob))
             elif blob_type == "meta":
@@ -465,9 +462,13 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             else:
                 raise StreamSynthesisError("need blob type")
         network_out_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
+        delta_proc.join()
+        # We told FUSE that we have everything ready, so we need to wait until
+        # delta_proc fininshes
+        # we cannot start VM before delta_proc finishes, because we don't know
+        # what will be modified in the future
 
-        # start fuse after getting all modified disk/memory chunks
-        # need to update
+        time_fuse_start = time.time()
         disk_overlay_map = ','.join(disk_chunk_list)
         memory_overlay_map = ','.join(memory_chunk_list)
         fuse = run_fuse(Cloudlet_Const.CLOUDLETFS_PATH, Cloudlet_Const.CHUNK_SIZE,
@@ -475,14 +476,15 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 resumed_disk=launch_disk,  disk_overlay_map=disk_overlay_map,
                 resumed_memory=launch_mem, memory_overlay_map=memory_overlay_map)
         synthesized_VM = SynthesizedVM(launch_disk, launch_mem, fuse)
-        fuse_proc = FuseFeedingProc(fuse, fuse_info_queue)
-        fuse_proc.start()
+        #fuse_proc = FuseFeedingProc(fuse, fuse_info_queue)
+        #fuse_proc.start()
+        #fuse_proc.join()
 
-        # no-pipelining
-        delta_proc.join()
-        fuse_proc.join()
-        import pdb;pdb.set_trace()
         synthesized_VM.resume()
+        time_fuse_end = time.time()
+        LOG.info("[time] last, but non-pipelined time (%f ~ %f): %f" % (time_fuse_start,
+                                                                        time_fuse_end,
+                                                                        (time_fuse_end-time_fuse_start)))
         connect_vnc(synthesized_VM.machine)
 
         # terminate
