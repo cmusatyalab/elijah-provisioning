@@ -38,6 +38,7 @@ import msgpack
 #    sys.exit(1)
 from server import NetworkUtil
 from Configuration import Const
+from Configuration import VMOverlayCreationMode
 from synthesis_protocol import Protocol
 
 
@@ -53,6 +54,7 @@ class StreamSynthesisClient(multiprocessing.Process):
     def transfer(self):
         # connect
         address = ("127.0.0.1", 8022)
+        #address = ("128.2.213.12", 8022)
         print "Connecting to (%s).." % str(address)
         sock = socket.create_connection(address, 10)
         sock.setblocking(True)
@@ -113,11 +115,11 @@ class StreamSynthesisClient(multiprocessing.Process):
             time_process_end = time.time()
             processed_time = time_process_end-time_process_start
             processed_size = transfer_size
-            emulated_time = (processed_size*8) / (self.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
+            emulated_time = (processed_size*8) / (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
             if emulated_time > processed_time:
                 sleep_time = (emulated_time-processed_time)
                 sys.stdout.write("Emulating BW of %d Mbps, so wait %f s\n" %\
-                        (self.EMULATED_BANDWIDTH_Mbps, sleep_time))
+                        (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps, sleep_time))
                 time.sleep(sleep_time)
 
         # end message

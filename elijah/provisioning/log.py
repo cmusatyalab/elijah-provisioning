@@ -22,6 +22,7 @@ import os
 import logging
 import sys
 import stat
+import grp
 from Configuration import Const as Const
 
 loggers = dict()

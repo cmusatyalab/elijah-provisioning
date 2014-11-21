@@ -56,6 +56,8 @@ class CompressProc(process_manager.ProcWorker):
         input_list = [self.control_queue._reader.fileno(),
                         self.delta_list_queue._reader.fileno()]
         while input_size < self.block_size:
+            #self.monitor_current_inqueue_length.value = self.delta_list_queue.qsize()
+            #self.monitor_current_outqueue_length.value = self.comp_delta_queue.qsize()
             (input_ready, [], []) = select.select(input_list, [], [])
             if self.control_queue._reader.fileno() in input_ready:
                 control_msg = self.control_queue.get()

@@ -1411,7 +1411,6 @@ def _waiting_to_finish(process_controller, worker_name):
 
 
 class StreamSynthesisFile(multiprocessing.Process):
-    EMULATED_BANDWIDTH_Mbps = 10000 # Mbps
 
     def __init__(self, basevm_uuid, compdata_queue, temp_compfile_dir):
         self.basevm_uuid = basevm_uuid
@@ -1469,28 +1468,30 @@ class StreamSynthesisFile(multiprocessing.Process):
                 # wait to emulate network badwidth
                 processed_time = time_process_end-time_process_start
                 processed_size = os.path.getsize(blob_filename)
-                emulated_time = (processed_size*8) / (self.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
+                emulated_time = (processed_size*8) / (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
                 if emulated_time > processed_time:
                     sleep_time = (emulated_time-processed_time)
                     LOG.debug("Emulating BW of %d Mbps, so wait %f s" %\
-                            (self.EMULATED_BANDWIDTH_Mbps, sleep_time))
+                            (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps, sleep_time))
                     sleep(sleep_time)
 
 
 
 def create_residue(base_disk, base_hashvalue,
                    basedisk_hashdict, basemem_hashdict,
-                   resumed_vm, options, original_deltalist):
+                   resumed_vm, options, original_deltalist,
+                   overlay_mode=None):
     '''Get residue
     return overlay_metafile, overlay_files
     '''
     time_start = time()
     process_controller = process_manager.get_instance()
-    #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
-    #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
-    #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process_finite_queue()
-    #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
-    overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+    if overlay_mode == None:
+        overlay_mode = VMOverlayCreationMode.get_serial_single_process()
+        #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
+        #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process_finite_queue()
+        #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
+        #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
 
     process_controller.set_mode(overlay_mode)
     LOG.info("* Overlay creation configuration")
@@ -1565,7 +1566,7 @@ def create_residue(base_disk, base_hashvalue,
 
 
     time_packaging_start = time()
-    overlay_mode.OUTPUT_DESTINATION = "network"
+    overlay_mode.OUTPUT_DESTINATION = "file"
     if overlay_mode.OUTPUT_DESTINATION.startswith("network"):
         from stream_client import StreamSynthesisClient
         resume_disk_size = os.path.getsize(resumed_vm.resumed_disk)
@@ -1604,10 +1605,6 @@ def create_residue(base_disk, base_hashvalue,
         synthesis_file = StreamSynthesisFile(base_hashvalue, compdata_queue, temp_compfile_dir)
         synthesis_file.start()
 
-        process_controller.terminate()
-        cpu_stat = process_controller.cpu_statistics
-        #open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
-
         # wait until getting the memory snapshot size
         #memory_read_proc.join()
         resume_memory_size = -1
@@ -1640,6 +1637,10 @@ def create_residue(base_disk, base_hashvalue,
                                                                     (time_packaging_end-time_packaging_start)))
 
         # 7. terminting
+        process_controller.terminate()
+        cpu_stat = process_controller.cpu_statistics
+        #open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
+
         memory_read_proc.finish()   # deallocate resources for snapshotting
         resumed_vm.machine = None   # protecting malaccess to machine 
         if os.path.exists(overlay_metafile) == True:
@@ -2005,6 +2006,8 @@ def synthesis(base_disk, overlay_path, **kwargs):
     zip_container = kwargs.get('zip_container', False)
     return_residue = kwargs.get('return_residue', False)
     qemu_args = kwargs.get('qemu_args', False)
+    overlay_mode = kwargs.get('overlay_mode', None)
+    is_profiling_test = kwargs.get('is_profiling_test', False)
 
     nova_xml = kwargs.get('nova_xml', None)
     base_mem = kwargs.get('base_mem', None)
@@ -2046,7 +2049,11 @@ def synthesis(base_disk, overlay_path, **kwargs):
         preload_thread = PreloadResidueData(base_diskmeta, base_memmeta)
         preload_thread.daemon = True
         preload_thread.start()
-    connect_vnc(synthesized_VM.machine)
+
+    if is_profiling_test == False:
+        connect_vnc(synthesized_VM.machine)
+    else:
+        sleep(10)
 
     # statistics
     synthesized_VM.monitor.terminate()
@@ -2083,7 +2090,8 @@ def synthesis(base_disk, overlay_path, **kwargs):
                                              preload_thread.basemem_hashdict,
                                              synthesized_VM,
                                              options,
-                                             prev_mem_deltalist)
+                                             prev_mem_deltalist,
+                                             overlay_mode=overlay_mode)
             if residue_overlay is not None:
                 LOG.info("[RESULT] Residue")
                 LOG.info("[RESULT]   Metafile : %s" % \

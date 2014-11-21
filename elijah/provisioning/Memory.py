@@ -604,6 +604,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                         processed_datasize = 0
                         processed_duration = float(0)
 
+                #self.monitor_current_inqueue_length.value = self.modified_mem_queue.qsize()
+                #self.monitor_current_outqueue_length.value = self.deltalist_queue.qsize()
                 input_fd = [self.control_queue._reader.fileno(), memory_data_queue._reader.fileno()]
                 input_ready, out_ready, err_ready = select.select(input_fd, [], [])
                 if self.control_queue._reader.fileno() in input_ready:

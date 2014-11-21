@@ -264,6 +264,8 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         for index, chunk in enumerate(self.modified_chunk_dict.keys()):
             # check control message
             try:
+                #self.monitor_current_inqueue_length.value = 0
+                #self.monitor_current_outqueue_length.value = self.disk_deltalist_queue.qsize()
                 input_ready, out_ready, err_ready = select.select(input_fd, [], [], 0.0001)
                 if self.control_queue._reader.fileno() in input_ready:
                     control_msg = self.control_queue.get()

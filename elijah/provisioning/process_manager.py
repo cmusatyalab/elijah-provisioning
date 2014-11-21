@@ -123,6 +123,35 @@ class ProcessManager(threading.Thread):
             result[worker_name] = response
         return result
 
+    def _get_queue_length(self):
+        worker_names = self.process_list.keys()
+        responses = dict()
+        for worker_name in worker_names:
+            worker = self.process_list.get(worker_name, None)
+            response = (worker.monitor_current_inqueue_length.value, worker.monitor_current_outqueue_length.value)
+            responses[worker_name] = response
+
+        #sys.stdout.write("[manager]\t")
+        #for (worker_name, response) in responses.iteritems():
+        #    sys.stdout.write("%s(%s)\t" % (worker_name[:10], str(response)))
+        #sys.stdout.write("\n")
+        return responses
+
+    def _get_queueing_time(self):
+        result = dict()
+        worker_names = self.process_list.keys()
+        responses = dict()
+        for worker_name in worker_names:
+            worker = self.process_list.get(worker_name, None)
+            response = (worker.monitor_current_get_time.value, worker.monitor_current_put_time.value)
+            responses[worker_name] = response
+
+        sys.stdout.write("[manager]\t")
+        for (worker_name, response) in responses.iteritems():
+            sys.stdout.write("%s(%s)\t" % (worker_name[:10], str(response)))
+        sys.stdout.write("\n")
+        return result
+
     def start_managing(self):
         time_s = time.time()
         self.cpu_statistics = list()
@@ -135,6 +164,8 @@ class ProcessManager(threading.Thread):
                 #self._change_comp_mode()
                 #self._change_diff_mode()
                 #break
+                #result = self._get_queue_length()
+                #time.sleep(0.1)
         except Exception as e:
             sys.stdout.write("[manager] Exception")
             sys.stderr.write(traceback.format_exc())
@@ -167,14 +198,18 @@ class ProcWorker(multiprocessing.Process):
 
         # measurement
         self.monitor_current_bw = float(0)
-        self.monitor_current_inqueue_size = 0
-        self.monitor_current_outqueue_size = 0
+        self.monitor_current_inqueue_length = multiprocessing.Value('d', -1.0)
+        self.monitor_current_outqueue_length = multiprocessing.Value('d', -1.0)
+        self.monitor_current_get_time = multiprocessing.Value('d', -1.0)
+        self.monitor_current_put_time = multiprocessing.Value('d', -1.0)
         super(ProcWorker, self).__init__(*args, **kwargs)
 
     def _handle_control_msg(self, control_msg):
         if control_msg == "current_bw":
             self.response_queue.put(self.monitor_current_bw)
             return True
+        elif control_msg == "queue_length":
+            return (self.monitor_current_inqueue_length, self.monitor_current_outqueue_length)
         elif control_msg == "cpu_usage_accum":
             #(utime, stime, child_utime, child_stime, elaspe_time) = os.times()
             #all_times = utime+stime+child_utime+child_stime

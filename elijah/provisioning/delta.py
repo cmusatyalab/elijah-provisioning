@@ -717,6 +717,8 @@ class DeltaDedup(process_manager.ProcWorker):
         is_disk_finished = False
         while is_memory_finished == False or is_disk_finished == False:
             time_process_start = time.time()
+            #self.monitor_current_inqueue_length.value = max(self.memory_deltalist_queue.qsize(), self.disk_deltalist_queue.qsize())
+            #self.monitor_current_outqueue_length.value = self.merged_deltalist_queue.qsize()
             input_list = [self.memory_deltalist_queue._reader.fileno(),
                           self.disk_deltalist_queue._reader.fileno(),
                           self.control_queue._reader.fileno()]
