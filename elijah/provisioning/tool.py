@@ -19,6 +19,7 @@
 #
 
 import xdelta3
+import bsdiff4
 import os
 import filecmp
 import sys
@@ -86,6 +87,14 @@ def diff_data(source_data, modi_data, buf_len):
     return patch
 
 
+def diff_data_bsdiff(source_data, modi_data):
+    if len(source_data) == 0 or len(modi_data) == 0:
+        raise IOError("[Error] Not valid data length: %d, %d" % (len(source_data), len(modi_data)))
+
+    patch = bsdiff4.diff(source_data, modi_data)
+    return patch
+
+
 def diff_files_custom(source_file, target_file, output_file, **kwargs):
     # kwargs
     # skip_validation   :   skipp sha1 validation
@@ -144,11 +153,18 @@ def merge_files(source_file, overlay_file, output_file, **kwargs):
 def merge_data(source_data, overlay_data, buf_len):
     if len(source_data) == 0 or len(overlay_data) == 0:
         raise IOError("[Error] Not valid data length: %d, %d" % (len(source_data), len(overlay_data)))
-    
     result, recover = xdelta3.xd3_decode_memory(overlay_data, source_data, buf_len)
     if result != 0:
         raise IOError("Error while xdelta3 : %d" % result)
     return recover 
+
+
+def merge_data_bsdiff(source_data, overlay_data):
+    if len(source_data) == 0 or len(overlay_data) == 0:
+        raise IOError("[Error] Not valid data length: %d, %d" % (len(source_data), len(overlay_data)))
+    recover = bsdiff4.patch(source_data, overlay_data)
+    return recover
+
 
 
 def compare_same(filename1, filename2):

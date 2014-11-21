@@ -57,6 +57,7 @@ class DeltaItem(object):
     REF_BASE_DISK       = 0x40
     REF_BASE_MEM        = 0x50
     REF_ZEROS           = 0x60
+    REF_BSDIFF          = 0x70
 
     # data exist only when ref_id is not xdelta
     def __init__(self, delta_type, offset, offset_len, hash_value, ref_id, data_len=0, data=None):
@@ -89,7 +90,8 @@ class DeltaItem(object):
                 chr(self.delta_type | self.ref_id))
 
         if self.ref_id == DeltaItem.REF_RAW or \
-               self.ref_id == DeltaItem.REF_XDELTA:
+                self.ref_id == DeltaItem.REF_XDELTA or \
+                self.ref_id == DeltaItem.REF_BSDIFF:
             data += struct.pack("!Q", self.data_len)
             if self.data_len != 0:
                 data += struct.pack("!%ds" % self.data_len, self.data)
@@ -119,7 +121,8 @@ class DeltaItem(object):
         delta_type = ord(ref_info) & 0x0F
 
         if ref_id == DeltaItem.REF_RAW or \
-                ref_id == DeltaItem.REF_XDELTA:
+                ref_id == DeltaItem.REF_XDELTA or \
+                ref_id == DeltaItem.REF_BSDIFF:
             data_len = struct.unpack("!Q", stream.read(8))[0]
             data = stream.read(data_len)
         elif ref_id == DeltaItem.REF_SELF:
@@ -215,7 +218,9 @@ class DeltaList(object):
         matching = 0
         for delta_item in delta_list[1:]:
             if delta_item.hash_value == pivot.hash_value:
-                if delta_item.ref_id == DeltaItem.REF_XDELTA or delta_item.ref_id == DeltaItem.REF_RAW:
+                if delta_item.ref_id == DeltaItem.REF_XDELTA or \
+                        delta_item.ref_id == DeltaItem.REF_RAW or \
+                        delta_item.ref_id == DeltaItem.REF_BSDIFF:
                     # same data/hash
                     # save reference start offset
                     delta_item.ref_id = DeltaItem.REF_SELF
@@ -307,7 +312,8 @@ class DeltaList(object):
                     memory_from_base_mem += 1
                 elif delta_item.delta_type == DeltaItem.DELTA_DISK:
                     disk_from_base_mem += 1
-            elif delta_item.ref_id == DeltaItem.REF_XDELTA:
+            elif delta_item.ref_id == DeltaItem.REF_XDELTA or \
+                delta_item.ref_id == DeltaItem.REF_BSDIFF:
                 if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
                     memory_from_xdelta += 1
                 elif delta_item.delta_type == DeltaItem.DELTA_DISK:
@@ -401,7 +407,9 @@ def diff_with_deltalist(delta_list, const_deltalist, ref_id):
 
         # compare
         if delta.hash_value == const_delta.hash_value and \
-                ((delta.ref_id == DeltaItem.REF_XDELTA) or (delta.ref_id == DeltaItem.REF_RAW)):
+                ((delta.ref_id == DeltaItem.REF_XDELTA) or \
+                 (delta.ref_id == DeltaItem.REF_RAW) or \
+                 (delta.ref_id == DeltaItem.REF_BSDIFF)):
             if delta.offset_len != const_delta.offset_len:
                 message = "Hash is same but length is different %d != %d" % \
                         (delta.offset_len, const_delta.offset_len)
@@ -437,7 +445,9 @@ def diff_with_hashlist(base_hashlist, delta_list, ref_id):
 
         # compare
         if delta.hash_value == hash_value and \
-                ((delta.ref_id == DeltaItem.REF_XDELTA) or (delta.ref_id == DeltaItem.REF_RAW)):
+                ((delta.ref_id == DeltaItem.REF_XDELTA) or \
+                 (delta.ref_id == DeltaItem.REF_RAW) or \
+                 (delta.ref_id == DeltaItem.REF_BSDIFF)):
             matching_count += 1
             #LOG.debug("page %ld is matching base %ld" % (s_start, start))
             delta.ref_id = ref_id
@@ -574,6 +584,16 @@ class Recovered_delta(multiprocessing.Process):
             else:
                 raise DeltaError("Delta type should be either disk or memory")
             recover_data = tool.merge_data(base_data, patch_data, len(base_data)*5)
+        elif delta_item.ref_id == DeltaItem.REF_BSDIFF:
+            patch_data = delta_item.data
+            patch_original_size = delta_item.offset_len
+            if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+                base_data = self.raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
+            elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+                base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
+            else:
+                raise DeltaError("Delta type should be either disk or memory")
+            recover_data = tool.merge_data_bsdiff(base_data, patch_data)
         else:
             raise MemoryError("Cannot recover: invalid referce id %d" % delta_item.ref_id)
 
@@ -641,7 +661,9 @@ class Recovered_delta(multiprocessing.Process):
 def deduplicate_deltaitem(hash_dict, delta_item, ref_id):
     ref_offset = hash_dict.get(delta_item.hash_value, None)
     if ref_offset is not None:
-        if ((delta_item.ref_id == DeltaItem.REF_XDELTA) or (delta_item.ref_id == DeltaItem.REF_RAW)):
+        if ((delta_item.ref_id == DeltaItem.REF_XDELTA) or \
+            (delta_item.ref_id == DeltaItem.REF_RAW) or \
+            (delta_item.ref_id == DeltaItem.REF_BSDIFF)):
             delta_item.ref_id = ref_id
             delta_item.data_len = 8
             delta_item.data = ref_offset
@@ -767,8 +789,9 @@ class DeltaDedup(process_manager.ProcWorker):
                     else:
                         # chunk that are not deduplicated yet
                         # comparison with other delta_item within itself
-                        if ((delta_item.ref_id == DeltaItem.REF_XDELTA)
-                            or (delta_item.ref_id == DeltaItem.REF_RAW)):
+                        if ((delta_item.ref_id == DeltaItem.REF_XDELTA)\
+                            or (delta_item.ref_id == DeltaItem.REF_RAW)\
+                            or (delta_item.ref_id == DeltaItem.REF_BSDIFF)):
                             ret = deduplicate_deltaitem(self.self_hashdict,
                                                         delta_item,
                                                         DeltaItem.REF_SELF)

@@ -182,6 +182,16 @@ class RecoverDeltaProc(multiprocessing.Process):
             else:
                 raise StreamSynthesisError("Delta type should be either disk or memory")
             recover_data = tool.merge_data(base_data, patch_data, len(base_data)*5)
+        elif delta_item.ref_id == DeltaItem.REF_BSDIFF:
+            patch_data = delta_item.data
+            patch_original_size = delta_item.offset_len
+            if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+                base_data = self.raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
+            elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+                base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
+            else:
+                raise DeltaError("Delta type should be either disk or memory")
+            recover_data = tool.merge_data_bsdiff(base_data, patch_data)
         else:
             raise StreamSynthesisError("Cannot recover: invalid referce id %d" % delta_item.ref_id)
 

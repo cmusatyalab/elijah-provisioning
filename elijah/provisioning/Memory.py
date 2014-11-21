@@ -505,6 +505,11 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     diff_type = DeltaItem.REF_XDELTA
                     if len(diff_data) > len(data):
                         raise IOError("xdelta3 patch is bigger than origianl")
+                elif self.diff_algorithm == "bsdiff":
+                    diff_data = tool.diff_data_bsdiff(base_data, data)
+                    diff_type = DeltaItem.REF_BSDIFF
+                    if len(diff_data) > len(data):
+                        raise IOError("bsdiff patch is bigger than origianl")
                 elif self.diff_algorithm == "none":
                     diff_data = data
                     diff_type = DeltaItem.REF_RAW
@@ -912,6 +917,11 @@ class MemoryDiffProc(multiprocessing.Process):
                                     diff_type = DeltaItem.REF_XDELTA
                                     if len(diff_data) > len(data):
                                         raise IOError("xdelta3 patch is bigger than origianl")
+                                elif self.diff_algorithm == "bsdiff":
+                                    diff_data = tool.diff_data_bsdiff(source_data, data)
+                                    diff_type = DeltaItem.REF_BSDIFF
+                                    if len(diff_data) > len(data):
+                                        raise IOError("bsdiff patch is bigger than origianl")
                                 elif self.diff_algorithm == "none":
                                     diff_data = data
                                     diff_type = DeltaItem.REF_RAW
