@@ -13,6 +13,7 @@ from delta import DeltaItem
 
 import lzma
 import bz2
+import zlib
 from Configuration import Const
 from package import VMOverlayPackage
 import process_manager
@@ -206,6 +207,10 @@ class CompChildProc(multiprocessing.Process):
                     comp = bz2.BZ2Compressor(self.comp_level)
                     output_data = comp.compress(input_data)
                     output_data += comp.flush()
+                elif self.comp_type == Const.COMPRESSION_GZIP:
+                    comp = zlib.compressobj(self.comp_level, zlib.DEFLATED, zlib.MAX_WBITS | 16)
+                    output_data = comp.compress(input_data)
+                    output_data += comp.flush()
                 else:
                     raise CompressionError("Not supporting")
 
@@ -309,7 +314,7 @@ class DecompChildProc(multiprocessing.Process):
                     decomp_data = decompressor.decompress(comp_data)
                     decomp_data += decompressor.flush()
                 elif comp_type == Const.COMPRESSION_GZIP:
-                    raise CompressionError("Not implemented")
+                    decomp_data = zlib.decompress(comp_data, zlib.MAX_WBITS|16)
                 else:
                     raise CompressionError("Not valid compression option")
                 self.output_queue.put(decomp_data)
@@ -366,7 +371,9 @@ def decomp_overlayzip(overlay_path, outfilename):
             decomp_data += decompressor.flush()
             out_fd.write(decomp_data)
         elif comp_type == Const.COMPRESSION_GZIP:
-            raise CompressionError("Not implemented")
+            comp_data = overlay_package.read_blob(comp_filename)
+            decomp_data = zlib.decompress(comp_data, zlib.MAX_WBITS|16)
+            out_fd.write(decomp_data)
         else:
             raise CompressionError("Not valid compression option")
     #disk_index = [((item*4096)<<1) | (0x02 & 0x0F) for item in disk_chunks]
@@ -374,11 +381,4 @@ def decomp_overlayzip(overlay_path, outfilename):
 
     out_fd.close()
     return meta_info
-
-
-def _decomp_bzip2(overlay_file):
-    pass
-
-
-
 
