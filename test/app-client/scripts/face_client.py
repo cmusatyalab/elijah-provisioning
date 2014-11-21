@@ -49,7 +49,7 @@ def process_command_line(argv):
             '-s', '--server', action='store', type='string', dest='server_address', default="localhost",
             help='Set Input image directory')
     parser.add_option(
-            '-p', '--port', action='store', type='int', dest='server_port', default=9092,
+            '-p', '--port', action='store', type='int', dest='server_port', default=9876,
             help='Set Input image directory')
     settings, args = parser.parse_args(argv)
     if not len(args) == 0:
