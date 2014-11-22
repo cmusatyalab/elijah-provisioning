@@ -483,7 +483,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             self.deltalist_queue.put(Const.QUEUE_FAILED_MESSAGE)
 
     def change_mode(self, new_mode):
-        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
+        for (proc, c_queue, m_queue) in self.proc_list:
             if proc.is_alive() == True:
                 m_queue.put(new_mode)
 
@@ -571,11 +571,10 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
         # launch child processes
         output_fd_list = list()
-        output_fd_dict = dict()
         base_hashlist_length = len(self.memory_hashlist)
+        task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_MEMORY_DIFF)
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
-            task_queue = multiprocessing.Queue(maxsize=1)
             mode_queue = multiprocessing.Queue()
             diff_proc = MemoryDiffProc(command_queue, task_queue, mode_queue,
                                        self.deltalist_queue,
@@ -587,9 +586,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                                        self.free_pfn_dict,
                                        self.apply_free_memory)
             diff_proc.start()
-            self.proc_list.append((diff_proc, task_queue, command_queue, mode_queue))
-            output_fd_list.append(task_queue._writer.fileno())
-            output_fd_dict[task_queue._writer.fileno()] = task_queue
+            self.proc_list.append((diff_proc, command_queue, mode_queue))
 
         recved_data_size = 0
         freed_page_counter = 0
@@ -644,31 +641,27 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             memory_page_list = memory_page_list[-1:]
 
             # put task to child process
-            ([], output_ready, []) = select.select([], output_fd_list, [])
-            task_queue = output_fd_dict[output_ready[0]]
             task_queue.put(tasks)
 
         # send last memory page
         # libvirt randomly add string starting with 'LibvirtQemudSave'
         # Therefore, process the last memory page only when it's aligned
         if len(memory_page_list[0]) == (Memory.RAM_PAGE_SIZE + Memory.CHUNK_HEADER_SIZE):
-            ([], output_ready, []) = select.select([], output_fd_list, [])
-            task_queue = output_fd_dict[output_ready[0]]
             task_queue.put(memory_page_list)
 
         # send end meesage to every process
-        for (proc, t_queue, c_queue, mode_queue) in self.proc_list:
-            t_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+        for child_proc in self.proc_list:
+            task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
             #LOG.debug("[Memory] send end message to each child")
 
         # after this for loop, all processing finished, but child process still
         # alive until all data pass to the next step
         finished_proc_dict = dict()
         input_list = [self.control_queue._reader.fileno()]
-        for (proc, t_queue, c_queue, mode_queue) in self.proc_list:
+        for (proc, c_queue, mode_queue) in self.proc_list:
             fileno = c_queue._reader.fileno()
             input_list.append(fileno)
-            finished_proc_dict[fileno] = (c_queue, t_queue)
+            finished_proc_dict[fileno] = c_queue
         while len(finished_proc_dict.keys()) > 0:
             (input_ready, [], []) = select.select(input_list, [], [])
             for in_queue in input_ready:
@@ -676,12 +669,12 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     control_msg = self.control_queue.get()
                     self._handle_control_msg(control_msg)
                 else:
-                    (cq, tq) = finished_proc_dict[in_queue]
+                    cq = finished_proc_dict[in_queue]
                     cq.get()
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
 
-        for (proc, t_queue, c_queue, mode_queue) in self.proc_list:
+        for (proc, c_queue, mode_queue) in self.proc_list:
             #LOG.debug("[Memory] waiting to dump all data to the next stage")
             proc.join()
         # send end message after the next stage finishes processing
@@ -877,6 +870,7 @@ class MemoryDiffProc(multiprocessing.Process):
                     self.diff_algorithm = new_diff_algorithm
             if self.task_queue._reader.fileno() in inready:
                 memory_chunk_list = self.task_queue.get()
+                #print "getting a new job: %d %d" % (int(os.getpid()), len(memory_chunk_list))
                 if memory_chunk_list == Const.QUEUE_SUCCESS_MESSAGE:
                     #LOG.debug("[Memory][Child] diff proc get end message")
                     is_proc_running = False
