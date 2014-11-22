@@ -225,15 +225,6 @@ class VMOverlayCreationMode(object):
         return mode
 
     @staticmethod
-    def get_pipelined_single_process_finite_queue():
-        mode = VMOverlayCreationMode.get_pipelined_single_process()
-        mode.QUEUE_SIZE_DISK_DELTA_LIST = 128
-        mode.QUEUE_SIZE_MEMORY_DELTA_LIST = 128
-        mode.QUEUE_SIZE_OPTIMIZATION = 128
-        mode.QUEUE_SIZE_COMPRESSION = 128
-        return mode
-
-    @staticmethod
     def get_pipelined_multi_process():
         mode = VMOverlayCreationMode()
         mode.PROCESS_PIPELINED = True
@@ -252,7 +243,6 @@ class VMOverlayCreationMode(object):
         mode.NUM_PROC_DISK_DIFF = 4
         mode.NUM_PROC_OPTIMIZATION = 4
         mode.NUM_PROC_COMPRESSION = 4
-
         mode.QUEUE_SIZE_MEMORY_SNAPSHOT = -1    # always have infinite queue for communicating with QEMU
                                                 # Otherwise, QEMU will be automatically throttled
         mode.QUEUE_SIZE_DISK_DELTA_LIST = 4

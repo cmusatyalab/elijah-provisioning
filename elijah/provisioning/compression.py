@@ -44,7 +44,7 @@ class CompressProc(process_manager.ProcWorker):
         super(CompressProc, self).__init__(target=self.compress_stream)
 
     def change_mode(self, new_mode):
-        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
+        for (proc, c_queue, m_queue) in self.proc_list:
             if proc.is_alive() == True:
                 m_queue.put(new_mode)
 
@@ -87,20 +87,16 @@ class CompressProc(process_manager.ProcWorker):
         time_start = time.time()
 
         # launch child processes
-        output_fd_list = list()
-        output_fd_dict = dict()
+        task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_COMPRESSION)
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
             mode_queue = multiprocessing.Queue()
-            task_queue = multiprocessing.Queue(maxsize=1)
             comp_proc = CompChildProc(command_queue, task_queue, mode_queue,
                                       self.comp_delta_queue,
                                       self.comp_type,
                                       self.comp_level)
             comp_proc.start()
-            self.proc_list.append((comp_proc, task_queue, command_queue, mode_queue))
-            output_fd_list.append(task_queue._writer.fileno())
-            output_fd_dict[task_queue._writer.fileno()] = task_queue
+            self.proc_list.append((comp_proc, command_queue, mode_queue))
 
         is_last_blob = False
         total_read_size = 0
@@ -109,28 +105,26 @@ class CompressProc(process_manager.ProcWorker):
             is_last_blob, input_data, input_size, modified_disk_chunks, modified_memory_chunks = self._chunk_blob()
 
             if input_size > 0:
-                ([], output_ready, []) = select.select([], output_fd_list, [])
-                task_queue = output_fd_dict[output_ready[0]]
-                total_read_size += input_size
+                self.in_size += input_size
                 task_queue.put((input_data, modified_disk_chunks, modified_memory_chunks))
 
         # send end meesage to every process
-        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
-            t_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+        for index in self.proc_list:
+            task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
             #sys.stdout.write("[Comp] send end message to each child\n")
 
         # after this for loop, all processing finished, but child process still
         # alive until all data pass to the next step
         finished_proc_dict = dict()
         input_list = [self.control_queue._reader.fileno()]
-        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
+        for (proc, c_queue, m_queue) in self.proc_list:
             fileno = c_queue._reader.fileno()
             input_list.append(fileno)
-            finished_proc_dict[fileno] = (c_queue, t_queue)
+            finished_proc_dict[fileno] = c_queue
         while len(finished_proc_dict.keys()) > 0:
             #print "left proc number: %s" % (finished_proc_dict.keys())
-            #for ffno, (cq, tq) in finished_proc_dict.iteritems():
-            #    print "task quesize at %d: %d" % (ffno, tq.qsize())
+            #for ffno, cq in finished_proc_dict.iteritems():
+            #    print "task quesize at %d: %d" % (ffno, task_queue.qsize())
 
             (input_ready, [], []) = select.select(input_list, [], [])
             for in_queue in input_ready:
@@ -142,19 +136,13 @@ class CompressProc(process_manager.ProcWorker):
                             new_mode = self.control_queue.get()
                             self.change_mode(new_mode)
                 else:
-                    (cq, tq) = finished_proc_dict[in_queue]
+                    cq = finished_proc_dict[in_queue]
                     cq.get()
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
 
         time_end = time.time()
         #sys.stdout.write("[Comp] effetively finished\n")
-
-        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
-            #sys.stdout.write("[Comp] waiting to dump all data to the next stage\n")
-            proc.join()
-        # send end message after the next stage finishes processing
-        self.comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
         sys.stdout.write("[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f MB, %f MBps, %f s\n" % (
             self.num_proc, self.block_size, self.comp_level, time_start, time_end, total_read_size/1024.0/1024, 
             total_read_size/(time_end-time_start)/1024.0/1024, (time_end-time_start)))
@@ -163,6 +151,12 @@ class CompressProc(process_manager.ProcWorker):
                                                     self.out_size))
         sys.stdout.write("DEBUG\tprofiling\t%s\ttime\t%f\t%f\t%f\n" %\
                   (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
+
+        for (proc, c_queue, m_queue) in self.proc_list:
+            #sys.stdout.write("[Comp] waiting to dump all data to the next stage\n")
+            proc.join()
+        # send end message after the next stage finishes processing
+        self.comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
 
 
@@ -181,6 +175,7 @@ class CompChildProc(multiprocessing.Process):
         is_proc_running = True
         input_list = [self.task_queue._reader.fileno(),
                       self.mode_queue._reader.fileno()]
+        loop_counter = 0
         while is_proc_running:
             inready, outread, errready = select.select(input_list, [], [])
             if self.mode_queue._reader.fileno() in inready:
@@ -202,6 +197,7 @@ class CompChildProc(multiprocessing.Process):
                     is_proc_running = False
                     break
                 (input_data, modified_disk_chunks, modified_memory_chunks) = input_task
+                loop_counter += 1
 
                 if self.comp_type == Const.COMPRESSION_LZMA:
                     # mode = 2 indicates LZMA_SYNC_FLUSH, which show all output right after input
@@ -220,7 +216,8 @@ class CompChildProc(multiprocessing.Process):
                     raise CompressionError("Not supporting")
 
                 self.output_queue.put((self.comp_type, output_data, modified_disk_chunks, modified_memory_chunks))
-        #sys.stdout.write("[Comp][Child] child finished. send command queue msg\n")
+        sys.stdout.write("[Comp][Child] child finished. process %d jobs\n" % \
+                         (loop_counter))
         self.command_queue.put("Compressed processed everything")
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()

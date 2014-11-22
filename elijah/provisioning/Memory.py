@@ -267,8 +267,8 @@ class Memory(object):
 
         # get hash of memory area
         self.freed_counter = freed_counter
-        LOG.debug("FREE Memory Counter: %ld(%ld)" % \
-                (freed_counter, freed_counter*Memory.RAM_PAGE_SIZE))
+        #LOG.debug("FREE Memory Counter: %ld(%ld)" % \
+        #        (freed_counter, freed_counter*Memory.RAM_PAGE_SIZE))
 
     @staticmethod
     def import_from_metafile(meta_path, raw_path):
@@ -433,8 +433,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
     def create_memory_deltalist(self):
         # get memory delta
-        time_s = time.time()
-        LOG.debug("1.get modified page list")
         self.modified_memory_fd = SeekablePipe(self.modified_mem_queue)
 
         # get modified pages 
@@ -468,12 +466,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             sys.stderr.write(traceback.format_exc())
             sys.stderr.write("%s\n" % str(e))
             self.deltalist_queue.put(Const.QUEUE_FAILED_MESSAGE)
-        time_e = time.time()
-        LOG.debug("profiling\t%s\tsize\t%ld\t%ld" % (self.__class__.__name__,
-                                                    self.in_size,
-                                                    self.out_size))
-        LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_s, time_e, (time_e-time_s)))
 
     def change_mode(self, new_mode):
         for (proc, c_queue, m_queue) in self.proc_list:
@@ -647,8 +639,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
         # send end meesage to every process
         for child_proc in self.proc_list:
+            LOG.debug("[Memory] send end message to each child")
             task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-            #LOG.debug("[Memory] send end message to each child")
 
         # after this for loop, all processing finished, but child process still
         # alive until all data pass to the next step
@@ -669,6 +661,12 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     cq.get()
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
+        time_e = time.time()
+        LOG.debug("profiling\t%s\tsize\t%ld\t%ld" % (self.__class__.__name__,
+                                                    self.in_size,
+                                                    self.out_size))
+        LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
+                  (self.__class__.__name__, time_s, time_e, (time_e-time_s)))
 
         for (proc, c_queue, mode_queue) in self.proc_list:
             #LOG.debug("[Memory] waiting to dump all data to the next stage")
@@ -854,6 +852,7 @@ class MemoryDiffProc(multiprocessing.Process):
         input_list = [self.task_queue._reader.fileno(),
                       self.mode_queue._reader.fileno()]
         freed_page_counter = 0
+        loop_counter = 0
         while is_proc_running:
             inready, outread, errready = select.select(input_list, [], [])
             if self.mode_queue._reader.fileno() in inready:
@@ -868,11 +867,12 @@ class MemoryDiffProc(multiprocessing.Process):
                 memory_chunk_list = self.task_queue.get()
                 #print "getting a new job: %d %d" % (int(os.getpid()), len(memory_chunk_list))
                 if memory_chunk_list == Const.QUEUE_SUCCESS_MESSAGE:
-                    #LOG.debug("[Memory][Child] diff proc get end message")
+                    #LOG.debug("[Memory][Child]%d diff proc get end message" % (int(os.getpid())))
                     is_proc_running = False
                     break
                 time_process_start = time.time()
                 deltaitem_list = list()
+                loop_counter += 1
                 for data in memory_chunk_list:
                     ram_offset, = struct.unpack(Memory.CHUNK_HEADER_FMT, data[0:Memory.CHUNK_HEADER_SIZE])
                     ram_offset += self.libvirt_header_offset    # add libvirt header offset
@@ -932,7 +932,7 @@ class MemoryDiffProc(multiprocessing.Process):
                             #print "deltaitem: %d %d" % (diff_type, len(diff_data))
                 time_process_end = time.time()
                 self.deltalist_queue.put(deltaitem_list)
-        #LOG.debug("[Memory][Child] child finished. send command queue msg")
+        LOG.debug("[Memory][Child] Child finished. process %d jobs" % (loop_counter))
         self.command_queue.put("processed everything")
         self.task_queue.put(freed_page_counter)
         #out_fd.close()  # measurement

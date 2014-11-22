@@ -827,7 +827,9 @@ def get_overlay_deltalist(monitoring_info, options,
                                                              options.FREE_SUPPORT,
                                                              free_memory_dict)
         memory_deltalist_proc.start()
-    time_mem_delta = time()
+        if overlay_mode.PROCESS_PIPELINED == False:
+            _waiting_to_finish(process_controller, "CreateMemoryDeltalist")
+        time_mem_delta = time()
 
     LOG.info("Get disk delta")
     disk_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_DISK_DELTA_LIST)
@@ -842,15 +844,11 @@ def get_overlay_deltalist(monitoring_info, options,
                                                    apply_discard,
                                                    used_blocks_dict)
     disk_deltalist_proc.start()
-
-    time_disk_delta = time()
-    LOG.info("Generate VM overlay using deduplication")
-
-    if overlay_mode.PROCESS_PIPELINED == False:
-        _waiting_to_finish(process_controller, "CreateMemoryDeltalist")
     if overlay_mode.PROCESS_PIPELINED == False:
         _waiting_to_finish(process_controller, "CreateDiskDeltalist")
+    time_disk_delta = time()
 
+    LOG.info("Generate VM overlay using deduplication")
     dedup_proc = delta.DeltaDedup(memory_deltalist_queue, Memory.Memory.RAM_PAGE_SIZE,
                                   disk_deltalist_queue, Const.CHUNK_SIZE,
                                   merged_deltalist_queue,
@@ -1584,7 +1582,6 @@ def create_residue(base_disk, base_hashvalue,
         LOG.debug("[time] Getting memory snapshot size (%f~%f):%f" % (time_start,
                                                                         time_memory_snapshot_size,
                                                                         (time_memory_snapshot_size-time_start)))
-        LOG.debug("Memory Snapshot size: %ld" % (resume_memory_size))
 
         metadata = dict()
         metadata[Const.META_BASE_VM_SHA256] = base_hashvalue
@@ -1623,7 +1620,6 @@ def create_residue(base_disk, base_hashvalue,
         synthesis_file.join()
         overlay_info, overlay_files = synthesis_file.get_overlay_info()
 
-        LOG.debug("Memory Snapshot size: %ld" % (resume_memory_size))
         overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
         overlay_metafile = _generate_overlaymeta(overlay_metapath,
                                                 overlay_info,

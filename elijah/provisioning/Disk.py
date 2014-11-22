@@ -253,7 +253,6 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             self.proc_list.append((diff_proc, command_queue, mode_queue))
 
         # 1. get modified page
-        LOG.debug("1. Get modified disk page")
         modified_chunk_counter = 0
         modified_chunk_list = []
         #input_fd = [self.control_queue._reader.fileno()]
@@ -361,8 +360,8 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             self.ret_statistics['xrayed'] = xray_counter
             self.ret_statistics['trimed_list'] = trimed_list
             self.ret_statistics['xrayed_list'] = xrayed_list
-        LOG.debug("1-1. Trim(%d, overwritten after trim(%d)), Xray(%d)" % \
-                (trim_counter, overwritten_after_trim, xray_counter))
+        #LOG.debug("1-1. Trim(%d, overwritten after trim(%d)), Xray(%d)" % \
+        #        (trim_counter, overwritten_after_trim, xray_counter))
         time_end = time.time()
         LOG.debug("[time] Disk first input at : %f" % (time_first_recv))
         LOG.debug("profiling\t%s\tsize\t%ld\t%ld" % (self.__class__.__name__,
@@ -426,6 +425,7 @@ class DiskDiffProc(multiprocessing.Process):
         modified_fd = open(self.modified_disk, "rb")
 
         is_proc_running = True
+        loop_counter = 0
         input_list = [self.task_queue._reader.fileno(),
                       self.mode_queue._reader.fileno()]
         while is_proc_running:
@@ -445,6 +445,7 @@ class DiskDiffProc(multiprocessing.Process):
                     is_proc_running = False
                     break
 
+                loop_counter += 1
                 deltaitem_list = list()
                 for chunk in task_list:
                     offset = chunk * self.chunk_size
@@ -481,7 +482,7 @@ class DiskDiffProc(multiprocessing.Process):
                             data=diff_data)
                     deltaitem_list.append(delta_item)
                 self.deltalist_queue.put(deltaitem_list)
-        #LOG.debug("[Disk][Child] child finished. send command queue msg")
+        LOG.debug("[Disk][Child] Child finished. process %d jobs" % (loop_counter))
         self.command_queue.put("processed everything")
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()

@@ -731,7 +731,6 @@ class DeltaDedup(process_manager.ProcWorker):
         zero_hash_dict = dict()
         zero_hash = sha256(struct.pack("!s", chr(0x00))*chunk_size).digest()
         zero_hash_dict[zero_hash] = long(-1)
-        LOG.debug("2.Optimization")
         is_memory_finished = False
         is_disk_finished = False
         while is_memory_finished == False or is_disk_finished == False:
@@ -831,7 +830,8 @@ class DeltaDedup(process_manager.ProcWorker):
             number_of_base_mem_memory + number_of_self_ref_memory
         self.out_size = self.in_size - (saved_item*Const.CHUNK_SIZE)
         time_end = time.time()
-        LOG.debug("Dedup statistics: %s" % str(self.statistics))
+
+        #LOG.debug("Dedup statistics: %s" % str(self.statistics))
         LOG.debug("[time] Dedup: first input at : %f" % (time_first_recv))
         LOG.debug("profiling\t%s\tsize\t%ld\t%ld" % (self.__class__.__name__,
                                                     self.in_size,
