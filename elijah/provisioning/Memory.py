@@ -575,7 +575,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         base_hashlist_length = len(self.memory_hashlist)
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
-            task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.QUEUE_SIZE_MEMORY_DELTA_LIST)
+            task_queue = multiprocessing.Queue(maxsize=1)
             mode_queue = multiprocessing.Queue()
             diff_proc = MemoryDiffProc(command_queue, task_queue, mode_queue,
                                        self.deltalist_queue,

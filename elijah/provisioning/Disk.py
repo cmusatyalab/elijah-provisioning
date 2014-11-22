@@ -239,11 +239,9 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         xrayed_list = []
 
         # launch child processes
-        output_fd_list = list()
-        output_fd_dict = dict()
+        task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_DISK_DIFF)
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
-            task_queue = multiprocessing.Queue(maxsize=1)
             mode_queue = multiprocessing.Queue()
             diff_proc = DiskDiffProc(command_queue, task_queue, mode_queue,
                                      self.disk_deltalist_queue,
@@ -252,28 +250,25 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                                      self.modified_disk,
                                      self.chunk_size)
             diff_proc.start()
-            self.proc_list.append((diff_proc, task_queue, command_queue, mode_queue))
-            output_fd_list.append(task_queue._writer.fileno())
-            output_fd_dict[task_queue._writer.fileno()] = task_queue
+            self.proc_list.append((diff_proc, command_queue, mode_queue))
 
         # 1. get modified page
         LOG.debug("1. Get modified disk page")
         modified_chunk_counter = 0
         modified_chunk_list = []
-        input_fd = [self.control_queue._reader.fileno()]
+        #input_fd = [self.control_queue._reader.fileno()]
         for index, chunk in enumerate(self.modified_chunk_dict.keys()):
             # check control message
             try:
                 #self.monitor_current_inqueue_length.value = 0
                 #self.monitor_current_outqueue_length.value = self.disk_deltalist_queue.qsize()
-                input_ready, out_ready, err_ready = select.select(input_fd, [], [], 0.0001)
-                if self.control_queue._reader.fileno() in input_ready:
-                    control_msg = self.control_queue.get()
-                    ret = self._handle_control_msg(control_msg)
-                    if ret == False:
-                        if control_msg == "change_mode":
-                            new_mode = self.control_queue.get()
-                            self.change_mode(new_mode)
+                #input_ready, out_ready, err_ready = select.select(input_fd, [], [], 0.0001)
+                control_msg = self.control_queue.get_nowait()
+                ret = self._handle_control_msg(control_msg)
+                if ret == False:
+                    if control_msg == "change_mode":
+                        new_mode = self.control_queue.get()
+                        self.change_mode(new_mode)
             except Queue.Empty as e:
                 pass
             except Exception as e:
@@ -297,13 +292,6 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                     else:
                         overwritten_after_trim += 1
 
-            # check xray discard
-            if self.used_blocks_dict:
-                start_sector = offset/512
-                if self.used_blocks_dict.get(start_sector) != True:
-                    xrayed_list.append(chunk)
-                    xray_counter +=1
-                    is_discarded = True
             if is_discarded == True:
                 # only apply when it is true
                 if self.apply_discard:
@@ -314,12 +302,9 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 is_first_recv = True
                 time_first_recv = time.time()
 
-            if len(modified_chunk_list) > 100:
-                ([], output_ready, []) = select.select([], output_fd_list, [])
-                task_queue = output_fd_dict[output_ready[0]]
+            if len(modified_chunk_list) > 255:  # 1MB
                 task_queue.put(modified_chunk_list)
                 modified_chunk_list = []
-
 
             # measurement
             modified_chunk_counter += 1
@@ -333,24 +318,22 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 processed_duration = float(0)
 
         # send last chunks
-        ([], output_ready, []) = select.select([], output_fd_list, [])
-        task_queue = output_fd_dict[output_ready[0]]
         task_queue.put(modified_chunk_list)
         modified_chunk_list = []
 
         # send end meesage to every process
-        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
-            t_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+        for index in self.proc_list:
+            task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
             #LOG.debug("[Disk] send end message to each child")
 
         # after this for loop, all processing finished, but child process still
         # alive until all data pass to the next step
         finished_proc_dict = dict()
         input_list = [self.control_queue._reader.fileno()]
-        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
+        for (proc, c_queue, m_queue) in self.proc_list:
             fileno = c_queue._reader.fileno()
             input_list.append(fileno)
-            finished_proc_dict[fileno] = (c_queue, t_queue)
+            finished_proc_dict[fileno] = c_queue
         while len(finished_proc_dict.keys()) > 0:
             #print "disk left proc number: %s" % (finished_proc_dict.keys())
             #for ffno, (cq, tq) in finished_proc_dict.iteritems():
@@ -361,17 +344,17 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                     control_msg = self.control_queue.get()
                     self._handle_control_msg(control_msg)
                 else:
-                    (cq, tq) = finished_proc_dict[in_queue]
+                    cq = finished_proc_dict[in_queue]
                     cq.get()
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
 
-        for (proc, t_queue, c_queue, m_queue) in self.proc_list:
+        for (proc, c_queue, m_queue) in self.proc_list:
             #LOG.debug("[Disk] waiting to dump all data to the next stage")
             proc.join()
         # send end message after the next stage finishes processing
         self.disk_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-        LOG.debug("# of modified disk delta item: %ld" % modified_chunk_counter)
+        #LOG.debug("# of modified disk delta item: %ld" % modified_chunk_counter)
 
         if self.ret_statistics != None:
             self.ret_statistics['trimed'] = trim_counter

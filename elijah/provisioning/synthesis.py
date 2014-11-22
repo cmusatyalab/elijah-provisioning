@@ -1488,12 +1488,12 @@ def create_residue(base_disk, base_hashvalue,
     process_controller = process_manager.get_instance()
     if overlay_mode == None:
         #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
+        #overlay_mode = VMOverlayCreationMode.get_serial_multi_process()
         #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
-        #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process_finite_queue()
         #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
-        overlay_mode.MEMORY_DIFF_ALGORITHM = "bsdiff"
-        overlay_mode.DISK_DIFF_ALGORITHM = "bsdiff"
+        #overlay_mode.MEMORY_DIFF_ALGORITHM = "bsdiff"
+        #overlay_mode.DISK_DIFF_ALGORITHM = "bsdiff"
 
     process_controller.set_mode(overlay_mode)
     LOG.info("* Overlay creation configuration")
