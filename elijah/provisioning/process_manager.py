@@ -202,6 +202,8 @@ class ProcWorker(multiprocessing.Process):
         self.monitor_current_outqueue_length = multiprocessing.Value('d', -1.0)
         self.monitor_current_get_time = multiprocessing.Value('d', -1.0)
         self.monitor_current_put_time = multiprocessing.Value('d', -1.0)
+        self.in_size = 0
+        self.out_size = 0
         super(ProcWorker, self).__init__(*args, **kwargs)
 
     def _handle_control_msg(self, control_msg):

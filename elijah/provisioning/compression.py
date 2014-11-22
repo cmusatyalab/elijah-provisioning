@@ -158,6 +158,11 @@ class CompressProc(process_manager.ProcWorker):
         sys.stdout.write("[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f MB, %f MBps, %f s\n" % (
             self.num_proc, self.block_size, self.comp_level, time_start, time_end, total_read_size/1024.0/1024, 
             total_read_size/(time_end-time_start)/1024.0/1024, (time_end-time_start)))
+        sys.stdout.write("DEBUG\tprofiling\t%s\tsize\t%ld\t%ld\n" % (self.__class__.__name__,
+                                                    self.in_size,
+                                                    self.out_size))
+        sys.stdout.write("DEBUG\tprofiling\t%s\ttime\t%f\t%f\t%f\n" %\
+                  (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
 
 
 

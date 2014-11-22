@@ -454,18 +454,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         # get memory meta data from snapshot
         self.modified_memory_fd.seek(libvirt_header_len)
 
-        # TODO: support getting free memory for streaming case
         self.free_pfn_dict = None
-        '''
-        if self.apply_free_memory == True:
-            # get free memory list
-            mem_size_mb = ram_info.get('pc.ram').get('length')/1024/1024
-            mem_abs_offset = ram_info.get('pc.ram').get('offset')
-            free_pfn_dict = get_free_pfn_dict(filepath, mem_size_mb,
-                    mem_abs_offset)
-        else:
-            free_pfn_dict = None
-        '''
         try:
             self.freed_counter = self._get_modified_memory_page(self.modified_memory_fd)
             LOG.debug("FREE Memory Counter: %ld(%ld)" % \
@@ -474,13 +463,17 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 self.free_memory_info['free_pfn_dict'] = self.free_pfn_dict
                 self.free_memory_info['freed_counter'] = self.freed_counter
 
-            time_e = time.time()
-            LOG.debug("[time] Memory hashing and diff time (%f ~ %f): %f" % (time_s, time_e, (time_e-time_s)))
         except Exception, e:
             sys.stdout.write("[compression] Exception1n")
             sys.stderr.write(traceback.format_exc())
             sys.stderr.write("%s\n" % str(e))
             self.deltalist_queue.put(Const.QUEUE_FAILED_MESSAGE)
+        time_e = time.time()
+        LOG.debug("profiling\t%s\tsize\t%ld\t%ld" % (self.__class__.__name__,
+                                                    self.in_size,
+                                                    self.out_size))
+        LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
+                  (self.__class__.__name__, time_s, time_e, (time_e-time_s)))
 
     def change_mode(self, new_mode):
         for (proc, c_queue, m_queue) in self.proc_list:
@@ -568,6 +561,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         memory_data = fin.data_buffer[Const.LIBVIRT_HEADER_SIZE:]
         memory_page_list += chunks(memory_data, memory_chunk_size)
         memory_data_queue = fin.data_queue
+        self.in_size += Const.LIBVIRT_HEADER_SIZE
 
         # launch child processes
         output_fd_list = list()
@@ -642,12 +636,14 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
             # put task to child process
             task_queue.put(tasks)
+            self.in_size = self.in_size + (len(tasks)*memory_chunk_size)
 
         # send last memory page
         # libvirt randomly add string starting with 'LibvirtQemudSave'
         # Therefore, process the last memory page only when it's aligned
         if len(memory_page_list[0]) == (Memory.RAM_PAGE_SIZE + Memory.CHUNK_HEADER_SIZE):
             task_queue.put(memory_page_list)
+            self.in_size = self.in_size + (len(memory_page_list)*memory_chunk_size)
 
         # send end meesage to every process
         for child_proc in self.proc_list:

@@ -365,7 +365,11 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 (trim_counter, overwritten_after_trim, xray_counter))
         time_end = time.time()
         LOG.debug("[time] Disk first input at : %f" % (time_first_recv))
-        LOG.debug("[time] Disk hashing and diff time (%f ~ %f): %f" % (time_start, time_end, (time_end-time_start)))
+        LOG.debug("profiling\t%s\tsize\t%ld\t%ld" % (self.__class__.__name__,
+                                                    self.in_size,
+                                                    self.out_size))
+        LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
+                  (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
 
 
 def recover_disk(base_disk, base_mem, overlay_mem, overlay_disk, recover_path, chunk_size):

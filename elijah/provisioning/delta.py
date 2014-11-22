@@ -731,10 +731,7 @@ class DeltaDedup(process_manager.ProcWorker):
         zero_hash_dict = dict()
         zero_hash = sha256(struct.pack("!s", chr(0x00))*chunk_size).digest()
         zero_hash_dict[zero_hash] = long(-1)
-        LOG.debug("2-1.Find zero page")
-        LOG.debug("2-2.get delta from base Memory")
-        LOG.debug("2-3.get delta from base Disk")
-        LOG.debug("3.get delta from itself")
+        LOG.debug("2.Optimization")
         is_memory_finished = False
         is_disk_finished = False
         while is_memory_finished == False or is_disk_finished == False:
@@ -806,6 +803,7 @@ class DeltaDedup(process_manager.ProcWorker):
                                 self.self_hashdict[delta_item.hash_value] = ref_offset
 
                 self.merged_deltalist_queue.put(deltaitem_list)
+                self.in_size += (len(deltaitem_list)*Const.CHUNK_SIZE)
 
                 # measurement
                 time_process_finish = time.time()
@@ -828,10 +826,18 @@ class DeltaDedup(process_manager.ProcWorker):
         self.statistics['number_of_base_disk_memory'] = number_of_base_disk_memory
         self.statistics['number_of_base_mem_memory'] = number_of_base_mem_memory
         self.statistics['number_of_self_ref_memory'] = number_of_self_ref_memory
+        saved_item = number_of_zero_page_disk + number_of_base_disk_disk + number_of_base_mem_disk +\
+            number_of_self_ref_disk + number_of_zero_page_memory + number_of_base_disk_memory +\
+            number_of_base_mem_memory + number_of_self_ref_memory
+        self.out_size = self.in_size - (saved_item*Const.CHUNK_SIZE)
         time_end = time.time()
         LOG.debug("Dedup statistics: %s" % str(self.statistics))
         LOG.debug("[time] Dedup: first input at : %f" % (time_first_recv))
-        LOG.debug("[time] Dedup: time (%f ~ %f): %f" % (time_start, time_end, (time_end-time_start)))
+        LOG.debug("profiling\t%s\tsize\t%ld\t%ld" % (self.__class__.__name__,
+                                                    self.in_size,
+                                                    self.out_size))
+        LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
+                  (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
 
     @staticmethod
     def memory_import_hashdict(meta_path):

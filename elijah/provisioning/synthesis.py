@@ -1066,6 +1066,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
         self.result_queue = result_queue
         self.machine_memory_size = machine_memory_size*1024
         self.total_read_size = 0
+        self.total_write_size = 0
         self.conn = conn
         self.machine = machine
 
@@ -1091,6 +1092,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
         try:
             self.in_fd = open(self.input_path, 'rb')
             self.total_read_size = 0
+            self.total_write_size = 0
             # read first 40KB and aligen header with 4KB
             data = self.in_fd.read(Memory.Memory.RAM_PAGE_SIZE*10)
             if is_first_recv == False:
@@ -1102,7 +1104,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             align_size = Const.LIBVIRT_HEADER_SIZE
             new_header = libvirt_header.get_aligned_header(align_size)
             self.result_queue.put(new_header)
-            self.total_read_size += len(new_header)
+            self.total_write_size += len(new_header)
 
             # get memory snapshot size
             original_header_len = len(original_header)
@@ -1111,7 +1113,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             mem_snapshot_size, = struct.unpack(Memory.Memory.CHUNK_HEADER_FMT, memory_size_data)
             self.memory_snapshot_size.value = long(mem_snapshot_size + len(new_header))
             self.result_queue.put(new_data)
-            self.total_read_size += len(new_data)
+            self.total_write_size += len(new_data)
             LOG.info("Memory snapshot size: %ld, header size: %ld at %f" % \
                      (mem_snapshot_size, len(new_header), time()))
 
@@ -1129,7 +1131,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
                         break
                     current_size = len(data)
                     self.result_queue.put(data)
-                    self.total_read_size += current_size
+                    self.total_write_size += current_size
                     #prog_bar.set_percent(100.0*self.total_read_size/self.machine_memory_size)
                     #prog_bar.show_progress()
 
@@ -1152,9 +1154,10 @@ class MemoryReadProcess(process_manager.ProcWorker):
         self.process_info['is_alive'] = False
         #LOG.debug("[time] Memory size of launch VM: %ld" % (self.total_read_size))
         LOG.debug("[time] Memory snapshotting first input at : %f" % (time_first_recv))
-        LOG.debug("[time] memory snapshotting (%f ~ %f): %f, %f GBps" % (
-            time_s, time_e, (time_e-time_s),
-            (self.total_read_size/(time_e-time_s)/1024/1024/1024)))
+        LOG.debug("profiling\t%s\tsize\t%ld\t%ld" % \
+                  (self.__class__.__name__, self.total_read_size, self.total_write_size))
+        LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" % \
+                  (self.__class__.__name__, time_s, time_e, (time_e-time_s)))
 
     def get_memory_snapshot_size(self):
         if long(self.memory_snapshot_size.value) > 0:
