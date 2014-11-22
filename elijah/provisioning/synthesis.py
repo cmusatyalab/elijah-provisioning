@@ -1112,7 +1112,8 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.memory_snapshot_size.value = long(mem_snapshot_size + len(new_header))
             self.result_queue.put(new_data)
             self.total_read_size += len(new_data)
-            LOG.info("Header size of memory snapshot is %s" % len(new_header))
+            LOG.info("Memory snapshot size: %ld, header size: %ld at %f" % \
+                     (mem_snapshot_size, len(new_header), time()))
 
             # write rest of the memory data
             #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
@@ -1492,8 +1493,6 @@ def create_residue(base_disk, base_hashvalue,
         #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
         #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
-        #overlay_mode.MEMORY_DIFF_ALGORITHM = "bsdiff"
-        #overlay_mode.DISK_DIFF_ALGORITHM = "bsdiff"
 
     process_controller.set_mode(overlay_mode)
     LOG.info("* Overlay creation configuration")
