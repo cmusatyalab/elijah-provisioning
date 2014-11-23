@@ -205,16 +205,6 @@ class VMOverlayCreationMode(object):
         return mode
 
     @staticmethod
-    def get_serial_multi_cores():
-        mode = VMOverlayCreationMode()
-        mode.PROCESS_PIPELINED = False
-        mode.NUM_PROC_MEMORY_DIFF = 4
-        mode.NUM_PROC_DISK_DIFF = 4
-        mode.NUM_PROC_OPTIMIZATION = 4
-        mode.NUM_PROC_COMPRESSION = 4
-        return mode
-
-    @staticmethod
     def get_pipelined_single_process():
         mode = VMOverlayCreationMode()
         mode.PROCESS_PIPELINED = True

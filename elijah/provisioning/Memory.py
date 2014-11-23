@@ -651,14 +651,15 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             input_list.append(fileno)
             finished_proc_dict[fileno] = c_queue
         while len(finished_proc_dict.keys()) > 0:
-            (input_ready, [], []) = select.select(input_list, [], [])
+            (input_ready, [], []) = select.select(input_list, [], [], 0.01)
             for in_queue in input_ready:
                 if self.control_queue._reader.fileno() == in_queue:
                     control_msg = self.control_queue.get()
                     self._handle_control_msg(control_msg)
                 else:
                     cq = finished_proc_dict[in_queue]
-                    cq.get()
+                    processed_size = cq.get()
+                    self.out_size += processed_size
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
         time_e = time.time()
@@ -853,6 +854,7 @@ class MemoryDiffProc(multiprocessing.Process):
                       self.mode_queue._reader.fileno()]
         freed_page_counter = 0
         loop_counter = 0
+        outdata_size = 0
         while is_proc_running:
             inready, outread, errready = select.select(input_list, [], [])
             if self.mode_queue._reader.fileno() in inready:
@@ -922,6 +924,8 @@ class MemoryDiffProc(multiprocessing.Process):
                                 diff_data = data
                                 diff_type = DeltaItem.REF_RAW
 
+                            diff_data_len = len(diff_data)
+                            outdata_size += diff_data_len
                             delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
                                     ram_offset, len(data),
                                     hash_value=chunk_hashvalue,
@@ -933,7 +937,7 @@ class MemoryDiffProc(multiprocessing.Process):
                 time_process_end = time.time()
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Memory][Child] Child finished. process %d jobs" % (loop_counter))
-        self.command_queue.put("processed everything")
+        self.command_queue.put(outdata_size)
         self.task_queue.put(freed_page_counter)
         #out_fd.close()  # measurement
         while self.mode_queue.empty() == False:

@@ -59,7 +59,7 @@ class CompressProc(process_manager.ProcWorker):
         while input_size < self.block_size:
             #self.monitor_current_inqueue_length.value = self.delta_list_queue.qsize()
             #self.monitor_current_outqueue_length.value = self.comp_delta_queue.qsize()
-            (input_ready, [], []) = select.select(input_list, [], [])
+            (input_ready, [], []) = select.select(input_list, [], [], 0.01)
             if self.control_queue._reader.fileno() in input_ready:
                 control_msg = self.control_queue.get()
                 ret = self._handle_control_msg(control_msg)
@@ -85,6 +85,8 @@ class CompressProc(process_manager.ProcWorker):
 
     def compress_stream(self):
         time_start = time.time()
+        self.in_size = 0
+        self.out_size = 0
 
         # launch child processes
         task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_COMPRESSION)
@@ -137,7 +139,8 @@ class CompressProc(process_manager.ProcWorker):
                             self.change_mode(new_mode)
                 else:
                     cq = finished_proc_dict[in_queue]
-                    cq.get()
+                    processed_size = cq.get()
+                    self.out_size += processed_size
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
 
@@ -176,6 +179,7 @@ class CompChildProc(multiprocessing.Process):
         input_list = [self.task_queue._reader.fileno(),
                       self.mode_queue._reader.fileno()]
         loop_counter = 0
+        outdata_size = 0
         while is_proc_running:
             inready, outread, errready = select.select(input_list, [], [])
             if self.mode_queue._reader.fileno() in inready:
@@ -215,10 +219,14 @@ class CompChildProc(multiprocessing.Process):
                 else:
                     raise CompressionError("Not supporting")
 
-                self.output_queue.put((self.comp_type, output_data, modified_disk_chunks, modified_memory_chunks))
+                outdata_size += len(output_data)
+                self.output_queue.put((self.comp_type,
+                                       output_data,
+                                       modified_disk_chunks,
+                                       modified_memory_chunks))
         sys.stdout.write("[Comp][Child] child finished. process %d jobs\n" % \
                          (loop_counter))
-        self.command_queue.put("Compressed processed everything")
+        self.command_queue.put(outdata_size)
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()
             msg = "Empty new compression mode that does not refelected"

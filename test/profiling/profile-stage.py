@@ -6,7 +6,7 @@ sys.path.insert(0, "../../")
 import traceback
 from datetime import datetime
 from elijah.provisioning.Configuration import Const
-Const.LOG_PATH = "/home/krha/cloudlet/provisioning/log/profile-%s" % str(datetime.now())
+Const.LOG_PATH = os.path.join(os.path.abspath(os.curdir), "log-%s" % str(datetime.now()))
 from elijah.provisioning import log as logging
 LOG = logging.getLogger(__name__)
 
@@ -40,9 +40,9 @@ def run_profile(base_path, overlay_path, overlay_mode):
 def generate_mode():
     mode_list = list()
     for memory_diff in ("xdelta3", "none"):
-        for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2): 
+        for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
             for comp_level in (1, 5, 9):
-                overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
+                overlay_mode = VMOverlayCreationMode.get_serial_single_process()
                 overlay_mode.COMPRESSION_ALGORITHM_TYPE = comp_type
                 overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
                 mode_list.append(overlay_mode)
@@ -73,7 +73,7 @@ if __name__ == "__main__":
 
 
     base_path = linux_base_path
-    overlay_path = fluid
+    overlay_path = moped
     is_url, overlay_path = PackagingUtil.is_zip_contained(overlay_path)
     mode_list = generate_mode()
     for each_mode in mode_list:

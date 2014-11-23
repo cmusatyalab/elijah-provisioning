@@ -733,6 +733,8 @@ class DeltaDedup(process_manager.ProcWorker):
         zero_hash_dict[zero_hash] = long(-1)
         is_memory_finished = False
         is_disk_finished = False
+        self.in_size = 0
+        self.out_size = 0
         while is_memory_finished == False or is_disk_finished == False:
             time_process_start = time.time()
             #self.monitor_current_inqueue_length.value = max(self.memory_deltalist_queue.qsize(), self.disk_deltalist_queue.qsize())
@@ -764,6 +766,7 @@ class DeltaDedup(process_manager.ProcWorker):
                     time_first_recv = time.time()
 
                 for delta_item in deltaitem_list:
+                    self.in_size += delta_item.data_len
                     if deduplicate_deltaitem(zero_hash_dict, delta_item,
                                             DeltaItem.REF_ZEROS) == True:
                         if delta_item.delta_type == DeltaItem.DELTA_DISK:
@@ -800,9 +803,10 @@ class DeltaDedup(process_manager.ProcWorker):
                                 ref_offset = long(delta_item.index)
                                 offset_length = 8
                                 self.self_hashdict[delta_item.hash_value] = ref_offset
+                    # now delta item has new data length
+                    self.out_size += delta_item.data_len
 
                 self.merged_deltalist_queue.put(deltaitem_list)
-                self.in_size += (len(deltaitem_list)*Const.CHUNK_SIZE)
 
                 # measurement
                 time_process_finish = time.time()
@@ -828,7 +832,6 @@ class DeltaDedup(process_manager.ProcWorker):
         saved_item = number_of_zero_page_disk + number_of_base_disk_disk + number_of_base_mem_disk +\
             number_of_self_ref_disk + number_of_zero_page_memory + number_of_base_disk_memory +\
             number_of_base_mem_memory + number_of_self_ref_memory
-        self.out_size = self.in_size - (saved_item*Const.CHUNK_SIZE)
         time_end = time.time()
 
         #LOG.debug("Dedup statistics: %s" % str(self.statistics))

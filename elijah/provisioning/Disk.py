@@ -290,10 +290,10 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                         is_discarded = True
                     else:
                         overwritten_after_trim += 1
-
             if is_discarded == True:
                 # only apply when it is true
                 if self.apply_discard:
+                    self.in_size += self.chunk_size
                     continue
 
             modified_chunk_list.append(chunk)
@@ -301,7 +301,9 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 is_first_recv = True
                 time_first_recv = time.time()
 
-            if len(modified_chunk_list) > 255:  # 1MB
+            modified_chunk_length = len(modified_chunk_list)
+            if modified_chunk_length > 255:  # 1MB
+                self.in_size += (modified_chunk_length*self.chunk_size)
                 task_queue.put(modified_chunk_list)
                 modified_chunk_list = []
 
@@ -317,6 +319,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 processed_duration = float(0)
 
         # send last chunks
+        self.in_size += (len(modified_chunk_list)*self.chunk_size)
         task_queue.put(modified_chunk_list)
         modified_chunk_list = []
 
@@ -337,14 +340,15 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             #print "disk left proc number: %s" % (finished_proc_dict.keys())
             #for ffno, (cq, tq) in finished_proc_dict.iteritems():
             #    print "task quesize at %d: %d" % (ffno, tq.qsize())
-            (input_ready, [], []) = select.select(input_list, [], [])
+            (input_ready, [], []) = select.select(input_list, [], [], 0.01)
             for in_queue in input_ready:
                 if self.control_queue._reader.fileno() == in_queue:
                     control_msg = self.control_queue.get()
                     self._handle_control_msg(control_msg)
                 else:
                     cq = finished_proc_dict[in_queue]
-                    cq.get()
+                    processed_size = cq.get()
+                    self.out_size += processed_size
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
 
@@ -426,6 +430,7 @@ class DiskDiffProc(multiprocessing.Process):
 
         is_proc_running = True
         loop_counter = 0
+        outdata_size = 0
         input_list = [self.task_queue._reader.fileno(),
                       self.mode_queue._reader.fileno()]
         while is_proc_running:
@@ -474,16 +479,18 @@ class DiskDiffProc(multiprocessing.Process):
                         diff_data = data
                         diff_type = DeltaItem.REF_RAW
 
+                    diff_data_len = len(diff_data)
+                    outdata_size += diff_data_len
                     delta_item = DeltaItem(DeltaItem.DELTA_DISK,
                             offset, len(data),
                             hash_value=sha256(data).digest(),
                             ref_id=diff_type,
-                            data_len=len(diff_data),
+                            data_len=diff_data_len,
                             data=diff_data)
                     deltaitem_list.append(delta_item)
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Disk][Child] Child finished. process %d jobs" % (loop_counter))
-        self.command_queue.put("processed everything")
+        self.command_queue.put(outdata_size)
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()
             msg = "Empty new compression mode that does not refelected"
