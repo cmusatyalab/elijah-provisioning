@@ -5,6 +5,8 @@ import sys
 sys.path.insert(0, "../../")
 import traceback
 from datetime import datetime
+import json
+
 from elijah.provisioning.Configuration import Const
 Const.LOG_PATH = os.path.join(os.path.abspath(os.curdir), "log-%s" % str(datetime.now()))
 from elijah.provisioning import log as logging
@@ -16,14 +18,12 @@ from elijah.provisioning.package import PackagingUtil
 
 
 
-
 class ProfilingError(Exception):
     pass
 
 
 def run_profile(base_path, overlay_path, overlay_mode):
-    LOG.debug("--------------------- new test ---------------------")
-    LOG.debug("overlay: %s" % overlay_path)
+    LOG.debug("==========================================")
     print overlay_mode
 
     try:
@@ -47,6 +47,24 @@ def generate_mode():
                 overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
                 mode_list.append(overlay_mode)
     return mode_list
+
+
+def validation_mode():
+    mode_list = list()
+    for num_proc in (1,2,3,4):
+        overlay_mode = VMOverlayCreationMode.get_serial_single_process()
+        overlay_mode.NUM_PROC_COMPRESSION = num_proc
+        mode_list.append(overlay_mode)
+    for num_proc in (1,2,3,4):
+        overlay_mode = VMOverlayCreationMode.get_serial_single_process()
+        overlay_mode.NUM_PROC_MEMORY_DIFF = num_proc
+        mode_list.append(overlay_mode)
+    for num_proc in (1,2,3,4):
+        overlay_mode = VMOverlayCreationMode.get_serial_single_process()
+        overlay_mode.NUM_PROC_DISK_DIFF = num_proc
+        mode_list.append(overlay_mode)
+    return mode_list
+
 
 
 if __name__ == "__main__":
@@ -75,6 +93,7 @@ if __name__ == "__main__":
     base_path = linux_base_path
     overlay_path = moped
     is_url, overlay_path = PackagingUtil.is_zip_contained(overlay_path)
-    mode_list = generate_mode()
+    #mode_list = generate_mode()
+    mode_list = validation_mode()
     for each_mode in mode_list:
         run_profile(base_path, overlay_path, each_mode)
