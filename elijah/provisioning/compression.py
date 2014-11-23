@@ -388,6 +388,12 @@ def decomp_overlayzip(overlay_path, outfilename):
             raise CompressionError("Not valid compression option")
     #disk_index = [((item*4096)<<1) | (0x02 & 0x0F) for item in disk_chunks]
     #memory_index = [((item*4096)<<1) | (0x01 & 0x0F) for item in memory_chunks]
+    #mem_set = set()
+    #for index in memory_index:
+    #    if index in mem_set:
+    #        print 'dup'
+    #    else:
+    #        mem_set.add(index)
 
     out_fd.close()
     return meta_info

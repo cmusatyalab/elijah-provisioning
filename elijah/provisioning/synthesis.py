@@ -47,6 +47,7 @@ import msgpack
 from progressbar import AnimatedProgressBar
 from package import VMOverlayPackage
 import process_manager
+import qmp_af_unix
 
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
@@ -363,8 +364,13 @@ class SynthesizedVM(threading.Thread):
         open(self.qemu_logfile, "w+").close()
         os.chmod(os.path.dirname(self.qemu_logfile), 0o771)
         os.chmod(self.qemu_logfile, 0o666)
+        #self.qmp_channel = os.path.abspath(os.path.join(temp_qemu_dir, "qmp-channel"))
+        self.qmp_channel = os.path.abspath("/tmp/cloudlet-qmp")
+        if os.path.exists(self.qmp_channel) == True:
+            os.remove(self.qmp_channel)
         LOG.info("Launch disk: %s" % os.path.abspath(launch_disk))
         LOG.info("Launch memory: %s" % os.path.abspath(launch_mem))
+        LOG.info("QMP channel: %s" % self.qmp_channel)
 
         self.resumed_disk = os.path.join(fuse.mountpoint, 'disk', 'image')
         self.resumed_mem = os.path.join(fuse.mountpoint, 'memory', 'image')
@@ -392,6 +398,7 @@ class SynthesizedVM(threading.Thread):
             self.old_xml_str, self.new_xml_str = _convert_xml(self.resumed_disk,
                     mem_snapshot=self.resumed_mem,
                     qemu_logfile=self.qemu_logfile,
+                    qmp_channel=self.qmp_channel,
                     qemu_args=self.qemu_args,
                     nova_xml=self.nova_xml)
 
@@ -520,10 +527,10 @@ def _test_dma_accuracy(dma_dict, disk_deltalist, mem_deltalist):
 
 
 def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
-        qemu_logfile=None, qemu_args=None, nova_xml=None):
+        qemu_logfile=None, qmp_channel=None, qemu_args=None, nova_xml=None):
     # we need either input xml or memory snapshot path
     # if we have mem_snapshot, we update new xml to the memory snapshot
-    
+
     if xml == None and mem_snapshot == None:
         raise CloudletGenerationError("we need either input xml or memory snapshot path")
 
@@ -652,7 +659,8 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
         if qemu_element is None:
             qemu_element = Element("{%s}commandline" % qemu_xmlns)
             xml.append(qemu_element)
-        # remove previous cloudlet argument if it is
+
+        # remove previous logging argument
         argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
         remove_list = list()
         for argument_item in argument_list:
@@ -665,6 +673,27 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
         qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':'-cloudlet'}))
         qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':"logfile=%s" % qemu_logfile}))
 
+    # append QMP channel for controlling live migration
+    if qmp_channel is not None:
+        qemu_xmlns="http://libvirt.org/schemas/domain/qemu/1.0"
+        qemu_element = xml.find("{%s}commandline" % qemu_xmlns)
+        if qemu_element is None:
+            qemu_element = Element("{%s}commandline" % qemu_xmlns)
+            xml.append(qemu_element)
+
+        # remove previous qmp argument
+        argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
+        remove_list = list()
+        for argument_item in argument_list:
+            arg_value = argument_item.get('value').strip()
+            if arg_value.startswith('-qmp') or arg_value.startswith('unix:'):
+                remove_list.append(argument_item)
+        for item in remove_list:
+            qemu_element.remove(item)
+
+        qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':'-qmp'}))
+        qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':"unix:%s,server,nowait" % qmp_channel}))
+
     # append qemu argument given from user
     if qemu_args:
         qemu_xmlns = "http://libvirt.org/schemas/domain/qemu/1.0"
@@ -674,6 +703,7 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
             xml.append(qemu_element)
         for each_argument in qemu_args:
             qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':each_argument}))
+
 
     # TODO: Handle console/serial element properly
     device_element = xml.find("devices")
@@ -689,6 +719,7 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
         network_filter = network_element.find("filterref")
         if network_filter is not None:
             network_element.remove(network_filter)
+
 
     # remove security option:
     # this option only works with OpenStack and causes error in standalone version
@@ -950,24 +981,27 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
     # Get modified list from overlay_meta
     vm_disk_size = meta_info[Const.META_RESUME_VM_DISK_SIZE]
     vm_memory_size = meta_info[Const.META_RESUME_VM_MEMORY_SIZE]
-    memory_chunk_list = list()
-    disk_chunk_list = list()
+    memory_chunk_all = set()
+    disk_chunk_all = set()
     for each_file in meta_info[Const.META_OVERLAY_FILES]:
         memory_chunks = each_file[Const.META_OVERLAY_FILE_MEMORY_CHUNKS]
         disk_chunks = each_file[Const.META_OVERLAY_FILE_DISK_CHUNKS]
-        memory_chunk_list.extend(["%ld:0" % item for item in memory_chunks])
-        disk_chunk_list.extend(["%ld:0" % item for item in disk_chunks])
-    disk_overlay_map = ','.join(disk_chunk_list)
-    memory_overlay_map = ','.join(memory_chunk_list)
+        memory_chunk_set = set(["%ld:0" % item for item in memory_chunks])
+        disk_chunk_set = set(["%ld:0" % item for item in disk_chunks])
+        memory_chunk_all.update(memory_chunk_set)
+        disk_chunk_all.update(disk_chunk_set)
+    disk_overlay_map = ','.join(disk_chunk_all)
+    memory_overlay_map = ','.join(memory_chunk_all)
 
     # make FUSE disk & memory
     kwargs['meta_info'] = meta_info
+    time_start_fuse = time()
     fuse = run_fuse(Const.CLOUDLETFS_PATH, Const.CHUNK_SIZE,
             base_image, vm_disk_size, base_mem, vm_memory_size,
             resumed_disk=launch_disk.name,  disk_overlay_map=disk_overlay_map,
             resumed_memory=launch_mem.name, memory_overlay_map=memory_overlay_map,
             **kwargs)
-    LOG.info("Start FUSE")
+    LOG.info("Start FUSE (%f s)" % (time()-time_start_fuse))
 
     # Recover Modified Memory
     named_pipename = overlay_file+".fifo"
@@ -1059,7 +1093,7 @@ def run_vm(conn, domain_xml, **kwargs):
 
 class MemoryReadProcess(process_manager.ProcWorker):
     def __init__(self, input_path, machine_memory_size,
-                 conn, machine, result_queue):
+                 conn, machine, qmp_channel, result_queue):
         self.input_path = input_path
         self.result_queue = result_queue
         self.machine_memory_size = machine_memory_size*1024
@@ -1067,6 +1101,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
         self.total_write_size = 0
         self.conn = conn
         self.machine = machine
+        self.qmp = qmp_af_unix.QmpAfUnix(qmp_channel)
 
         self.manager = multiprocessing.Manager()
         self.memory_snapshot_size = multiprocessing.Value('d', 0.0)
@@ -1074,6 +1109,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
         super(MemoryReadProcess, self).__init__(target=self.read_mem_snapshot)
 
     def read_mem_snapshot(self):
+        #self.qmp.stop_raw_live_once()
         # create memory snapshot aligned with 4KB
         time_s = time()
         is_first_recv = False
@@ -1206,6 +1242,7 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
     #Set migration speed
     nova_util = kwargs.get('nova_util', None)
     fuse_stream_monitor = kwargs.get('fuse_stream_monitor', None)
+    qmp_channel_path = kwargs.get('qmp_channel_path', None)
     ret = machine.migrateSetMaxSpeed(1000000, 0)   # 1000 Gbps, unlimited
     if ret != 0:
         raise CloudletGenerationError("Cannot set migration speed : %s", machine.name())
@@ -1243,6 +1280,7 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
                                              machine_memory_size,
                                              conn,
                                              machine,
+                                             qmp_channel_path,
                                              output_queue)
         memory_read_proc.start()
         libvirt_thread = LibvirtThread(machine, named_pipe_output)
@@ -1506,6 +1544,7 @@ def create_residue(base_disk, base_hashvalue,
     (base_diskmeta, base_mem, base_memmeta) = \
             Const.get_basepath(base_disk, check_exist=True)
     qemu_logfile = resumed_vm.qemu_logfile
+    qmp_channel = resumed_vm.qemu_logfile
 
     # 2. suspend VM and get monitoring information
     memory_snapshot_queue = multiprocessing.Queue(overlay_mode.QUEUE_SIZE_MEMORY_SNAPSHOT)
@@ -1528,7 +1567,8 @@ def create_residue(base_disk, base_hashvalue,
     memory_read_proc = save_mem_snapshot(resumed_vm.conn,
                                          resumed_vm.machine,
                                          memory_snapshot_queue,
-                                         fuse_stream_monitor=resumed_vm.monitor)
+                                         fuse_stream_monitor=resumed_vm.monitor,
+                                         qmp_channel_path=qmp_channel)
 
     if overlay_mode.PROCESS_PIPELINED == False:
         _waiting_to_finish(process_controller, "MemoryReadProcess")
@@ -1539,7 +1579,6 @@ def create_residue(base_disk, base_hashvalue,
     #    data = memory_snapshot_queue.get()
     #    if data == Const.QUEUE_SUCCESS_MESSAGE:
     #        break
-    #import pdb;pdb.set_trace()
 
     # 3. get overlay VM (semantic gap + deduplication)
     dedup_proc = get_overlay_deltalist(monitoring_info, options,

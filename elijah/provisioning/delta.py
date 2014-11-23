@@ -460,6 +460,7 @@ def diff_with_hashlist(base_hashlist, delta_list, ref_id):
 
 
 class Recovered_delta(multiprocessing.Process):
+#class Recovered_delta(threading.Thread):
     FUSE_INDEX_DISK = 1
     FUSE_INDEX_MEMORY = 2
     END_OF_PIPE = "end_of_pipe"
@@ -498,6 +499,7 @@ class Recovered_delta(multiprocessing.Process):
         self.delta_list = list()
 
         multiprocessing.Process.__init__(self)
+        #threading.Thread.__init__(self)
 
     def run(self):
         start_time = time.time()
@@ -553,6 +555,9 @@ class Recovered_delta(multiprocessing.Process):
     def recover_item(self, delta_item):
         if type(delta_item) != DeltaItem:
             raise MemoryError("Need list of DeltaItem")
+
+        #if delta_item.offset == 25047040:
+        #    import pdb;pdb.set_trace()
 
         #LOG.debug("recovering %ld/%ld" % (index, len(delta_list)))
         if (delta_item.ref_id == DeltaItem.REF_RAW):
