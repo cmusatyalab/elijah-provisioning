@@ -1101,7 +1101,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
         self.total_write_size = 0
         self.conn = conn
         self.machine = machine
-        self.qmp = qmp_af_unix.QmpAfUnix(qmp_channel)
 
         self.manager = multiprocessing.Manager()
         self.memory_snapshot_size = multiprocessing.Value('d', 0.0)
@@ -1166,7 +1165,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     current_size = len(data)
                     self.result_queue.put(data)
                     self.total_write_size += current_size
-                    #prog_bar.set_percent(100.0*self.total_read_size/self.machine_memory_size)
+                    #prog_bar.set_percent(100.0*self.total_write_size/mem_snapshot_size)
                     #prog_bar.show_progress()
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
@@ -1206,28 +1205,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.machine = None
 
 
-class ProcessingProcess(multiprocessing.Process):
-    def __init__(self, data_pipe, outpath):
-        self.data_pipe = data_pipe
-        self.outpath = outpath
-        multiprocessing.Process.__init__(self, target=self.process)
-
-    def process(self):
-        recv_pipe, send_pipe = self.data_pipe
-        send_pipe.close()
-        self.out_fd = open(self.outpath, 'wb')
-        total_bytes = 0
-        while True:
-            try:
-                data = recv_pipe.recv()
-                total_bytes += len(data)
-                self.out_fd.write(data)
-            except EOFError:
-                break
-        LOG.debug("finish receiving: %ld bytes" % total_bytes)
-        self.out_fd.close()
-
-
 class LibvirtThread(threading.Thread):
     def __init__(self, machine, outputpath):
         self.machine = machine
@@ -1248,9 +1225,9 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
         raise CloudletGenerationError("Cannot set migration speed : %s", machine.name())
 
     # Pause VM
-    state, reason = machine.state(0)
-    if state != libvirt.VIR_DOMAIN_PAUSED:
-        machine.suspend()
+    #state, reason = machine.state(0)
+    #if state != libvirt.VIR_DOMAIN_PAUSED:
+    #    machine.suspend()
 
     # Stop monitoring for memory access (snapshot will create a lot of access)
     fuse_stream_monitor.del_path(cloudletfs.StreamMonitor.MEMORY_ACCESS)
@@ -1292,6 +1269,10 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
             raise CloudletGenerationError("libvirt memory save : " + str(e))
     finally:
         pass
+    #qmp_channel = "/tmp/cloudlet-qmp"
+    #qmp = qmp_af_unix.QmpAfUnix(qmp_channel)
+    #sleep(1)
+    #qmp.stop_raw_live_once()
 
     # TODO: update this to work with streaming
     try:
@@ -1532,7 +1513,7 @@ def create_residue(base_disk, base_hashvalue,
         #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
         #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
-        #overlay_mode.NUM_PROC_COMPRESSION = 1
+        #overlay_mode.NUM_PROC_COMPRESSION = 4
         #overlay_mode.NUM_PROC_DISK_DIFF = 1
         #overlay_mode.NUM_PROC_MEMORY_DIFF = 1
         #overlay_mode.NUM_PROC_OPTIMIZATION = 1
