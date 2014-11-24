@@ -16,6 +16,13 @@ from elijah.provisioning.Configuration import VMOverlayCreationMode
 from elijah.provisioning import synthesis as synthesis
 from elijah.provisioning.package import PackagingUtil
 
+try:
+    import affinity
+except ImportError as e:
+    sys.stderr.__write("Cannot find affinity package\n")
+    sys.exit(1)
+
+
 
 
 class ProfilingError(Exception):
@@ -36,34 +43,48 @@ def run_profile(base_path, overlay_path, overlay_mode):
         sys.stderr.write("%s\n" % str(e))
         sys.stderr.write("%s\nFailed to synthesize" % str(traceback.format_exc()))
 
+def set_affiinity(num_cores):
+    affinity_mask = 0x01
+    if num_cores == 1:
+        affinity_mask = 0x02     # cpu 1
+    elif num_cores ==2:
+        affinity_mask = 0x06    # cpu 1,2
+    elif num_cores ==3:
+        affinity_mask = 0x0e    # cpu 1,2,3
+    elif num_cores ==4:
+        affinity_mask = 0x1e # cpu 1,2,3,4
+    else:
+        raise IOException("Do not allocate more than 4 cores at this experiement")
+    affinity.set_process_affinity_mask(0, affinity_mask)
+
+
 
 def generate_mode():
     mode_list = list()
-    for memory_diff in ("xdelta3", "bsdiff", "none"):
+    for diff in ("xdelta3", "bsdiff", "none"):
         for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
             for comp_level in (1, 4, 9):
                 overlay_mode = VMOverlayCreationMode.get_serial_single_process()
                 overlay_mode.COMPRESSION_ALGORITHM_TYPE = comp_type
                 overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
+                overlay_mode.MEMORY_DIFF_ALGORITHM = diff
+                overlay_mode.DISK_DIFF_ALGORITHM = diff
+
                 mode_list.append(overlay_mode)
     return mode_list
 
 
 def validation_mode():
     mode_list = list()
-    core = 4
-    mode2 = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
-    mode2.QUEUE_SIZE_MEMORY_SNAPSHOT = -1
-    mode2.QUEUE_SIZE_DISK_DELTA_LIST = 4
-    mode2.QUEUE_SIZE_MEMORY_DELTA_LIST = 4
-    mode2.QUEUE_SIZE_OPTIMIZATION = 4
-    mode2.QUEUE_SIZE_COMPRESSION = 4
 
-    mode2.NUM_PROC_DISK_DIFF = core
-    mode2.NUM_PROC_MEMORY_DIFF = core
-    mode2.NUM_PROC_OPTIMIZATION = core
-    mode2.NUM_PROC_COMPRESSION = core
-    mode_list.append(mode2)
+    for core in (1,2,3,4):
+        mode = VMOverlayCreationMode.get_serial_single_process()
+        mode.NUM_PROC_DISK_DIFF = core
+        mode.NUM_PROC_MEMORY_DIFF = core
+        mode.NUM_PROC_OPTIMIZATION = core
+        mode.NUM_PROC_COMPRESSION = core
+        mode_list.append(mode)
+
     return mode_list
 
 
@@ -96,5 +117,16 @@ if __name__ == "__main__":
     is_url, overlay_path = PackagingUtil.is_zip_contained(overlay_path)
     #mode_list = generate_mode()
     mode_list = validation_mode()
+
     for each_mode in mode_list:
+        comp_core = each_mode.NUM_PROC_COMPRESSION
+        disk_diff_core = each_mode.NUM_PROC_DISK_DIFF
+        memory_diff_core = each_mode.NUM_PROC_MEMORY_DIFF
+        if (comp_core == disk_diff_core == memory_diff_core) == False:
+            msg = "Assign core should be equal to every stage for profiling"
+            raise IOException(msg)
+
+    for each_mode in mode_list:
+        num_core = each_mode.NUM_PROC_COMPRESSION
+        set_affiinity(num_core)
         run_profile(base_path, overlay_path, each_mode)
