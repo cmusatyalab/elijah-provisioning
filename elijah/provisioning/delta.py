@@ -530,8 +530,8 @@ class Recovered_delta(multiprocessing.Process):
         for delta_item in unresolved_deltaitem_list:
             ret = self.recover_item(delta_item)
             if ret == None:
-                msg = "Cannot find self reference: type(%ld), offset(%ld), index(%ld), ref_index(%ld)" % \
-                        (delta_item.delta_type, delta_item.offset, delta_item.index, ref_index)
+                msg = "Cannot find self reference: type(%ld), offset(%ld), index(%ld)" % \
+                        (delta_item.delta_type, delta_item.offset, delta_item.index)
                 raise MemoryError(msg)
             self.process_deltaitem(delta_item)
             count += 1
@@ -796,17 +796,18 @@ class DeltaDedup(process_manager.ProcWorker):
                         if ((delta_item.ref_id == DeltaItem.REF_XDELTA)\
                             or (delta_item.ref_id == DeltaItem.REF_RAW)\
                             or (delta_item.ref_id == DeltaItem.REF_BSDIFF)):
-                            ret = deduplicate_deltaitem(self.self_hashdict,
-                                                        delta_item,
-                                                        DeltaItem.REF_SELF)
-                            if ret == True:
+
+                            ref_offset = self.self_hashdict.get(delta_item.hash_value, None)
+                            if ref_offset is not None:
+                                delta_item.ref_id = DeltaItem.REF_SELF
+                                delta_item.data_len = 8
+                                delta_item.data = ref_offset
                                 if delta_item.delta_type == DeltaItem.DELTA_DISK:
                                     number_of_self_ref_disk += 1
                                 else:
                                     number_of_self_ref_memory += 1
                             else:
                                 ref_offset = long(delta_item.index)
-                                offset_length = 8
                                 self.self_hashdict[delta_item.hash_value] = ref_offset
                     # now delta item has new data length
                     self.out_size += delta_item.data_len

@@ -365,6 +365,7 @@ class SynthesizedVM(threading.Thread):
         os.chmod(os.path.dirname(self.qemu_logfile), 0o771)
         os.chmod(self.qemu_logfile, 0o666)
         #self.qmp_channel = os.path.abspath(os.path.join(temp_qemu_dir, "qmp-channel"))
+
         self.qmp_channel = os.path.abspath("/tmp/cloudlet-qmp")
         if os.path.exists(self.qmp_channel) == True:
             os.remove(self.qmp_channel)
@@ -1101,7 +1102,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
         self.total_write_size = 0
         self.conn = conn
         self.machine = machine
-        #self.qmp = qmp_af_unix.QmpAfUnix("/tmp/cloudlet-qmp")
+        self.qmp = qmp_af_unix.QmpAfUnix("/tmp/cloudlet-qmp")
 
         self.manager = multiprocessing.Manager()
         self.memory_snapshot_size = multiprocessing.Value('d', 0.0)
@@ -1112,7 +1113,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
         # create memory snapshot aligned with 4KB
         time_s = time()
         is_first_recv = False
-        #is_qmp_msg_sent = False
+        is_qmp_msg_sent = False
         time_first_recv = 0
         UPDATE_SIZE  = 1024*1024*10 # 10MB
         prev_processed_size = 0

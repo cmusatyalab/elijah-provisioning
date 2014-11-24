@@ -72,6 +72,20 @@ def parsing(inputfile):
         test_ret_list.append(test_ret)
         pprint(test_ret)
         print ""
+    return test_ret_list
+
+
+def profile_each_exp(each_exp_dict):
+    # total execution time from processing time
+
+    pass
+
+
+def profiling(test_ret_list):
+    # how change in mode will affect system performance?
+    for each_exp in test_ret_list:
+        profile_each_exp(each_exp)
+
 
 
 
@@ -80,4 +94,5 @@ if __name__ == "__main__":
         sys.stderr.write("Need input filename")
         sys.exit(1)
     inputfile = sys.argv[1]
-    parsing(inputfile)
+    test_ret_list = parsing(inputfile)
+    profiling(test_ret_list)
