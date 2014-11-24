@@ -1170,10 +1170,10 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     #prog_bar.set_percent(100.0*self.total_write_size/mem_snapshot_size)
                     #prog_bar.show_progress()
 
-                    #if (is_qmp_msg_sent == False) and\
-                    #        (self.total_write_size > (mem_snapshot_size + Const.LIBVIRT_HEADER_SIZE)):
-                    #    self.qmp.stop_raw_live_once()
-                    #    is_qmp_msg_sent = True
+                    if (is_qmp_msg_sent == False) and\
+                            (self.total_write_size > (mem_snapshot_size + Const.LIBVIRT_HEADER_SIZE)):
+                        self.qmp.stop_raw_live_once()
+                        is_qmp_msg_sent = True
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time()
@@ -1958,6 +1958,7 @@ def _reconstruct_mem_deltalist(base_disk, base_mem, overlay_filepath):
     ZERO_DATA = struct.pack("!s", chr(0x00)) * Const.CHUNK_SIZE
     chunk_size = Const.CHUNK_SIZE
     recovered_data_dict = dict()
+    recovered_hash_dict = dict()
 
     for delta_item in deltalist:
         if type(delta_item) != DeltaItem:
@@ -1984,6 +1985,13 @@ def _reconstruct_mem_deltalist(base_disk, base_mem, overlay_filepath):
                         delta_item.index, ref_index)
                 raise MemoryError(msg)
             recover_data = self_ref_data
+        elif delta_item.ref_id == DeltaItem.REF_SELF_HASH:
+            ref_hashvalue = delta_item.data
+            self_ref_data = recovered_hash_dict.get(ref_hashvalue, None)
+            if self_ref_delta_item == None:
+                return None
+            recover_data = self_ref_data
+            delta_item.hash_value = ref_hashvalue
         elif delta_item.ref_id == DeltaItem.REF_XDELTA:
             patch_data = delta_item.data
             patch_original_size = delta_item.offset_len
@@ -2019,8 +2027,10 @@ def _reconstruct_mem_deltalist(base_disk, base_mem, overlay_filepath):
         #delta_item.ref_id = DeltaItem.REF_RAW
         #delta_item.data = recover_data
         #delta_item.data_len = len(recover_data)
-        delta_item.hash_value = hashlib.sha256(recover_data).digest()
+        if delta_item.hash_value == None or len(delta_item.hash_value) == 0:
+            delta_item.hash_value = hashlib.sha256(recover_data).digest()
         recovered_data_dict[delta_item.index] = recover_data
+        recovered_hash_dict[delta_item.hash_value] = recover_data
         ret_deltalist.append(delta_item)
 
     base_disk_fd.close()
@@ -2030,6 +2040,7 @@ def _reconstruct_mem_deltalist(base_disk, base_mem, overlay_filepath):
     raw_mem.close()
     raw_mem = None
     recovered_data_dict = None
+    recovered_hash_dict = None
 
     return ret_deltalist
 

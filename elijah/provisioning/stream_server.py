@@ -29,6 +29,7 @@ import socket
 import tempfile
 import multiprocessing
 import threading
+from hashlib import sha256
 
 import delta
 from server import NetworkUtil
@@ -86,6 +87,7 @@ class RecoverDeltaProc(multiprocessing.Process):
         self.chunk_size = chunk_size
         self.zero_data = struct.pack("!s", chr(0x00)) * chunk_size
         self.recovered_delta_dict = dict()
+        self.recovered_hash_dict = dict()
         self.delta_list = list()
 
         multiprocessing.Process.__init__(self, target=self.recover_deltaitem)
@@ -172,6 +174,13 @@ class RecoverDeltaProc(multiprocessing.Process):
                 #raise StreamSynthesisError(msg)
                 return None
             recover_data = self_ref_delta_item.data
+        elif delta_item.ref_id == DeltaItem.REF_SELF_HASH:
+            ref_hashvalue = delta_item.data
+            self_ref_delta_item = self.recovered_hash_dict.get(ref_hashvalue, None)
+            if self_ref_delta_item == None:
+                return None
+            recover_data = self_ref_delta_item.data
+            delta_item.hash_value = ref_hashvalue
         elif delta_item.ref_id == DeltaItem.REF_XDELTA:
             patch_data = delta_item.data
             patch_original_size = delta_item.offset_len
@@ -205,6 +214,8 @@ class RecoverDeltaProc(multiprocessing.Process):
         # recover
         delta_item.ref_id = DeltaItem.REF_RAW
         delta_item.data = recover_data
+        if delta_item.hash_value == None or len(delta_item.hash_value) == 0:
+            delta_item.hash_value = sha256(recover_data).digest()
 
         return delta_item
 
@@ -248,6 +259,10 @@ class RecoverDeltaProc(multiprocessing.Process):
                 ref_id == DeltaItem.REF_BASE_MEM:
             data = struct.unpack("!Q", stream[offset:offset+8])[0]
             offset += 8
+        elif ref_id == DeltaItem.REF_SELF_HASH:
+            #print "unpacking ref_self_hash"
+            data = struct.unpack("!32s", stream[offset:offset+32])[0]
+            offset += 32
 
         # hash_value typically does not exist when recovered becuase we don't need it
         if with_hashvalue:
@@ -267,6 +282,7 @@ class RecoverDeltaProc(multiprocessing.Process):
 
         # save it to dictionary to find self_reference easily
         self.recovered_delta_dict[delta_item.index] = delta_item
+        self.recovered_hash_dict[delta_item.hash_value] = delta_item
         self.delta_list.append(delta_item)
 
         # write to output file 

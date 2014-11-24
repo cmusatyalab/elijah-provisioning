@@ -58,6 +58,7 @@ class DeltaItem(object):
     REF_BASE_MEM        = 0x50
     REF_ZEROS           = 0x60
     REF_BSDIFF          = 0x70
+    REF_SELF_HASH       = 0x80
 
     # data exist only when ref_id is not xdelta
     def __init__(self, delta_type, offset, offset_len, hash_value, ref_id, data_len=0, data=None):
@@ -95,11 +96,16 @@ class DeltaItem(object):
             data += struct.pack("!Q", self.data_len)
             if self.data_len != 0:
                 data += struct.pack("!%ds" % self.data_len, self.data)
-        elif self.ref_id == DeltaItem.REF_SELF:
-            data += struct.pack("!Q", self.data)
         elif self.ref_id == DeltaItem.REF_BASE_DISK or \
                 self.ref_id == DeltaItem.REF_BASE_MEM:
             data += struct.pack("!Q", self.data)
+        elif self.ref_id == DeltaItem.REF_SELF:
+            # saving offset for reference
+            data += struct.pack("!Q", self.data)
+        elif self.ref_id == DeltaItem.REF_SELF_HASH:
+            # saving hashvalue for reference
+            # this is for handling live migration
+            data += struct.pack("!32s", self.data)
 
         if with_hashvalue:
             LOG.debug("hash size is %d" % len(self.hash_value))
@@ -125,11 +131,14 @@ class DeltaItem(object):
                 ref_id == DeltaItem.REF_BSDIFF:
             data_len = struct.unpack("!Q", stream.read(8))[0]
             data = stream.read(data_len)
-        elif ref_id == DeltaItem.REF_SELF:
-            data = struct.unpack("!Q", stream.read(8))[0]
         elif ref_id == DeltaItem.REF_BASE_DISK or \
                 ref_id == DeltaItem.REF_BASE_MEM:
             data = struct.unpack("!Q", stream.read(8))[0]
+        elif ref_id == DeltaItem.REF_SELF:
+            data = struct.unpack("!Q", stream.read(8))[0]
+        elif ref_id == DeltaItem.REF_SELF_HASH:
+            #print "unpacking ref_self_hash"
+            data = struct.unpack("!32s", stream.read(32))[0]
 
         # hash_value typically does not exist when recovered becuase we don't need it
         if with_hashvalue:
@@ -496,6 +505,7 @@ class Recovered_delta(multiprocessing.Process):
         self.chunk_size = chunk_size
         self.zero_data = struct.pack("!s", chr(0x00)) * chunk_size
         self.recovered_delta_dict = dict()
+        self.recovered_hash_dict = dict()
         self.delta_list = list()
 
         multiprocessing.Process.__init__(self)
@@ -556,9 +566,6 @@ class Recovered_delta(multiprocessing.Process):
         if type(delta_item) != DeltaItem:
             raise MemoryError("Need list of DeltaItem")
 
-        #if delta_item.offset == 25047040:
-        #    import pdb;pdb.set_trace()
-
         #LOG.debug("recovering %ld/%ld" % (index, len(delta_list)))
         if (delta_item.ref_id == DeltaItem.REF_RAW):
             recover_data = delta_item.data
@@ -579,6 +586,13 @@ class Recovered_delta(multiprocessing.Process):
                 #raise MemoryError(msg)
                 return None
             recover_data = self_ref_delta_item.data
+        elif delta_item.ref_id == DeltaItem.REF_SELF_HASH:
+            ref_hashvalue = delta_item.data
+            self_ref_delta_item = self.recovered_hash_dict.get(ref_hashvalue, None)
+            if self_ref_delta_item == None:
+                return None
+            recover_data = self_ref_delta_item.data
+            delta_item.hash_value = ref_hashvalue
         elif delta_item.ref_id == DeltaItem.REF_XDELTA:
             patch_data = delta_item.data
             patch_original_size = delta_item.offset_len
@@ -611,6 +625,8 @@ class Recovered_delta(multiprocessing.Process):
         # recover
         delta_item.ref_id = DeltaItem.REF_RAW
         delta_item.data = recover_data
+        if delta_item.hash_value == None or len(delta_item.hash_value) == 0:
+            delta_item.hash_value = sha256(recover_data).digest()
 
         return delta_item
 
@@ -623,6 +639,7 @@ class Recovered_delta(multiprocessing.Process):
 
         # save it to dictionary to find self_reference easily
         self.recovered_delta_dict[delta_item.index] = delta_item
+        self.recovered_hash_dict[delta_item.hash_value] = delta_item
         self.delta_list.append(delta_item)
 
         # write to output file 
@@ -646,6 +663,8 @@ class Recovered_delta(multiprocessing.Process):
             overlay_chunk_ids[:] = []
 
     def finish(self):
+        self.recovered_delta_dict = None
+        self.recovered_hash_dict = None
         if self.base_disk_fd is not None:
             self.base_disk_fd.close()
             self.base_disk_fd = None
@@ -694,6 +713,7 @@ class DeltaDedup(process_manager.ProcWorker):
         self.basemem_hashdict= basemem_hashdict
 
         self.self_hashdict = dict()
+        self.self_hashset = set()
 
         # shared data with other process
         self.manager = multiprocessing.Manager()
@@ -796,19 +816,30 @@ class DeltaDedup(process_manager.ProcWorker):
                         if ((delta_item.ref_id == DeltaItem.REF_XDELTA)\
                             or (delta_item.ref_id == DeltaItem.REF_RAW)\
                             or (delta_item.ref_id == DeltaItem.REF_BSDIFF)):
+                            '''
+                            if delta_item.hash_value in self.self_hashset:
+                                delta_item.ref_id = deltaitem.ref_self_hash
+                                delta_item.data_len = 32
+                                delta_item.data = delta_item.hash_value
+                                if delta_item.delta_type == deltaitem.delta_disk:
+                                    number_of_self_ref_disk += 1
+                                else:
+                                    number_of_self_ref_memory += 1
+                            else:
+                                self.self_hashset.add(delta_item.hash_value)
+                            '''
 
+                            # old implementation using offset for reference
                             ref_offset = self.self_hashdict.get(delta_item.hash_value, None)
                             if ref_offset is not None:
                                 delta_item.ref_id = DeltaItem.REF_SELF
                                 delta_item.data_len = 8
                                 delta_item.data = ref_offset
-                                if delta_item.delta_type == DeltaItem.DELTA_DISK:
-                                    number_of_self_ref_disk += 1
-                                else:
-                                    number_of_self_ref_memory += 1
                             else:
                                 ref_offset = long(delta_item.index)
                                 self.self_hashdict[delta_item.hash_value] = ref_offset
+                            # old implementation using offset for reference
+
                     # now delta item has new data length
                     self.out_size += delta_item.data_len
 
