@@ -1642,6 +1642,10 @@ def create_residue(base_disk, base_hashvalue,
                                                                         (time_memory_snapshot_size-time_start)))
         # wait to finish creating files
         synthesis_file.join()
+        time_end_transfer = time()
+        LOG.debug("[time] Time for finishing transferring (%f ~ %f): %f" % (time_start,
+                                                                            time_end_transfer,
+                                                                            (time_end_transfer-time_start)))
         overlay_info, overlay_files = synthesis_file.get_overlay_info()
 
         overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)

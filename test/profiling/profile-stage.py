@@ -39,9 +39,9 @@ def run_profile(base_path, overlay_path, overlay_mode):
 
 def generate_mode():
     mode_list = list()
-    for memory_diff in ("xdelta3", "none"):
+    for memory_diff in ("xdelta3", "bsdiff", "none"):
         for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
-            for comp_level in (1, 5, 9):
+            for comp_level in (1, 4, 9):
                 overlay_mode = VMOverlayCreationMode.get_serial_single_process()
                 overlay_mode.COMPRESSION_ALGORITHM_TYPE = comp_type
                 overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
@@ -51,18 +51,19 @@ def generate_mode():
 
 def validation_mode():
     mode_list = list()
-    for num_proc in (1,2,3,4):
-        overlay_mode = VMOverlayCreationMode.get_serial_single_process()
-        overlay_mode.NUM_PROC_COMPRESSION = num_proc
-        mode_list.append(overlay_mode)
-    for num_proc in (1,2,3,4):
-        overlay_mode = VMOverlayCreationMode.get_serial_single_process()
-        overlay_mode.NUM_PROC_MEMORY_DIFF = num_proc
-        mode_list.append(overlay_mode)
-    for num_proc in (1,2,3,4):
-        overlay_mode = VMOverlayCreationMode.get_serial_single_process()
-        overlay_mode.NUM_PROC_DISK_DIFF = num_proc
-        mode_list.append(overlay_mode)
+    core = 4
+    mode2 = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+    mode2.QUEUE_SIZE_MEMORY_SNAPSHOT = -1
+    mode2.QUEUE_SIZE_DISK_DELTA_LIST = 4
+    mode2.QUEUE_SIZE_MEMORY_DELTA_LIST = 4
+    mode2.QUEUE_SIZE_OPTIMIZATION = 4
+    mode2.QUEUE_SIZE_COMPRESSION = 4
+
+    mode2.NUM_PROC_DISK_DIFF = core
+    mode2.NUM_PROC_MEMORY_DIFF = core
+    mode2.NUM_PROC_OPTIMIZATION = core
+    mode2.NUM_PROC_COMPRESSION = core
+    mode_list.append(mode2)
     return mode_list
 
 
