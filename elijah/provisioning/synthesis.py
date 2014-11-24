@@ -1523,7 +1523,8 @@ def create_residue(base_disk, base_hashvalue,
     process_controller.set_mode(overlay_mode)
     LOG.info("* Overlay creation configuration")
     LOG.info("  - %s" % str(options))
-    LOG.debug("\n%s" % str(overlay_mode))
+    LOG.debug("* Overlay creation mode start\n%s" % str(overlay_mode))
+    LOG.debug("* Overlay creation mode end")
 
     # 1. sanity check
     if (options == None) or (isinstance(options, Options) == False):
