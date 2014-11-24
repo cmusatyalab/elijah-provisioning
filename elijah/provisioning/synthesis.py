@@ -1101,6 +1101,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
         self.total_write_size = 0
         self.conn = conn
         self.machine = machine
+        #self.qmp = qmp_af_unix.QmpAfUnix("/tmp/cloudlet-qmp")
 
         self.manager = multiprocessing.Manager()
         self.memory_snapshot_size = multiprocessing.Value('d', 0.0)
@@ -1108,10 +1109,10 @@ class MemoryReadProcess(process_manager.ProcWorker):
         super(MemoryReadProcess, self).__init__(target=self.read_mem_snapshot)
 
     def read_mem_snapshot(self):
-        #self.qmp.stop_raw_live_once()
         # create memory snapshot aligned with 4KB
         time_s = time()
         is_first_recv = False
+        #is_qmp_msg_sent = False
         time_first_recv = 0
         UPDATE_SIZE  = 1024*1024*10 # 10MB
         prev_processed_size = 0
@@ -1167,6 +1168,11 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     self.total_write_size += current_size
                     #prog_bar.set_percent(100.0*self.total_write_size/mem_snapshot_size)
                     #prog_bar.show_progress()
+
+                    #if (is_qmp_msg_sent == False) and\
+                    #        (self.total_write_size > (mem_snapshot_size + Const.LIBVIRT_HEADER_SIZE)):
+                    #    self.qmp.stop_raw_live_once()
+                    #    is_qmp_msg_sent = True
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time()
@@ -1269,10 +1275,6 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
             raise CloudletGenerationError("libvirt memory save : " + str(e))
     finally:
         pass
-    #qmp_channel = "/tmp/cloudlet-qmp"
-    #qmp = qmp_af_unix.QmpAfUnix(qmp_channel)
-    #sleep(1)
-    #qmp.stop_raw_live_once()
 
     # TODO: update this to work with streaming
     try:
@@ -1513,7 +1515,7 @@ def create_residue(base_disk, base_hashvalue,
         #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
         #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
-        #overlay_mode.NUM_PROC_COMPRESSION = 4
+        #overlay_mode.NUM_PROC_COMPRESSION = 1
         #overlay_mode.NUM_PROC_DISK_DIFF = 1
         #overlay_mode.NUM_PROC_MEMORY_DIFF = 1
         #overlay_mode.NUM_PROC_OPTIMIZATION = 1
