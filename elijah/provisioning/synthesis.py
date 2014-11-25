@@ -1033,6 +1033,14 @@ def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
     disk_overlay_map = str(disk_overlay_map) if disk_overlay_map else ""
     memory_overlay_map = str(memory_overlay_map) if memory_overlay_map else ""
 
+    # save overlay maps to files and pass file paths
+    #disk_overlay_path = NamedTemporaryFile(prefix="cloudletfs-disk-overlaymap-", delete=True)
+    #LOG.debug("write disk overlay map info to %s" % disk_overlay_path.name)
+    #open(disk_overlay_path.name, "w+").write(disk_overlay_map)
+    #memory_overlay_path = NamedTemporaryFile(prefix="cloudletfs-memory-overlaymap-", delete=True)
+    #LOG.debug("write memory overlay map info to %s" % memory_overlay_path.name)
+    #open(memory_overlay_path.name, "w+").write(memory_overlay_map)
+
     # launch fuse
     execute_args = [
             # disk parameter
@@ -1101,8 +1109,9 @@ class MemoryReadProcess(process_manager.ProcWorker):
         self.total_read_size = 0
         self.total_write_size = 0
         self.conn = conn
+        self.qmp_thread = QmpThread(qmp_channel, timeout=10)
+        self.qmp_thread.daemon = True
         self.machine = machine
-        self.qmp = qmp_af_unix.QmpAfUnix("/tmp/cloudlet-qmp")
 
         self.manager = multiprocessing.Manager()
         self.memory_snapshot_size = multiprocessing.Value('d', 0.0)
@@ -1172,8 +1181,8 @@ class MemoryReadProcess(process_manager.ProcWorker):
 
                     if (is_qmp_msg_sent == False) and\
                             (self.total_write_size > (mem_snapshot_size + Const.LIBVIRT_HEADER_SIZE)):
-                        self.qmp.stop_raw_live_once()
                         is_qmp_msg_sent = True
+                        #self.qmp_thread.start()
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time()
@@ -1220,6 +1229,21 @@ class LibvirtThread(threading.Thread):
 
     def save_mem(self):
         self.machine.save(self.outputpath)
+
+
+class QmpThread(threading.Thread):
+    def __init__(self, qmp_path, timeout):
+        self.qmp_path = qmp_path
+        self.timeout = timeout
+        self.qmp = qmp_af_unix.QmpAfUnix("/tmp/cloudlet-qmp")
+        threading.Thread.__init__(self, target=self.suspend_vm)
+
+    def suspend_vm(self):
+        for index in range(self.timeout):
+            sys.stdout.write("waiting %d/%d seconds\n" % (index, self.timeout))
+            sleep(1)
+        self.qmp.stop_raw_live_once()
+
 
 
 def save_mem_snapshot(conn, machine, output_queue, **kwargs):

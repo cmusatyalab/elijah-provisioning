@@ -875,6 +875,8 @@ class MemoryDiffProc(multiprocessing.Process):
                 time_process_start = time.time()
                 deltaitem_list = list()
                 loop_counter += 1
+                if type(memory_chunk_list) == type(1):
+                    LOG.debug("Invalid data at memory_chunk_list: %d" % memory_chunk_list)
                 for data in memory_chunk_list:
                     ram_offset, = struct.unpack(Memory.CHUNK_HEADER_FMT, data[0:Memory.CHUNK_HEADER_SIZE])
                     ram_offset += self.libvirt_header_offset    # add libvirt header offset
@@ -902,7 +904,7 @@ class MemoryDiffProc(multiprocessing.Process):
                                 if source_data == None:
                                     msg = "launch memory snapshot is bigger than base vm at %ld (%ld > %ld)" %\
                                         (ram_offset, ram_offset+len(data), self.raw_filesize)
-                                    LOG.debug(msg)
+                                    #LOG.debug(msg)
                                     raise IOError(msg)
                                 if self.diff_algorithm == "xdelta3":
                                     diff_data = tool.diff_data(source_data, data, 2*len(source_data))

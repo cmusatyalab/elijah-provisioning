@@ -446,8 +446,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         temp_synthesis_dir = tempfile.mkdtemp(prefix="cloudlet-comp-")
         launch_disk = os.path.join(temp_synthesis_dir, "launch-disk")
         launch_mem = os.path.join(temp_synthesis_dir, "launch-mem")
-        disk_chunk_list = list()
-        memory_chunk_list = list()
+        memory_chunk_all = set()
+        disk_chunk_all = set()
 
         # start pipelining processes
         network_out_queue = multiprocessing.Queue()
@@ -483,8 +483,11 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
             blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
             blob_memory_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
-            disk_chunk_list += ["%ld:1" % item for item in blob_disk_chunk]
-            memory_chunk_list += ["%ld:1" % item for item in blob_memory_chunk]
+            memory_chunk_set = set(["%ld:1" % item for item in blob_memory_chunk])
+            disk_chunk_set = set(["%ld:1" % item for item in blob_disk_chunk])
+            memory_chunk_all.update(memory_chunk_set)
+            disk_chunk_all.update(disk_chunk_set)
+
             compressed_blob = self._recv_all(blob_size)
             network_out_queue.put((blob_comp_type, compressed_blob))
             #elif blob_type == "meta":
@@ -499,8 +502,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         # what will be modified in the future
 
         time_fuse_start = time.time()
-        disk_overlay_map = ','.join(disk_chunk_list)
-        memory_overlay_map = ','.join(memory_chunk_list)
+        disk_overlay_map = ','.join(disk_chunk_all)
+        memory_overlay_map = ','.join(memory_chunk_all)
         fuse = run_fuse(Cloudlet_Const.CLOUDLETFS_PATH, Cloudlet_Const.CHUNK_SIZE,
                 base_diskpath, launch_disk_size, base_mempath, launch_memory_size,
                 resumed_disk=launch_disk,  disk_overlay_map=disk_overlay_map,

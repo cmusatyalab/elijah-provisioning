@@ -816,19 +816,17 @@ class DeltaDedup(process_manager.ProcWorker):
                         if ((delta_item.ref_id == DeltaItem.REF_XDELTA)\
                             or (delta_item.ref_id == DeltaItem.REF_RAW)\
                             or (delta_item.ref_id == DeltaItem.REF_BSDIFF)):
-                            '''
                             if delta_item.hash_value in self.self_hashset:
-                                delta_item.ref_id = deltaitem.ref_self_hash
+                                delta_item.ref_id = delta_item.REF_SELF_HASH
                                 delta_item.data_len = 32
                                 delta_item.data = delta_item.hash_value
-                                if delta_item.delta_type == deltaitem.delta_disk:
+                                if delta_item.delta_type == DeltaItem.DELTA_DISK:
                                     number_of_self_ref_disk += 1
                                 else:
                                     number_of_self_ref_memory += 1
                             else:
                                 self.self_hashset.add(delta_item.hash_value)
                             '''
-
                             # old implementation using offset for reference
                             ref_offset = self.self_hashdict.get(delta_item.hash_value, None)
                             if ref_offset is not None:
@@ -839,6 +837,7 @@ class DeltaDedup(process_manager.ProcWorker):
                                 ref_offset = long(delta_item.index)
                                 self.self_hashdict[delta_item.hash_value] = ref_offset
                             # old implementation using offset for reference
+                            '''
 
                     # now delta item has new data length
                     self.out_size += delta_item.data_len
