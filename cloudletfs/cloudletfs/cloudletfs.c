@@ -175,7 +175,7 @@ static GList *synthesis_chunk_list_new(const gchar *overlay_chunks,
                 g_slice_new0(struct chunk_synthesis_info);
         chunk->chunk_number = chunk_number;
         chunk->valid = (valid_bit == 1) ? true : false;
-        chunk_list = g_list_append(chunk_list, chunk);
+        chunk_list = g_list_prepend(chunk_list, chunk);
         g_strfreev(overlay_info);
     }
     g_strfreev(components);
