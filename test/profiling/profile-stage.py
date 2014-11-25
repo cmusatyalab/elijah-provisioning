@@ -61,29 +61,29 @@ def set_affiinity(num_cores):
 
 def generate_mode():
     mode_list = list()
-    for diff in ("xdelta3", "bsdiff", "none"):
-        for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
-            for comp_level in (1, 4, 9):
-                overlay_mode = VMOverlayCreationMode.get_serial_single_process()
-                overlay_mode.COMPRESSION_ALGORITHM_TYPE = comp_type
-                overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
-                overlay_mode.MEMORY_DIFF_ALGORITHM = diff
-                overlay_mode.DISK_DIFF_ALGORITHM = diff
+    #for diff in ("xdelta3", "bsdiff", "none"):
+    for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
+        for comp_level in (1, 4, 9):
+            overlay_mode = VMOverlayCreationMode.get_serial_single_process()
+            overlay_mode.COMPRESSION_ALGORITHM_TYPE = comp_type
+            overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
+            #overlay_mode.MEMORY_DIFF_ALGORITHM = diff
+            #overlay_mode.DISK_DIFF_ALGORITHM = diff
 
-                mode_list.append(overlay_mode)
+            mode_list.append(overlay_mode)
     return mode_list
 
 
 def validation_mode():
     mode_list = list()
+    core = 1
 
-    for core in (1,2,3,4):
-        mode = VMOverlayCreationMode.get_serial_single_process()
-        mode.NUM_PROC_DISK_DIFF = core
-        mode.NUM_PROC_MEMORY_DIFF = core
-        mode.NUM_PROC_OPTIMIZATION = core
-        mode.NUM_PROC_COMPRESSION = core
-        mode_list.append(mode)
+    mode = VMOverlayCreationMode.get_serial_single_process()
+    mode.NUM_PROC_DISK_DIFF = core
+    mode.NUM_PROC_MEMORY_DIFF = core
+    mode.NUM_PROC_OPTIMIZATION = core
+    mode.NUM_PROC_COMPRESSION = core
+    mode_list.append(mode)
 
     return mode_list
 
@@ -115,16 +115,17 @@ if __name__ == "__main__":
     base_path = linux_base_path
     overlay_path = moped
     is_url, overlay_path = PackagingUtil.is_zip_contained(overlay_path)
-    #mode_list = generate_mode()
-    mode_list = validation_mode()
+    mode_list = generate_mode()
+    #mode_list = validation_mode()
 
+    # check modes are valid
     for each_mode in mode_list:
         comp_core = each_mode.NUM_PROC_COMPRESSION
         disk_diff_core = each_mode.NUM_PROC_DISK_DIFF
         memory_diff_core = each_mode.NUM_PROC_MEMORY_DIFF
         if (comp_core == disk_diff_core == memory_diff_core) == False:
             msg = "Assign core should be equal to every stage for profiling"
-            raise IOException(msg)
+            raise ProfilingError(msg)
 
     for each_mode in mode_list:
         num_core = each_mode.NUM_PROC_COMPRESSION

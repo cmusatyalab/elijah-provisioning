@@ -553,7 +553,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         memory_data = fin.data_buffer[Const.LIBVIRT_HEADER_SIZE:]
         memory_page_list += chunks(memory_data, memory_chunk_size)
         memory_data_queue = fin.data_queue
-        self.in_size += Const.LIBVIRT_HEADER_SIZE
 
         # launch child processes
         output_fd_list = list()
@@ -628,14 +627,12 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
             # put task to child process
             task_queue.put(tasks)
-            self.in_size = self.in_size + (len(tasks)*memory_chunk_size)
 
         # send last memory page
         # libvirt randomly add string starting with 'LibvirtQemudSave'
         # Therefore, process the last memory page only when it's aligned
         if len(memory_page_list[0]) == (Memory.RAM_PAGE_SIZE + Memory.CHUNK_HEADER_SIZE):
             task_queue.put(memory_page_list)
-            self.in_size = self.in_size + (len(memory_page_list)*memory_chunk_size)
 
         # send end meesage to every process
         for child_proc in self.proc_list:
@@ -658,14 +655,16 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     self._handle_control_msg(control_msg)
                 else:
                     cq = finished_proc_dict[in_queue]
-                    processed_size = cq.get()
-                    self.out_size += processed_size
+                    (input_size, output_size) = cq.get()
+                    self.in_size += input_size
+                    self.out_size += output_size
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
         time_e = time.time()
-        LOG.debug("profiling\t%s\tsize\t%ld\t%ld" % (self.__class__.__name__,
-                                                    self.in_size,
-                                                    self.out_size))
+        LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
+                                                         self.in_size,
+                                                         self.out_size,
+                                                         (float(self.in_size)/self.out_size)))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
                   (self.__class__.__name__, time_s, time_e, (time_e-time_s)))
 
@@ -854,6 +853,7 @@ class MemoryDiffProc(multiprocessing.Process):
                       self.mode_queue._reader.fileno()]
         freed_page_counter = 0
         loop_counter = 0
+        indata_size = 0
         outdata_size = 0
         while is_proc_running:
             inready, outread, errready = select.select(input_list, [], [])
@@ -881,6 +881,7 @@ class MemoryDiffProc(multiprocessing.Process):
                     ram_offset, = struct.unpack(Memory.CHUNK_HEADER_FMT, data[0:Memory.CHUNK_HEADER_SIZE])
                     ram_offset += self.libvirt_header_offset    # add libvirt header offset
                     data = data[Memory.CHUNK_HEADER_SIZE:]
+                    chunk_data_len = len(data)
                     hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
                     #print "%d\t%d\t%d" % (self.libvirt_header_offset, ram_offset, len(data))
 
@@ -903,18 +904,18 @@ class MemoryDiffProc(multiprocessing.Process):
                                 source_data = self.get_raw_data(ram_offset, len(data))
                                 if source_data == None:
                                     msg = "launch memory snapshot is bigger than base vm at %ld (%ld > %ld)" %\
-                                        (ram_offset, ram_offset+len(data), self.raw_filesize)
+                                        (ram_offset, ram_offset+chunk_data_len, self.raw_filesize)
                                     #LOG.debug(msg)
                                     raise IOError(msg)
                                 if self.diff_algorithm == "xdelta3":
                                     diff_data = tool.diff_data(source_data, data, 2*len(source_data))
                                     diff_type = DeltaItem.REF_XDELTA
-                                    if len(diff_data) > len(data):
+                                    if len(diff_data) > chunk_data_len:
                                         raise IOError("xdelta3 patch is bigger than origianl")
                                 elif self.diff_algorithm == "bsdiff":
                                     diff_data = tool.diff_data_bsdiff(source_data, data)
                                     diff_type = DeltaItem.REF_BSDIFF
-                                    if len(diff_data) > len(data):
+                                    if len(diff_data) > chunk_data_len:
                                         raise IOError("bsdiff patch is bigger than origianl")
                                 elif self.diff_algorithm == "none":
                                     diff_data = data
@@ -927,9 +928,10 @@ class MemoryDiffProc(multiprocessing.Process):
                                 diff_type = DeltaItem.REF_RAW
 
                             diff_data_len = len(diff_data)
-                            outdata_size += diff_data_len
+                            indata_size += (chunk_data_len+11)
+                            outdata_size += (diff_data_len+11)
                             delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
-                                    ram_offset, len(data),
+                                    ram_offset, chunk_data_len,
                                     hash_value=chunk_hashvalue,
                                     ref_id=diff_type,
                                     data_len=len(diff_data),
@@ -939,7 +941,7 @@ class MemoryDiffProc(multiprocessing.Process):
                 time_process_end = time.time()
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Memory][Child] Child finished. process %d jobs" % (loop_counter))
-        self.command_queue.put(outdata_size)
+        self.command_queue.put((indata_size, outdata_size))
         self.task_queue.put(freed_page_counter)
         #out_fd.close()  # measurement
         while self.mode_queue.empty() == False:

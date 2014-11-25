@@ -791,7 +791,7 @@ class DeltaDedup(process_manager.ProcWorker):
                     time_first_recv = time.time()
 
                 for delta_item in deltaitem_list:
-                    self.in_size += delta_item.data_len
+                    self.in_size += (delta_item.data_len+11)
                     if deduplicate_deltaitem(zero_hash_dict, delta_item,
                                             DeltaItem.REF_ZEROS) == True:
                         if delta_item.delta_type == DeltaItem.DELTA_DISK:
@@ -840,7 +840,7 @@ class DeltaDedup(process_manager.ProcWorker):
                             '''
 
                     # now delta item has new data length
-                    self.out_size += delta_item.data_len
+                    self.out_size += (delta_item.data_len+11)
 
                 self.merged_deltalist_queue.put(deltaitem_list)
 
@@ -872,9 +872,10 @@ class DeltaDedup(process_manager.ProcWorker):
 
         #LOG.debug("Dedup statistics: %s" % str(self.statistics))
         LOG.debug("[time] Dedup: first input at : %f" % (time_first_recv))
-        LOG.debug("profiling\t%s\tsize\t%ld\t%ld" % (self.__class__.__name__,
-                                                    self.in_size,
-                                                    self.out_size))
+        LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
+                                                         self.in_size,
+                                                         self.out_size,
+                                                         (float(self.in_size)/self.out_size)))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
                   (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
 

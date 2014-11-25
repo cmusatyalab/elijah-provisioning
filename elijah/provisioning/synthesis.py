@@ -1201,10 +1201,9 @@ class MemoryReadProcess(process_manager.ProcWorker):
 
         time_e = time()
         self.process_info['is_alive'] = False
-        #LOG.debug("[time] Memory size of launch VM: %ld" % (self.total_read_size))
         LOG.debug("[time] Memory snapshotting first input at : %f" % (time_first_recv))
-        LOG.debug("profiling\t%s\tsize\t%ld\t%ld" % \
-                  (self.__class__.__name__, self.total_read_size, self.total_write_size))
+        LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % \
+                  (self.__class__.__name__, self.total_write_size, self.total_write_size, 1))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" % \
                   (self.__class__.__name__, time_s, time_e, (time_e-time_s)))
 
@@ -1535,11 +1534,11 @@ def create_residue(base_disk, base_hashvalue,
     time_start = time()
     process_controller = process_manager.get_instance()
     if overlay_mode == None:
-        #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
+        overlay_mode = VMOverlayCreationMode.get_serial_single_process()
         #overlay_mode = VMOverlayCreationMode.get_serial_multi_process()
         #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
         #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
-        overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+        #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
         #overlay_mode.NUM_PROC_COMPRESSION = 1
         #overlay_mode.NUM_PROC_DISK_DIFF = 1
         #overlay_mode.NUM_PROC_MEMORY_DIFF = 1

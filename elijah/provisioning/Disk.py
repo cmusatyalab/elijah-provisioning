@@ -293,7 +293,6 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             if is_discarded == True:
                 # only apply when it is true
                 if self.apply_discard:
-                    self.in_size += self.chunk_size
                     continue
 
             modified_chunk_list.append(chunk)
@@ -303,7 +302,6 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
 
             modified_chunk_length = len(modified_chunk_list)
             if modified_chunk_length > 255:  # 1MB
-                self.in_size += (modified_chunk_length*self.chunk_size)
                 task_queue.put(modified_chunk_list)
                 modified_chunk_list = []
 
@@ -319,7 +317,6 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                 processed_duration = float(0)
 
         # send last chunks
-        self.in_size += (len(modified_chunk_list)*self.chunk_size)
         task_queue.put(modified_chunk_list)
         modified_chunk_list = []
 
@@ -347,8 +344,9 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                     self._handle_control_msg(control_msg)
                 else:
                     cq = finished_proc_dict[in_queue]
-                    processed_size = cq.get()
-                    self.out_size += processed_size
+                    (input_size, output_size) = cq.get()
+                    self.in_size += input_size
+                    self.out_size += output_size
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
 
@@ -368,9 +366,14 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         #        (trim_counter, overwritten_after_trim, xray_counter))
         time_end = time.time()
         LOG.debug("[time] Disk first input at : %f" % (time_first_recv))
-        LOG.debug("profiling\t%s\tsize\t%ld\t%ld" % (self.__class__.__name__,
-                                                    self.in_size,
-                                                    self.out_size))
+        if self.out_size != 0:
+            in_out_ratio = float(self.in_size)/self.out_size
+        else:
+            in_out_ratio = 1
+        LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
+                                                        self.in_size,
+                                                        self.out_size,
+                                                        in_out_ratio))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
                   (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
 
@@ -430,6 +433,7 @@ class DiskDiffProc(multiprocessing.Process):
 
         is_proc_running = True
         loop_counter = 0
+        indata_size = 0
         outdata_size = 0
         input_list = [self.task_queue._reader.fileno(),
                       self.mode_queue._reader.fileno()]
@@ -457,17 +461,18 @@ class DiskDiffProc(multiprocessing.Process):
                     # check file system 
                     modified_fd.seek(offset)
                     data = modified_fd.read(self.chunk_size)
-                    source_data = base_mmap[offset:offset+len(data)]
+                    chunk_data_len = len(data)
+                    source_data = base_mmap[offset:offset+chunk_data_len]
                     try:
                         if self.diff_algorithm == "xdelta3":
                             diff_data = tool.diff_data(source_data, data, 2*len(source_data))
                             diff_type = DeltaItem.REF_XDELTA
-                            if len(diff_data) > len(data):
+                            if len(diff_data) > chunk_data_len:
                                 raise IOError("xdelta3 patch is bigger than origianl")
                         elif self.diff_algorithm == "bsdiff":
                             diff_data = tool.diff_data_bsdiff(source_data, data)
                             diff_type = DeltaItem.REF_BSDIFF
-                            if len(diff_data) > len(data):
+                            if len(diff_data) > chunk_data_len:
                                 raise IOError("bsdiff patch is bigger than origianl")
                         elif self.diff_algorithm == "none":
                             diff_data = data
@@ -480,7 +485,8 @@ class DiskDiffProc(multiprocessing.Process):
                         diff_type = DeltaItem.REF_RAW
 
                     diff_data_len = len(diff_data)
-                    outdata_size += diff_data_len
+                    indata_size += (chunk_data_len+11)
+                    outdata_size += (diff_data_len+11)
                     delta_item = DeltaItem(DeltaItem.DELTA_DISK,
                             offset, len(data),
                             hash_value=sha256(data).digest(),
@@ -490,7 +496,7 @@ class DiskDiffProc(multiprocessing.Process):
                     deltaitem_list.append(delta_item)
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Disk][Child] Child finished. process %d jobs" % (loop_counter))
-        self.command_queue.put(outdata_size)
+        self.command_queue.put((indata_size, outdata_size))
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()
             msg = "Empty new compression mode that does not refelected"
