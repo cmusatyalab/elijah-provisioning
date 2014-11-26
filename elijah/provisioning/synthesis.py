@@ -1534,11 +1534,11 @@ def create_residue(base_disk, base_hashvalue,
     time_start = time()
     process_controller = process_manager.get_instance()
     if overlay_mode == None:
-        overlay_mode = VMOverlayCreationMode.get_serial_single_process()
+        #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
         #overlay_mode = VMOverlayCreationMode.get_serial_multi_process()
         #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
         #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
-        #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+        overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
         #overlay_mode.NUM_PROC_COMPRESSION = 1
         #overlay_mode.NUM_PROC_DISK_DIFF = 1
         #overlay_mode.NUM_PROC_MEMORY_DIFF = 1

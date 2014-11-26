@@ -759,6 +759,7 @@ class DeltaDedup(process_manager.ProcWorker):
         is_memory_finished = False
         is_disk_finished = False
         self.in_size = 0
+        self.total_block = 0
         self.out_size = 0
         while is_memory_finished == False or is_disk_finished == False:
             time_process_start = time.time()
@@ -790,6 +791,7 @@ class DeltaDedup(process_manager.ProcWorker):
                     is_first_recv = True
                     time_first_recv = time.time()
 
+                self.total_block += len(deltaitem_list)
                 for delta_item in deltaitem_list:
                     self.in_size += (delta_item.data_len+11)
                     if deduplicate_deltaitem(zero_hash_dict, delta_item,
@@ -878,6 +880,12 @@ class DeltaDedup(process_manager.ProcWorker):
                                                          (float(self.in_size)/self.out_size)))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
                   (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
+        LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
+                                                             float(self.in_size)/self.total_block,
+                                                             float(self.out_size)/self.total_block,
+                                                             self.total_block))
+        LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
+                  (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block))
 
     @staticmethod
     def memory_import_hashdict(meta_path):

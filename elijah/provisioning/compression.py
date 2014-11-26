@@ -83,11 +83,14 @@ class CompressProc(process_manager.ProcWorker):
                         modified_memory_chunks.append(offset)
                     input_data += delta_bytes
                     input_size += len(delta_bytes)
+                self.total_block += len(deltaitem_list)
+        self.in_size += input_size
         return is_last_blob, input_data, input_size, modified_disk_chunks, modified_memory_chunks
 
     def compress_stream(self):
         time_start = time.time()
         self.in_size = 0
+        self.total_block = 0
         self.out_size = 0
 
         # launch child processes
@@ -110,7 +113,6 @@ class CompressProc(process_manager.ProcWorker):
 
             if input_size > 0:
                 task_queue.put((input_data, modified_disk_chunks, modified_memory_chunks))
-                self.in_size += (input_size+11)
 
         # send end meesage to every process
         for index in self.proc_list:
@@ -157,6 +159,12 @@ class CompressProc(process_manager.ProcWorker):
                                                          (float(self.in_size)/self.out_size)))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
                   (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
+        LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
+                                                             float(self.in_size)/self.total_block,
+                                                             float(self.out_size)/self.total_block,
+                                                             self.total_block))
+        LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
+                  (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block))
 
         for (proc, c_queue, m_queue) in self.proc_list:
             #sys.stdout.write("[Comp] waiting to dump all data to the next stage\n")

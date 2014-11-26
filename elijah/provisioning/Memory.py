@@ -426,9 +426,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         self.num_proc = overlay_mode.NUM_PROC_MEMORY_DIFF
         self.diff_algorithm = overlay_mode.MEMORY_DIFF_ALGORITHM
 
-        # output
-        self.prev_procssed_size = 0
-        self.prev_procssed_tome = 0
         super(CreateMemoryDeltalist, self).__init__(target=self.create_memory_deltalist)
 
     def create_memory_deltalist(self):
@@ -505,6 +502,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 diff_data = data
                 diff_type = DeltaItem.REF_RAW
 
+            self.in_size += (len(data)+11)
+            self.out_size += (len(diff_data)+11)
             delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
                     offset, len(data),
                     hash_value=chunk_hashvalue,
@@ -513,6 +512,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     data=diff_data)
             delta_list.append(delta_item)
         base_memory_fd.close()
+        self.total_block += len(delta_list)
         self.deltalist_queue.put(delta_list)
 
     def _get_modified_memory_page(self, fin):
@@ -525,6 +525,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         time_first_recv = 0
 
         # measurement
+        self.total_block = 0
         processed_datasize = 0
         processed_duration = 0
         time_process_finish = 0
@@ -655,8 +656,9 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     self._handle_control_msg(control_msg)
                 else:
                     cq = finished_proc_dict[in_queue]
-                    (input_size, output_size) = cq.get()
+                    (input_size, output_size, blocks) = cq.get()
                     self.in_size += input_size
+                    self.total_block += blocks
                     self.out_size += output_size
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
@@ -667,6 +669,12 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                                                          (float(self.in_size)/self.out_size)))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
                   (self.__class__.__name__, time_s, time_e, (time_e-time_s)))
+        LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
+                                                         float(self.in_size)/self.total_block,
+                                                         float(self.out_size)/self.total_block,
+                                                         self.total_block))
+        LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
+                  (self.__class__.__name__, time_s, time_e, (time_e-time_s)/self.total_block))
 
         for (proc, c_queue, mode_queue) in self.proc_list:
             #LOG.debug("[Memory] waiting to dump all data to the next stage")
@@ -852,7 +860,7 @@ class MemoryDiffProc(multiprocessing.Process):
         input_list = [self.task_queue._reader.fileno(),
                       self.mode_queue._reader.fileno()]
         freed_page_counter = 0
-        loop_counter = 0
+        child_total_block = 0
         indata_size = 0
         outdata_size = 0
         while is_proc_running:
@@ -874,7 +882,6 @@ class MemoryDiffProc(multiprocessing.Process):
                     break
                 time_process_start = time.time()
                 deltaitem_list = list()
-                loop_counter += 1
                 if type(memory_chunk_list) == type(1):
                     LOG.debug("Invalid data at memory_chunk_list: %d" % memory_chunk_list)
                 for data in memory_chunk_list:
@@ -930,18 +937,19 @@ class MemoryDiffProc(multiprocessing.Process):
                             diff_data_len = len(diff_data)
                             indata_size += (chunk_data_len+11)
                             outdata_size += (diff_data_len+11)
+                            child_total_block += 1
                             delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
                                     ram_offset, chunk_data_len,
                                     hash_value=chunk_hashvalue,
                                     ref_id=diff_type,
-                                    data_len=len(diff_data),
+                                    data_len=diff_data_len,
                                     data=diff_data)
                             deltaitem_list.append(delta_item)
                             #print "deltaitem: %d %d" % (diff_type, len(diff_data))
                 time_process_end = time.time()
                 self.deltalist_queue.put(deltaitem_list)
-        LOG.debug("[Memory][Child] Child finished. process %d jobs" % (loop_counter))
-        self.command_queue.put((indata_size, outdata_size))
+        LOG.debug("[Memory][Child] Child finished. process %d jobs" % (child_total_block))
+        self.command_queue.put((indata_size, outdata_size, child_total_block))
         self.task_queue.put(freed_page_counter)
         #out_fd.close()  # measurement
         while self.mode_queue.empty() == False:

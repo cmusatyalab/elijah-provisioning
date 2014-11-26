@@ -219,6 +219,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
 
     def create_disk_deltalist(self):
         time_start = time.time()
+        self.total_block = 0
         is_first_recv = False
         time_first_recv = 0
         time_process_finish = 0
@@ -344,8 +345,9 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                     self._handle_control_msg(control_msg)
                 else:
                     cq = finished_proc_dict[in_queue]
-                    (input_size, output_size) = cq.get()
+                    (input_size, output_size, blocks) = cq.get()
                     self.in_size += input_size
+                    self.total_block += blocks
                     self.out_size += output_size
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
@@ -376,6 +378,12 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                                                         in_out_ratio))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
                   (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
+        LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
+                                                               float(self.in_size)/self.total_block,
+                                                               float(self.out_size)/self.total_block,
+                                                               self.total_block))
+        LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
+                  (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block))
 
 
 def recover_disk(base_disk, base_mem, overlay_mem, overlay_disk, recover_path, chunk_size):
@@ -432,7 +440,7 @@ class DiskDiffProc(multiprocessing.Process):
         modified_fd = open(self.modified_disk, "rb")
 
         is_proc_running = True
-        loop_counter = 0
+        child_total_block = 0
         indata_size = 0
         outdata_size = 0
         input_list = [self.task_queue._reader.fileno(),
@@ -454,7 +462,6 @@ class DiskDiffProc(multiprocessing.Process):
                     is_proc_running = False
                     break
 
-                loop_counter += 1
                 deltaitem_list = list()
                 for chunk in task_list:
                     offset = chunk * self.chunk_size
@@ -487,6 +494,7 @@ class DiskDiffProc(multiprocessing.Process):
                     diff_data_len = len(diff_data)
                     indata_size += (chunk_data_len+11)
                     outdata_size += (diff_data_len+11)
+                    child_total_block += 1
                     delta_item = DeltaItem(DeltaItem.DELTA_DISK,
                             offset, len(data),
                             hash_value=sha256(data).digest(),
@@ -495,8 +503,8 @@ class DiskDiffProc(multiprocessing.Process):
                             data=diff_data)
                     deltaitem_list.append(delta_item)
                 self.deltalist_queue.put(deltaitem_list)
-        LOG.debug("[Disk][Child] Child finished. process %d jobs" % (loop_counter))
-        self.command_queue.put((indata_size, outdata_size))
+        LOG.debug("[Disk][Child] Child finished. process %d jobs" % (child_total_block))
+        self.command_queue.put((indata_size, outdata_size, child_total_block))
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()
             msg = "Empty new compression mode that does not refelected"
