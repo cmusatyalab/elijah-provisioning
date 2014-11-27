@@ -70,8 +70,7 @@ def generate_mode():
                     overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
                     overlay_mode.MEMORY_DIFF_ALGORITHM = diff
                     overlay_mode.DISK_DIFF_ALGORITHM = diff
-
-                mode_list.append(overlay_mode)
+                    mode_list.append(overlay_mode)
     return mode_list
 
 

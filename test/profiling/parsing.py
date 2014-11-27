@@ -3,8 +3,57 @@ import sys
 import os
 import ast
 from pprint import pprint
+from collections import defaultdict
 
-stage_names = ["MemoryReadProcess", "CreateMemoryDeltalist", "CreateDiskDeltalist", "DeltaDedup"]
+stage_names = ["CreateMemoryDeltalist", "CreateDiskDeltalist", "DeltaDedup", "CompressProc"]
+
+
+class ProfilingError(Exception):
+    pass
+
+
+class Experiment(object):
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        return "%s,R:%s,P:%s" % (self.workload, self.get_total_R(), self.get_total_P())
+
+    def get_total_P(self):
+        # total P: max(disk_diff, memory_diff)+delta+compression
+        disk_diff = self.stage_time['CreateMemoryDeltalist']
+        memory_diff = self.stage_time['CreateDiskDeltalist']
+        delta = self.stage_time['DeltaDedup']
+        comp = self.stage_time['CompressProc']
+        total_p = max(disk_diff, memory_diff)+delta+comp
+        return total_p
+
+    def get_total_R(self):
+        # R: (disk_in + memor_in)/compressed_out
+        disk_diff = self.stage_size_in['CreateMemoryDeltalist']
+        memory_diff = self.stage_size_in['CreateDiskDeltalist']
+        comp = self.stage_size_out['CompressProc']
+        total_R = float(comp)/(disk_diff+memory_diff)
+        return round(total_R, 4)
+
+    @staticmethod
+    def mode_diff_str(exp1, exp2):
+        mode1 = exp1.mode
+        mode2 = exp2.mode
+        set_mode1, set_mode2= set(mode1.keys()), set(mode2.keys())
+        intersect = set_mode1.intersection(set_mode2)
+        changed_keys = [o for o in intersect if mode1[o] != mode2[o]]
+        changed_list = list()
+        for key in changed_keys:
+            value1 = mode1[key]
+            value2 = mode2[key]
+            changed = "%s: %s->%s" % (key, value1, value2)
+            changed_list.append(changed)
+        changed_str = ", ".join(changed_list)
+        return changed_str
+
+
+
 
 def parse_each_experiement(lines):
     # get configuration
@@ -36,25 +85,48 @@ def parse_each_experiement(lines):
         profile_lines.append(log)
 
     # process filtered log data
-    profile_ret = dict()
-    profile_ret['work'] = workload
-    profile_ret['conf'] = config_dict
-    profile_ret['size'] = dict.fromkeys(stage_names, 0)
-    profile_ret['time'] = dict.fromkeys(stage_names, 0)
+    exp = Experiment()
+    setattr(exp, 'workload', os.path.basename(workload))
+    setattr(exp, 'mode', config_dict)
+    setattr(exp, 'stage_size_in', dict.fromkeys(stage_names, 0))
+    setattr(exp, 'stage_size_out', dict.fromkeys(stage_names, 0))
+    setattr(exp, 'stage_size_ratio', dict.fromkeys(stage_names, 0))
+    setattr(exp, 'stage_time', dict.fromkeys(stage_names, 0))
+    setattr(exp, 'block', dict.fromkeys(stage_names, 0))
+    setattr(exp, 'block_size_in', dict.fromkeys(stage_names, 0))
+    setattr(exp, 'block_size_ratio', dict.fromkeys(stage_names, 0))
+    setattr(exp, 'block_size_out', dict.fromkeys(stage_names, 0))
+    setattr(exp, 'block_time', dict.fromkeys(stage_names, 0))
     for line in profile_lines:
         log = line.split("\t")
         stage_name = log[0]
         profile_type = str(log[1])
+        if stage_name not in stage_names:
+            continue
         if profile_type == "size":
             in_size = long(log[2])
             out_size = long(log[3])
             ratio = float(log[4])
-
-            profile_ret['size'][stage_name] = ratio
+            exp.stage_size_in[stage_name] = in_size
+            exp.stage_size_out[stage_name] = out_size
+            exp.stage_size_ratio[stage_name] = ratio
+        if profile_type == "block-size":
+            in_size = float(log[2])
+            out_size = float(log[3])
+            block_count = log[4]
+            exp.block[stage_name] = block_count
+            exp.block_size_in[stage_name] = in_size
+            exp.block_size_out[stage_name] = out_size
+            exp.block_size_ratio[stage_name] = float(in_size)/out_size
         if profile_type == "time":
             duration = float(log[-1])
-            profile_ret['time'][stage_name] = duration
-    return profile_ret
+            exp.stage_time[stage_name] = duration
+        if profile_type == "block-time":
+            duration = round(float(log[-1])*1000, 6)
+            exp.block_time[stage_name] = duration
+    #print "%s: %s, %s" % (exp.workload, exp.stage_time, exp.get_total_P())
+    #print "%s: %s, %s" % (exp.workload, exp.stage_size_in, exp.get_total_R())
+    return exp
 
 
 def parsing(inputfile):
@@ -68,14 +140,12 @@ def parsing(inputfile):
             new_log = list()
         else:
             new_log.append(line)
+    test_list.append(new_log)
 
-    #parse_each_experiement(test_list[0])
     test_ret_list = list()
     for each_exp_log in test_list:
         test_ret = parse_each_experiement(each_exp_log)
         test_ret_list.append(test_ret)
-        pprint(test_ret)
-        print ""
     return test_ret_list
 
 
@@ -85,11 +155,91 @@ def profile_each_exp(each_exp_dict):
     pass
 
 
+def _split_experiment(test_ret_list):
+    moped_exps = list()
+    fluid_exps = list()
+    face_exps = list()
+    mar_exps = list()
+    for each_exp in test_ret_list:
+        if each_exp.workload.find("moped") !=  -1:
+            moped_exps.append(each_exp)
+        elif each_exp.workload.find("fluid") !=  -1:
+            fluid_exps.append(each_exp)
+        elif each_exp.workload.find("face") !=  -1:
+            face_exps.append(each_exp)
+        elif each_exp.workload.find("mar") !=  -1:
+            mar_exps.append(each_exp)
+        else:
+            msg = "Invalid workload %s" % each_exp['work']
+            print msg
+            sys.exit(1)
+            raise ProfilingError(msg)
+    #if (len(moped_exps) == len(fluid_exps) == len(face_exps) == len(mar_exps)) == False:
+    #    msg = "workloads have different experiement size"
+    #    print msg
+    #    sys.exit(1)
+    #    raise ProfilingError(msg)
+    return moped_exps, fluid_exps, face_exps, mar_exps
+
+
 def profiling(test_ret_list):
     # how change in mode will affect system performance?
-    for each_exp in test_ret_list:
-        profile_each_exp(each_exp)
+    moped_exps, fluid_exps, face_exps, mar_exps = _split_experiment(test_ret_list)
+    comparison = defaultdict(list)
 
+    pivot_mode = moped_exps[0]
+    pivot_R = pivot_mode.get_total_R()
+    pivot_P = pivot_mode.get_total_P()
+    for other_mode in moped_exps:
+        other_r = other_mode.get_total_R()
+        other_p = other_mode.get_total_P()
+        ratio_r = round(other_r/pivot_R, 4)
+        ratio_p = round(other_p/pivot_P, 4)
+        mode_diff_str = Experiment.mode_diff_str(pivot_mode, other_mode)
+        if len(mode_diff_str) == 0:
+            mode_diff_str = "original"
+        comparison[mode_diff_str].append((ratio_r, ratio_p))
+        #print "%s\t%s %s" % (mode_diff_str, ratio_r, ratio_p)
+
+    pivot_mode = mar_exps[0]
+    pivot_R = pivot_mode.get_total_R()
+    pivot_P = pivot_mode.get_total_P()
+    for other_mode in mar_exps:
+        other_r = other_mode.get_total_R()
+        other_p = other_mode.get_total_P()
+        ratio_r = round(other_r/pivot_R, 4)
+        ratio_p = round(other_p/pivot_P, 4)
+        mode_diff_str = Experiment.mode_diff_str(pivot_mode, other_mode)
+        if len(mode_diff_str) == 0:
+            mode_diff_str = "original"
+        (o_r, o_p) = comparison[mode_diff_str][0]
+        comparison[mode_diff_str].append((ratio_r, ratio_p))
+        r_diff = abs(o_r-ratio_r)/o_r*100
+        p_diff = abs(o_p-ratio_p)/o_p*100
+        print "%s\t%f %f" % (mode_diff_str, round(r_diff,0), round(p_diff, 0))
+        #print "%s\t%f %f" % (mode_diff_str, ratio_r, ratio_p)
+
+    pivot_mode = face_exps[0]
+    pivot_R = pivot_mode.get_total_R()
+    pivot_P = pivot_mode.get_total_P()
+    for other_mode in face_exps:
+        other_r = other_mode.get_total_R()
+        other_p = other_mode.get_total_P()
+        ratio_r = round(other_r/pivot_R, 4)
+        ratio_p = round(other_p/pivot_P, 4)
+        mode_diff_str = Experiment.mode_diff_str(pivot_mode, other_mode)
+        if len(mode_diff_str) == 0:
+            mode_diff_str = "original"
+        (o_r, o_p) = comparison[mode_diff_str][0]
+        comparison[mode_diff_str].append((ratio_r, ratio_p))
+        r_diff = abs(o_r-ratio_r)/o_r*100
+        p_diff = abs(o_p-ratio_p)/o_p*100
+        #print "%s\t%f %f" % (mode_diff_str, round(r_diff, 0), round(p_diff, 0))
+        #print "%s\t%f %f" % (mode_diff_str, ratio_r, ratio_p)
+
+
+def get_ratio(in_config, out_configs):
+    pass
 
 
 
