@@ -1139,7 +1139,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.total_write_size = 0
             # read first 40KB and aligen header with 4KB
             data = self.in_fd.read(Memory.Memory.RAM_PAGE_SIZE*10)
-            self.qmp_thread.start()
             if is_first_recv == False:
                 is_first_recv = True
                 time_first_recv = time()
@@ -1183,6 +1182,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     if (is_qmp_msg_sent == False) and\
                             (self.total_write_size > (mem_snapshot_size + Const.LIBVIRT_HEADER_SIZE)):
                         is_qmp_msg_sent = True
+                        self.qmp_thread.start()
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time()
@@ -1238,15 +1238,22 @@ class QmpThread(threading.Thread):
         threading.Thread.__init__(self, target=self.suspend_vm)
 
     def suspend_vm(self):
-        #for index in range(self.timeout):
-        #    sys.stdout.write("waiting %d/%d seconds\n" % (index, self.timeout))
-        #    sleep(1)
         self.qmp.connect()
         ret = self.qmp.qmp_negotiate()
-        print "qmp negotiate: %s" % ret
         if ret:
+            self._waiting(1)
+            LOG.debug("[live] Send migration iteration signal")
+            ret = self.qmp.iterate_raw_live()
+        if ret:
+            self._waiting(self.timeout)
+            LOG.debug("[live] Send stop migration signal")
             self.qmp.stop_raw_live()
         self.qmp.disconnect()
+
+    def _waiting(self, timeout):
+        for index in range(timeout):
+            sys.stdout.write("waiting %d/%d seconds\n" % (index, timeout))
+            sleep(1)
 
 
 
@@ -1539,15 +1546,15 @@ def create_residue(base_disk, base_hashvalue,
     time_start = time()
     process_controller = process_manager.get_instance()
     if overlay_mode == None:
-        overlay_mode = VMOverlayCreationMode.get_serial_single_process()
+        #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
         #overlay_mode = VMOverlayCreationMode.get_serial_multi_process()
         #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
         #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
-        #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
-        #overlay_mode.NUM_PROC_COMPRESSION = 1
-        #overlay_mode.NUM_PROC_DISK_DIFF = 1
-        #overlay_mode.NUM_PROC_MEMORY_DIFF = 1
-        #overlay_mode.NUM_PROC_OPTIMIZATION = 1
+        overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+        overlay_mode.NUM_PROC_COMPRESSION = 1
+        overlay_mode.NUM_PROC_DISK_DIFF = 1
+        overlay_mode.NUM_PROC_MEMORY_DIFF = 1
+        overlay_mode.NUM_PROC_OPTIMIZATION = 1
 
     process_controller.set_mode(overlay_mode)
     LOG.info("* Overlay creation configuration")

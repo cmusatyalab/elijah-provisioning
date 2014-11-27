@@ -378,12 +378,20 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                                                         in_out_ratio))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
                   (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
-        LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
-                                                               float(self.in_size)/self.total_block,
-                                                               float(self.out_size)/self.total_block,
-                                                               self.total_block))
-        LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block))
+        if self.total_block > 0:
+            LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
+                                                                float(self.in_size)/self.total_block,
+                                                                float(self.out_size)/self.total_block,
+                                                                self.total_block))
+            LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
+                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block))
+        else:
+            LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
+                                                                 0,
+                                                                 0,
+                                                                 self.total_block))
+            LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
+                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)/1))
 
 
 def recover_disk(base_disk, base_mem, overlay_mem, overlay_disk, recover_path, chunk_size):

@@ -12,7 +12,7 @@ class QmpAfUnix:
         self.s_name = s_name
 
     def connect(self):
-        print "connecting to %s" % (self.s_name)
+        #print "connecting to %s" % (self.s_name)
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(self.s_name)
 

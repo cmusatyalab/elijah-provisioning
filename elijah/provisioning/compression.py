@@ -74,6 +74,15 @@ class CompressProc(process_manager.ProcWorker):
                 if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
                     is_last_blob = True
                     break
+                if deltaitem_list == Const.QUEUE_NEW_ITERATION:
+                    msg = "[live][comp] waiting for other thread finish current iteration (%d)" % \
+                        self.task_queue.qsize()
+                    LOG.debug(msg)
+                    while self.task_queue.empty() == False:
+                        time.sleep(0.01)
+                    LOG.debug("[live][comp] start compressing for new iteration")
+                    is_last_blob = False
+                    break
                 for delta_item in deltaitem_list:
                     delta_bytes = delta_item.get_serialized()
                     offset = delta_item.offset/Const.CHUNK_SIZE
@@ -94,11 +103,11 @@ class CompressProc(process_manager.ProcWorker):
         self.out_size = 0
 
         # launch child processes
-        task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_COMPRESSION)
+        self.task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_COMPRESSION)
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
             mode_queue = multiprocessing.Queue()
-            comp_proc = CompChildProc(command_queue, task_queue, mode_queue,
+            comp_proc = CompChildProc(command_queue, self.task_queue, mode_queue,
                                       self.comp_delta_queue,
                                       self.comp_type,
                                       self.comp_level)
@@ -112,11 +121,11 @@ class CompressProc(process_manager.ProcWorker):
             is_last_blob, input_data, input_size, modified_disk_chunks, modified_memory_chunks = self._chunk_blob()
 
             if input_size > 0:
-                task_queue.put((input_data, modified_disk_chunks, modified_memory_chunks))
+                self.task_queue.put((input_data, modified_disk_chunks, modified_memory_chunks))
 
         # send end meesage to every process
         for index in self.proc_list:
-            task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+            self.task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
             #sys.stdout.write("[Comp] send end message to each child\n")
 
         # after this for loop, all processing finished, but child process still

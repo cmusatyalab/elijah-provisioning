@@ -69,8 +69,8 @@ class Memory(object):
     CHUNK_HEADER_SIZE = struct.calcsize("=Q")
     ITER_SEQ_BITS   = 16
     ITER_SEQ_SHIFT  = CHUNK_HEADER_SIZE * 8 - ITER_SEQ_BITS
-    BLOB_POS_MASK   = (1 << ITER_SEQ_SHIFT) - 1
-    ITER_SEQ_MASK   = ((1 << (CHUNK_HEADER_SIZE * 8)) - 1) - BLOB_POS_MASK
+    CHUNK_POS_MASK   = (1 << ITER_SEQ_SHIFT) - 1
+    ITER_SEQ_MASK   = ((1 << (CHUNK_HEADER_SIZE * 8)) - 1) - CHUNK_POS_MASK
 
 
     def __init__(self):
@@ -519,18 +519,28 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         self.total_block += len(delta_list)
         self.deltalist_queue.put(delta_list)
 
+    def chunks(self, l, n):
+        ret_chunks = list()
+        for index in range(0, len(l), n):
+            chunked_data = l[index:index+n]
+            if len(chunked_data) == n:
+                header = chunked_data[0:Memory.CHUNK_HEADER_SIZE] 
+                blob_offset, = struct.unpack(Memory.CHUNK_HEADER_FMT, header)
+                iter_seq = (blob_offset & Memory.ITER_SEQ_MASK) >> Memory.ITER_SEQ_SHIFT
+                if iter_seq != self.iteration_seq:
+                    self.iteration_seq = iter_seq
+                    msg = "[live][memory] new iteration %d, waiting for other thread finish current iteration (%d)" %\
+                        (self.iteration_seq, self.task_queue.qsize())
+                    LOG.debug(msg)
+                    while self.task_queue.empty() == False:
+                        time.sleep(0.01)
+                    LOG.debug("[live][memory] start memory processing new iteration")
+                    self.task_queue.put(Const.QUEUE_NEW_ITERATION)
+            ret_chunks.append(chunked_data)
+        return ret_chunks
+        #return [l[i:i + n] for i in range(0, len(l), n)]
+
     def _get_modified_memory_page(self, fin):
-        def chunks(l, n):
-            ret_chunks = list()
-            for index in range(0, len(l), n):
-                chunked_data = l[index:index+n]
-                #if len(chunked_data) == n:
-                #    header = chunked_data[0:Memory.BLOB_HEADER_SIZE] 
-                #    blob_offset, = struct.unpack(Memory.BLOB_HEADER_FMT, header)
-                #    iter_seq = (blob_offset & Memory.ITER_SEQ_MASK) >> Memory.ITER_SEQ_SHIFT
-                ret_chunks.append(chunked_data)
-            return ret_chunks
-            #return [l[i:i + n] for i in range(0, len(l), n)]
 
         time_s = time.time()
         LOG.info("Get hash list of memory page")
@@ -539,6 +549,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
         # measurement
         self.total_block = 0
+        self.iteration_seq = 0
+
         processed_datasize = 0
         processed_duration = 0
         time_process_finish = 0
@@ -565,17 +577,17 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
         memory_page_list = list()
         memory_data = fin.data_buffer[Const.LIBVIRT_HEADER_SIZE:]
-        memory_page_list += chunks(memory_data, memory_chunk_size)
+        memory_page_list += self.chunks(memory_data, memory_chunk_size)
         memory_data_queue = fin.data_queue
 
         # launch child processes
         output_fd_list = list()
         base_hashlist_length = len(self.memory_hashlist)
-        task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_MEMORY_DIFF)
+        self.task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_MEMORY_DIFF)
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
             mode_queue = multiprocessing.Queue()
-            diff_proc = MemoryDiffProc(command_queue, task_queue, mode_queue,
+            diff_proc = MemoryDiffProc(command_queue, self.task_queue, mode_queue,
                                        self.deltalist_queue,
                                        self.diff_algorithm,
                                        self.basemem_path,
@@ -627,6 +639,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     if recved_data == Const.QUEUE_SUCCESS_MESSAGE:
                         # End of the stream
                         is_end_of_stream = True
+                        continue
                     else:
                         required_length = 0
                         if len(memory_page_list) == 1: # handle partial data
@@ -634,24 +647,25 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                             required_length = memory_chunk_size-len(last_data)
                             last_data += recved_data[0:required_length]
                             memory_page_list.append(last_data)
-                        memory_page_list += chunks(recved_data[required_length:], memory_chunk_size)
+                        memory_page_list += self.chunks(recved_data[required_length:], memory_chunk_size)
 
             tasks = memory_page_list[0:-1]
             memory_page_list = memory_page_list[-1:]
 
             # put task to child process
-            task_queue.put(tasks)
+            self.task_queue.put(tasks)
 
         # send last memory page
         # libvirt randomly add string starting with 'LibvirtQemudSave'
         # Therefore, process the last memory page only when it's aligned
-        if len(memory_page_list[0]) == (Memory.RAM_PAGE_SIZE + Memory.CHUNK_HEADER_SIZE):
-            task_queue.put(memory_page_list)
+        if len(memory_page_list) > 0 and len(memory_page_list[0]) == (Memory.RAM_PAGE_SIZE + Memory.CHUNK_HEADER_SIZE):
+            LOG.debug("[Memory][child] send last data to child: %d" % len(memory_page_list))
+            self.task_queue.put(memory_page_list)
 
         # send end meesage to every process
         for child_proc in self.proc_list:
-            #LOG.debug("[Memory] send end message to each child")
-            task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+            LOG.debug("[Memory] send end message to each child")
+            self.task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         # after this for loop, all processing finished, but child process still
         # alive until all data pass to the next step
@@ -888,11 +902,16 @@ class MemoryDiffProc(multiprocessing.Process):
                     self.diff_algorithm = new_diff_algorithm
             if self.task_queue._reader.fileno() in inready:
                 memory_chunk_list = self.task_queue.get()
-                #print "getting a new job: %d %d" % (int(os.getpid()), len(memory_chunk_list))
+                #print "getting a new job: %s %d" % (type(memory_chunk_list), len(memory_chunk_list))
                 if memory_chunk_list == Const.QUEUE_SUCCESS_MESSAGE:
-                    #LOG.debug("[Memory][Child]%d diff proc get end message" % (int(os.getpid())))
+                    LOG.debug("[Memory][Child] %d diff proc get end message" % (int(os.getpid())))
                     is_proc_running = False
                     break
+                if memory_chunk_list == Const.QUEUE_NEW_ITERATION:
+                    LOG.debug("[live][memory][child] new iteration start")
+                    self.deltalist_queue.put(Const.QUEUE_NEW_ITERATION)
+                    LOG.debug("[live][memory][child] Forward message to the compression stage")
+                    continue
                 time_process_start = time.time()
                 deltaitem_list = list()
                 if type(memory_chunk_list) == type(1):
@@ -901,7 +920,7 @@ class MemoryDiffProc(multiprocessing.Process):
                     # header parsing
                     ram_offset, = struct.unpack(Memory.CHUNK_HEADER_FMT, data[0:Memory.CHUNK_HEADER_SIZE])
                     iter_seq = (ram_offset & Memory.ITER_SEQ_MASK) >> Memory.ITER_SEQ_SHIFT
-                    ram_offset = (ram_offset & Memory.BLOB_POS_MASK) + self.libvirt_header_offset
+                    ram_offset = (ram_offset & Memory.CHUNK_POS_MASK) + self.libvirt_header_offset
                     #print "%d, %ld" % (iter_seq, ram_offset)
 
                     # get data

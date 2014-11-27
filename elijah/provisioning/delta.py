@@ -779,6 +779,10 @@ class DeltaDedup(process_manager.ProcWorker):
                     if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
                         is_memory_finished = True
                         continue
+                    if deltaitem_list == Const.QUEUE_NEW_ITERATION:
+                        LOG.debug("[live][delta] new iteration")
+                        self.merged_deltalist_queue.put(Const.QUEUE_NEW_ITERATION)
+                        continue
                 elif input_queue == self.disk_deltalist_queue._reader.fileno():
                     deltaitem_list = self.disk_deltalist_queue.get()
                     if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
