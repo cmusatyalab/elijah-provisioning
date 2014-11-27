@@ -149,7 +149,7 @@ class Options(object):
 
 class VMOverlayCreationMode(object):
     PIPE_ONE_ELEMENT_SIZE = 4096*100 # 400KB == Max Pipe size is 1MB
-    EMULATED_BANDWIDTH_Mbps = 1000000 # Mbps
+    EMULATED_BANDWIDTH_Mbps = 50 # Mbps
 
     def __init__(self):
         self.OUTPUT_DESTINATION                     = "file" # or "network"

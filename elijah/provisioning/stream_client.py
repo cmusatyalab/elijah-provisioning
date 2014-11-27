@@ -49,18 +49,20 @@ class StreamSynthesisClientError(Exception):
 class NetworkMeasurementThread(threading.Thread):
     def __init__(self, sock):
         self.sock = sock
-        threading.Thread.__init__(target=self.receiving)
+        threading.Thread.__init__(self, target=self.receiving)
 
     def receiving(self):
+        ack_time_list = list()
         ack_size = 8
         while True:
-            time_start_waiting = time.time()
-            ack = self.recv_all(self.sock, ack_size)
+            print "waiting ack"
+            ack = self.sock.recv(ack_size)
+            ack_time_list.append(time.time())
             if len(ack) != ack_size:
-                print "lost connection"
+                print "lost connection: %d" % len(ack)
                 break
-            time_ack_received = time.time()
-            print "ack received"
+            if len(ack_time_list) >= 2:
+                print "time between acks: %f" % (ack_time_list[-1] - ack_time_list[-2])
 
     def recv_all(self, sock, recv_size):
         data = ''
@@ -73,7 +75,6 @@ class NetworkMeasurementThread(threading.Thread):
 
 
 class StreamSynthesisClient(multiprocessing.Process):
-    EMULATED_BANDWIDTH_Mbps = 10 # Mbps
 
     def __init__(self, metadata, compdata_queue):
         self.metadata = metadata
@@ -126,33 +127,16 @@ class StreamSynthesisClient(multiprocessing.Process):
             sock.sendall(compdata)
             transfer_size += (4+len(header)+len(compdata))
             #print "transfer: %d" % transfer_size
-            '''
-            elif blob_type == "meta":
-                (metadata) = comp_task[1]
-                disk_size = metadata[Const.META_RESUME_VM_DISK_SIZE]
-                memory_size = metadata[Const.META_RESUME_VM_MEMORY_SIZE]
-                blob_header_dict = {
-                    "blob_type": "meta",
-                    Const.META_RESUME_VM_DISK_SIZE: disk_size,
-                    Const.META_RESUME_VM_MEMORY_SIZE: memory_size
-                    }
-                # send
-                header = NetworkUtil.encoding(blob_header_dict)
-                sock.sendall(struct.pack("!I", len(header)))
-                sock.sendall(header)
-                transfer_size += (4+len(header))
-            '''
 
             # wait to emulate network badwidth
-            time_process_end = time.time()
-            processed_time = time_process_end-time_process_start
-            processed_size = transfer_size
-            emulated_time = (processed_size*8) / (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
-            if emulated_time > processed_time:
-                sleep_time = (emulated_time-processed_time)
-                sys.stdout.write("Emulating BW of %d Mbps, so wait %f s\n" %\
-                        (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps, sleep_time))
-                time.sleep(sleep_time)
+            #time_process_end = time.time()
+            #processed_time = time_process_end-time_process_start
+            #processed_size = transfer_size
+            #emulated_time = (processed_size*8) / (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
+            #if emulated_time > processed_time:
+            #    sleep_time = (emulated_time-processed_time)
+            #    #sys.stdout.write("Emulating BW of %d Mbps, so wait %f s\n" %\ (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps, sleep_time))
+            #    time.sleep(sleep_time)
 
         # end message
         end_header = {

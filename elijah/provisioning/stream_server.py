@@ -23,6 +23,7 @@ import traceback
 import sys
 import time
 import struct
+import Queue
 import SocketServer
 import socket
 
@@ -48,18 +49,38 @@ from pprint import pformat
 from optparse import OptionParser
 import log as logging
 
+import mmap
+import tool
+from delta import DeltaItem
+
 
 LOG = logging.getLogger(__name__)
 session_resources = dict()   # dict[session_id] = obj(SessionResource)
+
+PERIODIC_ACK_BYTES = 100 * 1024 # every 100 KB
 
 
 class StreamSynthesisError(Exception):
     pass
 
 
-import mmap
-import tool
-from delta import DeltaItem
+class AckThread(threading.Thread):
+    def __init__(self, request):
+        self.request = request
+        self.ack_queue = Queue.Queue()
+        threading.Thread.__init__(self, target=self.start_sending_ack)
+
+    def start_sending_ack(self):
+        while True:
+            data = self.ack_queue.get()
+            # send ack
+            ack_data = struct.pack("!Q", 1)
+            self.request.sendall(ack_data)
+
+    def signal_ack(self):
+        self.ack_queue.put("a")
+
+
 class RecoverDeltaProc(multiprocessing.Process):
     FUSE_INDEX_DISK = 1
     FUSE_INDEX_MEMORY = 2
@@ -394,7 +415,19 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
     def _recv_all(self, recv_size):
         data = ''
         while len(data) < recv_size:
-            tmp_data = self.request.recv(recv_size - len(data))
+            one_time_recv_size = min(recv_size-len(data), PERIODIC_ACK_BYTES)
+            tmp_data = self.request.recv(one_time_recv_size)
+
+            # to send ack for every PERIODIC_ACK_BYTES bytes
+            self.total_recved_size_cur += len(tmp_data)
+            recv_bytes_size = self.total_recved_size_cur - self.total_recved_size_prev
+            #print recv_bytes_size
+            if recv_bytes_size >= PERIODIC_ACK_BYTES:
+                self.ack_thread.signal_ack()
+                self.total_recved_size_prev = self.total_recved_size_cur
+                if recv_bytes_size >= PERIODIC_ACK_BYTES*2:
+                    print "we missed to send %d acks" % ((recv_bytes_size/PERIODIC_ACK_BYTES)-1)
+
             if tmp_data == None:
                 raise StreamSynthesisError("Cannot recv data at %s" % str(self))
             if len(tmp_data) == 0:
@@ -424,78 +457,87 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         | header size | header | blob header size | blob header | blob data  |
         |  (4 bytes)  | (var)  | (4 bytes)        | (var bytes) | (var bytes)|
         '''
-        # get header
-        data = self.request.recv(4)
-        if data == None or len(data) != 4:
-            raise StreamSynthesisError("Failed to receive first byte of header")
-        message_size = struct.unpack("!I", data)[0]
-        msgpack_data = self._recv_all(message_size)
-        metadata = NetworkUtil.decoding(msgpack_data)
-        launch_disk_size = metadata[Cloudlet_Const.META_RESUME_VM_DISK_SIZE]
-        launch_memory_size = metadata[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
+        try:
+            # variable
+            self.ack_thread = AckThread(self.request)
+            self.ack_thread.start()
+            self.total_recved_size_cur = 0
+            self.total_recved_size_prev = 0
 
-        synthesis_option, base_diskpath = self._check_validity(metadata)
-        if base_diskpath == None:
-            raise StreamSynthesisError("No matching base VM")
-        (base_diskmeta, base_mempath, base_memmeta) = \
-                Cloudlet_Const.get_basepath(base_diskpath, check_exist=True)
-        LOG.info("  - %s" % str(pformat(self.synthesis_option)))
-        LOG.info("  - Base VM     : %s" % base_diskpath)
-
-        # variables for FUSE
-        temp_synthesis_dir = tempfile.mkdtemp(prefix="cloudlet-comp-")
-        launch_disk = os.path.join(temp_synthesis_dir, "launch-disk")
-        launch_mem = os.path.join(temp_synthesis_dir, "launch-mem")
-        memory_chunk_all = set()
-        disk_chunk_all = set()
-
-        # start pipelining processes
-        network_out_queue = multiprocessing.Queue()
-        decomp_queue = multiprocessing.Queue()
-        fuse_info_queue = multiprocessing.Queue()
-        decomp_proc = DecompProc(network_out_queue, decomp_queue)
-        decomp_proc.start()
-        LOG.info("Start Decompression process")
-        delta_proc = RecoverDeltaProc(base_diskpath, base_mempath,
-                                      decomp_queue,
-                                      launch_mem,
-                                      launch_disk,
-                                      Cloudlet_Const.CHUNK_SIZE,
-                                      fuse_info_queue)
-        delta_proc.start()
-        LOG.info("Start Synthesis process")
-
-        # get each blob
-        while True:
-            data = self.request.recv(4)
+            # get header
+            data = self._recv_all(4)
             if data == None or len(data) != 4:
                 raise StreamSynthesisError("Failed to receive first byte of header")
-                break
-            blob_header_size = struct.unpack("!I", data)[0]
-            blob_header_raw = self._recv_all(blob_header_size)
-            blob_header = NetworkUtil.decoding(blob_header_raw)
-            blob_size = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_SIZE)
-            if blob_size == None:
-                raise StreamSynthesisError("Failed to receive blob")
-            if blob_size == 0:
-                print "end of stream"
-                break
-            blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
-            blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
-            blob_memory_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
-            memory_chunk_set = set(["%ld:1" % item for item in blob_memory_chunk])
-            disk_chunk_set = set(["%ld:1" % item for item in blob_disk_chunk])
-            memory_chunk_all.update(memory_chunk_set)
-            disk_chunk_all.update(disk_chunk_set)
+            message_size = struct.unpack("!I", data)[0]
+            msgpack_data = self._recv_all(message_size)
+            metadata = NetworkUtil.decoding(msgpack_data)
+            launch_disk_size = metadata[Cloudlet_Const.META_RESUME_VM_DISK_SIZE]
+            launch_memory_size = metadata[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
 
-            compressed_blob = self._recv_all(blob_size)
-            network_out_queue.put((blob_comp_type, compressed_blob))
-            #elif blob_type == "meta":
-            #    print blob_header
-            #else:
-            #    raise StreamSynthesisError("need blob type")
+            synthesis_option, base_diskpath = self._check_validity(metadata)
+            if base_diskpath == None:
+                raise StreamSynthesisError("No matching base VM")
+            (base_diskmeta, base_mempath, base_memmeta) = \
+                    Cloudlet_Const.get_basepath(base_diskpath, check_exist=True)
+            LOG.info("  - %s" % str(pformat(self.synthesis_option)))
+            LOG.info("  - Base VM     : %s" % base_diskpath)
+
+            # variables for FUSE
+            temp_synthesis_dir = tempfile.mkdtemp(prefix="cloudlet-comp-")
+            launch_disk = os.path.join(temp_synthesis_dir, "launch-disk")
+            launch_mem = os.path.join(temp_synthesis_dir, "launch-mem")
+            memory_chunk_all = set()
+            disk_chunk_all = set()
+
+            # start pipelining processes
+            network_out_queue = multiprocessing.Queue()
+            decomp_queue = multiprocessing.Queue()
+            fuse_info_queue = multiprocessing.Queue()
+            decomp_proc = DecompProc(network_out_queue, decomp_queue)
+            decomp_proc.start()
+            LOG.info("Start Decompression process")
+            delta_proc = RecoverDeltaProc(base_diskpath, base_mempath,
+                                        decomp_queue,
+                                        launch_mem,
+                                        launch_disk,
+                                        Cloudlet_Const.CHUNK_SIZE,
+                                        fuse_info_queue)
+            delta_proc.start()
+            LOG.info("Start Synthesis process")
+
+            # get each blob
+            while True:
+                data = self.request.recv(4)
+                if data == None or len(data) != 4:
+                    raise StreamSynthesisError("Failed to receive first byte of header")
+                    break
+                blob_header_size = struct.unpack("!I", data)[0]
+                blob_header_raw = self._recv_all(blob_header_size)
+                blob_header = NetworkUtil.decoding(blob_header_raw)
+                blob_size = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_SIZE)
+                if blob_size == None:
+                    raise StreamSynthesisError("Failed to receive blob")
+                if blob_size == 0:
+                    print "end of stream"
+                    break
+                blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
+                blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
+                blob_memory_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
+                memory_chunk_set = set(["%ld:1" % item for item in blob_memory_chunk])
+                disk_chunk_set = set(["%ld:1" % item for item in blob_disk_chunk])
+                memory_chunk_all.update(memory_chunk_set)
+                disk_chunk_all.update(disk_chunk_set)
+
+                compressed_blob = self._recv_all(blob_size)
+                network_out_queue.put((blob_comp_type, compressed_blob))
+        except Exception, e:
+            sys.stderr.write("%sn" % str(e))
+            sys.stderr.write("failed at %sn" % str(traceback.format_exc()))
+
         network_out_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
         delta_proc.join()
+        print "deltaproc join"
+        '''
         # We told FUSE that we have everything ready, so we need to wait until
         # delta_proc fininshes
         # we cannot start VM before delta_proc finishes, because we don't know
@@ -524,6 +566,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         synthesized_VM.monitor.terminate()
         synthesized_VM.monitor.join()
         synthesized_VM.terminate()
+        '''
+        print "finished"
 
     def terminate(self):
         # force terminate when something wrong in handling request
@@ -574,7 +618,7 @@ class StreamSynthesisServer(SocketServer.TCPServer):
             sys.stderr.write("Check IP/Port : %s\n" % (str(server_address)))
             sys.exit(1)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        #self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         LOG.info("* Server configuration")
         LOG.info(" - Open TCP Server at %s" % (str(server_address)))
         LOG.info(" - Disable Nagle(No TCP delay)  : %s" \
