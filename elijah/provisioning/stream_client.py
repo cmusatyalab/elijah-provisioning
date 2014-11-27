@@ -53,16 +53,18 @@ class NetworkMeasurementThread(threading.Thread):
 
     def receiving(self):
         ack_time_list = list()
+        measured_bw_list = list()
         ack_size = 8
         while True:
-            print "waiting ack"
             ack = self.sock.recv(ack_size)
             ack_time_list.append(time.time())
             if len(ack) != ack_size:
-                print "lost connection: %d" % len(ack)
                 break
             if len(ack_time_list) >= 2:
-                print "time between acks: %f" % (ack_time_list[-1] - ack_time_list[-2])
+                time_pings = ack_time_list[-1] - ack_time_list[-2]
+                bw_mbps = 100*1024*8.0/time_pings/1024/1024
+                print "estimated bw: %f" % bw_mbps
+                measured_bw_list.append(bw_mbps)
 
     def recv_all(self, sock, recv_size):
         data = ''
@@ -76,14 +78,15 @@ class NetworkMeasurementThread(threading.Thread):
 
 class StreamSynthesisClient(multiprocessing.Process):
 
-    def __init__(self, metadata, compdata_queue):
+    def __init__(self, remote_addr, metadata, compdata_queue):
+        self.remote_addr = remote_addr
         self.metadata = metadata
         self.compdata_queue = compdata_queue
         super(StreamSynthesisClient, self).__init__(target=self.transfer)
 
     def transfer(self):
         # connect
-        address = ("127.0.0.1", 8022)
+        address = (self.remote_addr, 8022)
         #address = ("128.2.213.12", 8022)
         print "Connecting to (%s).." % str(address)
         sock = socket.create_connection(address, 10)

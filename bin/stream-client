@@ -70,6 +70,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('overlay_file')
+    parser.add_argument('remote_addr')
     args = parser.parse_args()
     stream_client = None
 
@@ -77,7 +78,7 @@ if __name__ == "__main__":
         comp_queue = multiprocessing.Queue()
         metadata = synthesize_data(args.overlay_file, comp_queue)
         basevm_uuid = "406ed612a6a8b8a03fbbc5f45cceb0408a1c1d947f09d3b8a5352973d77d01f5"
-        stream_client = StreamSynthesisClient(metadata, comp_queue)
+        stream_client = StreamSynthesisClient(args.remote_addr, metadata, comp_queue)
         stream_client.start()
         stream_client.join()
     except Exception as e:
