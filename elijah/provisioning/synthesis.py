@@ -1139,6 +1139,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.total_write_size = 0
             # read first 40KB and aligen header with 4KB
             data = self.in_fd.read(Memory.Memory.RAM_PAGE_SIZE*10)
+            self.qmp_thread.start()
             if is_first_recv == False:
                 is_first_recv = True
                 time_first_recv = time()
@@ -1182,7 +1183,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     if (is_qmp_msg_sent == False) and\
                             (self.total_write_size > (mem_snapshot_size + Const.LIBVIRT_HEADER_SIZE)):
                         is_qmp_msg_sent = True
-                        #self.qmp_thread.start()
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time()
@@ -1238,10 +1238,15 @@ class QmpThread(threading.Thread):
         threading.Thread.__init__(self, target=self.suspend_vm)
 
     def suspend_vm(self):
-        for index in range(self.timeout):
-            sys.stdout.write("waiting %d/%d seconds\n" % (index, self.timeout))
-            sleep(1)
-        self.qmp.stop_raw_live_once()
+        #for index in range(self.timeout):
+        #    sys.stdout.write("waiting %d/%d seconds\n" % (index, self.timeout))
+        #    sleep(1)
+        self.qmp.connect()
+        ret = self.qmp.qmp_negotiate()
+        print "qmp negotiate: %s" % ret
+        if ret:
+            self.qmp.stop_raw_live()
+        self.qmp.disconnect()
 
 
 
