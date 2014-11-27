@@ -67,6 +67,10 @@ class Memory(object):
     # header format for each memory page
     CHUNK_HEADER_FMT = "=Q"
     CHUNK_HEADER_SIZE = struct.calcsize("=Q")
+    ITER_SEQ_BITS   = 16
+    ITER_SEQ_SHIFT  = CHUNK_HEADER_SIZE * 8 - ITER_SEQ_BITS
+    BLOB_POS_MASK   = (1 << ITER_SEQ_SHIFT) - 1
+    ITER_SEQ_MASK   = ((1 << (CHUNK_HEADER_SIZE * 8)) - 1) - BLOB_POS_MASK
 
 
     def __init__(self):
@@ -517,7 +521,16 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
     def _get_modified_memory_page(self, fin):
         def chunks(l, n):
-            return [l[i:i + n] for i in range(0, len(l), n)]
+            ret_chunks = list()
+            for index in range(0, len(l), n):
+                chunked_data = l[index:index+n]
+                #if len(chunked_data) == n:
+                #    header = chunked_data[0:Memory.BLOB_HEADER_SIZE] 
+                #    blob_offset, = struct.unpack(Memory.BLOB_HEADER_FMT, header)
+                #    iter_seq = (blob_offset & Memory.ITER_SEQ_MASK) >> Memory.ITER_SEQ_SHIFT
+                ret_chunks.append(chunked_data)
+            return ret_chunks
+            #return [l[i:i + n] for i in range(0, len(l), n)]
 
         time_s = time.time()
         LOG.info("Get hash list of memory page")
@@ -885,8 +898,13 @@ class MemoryDiffProc(multiprocessing.Process):
                 if type(memory_chunk_list) == type(1):
                     LOG.debug("Invalid data at memory_chunk_list: %d" % memory_chunk_list)
                 for data in memory_chunk_list:
+                    # header parsing
                     ram_offset, = struct.unpack(Memory.CHUNK_HEADER_FMT, data[0:Memory.CHUNK_HEADER_SIZE])
-                    ram_offset += self.libvirt_header_offset    # add libvirt header offset
+                    iter_seq = (ram_offset & Memory.ITER_SEQ_MASK) >> Memory.ITER_SEQ_SHIFT
+                    ram_offset = (ram_offset & Memory.BLOB_POS_MASK) + self.libvirt_header_offset
+                    #print "%d, %ld" % (iter_seq, ram_offset)
+
+                    # get data
                     data = data[Memory.CHUNK_HEADER_SIZE:]
                     chunk_data_len = len(data)
                     hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
