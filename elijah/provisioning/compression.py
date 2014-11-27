@@ -74,15 +74,6 @@ class CompressProc(process_manager.ProcWorker):
                 if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
                     is_last_blob = True
                     break
-                if deltaitem_list == Const.QUEUE_NEW_ITERATION:
-                    msg = "[live][comp] waiting for other thread finish current iteration (%d)" % \
-                        self.task_queue.qsize()
-                    LOG.debug(msg)
-                    while self.task_queue.empty() == False:
-                        time.sleep(0.01)
-                    LOG.debug("[live][comp] start compressing for new iteration")
-                    is_last_blob = False
-                    break
                 for delta_item in deltaitem_list:
                     delta_bytes = delta_item.get_serialized()
                     offset = delta_item.offset/Const.CHUNK_SIZE

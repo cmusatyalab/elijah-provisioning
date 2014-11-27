@@ -529,13 +529,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 iter_seq = (blob_offset & Memory.ITER_SEQ_MASK) >> Memory.ITER_SEQ_SHIFT
                 if iter_seq != self.iteration_seq:
                     self.iteration_seq = iter_seq
-                    msg = "[live][memory] new iteration %d, waiting for other thread finish current iteration (%d)" %\
-                        (self.iteration_seq, self.task_queue.qsize())
+                    msg = "[live][memory] new iteration %d -> %d" % (self.iteration_seq, self.task_queue.qsize())
                     LOG.debug(msg)
-                    while self.task_queue.empty() == False:
-                        time.sleep(0.01)
-                    #LOG.debug("[live][memory] start memory processing new iteration")
-                    self.task_queue.put(Const.QUEUE_NEW_ITERATION)
             ret_chunks.append(chunked_data)
         return ret_chunks
 
@@ -908,11 +903,6 @@ class MemoryDiffProc(multiprocessing.Process):
                     LOG.debug("[Memory][Child] %d diff proc get end message" % (int(os.getpid())))
                     is_proc_running = False
                     break
-                if memory_chunk_list == Const.QUEUE_NEW_ITERATION:
-                    LOG.debug("[live][memory][child] new iteration start")
-                    self.deltalist_queue.put(Const.QUEUE_NEW_ITERATION)
-                    #LOG.debug("[live][memory][child] Forward message to the compression stage")
-                    continue
                 time_process_start = time.time()
                 deltaitem_list = list()
                 if type(memory_chunk_list) == type(1):
