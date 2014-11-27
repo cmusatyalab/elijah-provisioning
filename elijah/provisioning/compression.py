@@ -86,9 +86,11 @@ class CompressProc(process_manager.ProcWorker):
                 for delta_item in deltaitem_list:
                     delta_bytes = delta_item.get_serialized()
                     offset = delta_item.offset/Const.CHUNK_SIZE
-                    if delta_item.delta_type == DeltaItem.DELTA_DISK:
+                    if delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                            delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
                         modified_disk_chunks.append(offset)
-                    elif delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+                    elif delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                        delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
                         modified_memory_chunks.append(offset)
                     input_data += delta_bytes
                     input_size += len(delta_bytes)
@@ -97,89 +99,93 @@ class CompressProc(process_manager.ProcWorker):
         return is_last_blob, input_data, input_size, modified_disk_chunks, modified_memory_chunks
 
     def compress_stream(self):
-        time_start = time.time()
-        self.in_size = 0
-        self.total_block = 0
-        self.out_size = 0
+        try:
+            time_start = time.time()
+            self.in_size = 0
+            self.total_block = 0
+            self.out_size = 0
 
-        # launch child processes
-        self.task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_COMPRESSION)
-        for i in range(self.num_proc):
-            command_queue = multiprocessing.Queue()
-            mode_queue = multiprocessing.Queue()
-            comp_proc = CompChildProc(command_queue, self.task_queue, mode_queue,
-                                      self.comp_delta_queue,
-                                      self.comp_type,
-                                      self.comp_level)
-            comp_proc.start()
-            self.proc_list.append((comp_proc, command_queue, mode_queue))
+            # launch child processes
+            self.task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_COMPRESSION)
+            for i in range(self.num_proc):
+                command_queue = multiprocessing.Queue()
+                mode_queue = multiprocessing.Queue()
+                comp_proc = CompChildProc(command_queue, self.task_queue, mode_queue,
+                                        self.comp_delta_queue,
+                                        self.comp_type,
+                                        self.comp_level)
+                comp_proc.start()
+                self.proc_list.append((comp_proc, command_queue, mode_queue))
 
-        is_last_blob = False
-        total_read_size = 0
-        while is_last_blob == False:
-            # read data
-            is_last_blob, input_data, input_size, modified_disk_chunks, modified_memory_chunks = self._chunk_blob()
+            is_last_blob = False
+            total_read_size = 0
+            while is_last_blob == False:
+                # read data
+                is_last_blob, input_data, input_size, modified_disk_chunks, modified_memory_chunks = self._chunk_blob()
 
-            if input_size > 0:
-                self.task_queue.put((input_data, modified_disk_chunks, modified_memory_chunks))
+                if input_size > 0:
+                    self.task_queue.put((input_data, modified_disk_chunks, modified_memory_chunks))
 
-        # send end meesage to every process
-        for index in self.proc_list:
-            self.task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-            #sys.stdout.write("[Comp] send end message to each child\n")
+            # send end meesage to every process
+            for index in self.proc_list:
+                self.task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+                #sys.stdout.write("[Comp] send end message to each child\n")
 
-        # after this for loop, all processing finished, but child process still
-        # alive until all data pass to the next step
-        finished_proc_dict = dict()
-        input_list = [self.control_queue._reader.fileno()]
-        for (proc, c_queue, m_queue) in self.proc_list:
-            fileno = c_queue._reader.fileno()
-            input_list.append(fileno)
-            finished_proc_dict[fileno] = c_queue
-        while len(finished_proc_dict.keys()) > 0:
-            #print "left proc number: %s" % (finished_proc_dict.keys())
-            #for ffno, cq in finished_proc_dict.iteritems():
-            #    print "task quesize at %d: %d" % (ffno, task_queue.qsize())
+            # after this for loop, all processing finished, but child process still
+            # alive until all data pass to the next step
+            finished_proc_dict = dict()
+            input_list = [self.control_queue._reader.fileno()]
+            for (proc, c_queue, m_queue) in self.proc_list:
+                fileno = c_queue._reader.fileno()
+                input_list.append(fileno)
+                finished_proc_dict[fileno] = c_queue
+            while len(finished_proc_dict.keys()) > 0:
+                #print "left proc number: %s" % (finished_proc_dict.keys())
+                #for ffno, cq in finished_proc_dict.iteritems():
+                #    print "task quesize at %d: %d" % (ffno, task_queue.qsize())
 
-            (input_ready, [], []) = select.select(input_list, [], [])
-            for in_queue in input_ready:
-                if self.control_queue._reader.fileno() == in_queue:
-                    control_msg = self.control_queue.get()
-                    ret = self._handle_control_msg(control_msg)
-                    if ret == False:
-                        if control_msg == "change_mode":
-                            new_mode = self.control_queue.get()
-                            self.change_mode(new_mode)
-                else:
-                    cq = finished_proc_dict[in_queue]
-                    processed_size = cq.get()
-                    self.out_size += processed_size
-                    del finished_proc_dict[in_queue]
-        self.process_info['is_alive'] = False
+                (input_ready, [], []) = select.select(input_list, [], [])
+                for in_queue in input_ready:
+                    if self.control_queue._reader.fileno() == in_queue:
+                        control_msg = self.control_queue.get()
+                        ret = self._handle_control_msg(control_msg)
+                        if ret == False:
+                            if control_msg == "change_mode":
+                                new_mode = self.control_queue.get()
+                                self.change_mode(new_mode)
+                    else:
+                        cq = finished_proc_dict[in_queue]
+                        processed_size = cq.get()
+                        self.out_size += processed_size
+                        del finished_proc_dict[in_queue]
+            self.process_info['is_alive'] = False
 
-        time_end = time.time()
-        #sys.stdout.write("[Comp] effetively finished\n")
-        sys.stdout.write("[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f MB, %f MBps, %f s\n" % (
-            self.num_proc, self.block_size, self.comp_level, time_start, time_end, total_read_size/1024.0/1024, 
-            total_read_size/(time_end-time_start)/1024.0/1024, (time_end-time_start)))
-        LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
-                                                         self.in_size,
-                                                         self.out_size,
-                                                         (float(self.in_size)/self.out_size)))
-        LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
-        LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
-                                                             float(self.in_size)/self.total_block,
-                                                             float(self.out_size)/self.total_block,
-                                                             self.total_block))
-        LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block))
+            time_end = time.time()
+            #sys.stdout.write("[Comp] effetively finished\n")
+            sys.stdout.write("[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f MB, %f MBps, %f s\n" % (
+                self.num_proc, self.block_size, self.comp_level, time_start, time_end, total_read_size/1024.0/1024, 
+                total_read_size/(time_end-time_start)/1024.0/1024, (time_end-time_start)))
+            LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
+                                                            self.in_size,
+                                                            self.out_size,
+                                                            (float(self.in_size)/self.out_size)))
+            LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
+                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
+            LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
+                                                                float(self.in_size)/self.total_block,
+                                                                float(self.out_size)/self.total_block,
+                                                                self.total_block))
+            LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
+                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block))
 
-        for (proc, c_queue, m_queue) in self.proc_list:
-            #sys.stdout.write("[Comp] waiting to dump all data to the next stage\n")
-            proc.join()
-        # send end message after the next stage finishes processing
-        self.comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+            for (proc, c_queue, m_queue) in self.proc_list:
+                #sys.stdout.write("[Comp] waiting to dump all data to the next stage\n")
+                proc.join()
+            # send end message after the next stage finishes processing
+            self.comp_delta_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+        except Exception as e:
+            sys.stderr.write(str(e))
+            sys.stderr.write(traceback.format_exc())
 
 
 

@@ -2038,9 +2038,11 @@ def _reconstruct_mem_deltalist(base_disk, base_mem, overlay_filepath):
         elif delta_item.ref_id == DeltaItem.REF_XDELTA:
             patch_data = delta_item.data
             patch_original_size = delta_item.offset_len
-            if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+            if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                    delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
                 base_data = raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
-            elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+            elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
                 base_data = raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
             else:
                 msg = "Delta should be either disk or memory"
@@ -2049,9 +2051,11 @@ def _reconstruct_mem_deltalist(base_disk, base_mem, overlay_filepath):
         elif delta_item.ref_id == DeltaItem.REF_BSDIFF:
             patch_data = delta_item.data
             patch_original_size = delta_item.offset_len
-            if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+            if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                    delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
                 base_data = self.raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
-            elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+            elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
                 base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
             else:
                 raise DeltaError("Delta type should be either disk or memory")

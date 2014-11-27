@@ -705,7 +705,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                   (self.__class__.__name__, time_s, time_e, (time_e-time_s)/self.total_block))
 
         for (proc, c_queue, mode_queue) in self.proc_list:
-            #LOG.debug("[Memory] waiting to dump all data to the next stage")
+            LOG.debug("[Memory] waiting to dump all data to the next stage")
             proc.join()
         # send end message after the next stage finishes processing
         self.deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
@@ -938,6 +938,9 @@ class MemoryDiffProc(multiprocessing.Process):
                             self_hash_value = self.memory_hashlist[hash_list_index][2]
                         if self_hash_value == chunk_hashvalue:
                             is_modified = False
+                        delta_type = DeltaItem.DELTA_MEMORY
+                    else:
+                        delta_type = DeltaItem.DELTA_MEMORY_LIVE
 
                     if is_modified == True:
                         try:
@@ -972,16 +975,18 @@ class MemoryDiffProc(multiprocessing.Process):
                         indata_size += (chunk_data_len+11)
                         outdata_size += (diff_data_len+11)
                         child_total_block += 1
-                        delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
-                                ram_offset, chunk_data_len,
-                                hash_value=chunk_hashvalue,
-                                ref_id=diff_type,
-                                data_len=diff_data_len,
-                                data=diff_data)
+                        delta_item = DeltaItem(delta_type,
+                                               ram_offset, chunk_data_len,
+                                               hash_value=chunk_hashvalue,
+                                               ref_id=diff_type,
+                                               data_len=diff_data_len,
+                                               data=diff_data,
+                                               live_seq=iter_seq)
                         deltaitem_list.append(delta_item)
                         #print "deltaitem: %d %d" % (diff_type, len(diff_data))
                 time_process_end = time.time()
-                self.deltalist_queue.put(deltaitem_list)
+                if len(deltaitem_list) > 0:
+                    self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Memory][Child] Child finished. process %d jobs" % (child_total_block))
         self.command_queue.put((indata_size, outdata_size, child_total_block))
         self.task_queue.put(freed_page_counter)

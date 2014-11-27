@@ -357,7 +357,6 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             proc.join()
         # send end message after the next stage finishes processing
         self.disk_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-        #LOG.debug("# of modified disk delta item: %ld" % modified_chunk_counter)
 
         if self.ret_statistics != None:
             self.ret_statistics['trimed'] = trim_counter

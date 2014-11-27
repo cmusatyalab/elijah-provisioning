@@ -27,6 +27,7 @@ import os
 import random
 import select
 import threading
+import traceback
 import multiprocessing
 import Queue
 from operator import itemgetter
@@ -50,6 +51,8 @@ class DeltaItem(object):
     # We're using this value to sort for self referencing
     DELTA_MEMORY        = 0x01
     DELTA_DISK          = 0x02
+    DELTA_MEMORY_LIVE   = 0x03
+    DELTA_DISK_LIVE     = 0x04
 
     REF_RAW             = 0x10
     REF_XDELTA          = 0x20
@@ -60,8 +63,8 @@ class DeltaItem(object):
     REF_BSDIFF          = 0x70
     REF_SELF_HASH       = 0x80
 
-    # data exist only when ref_id is not xdelta
-    def __init__(self, delta_type, offset, offset_len, hash_value, ref_id, data_len=0, data=None):
+    def __init__(self, delta_type, offset, offset_len, hash_value, ref_id,
+                 data_len=0, data=None, live_seq=0):
         self.delta_type = delta_type
         self.offset = long(offset)
         self.offset_len = offset_len
@@ -69,6 +72,7 @@ class DeltaItem(object):
         self.ref_id = ref_id
         self.data_len = data_len
         self.data = data
+        self.live_seq = live_seq
 
         # new field for identify delta_item
         # offset is not unique identifier since we use both memory and disk
@@ -76,7 +80,13 @@ class DeltaItem(object):
 
     @staticmethod
     def get_index(delta_type, offset):
-        return long((offset << 1) | (delta_type & 0x0F))
+        if delta_type == DeltaItem.DELTA_DISK or delta_type == DeltaItem.DELTA_DISK_LIVE:
+            item_type = DeltaItem.DELTA_DISK
+        elif delta_type == DeltaItem.DELTA_MEMORY or delta_type == DeltaItem.DELTA_MEMORY_LIVE:
+            item_type = DeltaItem.DELTA_MEMORY
+        else:
+            raise DeltaError("Invalid delta type")
+        return long((offset << 1) | (item_type & 0x0F))
 
     def __getitem__(self, item):
         return self.__dict__[item]
@@ -107,6 +117,10 @@ class DeltaItem(object):
             # this is for handling live migration
             data += struct.pack("!32s", self.data)
 
+        if self.delta_type == DeltaItem.DELTA_DISK_LIVE or\
+                self.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
+            data += struct.pack("!H", self.live_seq)
+
         if with_hashvalue:
             LOG.debug("hash size is %d" % len(self.hash_value))
             if self.hash_value and (len(self.hash_value) > 0):
@@ -118,6 +132,7 @@ class DeltaItem(object):
     def unpack_stream(stream, with_hashvalue=False):
         data = stream.read(8 + 2 + 1)
         data_len = 0
+        live_seq = None
         if not data:
             return None
 
@@ -140,13 +155,17 @@ class DeltaItem(object):
             #print "unpacking ref_self_hash"
             data = struct.unpack("!32s", stream.read(32))[0]
 
+        if delta_type == DeltaItem.DELTA_DISK_LIVE or\
+                delta_type == DeltaItem.DELTA_MEMORY_LIVE:
+            live_seq = struct.unpack("!H", stream.read(2))[0]
+
         # hash_value typically does not exist when recovered becuase we don't need it
         if with_hashvalue:
             # hash_value is only needed for residue case
             hash_value = struct.unpack("!32s", stream.read(32))[0]
-            item = DeltaItem(delta_type, offset, offset_len, hash_value, ref_id, data_len, data)
+            item = DeltaItem(delta_type, offset, offset_len, hash_value, ref_id, data_len, data, live_seq=live_seq)
         else:
-            item = DeltaItem(delta_type, offset, offset_len, None, ref_id, data_len, data)
+            item = DeltaItem(delta_type, offset, offset_len, None, ref_id, data_len, data, live_seq=live_seq)
         return item
 
 
@@ -283,7 +302,8 @@ class DeltaList(object):
         mem_overlay_size = 0
 
         for delta_item in delta_list:
-            if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+            if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                    delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
                 memory_count += 1
                 mem_overlay_size += len(delta_item.get_serialized())
             elif delta_item.delta_type == DeltaItem.DELTA_DISK:
@@ -296,42 +316,56 @@ class DeltaList(object):
                 ref_delta = previous_delta_dict.get(ref_index, None)
                 if ref_delta == None:
                     raise DeltaError("Cannot calculate statistics for self_referencing")
-                if delta_item.delta_type == DeltaItem.DELTA_DISK:
-                    if (ref_delta.delta_type == DeltaItem.DELTA_MEMORY):
+                if delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                        delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+                    if (ref_delta.delta_type == DeltaItem.DELTA_MEMORY) or\
+                            (ref_delta.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
                         disk_from_overlay_mem += 1
                     else:
                         disk_from_self += 1
-                elif delta_item.delta_type == DeltaItem.DELTA_MEMORY:
-                    if (ref_delta.delta_type == DeltaItem.DELTA_DISK):
+                elif delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                    (ref_delta.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
+                    if (ref_delta.delta_type == DeltaItem.DELTA_DISK) or\
+                            (delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE):
                         memory_from_overlay_disk += 1
                     else:
                         memory_from_self += 1
             elif delta_item.ref_id == DeltaItem.REF_ZEROS:
-                if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+                if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                    (delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE):
                     memory_from_zeros += 1
-                elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+                elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                    (delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE):
                     disk_from_zeros += 1
             elif delta_item.ref_id == DeltaItem.REF_BASE_DISK:
-                if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+                if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                        (ref_delta.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
                     memory_from_base_disk += 1
-                elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+                elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                    (delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE):
                     disk_from_base_disk += 1
             elif delta_item.ref_id == DeltaItem.REF_BASE_MEM:
-                if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+                if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                        (ref_delta.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
                     memory_from_base_mem += 1
-                elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+                elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                    (delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE):
                     disk_from_base_mem += 1
             elif delta_item.ref_id == DeltaItem.REF_XDELTA or \
                 delta_item.ref_id == DeltaItem.REF_BSDIFF:
-                if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+                if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                        (ref_delta.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
                     memory_from_xdelta += 1
-                elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+                elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                    (delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE):
                     disk_from_xdelta += 1
                 xdelta_size += len(delta_item.data)
             elif delta_item.ref_id == DeltaItem.REF_RAW:
-                if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+                if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                        (ref_delta.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
                     memory_from_raw += 1
-                elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+                elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                    (delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE):
                     disk_from_raw += 1
                 raw_size += len(delta_item.data)
 
@@ -506,7 +540,7 @@ class Recovered_delta(multiprocessing.Process):
         self.zero_data = struct.pack("!s", chr(0x00)) * chunk_size
         self.recovered_delta_dict = dict()
         self.recovered_hash_dict = dict()
-        self.delta_list = list()
+        self.live_migration_iteration_dict = dict()
 
         multiprocessing.Process.__init__(self)
         #threading.Thread.__init__(self)
@@ -558,15 +592,12 @@ class Recovered_delta(multiprocessing.Process):
             self.time_queue.put({'start_time':start_time, 'end_time':end_time})
         LOG.info("[Delta] : (%s)-(%s)=(%s), delta %ld chunks" % \
                 (start_time, end_time, (end_time-start_time), count))
-        if self.deltalist_savepath:
-            DeltaList.tofile(self.delta_list, self.deltalist_savepath, with_hashvalue=True)
         self.finish()
 
     def recover_item(self, delta_item):
         if type(delta_item) != DeltaItem:
             raise MemoryError("Need list of DeltaItem")
 
-        #LOG.debug("recovering %ld/%ld" % (index, len(delta_list)))
         if (delta_item.ref_id == DeltaItem.REF_RAW):
             recover_data = delta_item.data
         elif (delta_item.ref_id == DeltaItem.REF_ZEROS):
@@ -596,9 +627,11 @@ class Recovered_delta(multiprocessing.Process):
         elif delta_item.ref_id == DeltaItem.REF_XDELTA:
             patch_data = delta_item.data
             patch_original_size = delta_item.offset_len
-            if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+            if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                    delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
                 base_data = self.raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
-            elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+            elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
                 base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
             else:
                 raise DeltaError("Delta type should be either disk or memory")
@@ -606,9 +639,11 @@ class Recovered_delta(multiprocessing.Process):
         elif delta_item.ref_id == DeltaItem.REF_BSDIFF:
             patch_data = delta_item.data
             patch_original_size = delta_item.offset_len
-            if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+            if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                    delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
                 base_data = self.raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
-            elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+            elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
                 base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
             else:
                 raise DeltaError("Delta type should be either disk or memory")
@@ -640,20 +675,34 @@ class Recovered_delta(multiprocessing.Process):
         # save it to dictionary to find self_reference easily
         self.recovered_delta_dict[delta_item.index] = delta_item
         self.recovered_hash_dict[delta_item.hash_value] = delta_item
-        self.delta_list.append(delta_item)
+
+        # do nothing if the latest memory or disk are already process
+        prev_iter_item = self.live_migration_iteration_dict.get(delta_item.index)
+        if (prev_iter_item is not None):
+            prev_seq = getattr(prev_iter_item, 'live_seq', 0)
+            item_seq = getattr(delta_item, 'live_seq', 0)
+            if prev_seq > item_seq:
+                msg = "Latest version is already synthesized at %d (%d)" % (delta_item.offset, delta_item.delta_type)
+                LOG.debug(msg)
+                return
 
         # write to output file 
         overlay_chunk_id = long(delta_item.offset/self.chunk_size)
-        if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+        if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
             self.recover_mem_fd.seek(delta_item.offset)
             self.recover_mem_fd.write(delta_item.data)
             overlay_chunk_ids.append("%d:%ld" %
                     (Recovered_delta.FUSE_INDEX_MEMORY, overlay_chunk_id))
-        elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+        elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
             self.recover_disk_fd.seek(delta_item.offset)
             self.recover_disk_fd.write(delta_item.data)
             overlay_chunk_ids.append("%d:%ld" %
                     (Recovered_delta.FUSE_INDEX_DISK, overlay_chunk_id))
+
+        # update the latest item for each memory page or disk block
+        self.live_migration_iteration_dict[delta_item.index] = delta_item
 
         if len(overlay_chunk_ids) % 1 == 0: # to be updated
             self.recover_mem_fd.flush()
@@ -663,8 +712,12 @@ class Recovered_delta(multiprocessing.Process):
             overlay_chunk_ids[:] = []
 
     def finish(self):
+        self.recovered_delta_dict.clear()
         self.recovered_delta_dict = None
+        self.recovered_hash_dict.clear()
         self.recovered_hash_dict = None
+        self.live_migration_iteration_dict.clear()
+        self.live_migration_iteration_dict = None
         if self.base_disk_fd is not None:
             self.base_disk_fd.close()
             self.base_disk_fd = None
@@ -729,167 +782,167 @@ class DeltaDedup(process_manager.ProcWorker):
         super(DeltaDedup, self).__init__(target=self.perform_dedup)
 
     def perform_dedup(self):
-        time_start = time.time()
-        is_first_recv = False
-        time_first_recv = 0
-        time_process_finish = 0
-        time_process_start = 0
-        time_prev_report = 0
-        processed_datasize = 0
-        processed_duration = float(0)
-        UPDATE_PERIOD = self.process_info['update_period']
+        try:
+            time_start = time.time()
+            is_first_recv = False
+            time_first_recv = 0
+            time_process_finish = 0
+            time_process_start = 0
+            time_prev_report = 0
+            processed_datasize = 0
+            processed_duration = float(0)
+            UPDATE_PERIOD = self.process_info['update_period']
 
-        # get hashtable
-        number_of_zero_page_disk = 0
-        number_of_zero_page_memory = 0
-        number_of_base_disk_disk = 0
-        number_of_base_disk_memory = 0
-        number_of_base_mem_disk = 0
-        number_of_base_mem_memory = 0
-        number_of_self_ref_disk = 0
-        number_of_self_ref_memory = 0
+            # get hashtable
+            number_of_zero_page_disk = 0
+            number_of_zero_page_memory = 0
+            number_of_base_disk_disk = 0
+            number_of_base_disk_memory = 0
+            number_of_base_mem_disk = 0
+            number_of_base_mem_memory = 0
+            number_of_self_ref_disk = 0
+            number_of_self_ref_memory = 0
 
-        if self.memory_chunk_size != self.disk_chunk_size:
-            raise DeltaError("Expect same chunk size for Disk and Memory")
-        chunk_size = self.disk_chunk_size
+            if self.memory_chunk_size != self.disk_chunk_size:
+                raise DeltaError("Expect same chunk size for Disk and Memory")
+            chunk_size = self.disk_chunk_size
 
-        zero_hash_dict = dict()
-        zero_hash = sha256(struct.pack("!s", chr(0x00))*chunk_size).digest()
-        zero_hash_dict[zero_hash] = long(-1)
-        is_memory_finished = False
-        is_disk_finished = False
-        self.in_size = 0
-        self.total_block = 0
-        self.out_size = 0
-        while is_memory_finished == False or is_disk_finished == False:
-            time_process_start = time.time()
-            #self.monitor_current_inqueue_length.value = max(self.memory_deltalist_queue.qsize(), self.disk_deltalist_queue.qsize())
-            #self.monitor_current_outqueue_length.value = self.merged_deltalist_queue.qsize()
-            input_list = [self.memory_deltalist_queue._reader.fileno(),
-                          self.disk_deltalist_queue._reader.fileno(),
-                          self.control_queue._reader.fileno()]
-            (input_ready, [], []) = select.select(input_list, [], [])
-            if self.control_queue._reader.fileno() in input_ready:
-                control_msg = self.control_queue.get()
-                self._handle_control_msg(control_msg)
-            for input_queue in input_ready:
-                deltaitem_list = None
-                if input_queue == self.memory_deltalist_queue._reader.fileno():
-                    deltaitem_list = self.memory_deltalist_queue.get()
-                    if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
-                        is_memory_finished = True
+            zero_hash_dict = dict()
+            zero_hash = sha256(struct.pack("!s", chr(0x00))*chunk_size).digest()
+            zero_hash_dict[zero_hash] = long(-1)
+            is_memory_finished = False
+            is_disk_finished = False
+            self.in_size = 0
+            self.total_block = 0
+            self.out_size = 0
+            while is_memory_finished == False or is_disk_finished == False:
+                time_process_start = time.time()
+                #self.monitor_current_inqueue_length.value = max(self.memory_deltalist_queue.qsize(), self.disk_deltalist_queue.qsize())
+                #self.monitor_current_outqueue_length.value = self.merged_deltalist_queue.qsize()
+                input_list = [self.memory_deltalist_queue._reader.fileno(),
+                            self.disk_deltalist_queue._reader.fileno(),
+                            self.control_queue._reader.fileno()]
+                (input_ready, [], []) = select.select(input_list, [], [])
+                if self.control_queue._reader.fileno() in input_ready:
+                    control_msg = self.control_queue.get()
+                    self._handle_control_msg(control_msg)
+                for input_queue in input_ready:
+                    deltaitem_list = None
+                    if input_queue == self.memory_deltalist_queue._reader.fileno():
+                        deltaitem_list = self.memory_deltalist_queue.get()
+                        if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
+                            is_memory_finished = True
+                            continue
+                        if deltaitem_list == Const.QUEUE_NEW_ITERATION:
+                            LOG.debug("[live][delta] new iteration")
+                            self.merged_deltalist_queue.put(Const.QUEUE_NEW_ITERATION)
+                            continue
+                    elif input_queue == self.disk_deltalist_queue._reader.fileno():
+                        deltaitem_list = self.disk_deltalist_queue.get()
+                        if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
+                            is_disk_finished = True
+                            continue
+                    else:   # control message
                         continue
-                    if deltaitem_list == Const.QUEUE_NEW_ITERATION:
-                        LOG.debug("[live][delta] new iteration")
-                        self.merged_deltalist_queue.put(Const.QUEUE_NEW_ITERATION)
-                        continue
-                elif input_queue == self.disk_deltalist_queue._reader.fileno():
-                    deltaitem_list = self.disk_deltalist_queue.get()
-                    if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
-                        is_disk_finished = True
-                        continue
-                else:   # control message
-                    continue
 
-                if is_first_recv == False:
-                    is_first_recv = True
-                    time_first_recv = time.time()
+                    if is_first_recv == False:
+                        is_first_recv = True
+                        time_first_recv = time.time()
 
-                self.total_block += len(deltaitem_list)
-                for delta_item in deltaitem_list:
-                    self.in_size += (delta_item.data_len+11)
-                    if deduplicate_deltaitem(zero_hash_dict, delta_item,
-                                            DeltaItem.REF_ZEROS) == True:
-                        if delta_item.delta_type == DeltaItem.DELTA_DISK:
-                            number_of_zero_page_disk += 1
+                    self.total_block += len(deltaitem_list)
+                    for delta_item in deltaitem_list:
+                        self.in_size += (delta_item.data_len+11)
+                        if deduplicate_deltaitem(zero_hash_dict, delta_item,
+                                                DeltaItem.REF_ZEROS) == True:
+                            if delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                                    delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+                                number_of_zero_page_disk += 1
+                            elif delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                                delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
+                                number_of_zero_page_memory += 1
+                        elif deduplicate_deltaitem(self.basemem_hashdict, delta_item,
+                                                DeltaItem.REF_BASE_MEM) == True:
+                            if delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                                    delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+                                number_of_base_mem_disk += 1
+                            elif delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                                delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
+                                number_of_base_mem_memory += 1
+                        elif deduplicate_deltaitem(self.basedisk_hashdict, delta_item,
+                                                DeltaItem.REF_BASE_DISK) == True:
+                            if delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                                    delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+                                number_of_base_disk_disk += 1
+                            elif delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                                delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
+                                number_of_base_disk_memory += 1
                         else:
-                            number_of_zero_page_memory += 1
-                    elif deduplicate_deltaitem(self.basemem_hashdict, delta_item,
-                                            DeltaItem.REF_BASE_MEM) == True:
-                        if delta_item.delta_type == DeltaItem.DELTA_DISK:
-                            number_of_base_mem_disk += 1
-                        else:
-                            number_of_base_mem_memory += 1
-                    elif deduplicate_deltaitem(self.basedisk_hashdict, delta_item,
-                                            DeltaItem.REF_BASE_DISK) == True:
-                        if delta_item.delta_type == DeltaItem.DELTA_DISK:
-                            number_of_base_disk_disk += 1
-                        else:
-                            number_of_base_disk_memory += 1
-                    else:
-                        # chunk that are not deduplicated yet
-                        # comparison with other delta_item within itself
-                        if ((delta_item.ref_id == DeltaItem.REF_XDELTA)\
-                            or (delta_item.ref_id == DeltaItem.REF_RAW)\
-                            or (delta_item.ref_id == DeltaItem.REF_BSDIFF)):
-                            if delta_item.hash_value in self.self_hashset:
-                                delta_item.ref_id = delta_item.REF_SELF_HASH
-                                delta_item.data_len = 32
-                                delta_item.data = delta_item.hash_value
-                                if delta_item.delta_type == DeltaItem.DELTA_DISK:
-                                    number_of_self_ref_disk += 1
+                            # chunk that are not deduplicated yet
+                            # comparison with other delta_item within itself
+                            if ((delta_item.ref_id == DeltaItem.REF_XDELTA)\
+                                or (delta_item.ref_id == DeltaItem.REF_RAW)\
+                                or (delta_item.ref_id == DeltaItem.REF_BSDIFF)):
+                                if delta_item.hash_value in self.self_hashset:
+                                    delta_item.ref_id = delta_item.REF_SELF_HASH
+                                    delta_item.data_len = 32
+                                    delta_item.data = delta_item.hash_value
+                                    if delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                                            delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+                                        number_of_self_ref_disk += 1
+                                    elif delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                                        delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
+                                        number_of_self_ref_memory += 1
                                 else:
-                                    number_of_self_ref_memory += 1
-                            else:
-                                self.self_hashset.add(delta_item.hash_value)
-                            '''
-                            # old implementation using offset for reference
-                            ref_offset = self.self_hashdict.get(delta_item.hash_value, None)
-                            if ref_offset is not None:
-                                delta_item.ref_id = DeltaItem.REF_SELF
-                                delta_item.data_len = 8
-                                delta_item.data = ref_offset
-                            else:
-                                ref_offset = long(delta_item.index)
-                                self.self_hashdict[delta_item.hash_value] = ref_offset
-                            # old implementation using offset for reference
-                            '''
+                                    self.self_hashset.add(delta_item.hash_value)
 
-                    # now delta item has new data length
-                    self.out_size += (delta_item.data_len+11)
+                        # now delta item has new data length
+                        self.out_size += (delta_item.data_len+11)
 
-                self.merged_deltalist_queue.put(deltaitem_list)
+                    self.merged_deltalist_queue.put(deltaitem_list)
 
-                # measurement
-                time_process_finish = time.time()
-                processed_datasize += (chunk_size * len(deltaitem_list))
-                processed_duration += (time_process_finish - time_process_start)
-                if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
-                    time_prev_report = time_process_finish
-                    #self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
-                    processed_datasize = 0
-                    processed_duration = float(0)
-        self.monitor_is_alive = False
-        self.process_info['is_alive'] = False
-        self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+                    # measurement
+                    time_process_finish = time.time()
+                    processed_datasize += (chunk_size * len(deltaitem_list))
+                    processed_duration += (time_process_finish - time_process_start)
+                    if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
+                        time_prev_report = time_process_finish
+                        #self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
+                        processed_datasize = 0
+                        processed_duration = float(0)
+            self.monitor_is_alive = False
+            self.process_info['is_alive'] = False
+            self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
-        self.statistics['number_of_zero_page_disk'] = number_of_zero_page_disk
-        self.statistics['number_of_base_disk_disk'] = number_of_base_disk_disk
-        self.statistics['number_of_base_mem_disk'] = number_of_base_mem_disk
-        self.statistics['number_of_self_ref_disk'] = number_of_self_ref_disk
-        self.statistics['number_of_zero_page_memory'] = number_of_zero_page_memory
-        self.statistics['number_of_base_disk_memory'] = number_of_base_disk_memory
-        self.statistics['number_of_base_mem_memory'] = number_of_base_mem_memory
-        self.statistics['number_of_self_ref_memory'] = number_of_self_ref_memory
-        saved_item = number_of_zero_page_disk + number_of_base_disk_disk + number_of_base_mem_disk +\
-            number_of_self_ref_disk + number_of_zero_page_memory + number_of_base_disk_memory +\
-            number_of_base_mem_memory + number_of_self_ref_memory
-        time_end = time.time()
+            self.statistics['number_of_zero_page_disk'] = number_of_zero_page_disk
+            self.statistics['number_of_base_disk_disk'] = number_of_base_disk_disk
+            self.statistics['number_of_base_mem_disk'] = number_of_base_mem_disk
+            self.statistics['number_of_self_ref_disk'] = number_of_self_ref_disk
+            self.statistics['number_of_zero_page_memory'] = number_of_zero_page_memory
+            self.statistics['number_of_base_disk_memory'] = number_of_base_disk_memory
+            self.statistics['number_of_base_mem_memory'] = number_of_base_mem_memory
+            self.statistics['number_of_self_ref_memory'] = number_of_self_ref_memory
+            saved_item = number_of_zero_page_disk + number_of_base_disk_disk + number_of_base_mem_disk +\
+                number_of_self_ref_disk + number_of_zero_page_memory + number_of_base_disk_memory +\
+                number_of_base_mem_memory + number_of_self_ref_memory
+            time_end = time.time()
 
-        #LOG.debug("Dedup statistics: %s" % str(self.statistics))
-        LOG.debug("[time] Dedup: first input at : %f" % (time_first_recv))
-        LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
-                                                         self.in_size,
-                                                         self.out_size,
-                                                         (float(self.in_size)/self.out_size)))
-        LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
-        LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
-                                                             float(self.in_size)/self.total_block,
-                                                             float(self.out_size)/self.total_block,
-                                                             self.total_block))
-        LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block))
+            #LOG.debug("Dedup statistics: %s" % str(self.statistics))
+            LOG.debug("[time] Dedup: first input at : %f" % (time_first_recv))
+            LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
+                                                            self.in_size,
+                                                            self.out_size,
+                                                            (float(self.in_size)/self.out_size)))
+            LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
+                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
+            LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
+                                                                float(self.in_size)/self.total_block,
+                                                                float(self.out_size)/self.total_block,
+                                                                self.total_block))
+            LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
+                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block))
+        except Exception as e:
+            LOG.error(str(e))
+            LOG.error("failed at %s" % str(traceback.format_exc()))
 
     @staticmethod
     def memory_import_hashdict(meta_path):
@@ -1036,10 +1089,12 @@ def _save_blob(start_index, delta_list, self_ref_dict, blob_name, blob_size, sta
             comp_delta_bytes = comp.compress(delta_bytes)
             comp_data += comp_delta_bytes
             item_count += 1
-            if delta_item.delta_type == DeltaItem.DELTA_MEMORY:
+            if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                    delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
                 memory_offset_list.append(delta_item.offset)
                 memory_overlay_size += len(comp_delta_bytes)
-            elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+            elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
                 disk_offset_list.append(delta_item.offset)
                 disk_overlay_size += len(comp_delta_bytes)
             else:
@@ -1055,10 +1110,12 @@ def _save_blob(start_index, delta_list, self_ref_dict, blob_name, blob_size, sta
                     comp_deduped_bytes = comp.compress(deduped_bytes)
                     comp_data += comp_deduped_bytes
                     item_count += 1
-                    if deduped_item.delta_type == DeltaItem.DELTA_MEMORY:
+                    if deduped_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                            deduped_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
                         memory_offset_list.append(deduped_item.offset)
                         memory_overlay_size += len(comp_deduped_bytes)
-                    elif deduped_item.delta_type == DeltaItem.DELTA_DISK:
+                    elif deduped_item.delta_type == DeltaItem.DELTA_DISK or\
+                        deduped_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
                         disk_offset_list.append(deduped_item.offset)
                         disk_overlay_size += len(comp_deduped_bytes)
                     else:
@@ -1147,10 +1204,12 @@ def discard_free_chunks(merged_modified_list, chunk_size, disk_discard, memory_d
     
     for item in merged_modified_list:
         chunk_number = item.offset/chunk_size
-        if item.delta_type == DeltaItem.DELTA_DISK:
+        if item.delta_type == DeltaItem.DELTA_DISK or\
+                item.delta_type == DeltaItem.DELTA_DISK_LIVE:
             if disk_discard.get(chunk_number, None) != None:
                 removing_item.append(item)
-        if item.delta_type == DeltaItem.DELTA_MEMORY:
+        if item.delta_type == DeltaItem.DELTA_MEMORY or\
+                item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
             if memory_discard.get(chunk_number, None) != None:
                 removing_item.append(item)
 
@@ -1188,10 +1247,14 @@ def residue_merge_deltalist(old_deltalist, new_deltalist):
         if old_item == None:
             # newly generate chunk. Just append
             ret_deltalist.append(new_item)
-            if new_item.delta_type == DeltaItem.DELTA_DISK:
+            if new_item.delta_type == DeltaItem.DELTA_DISK or\
+                    new_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
                 count_new_disk += 1
-            else:
+            elif new_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                new_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
                 count_new_mem += 1
+            else:
+                raise DeltaError("Invalid delta type")
         else:
             # overwrite existing one
             referred_deltalist = reference_dict.get(old_item, None)
@@ -1237,10 +1300,14 @@ def residue_merge_deltalist(old_deltalist, new_deltalist):
             del ret_deltalist[old_item_position]
             ret_deltalist.append(new_item)
 
-            if new_item.delta_type == DeltaItem.DELTA_DISK:
+            if new_item.delta_type == DeltaItem.DELTA_DISK or\
+                    new_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
                 count_overwrite_disk += 1
-            else:
+            elif new_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                new_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
                 count_overwrite_mem += 1
+            else:
+                raise DeltaError("Invalid delta type")
 
     LOG.debug("merge residue with previous :")
     LOG.debug("    add new disk   : %d" % (count_new_disk))
@@ -1297,7 +1364,8 @@ def residue_diff_deltalists(old_deltalist, new_deltalist, base_mem):
     # exists at previous overlay, but not in current overlay
     # --> chunks that are converted to original
     for item in old_deltalist:
-        if item.delta_type == DeltaItem.DELTA_DISK:
+        if item.delta_type == DeltaItem.DELTA_DISK or\
+                item.delta_type == DeltaItem.DELTA_DISK_LIVE:
             continue
         new_item = new_deltadict.get(item.index, None)
         if new_item != None:
