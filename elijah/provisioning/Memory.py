@@ -929,60 +929,56 @@ class MemoryDiffProc(multiprocessing.Process):
                     hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
                     #print "%d\t%d\t%d" % (self.libvirt_header_offset, ram_offset, len(data))
 
-                    self_hash_value = None
-                    if hash_list_index < self.base_hashlist_length:
-                        self_hash_value = self.memory_hashlist[hash_list_index][2]
+                    is_modified = True
                     chunk_hashvalue = sha256(data).digest()
-                    if self_hash_value != chunk_hashvalue:
-                        is_free_memory = False
-                        if (self.free_pfn_dict != None) and \
-                                (self.free_pfn_dict.get(long(ram_offset/Memory.RAM_PAGE_SIZE), None) == 1):
-                            is_free_memory = True
+                    if iter_seq == 0: # compare with base VM if it's the first iteration
+                        self_hash_value = None
+                        if hash_list_index < self.base_hashlist_length:
+                            self_hash_value = self.memory_hashlist[hash_list_index][2]
+                        if self_hash_value == chunk_hashvalue:
+                            is_modified = False
 
-                        if is_free_memory and self.apply_free_memory:
-                            # Do not compare. It is free memory
-                            freed_page_counter += 1
-                        else:
-                            try:
-                                # get diff compared to the base VM
-                                source_data = self.get_raw_data(ram_offset, len(data))
-                                if source_data == None:
-                                    msg = "launch memory snapshot is bigger than base vm at %ld (%ld > %ld)" %\
-                                        (ram_offset, ram_offset+chunk_data_len, self.raw_filesize)
-                                    #LOG.debug(msg)
-                                    raise IOError(msg)
-                                if self.diff_algorithm == "xdelta3":
-                                    diff_data = tool.diff_data(source_data, data, 2*len(source_data))
-                                    diff_type = DeltaItem.REF_XDELTA
-                                    if len(diff_data) > chunk_data_len:
-                                        raise IOError("xdelta3 patch is bigger than origianl")
-                                elif self.diff_algorithm == "bsdiff":
-                                    diff_data = tool.diff_data_bsdiff(source_data, data)
-                                    diff_type = DeltaItem.REF_BSDIFF
-                                    if len(diff_data) > chunk_data_len:
-                                        raise IOError("bsdiff patch is bigger than origianl")
-                                elif self.diff_algorithm == "none":
-                                    diff_data = data
-                                    diff_type = DeltaItem.REF_RAW
-                                else:
-                                    diff_data = data
-                                    diff_type = DeltaItem.REF_RAW
-                            except IOError as e:
+                    if is_modified == True:
+                        try:
+                            # get diff compared to the base VM
+                            source_data = self.get_raw_data(ram_offset, len(data))
+                            if source_data == None:
+                                msg = "launch memory snapshot is bigger than base vm at %ld (%ld > %ld)" %\
+                                    (ram_offset, ram_offset+chunk_data_len, self.raw_filesize)
+                                #LOG.debug(msg)
+                                raise IOError(msg)
+                            if self.diff_algorithm == "xdelta3":
+                                diff_data = tool.diff_data(source_data, data, 2*len(source_data))
+                                diff_type = DeltaItem.REF_XDELTA
+                                if len(diff_data) > chunk_data_len:
+                                    raise IOError("xdelta3 patch is bigger than origianl")
+                            elif self.diff_algorithm == "bsdiff":
+                                diff_data = tool.diff_data_bsdiff(source_data, data)
+                                diff_type = DeltaItem.REF_BSDIFF
+                                if len(diff_data) > chunk_data_len:
+                                    raise IOError("bsdiff patch is bigger than origianl")
+                            elif self.diff_algorithm == "none":
                                 diff_data = data
                                 diff_type = DeltaItem.REF_RAW
+                            else:
+                                diff_data = data
+                                diff_type = DeltaItem.REF_RAW
+                        except IOError as e:
+                            diff_data = data
+                            diff_type = DeltaItem.REF_RAW
 
-                            diff_data_len = len(diff_data)
-                            indata_size += (chunk_data_len+11)
-                            outdata_size += (diff_data_len+11)
-                            child_total_block += 1
-                            delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
-                                    ram_offset, chunk_data_len,
-                                    hash_value=chunk_hashvalue,
-                                    ref_id=diff_type,
-                                    data_len=diff_data_len,
-                                    data=diff_data)
-                            deltaitem_list.append(delta_item)
-                            #print "deltaitem: %d %d" % (diff_type, len(diff_data))
+                        diff_data_len = len(diff_data)
+                        indata_size += (chunk_data_len+11)
+                        outdata_size += (diff_data_len+11)
+                        child_total_block += 1
+                        delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
+                                ram_offset, chunk_data_len,
+                                hash_value=chunk_hashvalue,
+                                ref_id=diff_type,
+                                data_len=diff_data_len,
+                                data=diff_data)
+                        deltaitem_list.append(delta_item)
+                        #print "deltaitem: %d %d" % (diff_type, len(diff_data))
                 time_process_end = time.time()
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Memory][Child] Child finished. process %d jobs" % (child_total_block))
