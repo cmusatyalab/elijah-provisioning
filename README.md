@@ -67,6 +67,7 @@ You will need:
 * gvncviewer
 * python-libvirt
 * python-xdelta3
+* python-bsdiff4
 * python-dev (to pip install msgpack)
 * liblzma-dev (for pyliblzma)
 * apparmor-utils (for disable apparmor for libvirt)
