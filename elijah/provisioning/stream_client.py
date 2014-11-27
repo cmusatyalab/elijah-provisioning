@@ -23,6 +23,7 @@ import os
 import time
 import sys
 import struct
+import threading
 import multiprocessing
 import msgpack
 
@@ -42,6 +43,34 @@ from Configuration import VMOverlayCreationMode
 from synthesis_protocol import Protocol
 
 
+class StreamSynthesisClientError(Exception):
+    pass
+
+class NetworkMeasurementThread(threading.Thread):
+    def __init__(self, sock):
+        self.sock = sock
+        threading.Thread.__init__(target=self.receiving)
+
+    def receiving(self):
+        ack_size = 8
+        while True:
+            time_start_waiting = time.time()
+            ack = self.recv_all(self.sock, ack_size)
+            if len(ack) != ack_size:
+                print "lost connection"
+                break
+            time_ack_received = time.time()
+            print "ack received"
+
+    def recv_all(self, sock, recv_size):
+        data = ''
+        while len(data) < recv_size:
+            tmp_data = sock.recv(recv_size - len(data))
+            if len(tmp_data) == 0:
+                break
+            data += tmp_data
+        return data
+
 
 class StreamSynthesisClient(multiprocessing.Process):
     EMULATED_BANDWIDTH_Mbps = 10 # Mbps
@@ -58,6 +87,9 @@ class StreamSynthesisClient(multiprocessing.Process):
         print "Connecting to (%s).." % str(address)
         sock = socket.create_connection(address, 10)
         sock.setblocking(True)
+        self.receive_thread = NetworkMeasurementThread(sock)
+        self.receive_thread.daemon = True
+        self.receive_thread.start()
 
         # send header
         header_dict = {

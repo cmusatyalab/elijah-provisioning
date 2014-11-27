@@ -31,7 +31,7 @@ class ProfilingError(Exception):
 
 def run_profile(base_path, overlay_path, overlay_mode):
     LOG.debug("==========================================")
-    print overlay_mode
+    LOG.debug(overlay_path)
 
     try:
         synthesis.synthesis(base_path, overlay_path,
@@ -61,16 +61,17 @@ def set_affiinity(num_cores):
 
 def generate_mode():
     mode_list = list()
-    #for diff in ("xdelta3", "bsdiff", "none"):
-    for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
-        for comp_level in (1, 4, 9):
-            overlay_mode = VMOverlayCreationMode.get_serial_single_process()
-            overlay_mode.COMPRESSION_ALGORITHM_TYPE = comp_type
-            overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
-            #overlay_mode.MEMORY_DIFF_ALGORITHM = diff
-            #overlay_mode.DISK_DIFF_ALGORITHM = diff
+    for index in xrange(3):
+        for diff in ("xdelta3", "bsdiff", "none"):
+            for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
+                for comp_level in (1, 3, 5, 7, 9):
+                    overlay_mode = VMOverlayCreationMode.get_serial_single_process()
+                    overlay_mode.COMPRESSION_ALGORITHM_TYPE = comp_type
+                    overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
+                    overlay_mode.MEMORY_DIFF_ALGORITHM = diff
+                    overlay_mode.DISK_DIFF_ALGORITHM = diff
 
-            mode_list.append(overlay_mode)
+                mode_list.append(overlay_mode)
     return mode_list
 
 
@@ -113,8 +114,6 @@ if __name__ == "__main__":
 
 
     base_path = linux_base_path
-    overlay_path = moped
-    is_url, overlay_path = PackagingUtil.is_zip_contained(overlay_path)
     mode_list = generate_mode()
     #mode_list = validation_mode()
 
@@ -127,7 +126,9 @@ if __name__ == "__main__":
             msg = "Assign core should be equal to every stage for profiling"
             raise ProfilingError(msg)
 
-    for each_mode in mode_list:
-        num_core = each_mode.NUM_PROC_COMPRESSION
-        set_affiinity(num_core)
-        run_profile(base_path, overlay_path, each_mode)
+    for (base_path, overlay_path) in workloads:
+        for each_mode in mode_list:
+            is_url, overlay_url = PackagingUtil.is_zip_contained(overlay_path)
+            num_core = each_mode.NUM_PROC_COMPRESSION
+            set_affiinity(num_core)
+            run_profile(base_path, overlay_url, each_mode)

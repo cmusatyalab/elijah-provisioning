@@ -10,8 +10,9 @@ def parse_each_experiement(lines):
     # get configuration
     config_lines = ""
     is_start_config_line = False
-    for line in lines:
-        if line.find("* Overlay creation configuration") != -1:
+    workload = lines[0].split(" ")[-1]
+    for line in lines[1:]:
+        if line.find("* Overlay creation mode start") != -1:
             is_start_config_line = True
             continue
         if is_start_config_line == True:
@@ -36,6 +37,7 @@ def parse_each_experiement(lines):
 
     # process filtered log data
     profile_ret = dict()
+    profile_ret['work'] = workload
     profile_ret['conf'] = config_dict
     profile_ret['size'] = dict.fromkeys(stage_names, 0)
     profile_ret['time'] = dict.fromkeys(stage_names, 0)
@@ -46,7 +48,9 @@ def parse_each_experiement(lines):
         if profile_type == "size":
             in_size = long(log[2])
             out_size = long(log[3])
-            profile_ret['size'][stage_name] = (float(in_size)/out_size)
+            ratio = float(log[4])
+
+            profile_ret['size'][stage_name] = ratio
         if profile_type == "time":
             duration = float(log[-1])
             profile_ret['time'][stage_name] = duration
