@@ -27,6 +27,7 @@ import multiprocessing
 import time
 import sys
 import log as logging
+from Configuration import Const
 
 LOG = logging.getLogger(__name__)
 
@@ -158,9 +159,9 @@ class CloudletFS(threading.Thread):
             LOG.info("Fuse close pipe")
             # invalid formated string will shutdown fuse
             self.fuse_write("terminate")
-            self.proc.wait()
             self._pipe.close()
             self._pipe = None
+            #self.proc.terminate()
 
 
 class StreamMonitor(threading.Thread):
@@ -176,8 +177,11 @@ class StreamMonitor(threading.Thread):
                             # Condition.wait() overhead in green thread 
                             # of Openstack
         self.modified_chunk_dict = dict()
+        self.modified_chunk_queue = multiprocessing.Queue()
+        self.is_queue_accessed = False
         self.disk_access_chunk_list = list()
         self.mem_access_chunk_list = list()
+        self.del_list = list()
         threading.Thread.__init__(self, target=self.io_watch)
 
     def add_path(self, path, name):
@@ -196,9 +200,7 @@ class StreamMonitor(threading.Thread):
             monitor_name = item['name']
             if name == monitor_name:
                 LOG.info("stop monitoring at %s" % monitor_path)
-                self.epoll.unregister(fileno)
-                os.close(fileno)
-                del self.stream_dict[fileno]
+                self.del_list.append(fileno)
 
     def io_watch(self):
         while(not self.stop):
@@ -207,8 +209,26 @@ class StreamMonitor(threading.Thread):
             for fileno, event in events:
                 self._handle(fileno, event)
 
+            while len(self.del_list) > 0:
+                fileno = self.del_list.pop()
+                self.epoll.unregister(fileno)
+                os.close(fileno)
+                del self.stream_dict[fileno]
+
         for fileno, item in self.stream_dict.items():
-            self.del_path(item['name'])
+            self.epoll.unregister(fileno)
+            os.close(fileno)
+            del self.stream_dict[fileno]
+
+        if self.is_queue_accessed == True:
+            if self.modified_chunk_queue is not None:
+                self.modified_chunk_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+                self.modified_chunk_queue = None
+        else:
+            # no one accessed. Dump the data
+            while self.modified_chunk_queue.empty() == False:
+                self.modified_chunk_queue.get()
+
         self._running = False
         LOG.info("close Stream monitoring thread")
 
@@ -245,11 +265,17 @@ class StreamMonitor(threading.Thread):
         elif event & select.EPOLLPRI:
             LOG.debug("error?")
 
+    def get_modified_chunk_queue(self):
+        self.is_queue_accessed = True
+        return self.modified_chunk_queue
+
     def _handle_chunks_modification(self, line):
         ctime, chunk = line.split("\t")
         ctime = float(ctime)
         chunk = int(chunk)
         self.modified_chunk_dict[chunk] = ctime
+        if self.modified_chunk_queue is not None:
+            self.modified_chunk_queue.put((chunk, ctime))
         #LOG.debug("%s: %f, %d" % ("modification", ctime, chunk))
 
     def _handle_disk_access(self, line):

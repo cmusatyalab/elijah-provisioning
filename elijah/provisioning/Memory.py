@@ -534,11 +534,10 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     LOG.debug(msg)
                     while self.task_queue.empty() == False:
                         time.sleep(0.01)
-                    LOG.debug("[live][memory] start memory processing new iteration")
+                    #LOG.debug("[live][memory] start memory processing new iteration")
                     self.task_queue.put(Const.QUEUE_NEW_ITERATION)
             ret_chunks.append(chunked_data)
         return ret_chunks
-        #return [l[i:i + n] for i in range(0, len(l), n)]
 
     def _get_modified_memory_page(self, fin):
 
@@ -549,6 +548,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
         # measurement
         self.total_block = 0
+        self.iteration_datasize_list = list()
+        self.iteration_size = 0
         self.iteration_seq = 0
 
         processed_datasize = 0
@@ -910,7 +911,7 @@ class MemoryDiffProc(multiprocessing.Process):
                 if memory_chunk_list == Const.QUEUE_NEW_ITERATION:
                     LOG.debug("[live][memory][child] new iteration start")
                     self.deltalist_queue.put(Const.QUEUE_NEW_ITERATION)
-                    LOG.debug("[live][memory][child] Forward message to the compression stage")
+                    #LOG.debug("[live][memory][child] Forward message to the compression stage")
                     continue
                 time_process_start = time.time()
                 deltaitem_list = list()

@@ -429,8 +429,9 @@ class SynthesizedVM(threading.Thread):
             pass
 
         # terminate
-        self.monitor.terminate()
-        self.monitor.join()
+        if self.monitor is not None:
+            self.monitor.terminate()
+            self.monitor.join()
         self.fuse.terminate()
         self.qemu_monitor.terminate()
         self.qemu_monitor.join()
@@ -789,15 +790,15 @@ class VMMonitor(object):
         info_dict[_MonitoringInfo.DISK_USED_BLOCKS] = used_blocks_dict
         info_dict[_MonitoringInfo.DISK_FREE_BLOCKS] = trim_dict
         info_dict[_MonitoringInfo.MEMORY_FREE_BLOCKS] = free_memory_dict
+
+        modified_chunk_queue = self.fuse_stream_monitor.get_modified_chunk_queue()
         # mark the modifid disk area in the original VM overlay as modified area
-        m_chunk_dict = dict()
         if self.original_deltalist is not None:
             for o_delta_item in self.original_deltalist:
                 if o_delta_item.delta_type == DeltaItem.DELTA_DISK:
                     modified_index = o_delta_item.offset / Const.CHUNK_SIZE
-                    m_chunk_dict[modified_index] = 1.0
-        m_chunk_dict.update(self.fuse_stream_monitor.modified_chunk_dict)
-        info_dict[_MonitoringInfo.DISK_MODIFIED_BLOCKS] = m_chunk_dict
+                    modified_chunk_queue.put((modified_index, 1.0))
+        info_dict[_MonitoringInfo.DISK_MODIFIED_BLOCKS] = modified_chunk_queue
 
         self.monitoring_info = _MonitoringInfo(info_dict)
         return self.monitoring_info
@@ -840,7 +841,7 @@ def get_overlay_deltalist(monitoring_info, options,
 
     INFO = _MonitoringInfo
     free_memory_dict = getattr(monitoring_info, INFO.MEMORY_FREE_BLOCKS, None)
-    m_chunk_dict = getattr(monitoring_info, INFO.DISK_MODIFIED_BLOCKS, dict())
+    m_chunk_queue = getattr(monitoring_info, INFO.DISK_MODIFIED_BLOCKS, dict())
     trim_dict = getattr(monitoring_info, INFO.DISK_FREE_BLOCKS, None)
     used_blocks_dict = getattr(monitoring_info, INFO.DISK_USED_BLOCKS, None)
     dma_dict = dict()
@@ -866,7 +867,7 @@ def get_overlay_deltalist(monitoring_info, options,
     LOG.info("Get disk delta")
     disk_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_DISK_DELTA_LIST)
     disk_deltalist_proc = Disk.CreateDiskDeltalist(modified_disk,
-                                                   m_chunk_dict,
+                                                   m_chunk_queue,
                                                    Const.CHUNK_SIZE,
                                                    disk_deltalist_queue,
                                                    base_image,
@@ -1102,15 +1103,13 @@ def run_vm(conn, domain_xml, **kwargs):
 
 class MemoryReadProcess(process_manager.ProcWorker):
     def __init__(self, input_path, machine_memory_size,
-                 conn, machine, qmp_channel, result_queue):
+                 conn, machine, result_queue):
         self.input_path = input_path
         self.result_queue = result_queue
         self.machine_memory_size = machine_memory_size*1024
         self.total_read_size = 0
         self.total_write_size = 0
         self.conn = conn
-        self.qmp_thread = QmpThread(qmp_channel, timeout=10)
-        self.qmp_thread.daemon = True
         self.machine = machine
 
         self.manager = multiprocessing.Manager()
@@ -1182,7 +1181,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     if (is_qmp_msg_sent == False) and\
                             (self.total_write_size > (mem_snapshot_size + Const.LIBVIRT_HEADER_SIZE)):
                         is_qmp_msg_sent = True
-                        self.qmp_thread.start()
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time()
@@ -1231,23 +1229,25 @@ class LibvirtThread(threading.Thread):
 
 
 class QmpThread(threading.Thread):
-    def __init__(self, qmp_path, timeout):
+    def __init__(self, qmp_path, fuse_stream_monitor, timeout):
         self.qmp_path = qmp_path
         self.timeout = timeout
         self.qmp = qmp_af_unix.QmpAfUnix("/tmp/cloudlet-qmp")
+        self.fuse_stream_monitor = fuse_stream_monitor
         threading.Thread.__init__(self, target=self.suspend_vm)
 
     def suspend_vm(self):
         self.qmp.connect()
         ret = self.qmp.qmp_negotiate()
+        #if ret:
+        #    #self._waiting(self.timeout)
+        #    LOG.debug("[live] Send migration iteration signal")
+        #    ret = self.qmp.iterate_raw_live()
         if ret:
-            self._waiting(1)
-            LOG.debug("[live] Send migration iteration signal")
-            ret = self.qmp.iterate_raw_live()
-        if ret:
-            self._waiting(self.timeout)
+            #self._waiting(self.timeout)
             LOG.debug("[live] Send stop migration signal")
             self.qmp.stop_raw_live()
+            self.fuse_stream_monitor.terminate()
         self.qmp.disconnect()
 
     def _waiting(self, timeout):
@@ -1261,7 +1261,6 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
     #Set migration speed
     nova_util = kwargs.get('nova_util', None)
     fuse_stream_monitor = kwargs.get('fuse_stream_monitor', None)
-    qmp_channel_path = kwargs.get('qmp_channel_path', None)
     ret = machine.migrateSetMaxSpeed(1000000, 0)   # 1000 Gbps, unlimited
     if ret != 0:
         raise CloudletGenerationError("Cannot set migration speed : %s", machine.name())
@@ -1273,9 +1272,9 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
 
     # Stop monitoring for memory access (snapshot will create a lot of access)
     fuse_stream_monitor.del_path(cloudletfs.StreamMonitor.MEMORY_ACCESS)
-    if fuse_stream_monitor is not None:
-        fuse_stream_monitor.terminate()
-        fuse_stream_monitor.join()
+    #if fuse_stream_monitor is not None:
+    #    fuse_stream_monitor.terminate()
+    #    fuse_stream_monitor.join()
 
     # get VM information
     machine_memory_size = machine.memoryStats().get('actual', None)
@@ -1299,7 +1298,6 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
                                              machine_memory_size,
                                              conn,
                                              machine,
-                                             qmp_channel_path,
                                              output_queue)
         memory_read_proc.start()
         libvirt_thread = LibvirtThread(machine, named_pipe_output)
@@ -1562,13 +1560,15 @@ def create_residue(base_disk, base_hashvalue,
     LOG.debug("* Overlay creation mode start\n%s" % str(overlay_mode))
     LOG.debug("* Overlay creation mode end")
 
+    qmp_thread = QmpThread(resumed_vm.qmp_channel, resumed_vm.monitor, timeout=10)
+    qmp_thread.daemon = True
+
     # 1. sanity check
     if (options == None) or (isinstance(options, Options) == False):
         raise CloudletGenerationError("Given option is invalid: %s" % str(options))
     (base_diskmeta, base_mem, base_memmeta) = \
             Const.get_basepath(base_disk, check_exist=True)
     qemu_logfile = resumed_vm.qemu_logfile
-    qmp_channel = resumed_vm.qemu_logfile
 
     # 2. suspend VM and get monitoring information
     memory_snapshot_queue = multiprocessing.Queue(overlay_mode.QUEUE_SIZE_MEMORY_SNAPSHOT)
@@ -1591,8 +1591,7 @@ def create_residue(base_disk, base_hashvalue,
     memory_read_proc = save_mem_snapshot(resumed_vm.conn,
                                          resumed_vm.machine,
                                          memory_snapshot_queue,
-                                         fuse_stream_monitor=resumed_vm.monitor,
-                                         qmp_channel_path=qmp_channel)
+                                         fuse_stream_monitor=resumed_vm.monitor)
 
     if overlay_mode.PROCESS_PIPELINED == False:
         _waiting_to_finish(process_controller, "MemoryReadProcess")
@@ -1645,6 +1644,7 @@ def create_residue(base_disk, base_hashvalue,
         LOG.debug("[time] Getting memory snapshot size (%f~%f):%f" % (time_start,
                                                                         time_memory_snapshot_size,
                                                                         (time_memory_snapshot_size-time_start)))
+        qmp_thread.start()
 
         metadata = dict()
         metadata[Const.META_BASE_VM_SHA256] = base_hashvalue
@@ -1658,6 +1658,9 @@ def create_residue(base_disk, base_hashvalue,
         cpu_stat = process_controller.cpu_statistics
 
         # 7. terminting
+        if resumed_vm.monitor is not None:
+            resumed_vm.monitor.terminate()
+            resumed_vm.monitor.join()
         resumed_vm.machine = None   # protecting malaccess to machine 
         time_end = time()
 
@@ -1679,6 +1682,7 @@ def create_residue(base_disk, base_hashvalue,
         LOG.debug("[time] Getting memory snapshot size (%f~%f):%f" % (time_start,
                                                                         time_memory_snapshot_size,
                                                                         (time_memory_snapshot_size-time_start)))
+        qmp_thread.start()
         # wait to finish creating files
         synthesis_file.join()
         time_end_transfer = time()
@@ -1709,6 +1713,10 @@ def create_residue(base_disk, base_hashvalue,
         #open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
 
         memory_read_proc.finish()   # deallocate resources for snapshotting
+        # 7. terminting
+        if resumed_vm.monitor is not None:
+            resumed_vm.monitor.terminate()
+            resumed_vm.monitor.join()
         resumed_vm.machine = None   # protecting malaccess to machine 
         if os.path.exists(overlay_metafile) == True:
             os.remove(overlay_metafile)
@@ -2144,8 +2152,6 @@ def synthesis(base_disk, overlay_path, **kwargs):
         sleep(10)
 
     # statistics
-    synthesized_VM.monitor.terminate()
-    synthesized_VM.monitor.join()
     #mem_access_list = synthesized_VM.monitor.mem_access_chunk_list
     #disk_access_list = synthesized_VM.monitor.disk_access_chunk_list
     #synthesis_statistics(meta_info, overlay_filename.name, \
@@ -2188,6 +2194,8 @@ def synthesis(base_disk, overlay_path, **kwargs):
             LOG.error("Cannot create residue : %s" % (str(e)))
 
     # terminate
+    synthesized_VM.monitor.terminate()
+    synthesized_VM.monitor.join()
     synthesized_VM.terminate()
 
 

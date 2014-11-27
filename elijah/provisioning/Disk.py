@@ -179,7 +179,7 @@ def parse_qemu_log(qemu_logfile, chunk_size):
 
 class CreateDiskDeltalist(process_manager.ProcWorker):
     def __init__(self, modified_disk, 
-                 modified_chunk_dict, chunk_size,
+                 modified_chunk_queue, chunk_size,
                  disk_deltalist_queue,
                  basedisk_path,
                  overlay_mode,
@@ -190,12 +190,12 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         # base_diskmeta : hash list of base disk
         # base_disk: path to base VM disk
         # modified_disk_path : path to modified VM disk
-        # modified_chunk_dict : chunk dict of modified
+        # modified_chunk_queue : chunk dict of modified
         # overlay_path : path to destination of overlay disk
         # dma_dict : dma information, 
         #           dma_dict[disk_chunk] = {'time':time, 'memory_chunk':memory chunk number, 'read': True if read from disk'}
         self.modified_disk = modified_disk
-        self.modified_chunk_dict = modified_chunk_dict
+        self.modified_chunk_queue = modified_chunk_queue
         self.chunk_size = chunk_size
         self.disk_deltalist_queue = disk_deltalist_queue
         self.basedisk_path = basedisk_path
@@ -254,106 +254,106 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             self.proc_list.append((diff_proc, command_queue, mode_queue))
 
         # 1. get modified page
-        modified_chunk_counter = 0
-        modified_chunk_list = []
-        #input_fd = [self.control_queue._reader.fileno()]
-        for index, chunk in enumerate(self.modified_chunk_dict.keys()):
-            # check control message
-            try:
-                #self.monitor_current_inqueue_length.value = 0
-                #self.monitor_current_outqueue_length.value = self.disk_deltalist_queue.qsize()
-                #input_ready, out_ready, err_ready = select.select(input_fd, [], [], 0.0001)
-                control_msg = self.control_queue.get_nowait()
-                ret = self._handle_control_msg(control_msg)
-                if ret == False:
-                    if control_msg == "change_mode":
-                        new_mode = self.control_queue.get()
-                        self.change_mode(new_mode)
-            except Queue.Empty as e:
-                pass
-            except Exception as e:
-                sys.stdout.write("[CreateDiskDeltalist] Exception")
-                sys.stderr.write(traceback.format_exc())
-                sys.stderr.write("%s\n" % str(e))
+        try:
+            modified_chunk_counter = 0
+            modified_chunk_list = []
+            input_fd = [self.modified_chunk_queue._reader.fileno(), self.control_queue._reader.fileno()]
+            while True:
+                input_ready, out_ready, err_ready = select.select(input_fd, [], [])
+                if self.control_queue._reader.fileno() in input_ready:
+                    control_msg = self.control_queue.get()
+                    ret = self._handle_control_msg(control_msg)
+                    if ret == False:
+                        if control_msg == "change_mode":
+                            new_mode = self.control_queue.get()
+                            self.change_mode(new_mode)
+                if self.modified_chunk_queue._reader.fileno() in input_ready:
+                    recv_data = self.modified_chunk_queue.get()
+                    if recv_data == Const.QUEUE_SUCCESS_MESSAGE:
+                        break
+                    time_process_start = time.time()
+                    (chunk, ctime) = recv_data
+                    offset = chunk * self.chunk_size
 
-            time_process_start = time.time()
-            offset = chunk * self.chunk_size
-            ctime = self.modified_chunk_dict[chunk]
+                    # check TRIM discard
+                    is_discarded = False
+                    if self.trim_dict:
+                        trim_time = self.trim_dict.get(chunk, None)
+                        if trim_time:
+                            if (trim_time > ctime):
+                                trimed_list.append(chunk)
+                                trim_counter += 1
+                                is_discarded = True
+                            else:
+                                overwritten_after_trim += 1
+                    if is_discarded == True:
+                        # only apply when it is true
+                        if self.apply_discard:
+                            continue
 
-            # check TRIM discard
-            is_discarded = False
-            if self.trim_dict:
-                trim_time = self.trim_dict.get(chunk, None)
-                if trim_time:
-                    if (trim_time > ctime):
-                        trimed_list.append(chunk)
-                        trim_counter += 1
-                        is_discarded = True
-                    else:
-                        overwritten_after_trim += 1
-            if is_discarded == True:
-                # only apply when it is true
-                if self.apply_discard:
-                    continue
+                    modified_chunk_list.append(chunk)
+                    if is_first_recv == False:
+                        is_first_recv = True
+                        time_first_recv = time.time()
 
-            modified_chunk_list.append(chunk)
-            if is_first_recv == False:
-                is_first_recv = True
-                time_first_recv = time.time()
+                    modified_chunk_length = len(modified_chunk_list)
+                    if modified_chunk_length > 255:  # 1MB
+                        task_queue.put(modified_chunk_list)
+                        modified_chunk_list = []
 
-            modified_chunk_length = len(modified_chunk_list)
-            if modified_chunk_length > 255:  # 1MB
+                    # measurement
+                    modified_chunk_counter += 1
+                    time_process_finish = time.time()
+                    processed_datasize += self.chunk_size
+                    processed_duration += (time_process_finish - time_process_start)
+                    if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
+                        time_prev_report = time_process_finish
+                        #self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
+                        processed_datasize = 0
+                        processed_duration = float(0)
+
+            # send last chunks
+            if len(modified_chunk_list) > 0:
                 task_queue.put(modified_chunk_list)
                 modified_chunk_list = []
 
-            # measurement
-            modified_chunk_counter += 1
-            time_process_finish = time.time()
-            processed_datasize += self.chunk_size
-            processed_duration += (time_process_finish - time_process_start)
-            if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
-                time_prev_report = time_process_finish
-                #self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
-                processed_datasize = 0
-                processed_duration = float(0)
+            # send end meesage to every process
+            for index in self.proc_list:
+                task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+                LOG.debug("[Disk] send end message to each child")
 
-        # send last chunks
-        task_queue.put(modified_chunk_list)
-        modified_chunk_list = []
+            # after this for loop, all processing finished, but child process still
+            # alive until all data pass to the next step
+            finished_proc_dict = dict()
+            input_list = [self.control_queue._reader.fileno()]
+            for (proc, c_queue, m_queue) in self.proc_list:
+                fileno = c_queue._reader.fileno()
+                input_list.append(fileno)
+                finished_proc_dict[fileno] = c_queue
+            while len(finished_proc_dict.keys()) > 0:
+                #print "disk left proc number: %s" % (finished_proc_dict.keys())
+                #for ffno, (cq, tq) in finished_proc_dict.iteritems():
+                #    print "task quesize at %d: %d" % (ffno, tq.qsize())
+                (input_ready, [], []) = select.select(input_list, [], [], 0.01)
+                for in_queue in input_ready:
+                    if self.control_queue._reader.fileno() == in_queue:
+                        control_msg = self.control_queue.get()
+                        self._handle_control_msg(control_msg)
+                    else:
+                        cq = finished_proc_dict[in_queue]
+                        (input_size, output_size, blocks) = cq.get()
+                        self.in_size += input_size
+                        self.total_block += blocks
+                        self.out_size += output_size
+                        del finished_proc_dict[in_queue]
+            self.process_info['is_alive'] = False
+        except Exception as e:
+            print str(e)
+            LOG.error("failed at %s" % str(traceback.format_exc()))
 
-        # send end meesage to every process
-        for index in self.proc_list:
-            task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-            #LOG.debug("[Disk] send end message to each child")
-
-        # after this for loop, all processing finished, but child process still
-        # alive until all data pass to the next step
-        finished_proc_dict = dict()
-        input_list = [self.control_queue._reader.fileno()]
-        for (proc, c_queue, m_queue) in self.proc_list:
-            fileno = c_queue._reader.fileno()
-            input_list.append(fileno)
-            finished_proc_dict[fileno] = c_queue
-        while len(finished_proc_dict.keys()) > 0:
-            #print "disk left proc number: %s" % (finished_proc_dict.keys())
-            #for ffno, (cq, tq) in finished_proc_dict.iteritems():
-            #    print "task quesize at %d: %d" % (ffno, tq.qsize())
-            (input_ready, [], []) = select.select(input_list, [], [], 0.01)
-            for in_queue in input_ready:
-                if self.control_queue._reader.fileno() == in_queue:
-                    control_msg = self.control_queue.get()
-                    self._handle_control_msg(control_msg)
-                else:
-                    cq = finished_proc_dict[in_queue]
-                    (input_size, output_size, blocks) = cq.get()
-                    self.in_size += input_size
-                    self.total_block += blocks
-                    self.out_size += output_size
-                    del finished_proc_dict[in_queue]
-        self.process_info['is_alive'] = False
 
         for (proc, c_queue, m_queue) in self.proc_list:
-            #LOG.debug("[Disk] waiting to dump all data to the next stage")
+            LOG.debug("[Disk] waiting to dump all data to the next stage")
             proc.join()
         # send end message after the next stage finishes processing
         self.disk_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
@@ -466,7 +466,7 @@ class DiskDiffProc(multiprocessing.Process):
             if self.task_queue._reader.fileno() in inready:
                 task_list = self.task_queue.get()
                 if task_list == Const.QUEUE_SUCCESS_MESSAGE:
-                    #LOG.debug("[Disk][Child] diff proc get end message")
+                    LOG.debug("[Disk][Child] diff proc get end message")
                     is_proc_running = False
                     break
 
