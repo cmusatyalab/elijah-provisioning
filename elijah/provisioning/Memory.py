@@ -528,8 +528,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 blob_offset, = struct.unpack(Memory.CHUNK_HEADER_FMT, header)
                 iter_seq = (blob_offset & Memory.ITER_SEQ_MASK) >> Memory.ITER_SEQ_SHIFT
                 if iter_seq != self.iteration_seq:
+                    msg = "[live][memory] new iteration %d -> %d" % (self.iteration_seq, iter_seq)
                     self.iteration_seq = iter_seq
-                    msg = "[live][memory] new iteration %d -> %d" % (self.iteration_seq, self.task_queue.qsize())
                     LOG.debug(msg)
             ret_chunks.append(chunked_data)
         return ret_chunks

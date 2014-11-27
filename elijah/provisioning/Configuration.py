@@ -49,7 +49,6 @@ class Const(object):
     QUEUE_FAILED_MESSAGE        = "!!@#^&!MemorySnapshot Transfer FAILED Marker!!@#^&!"
     QUEUE_SUCCESS_MESSAGE_LEN   = len(QUEUE_SUCCESS_MESSAGE)
     QUEUE_FAILED_MESSAGE_LEN    = len(QUEUE_FAILED_MESSAGE)
-    QUEUE_NEW_ITERATION         = "!!@#^&!Live migration new iteration start Marker!!@#^&!"
 
     BASE_DISK               = ".base-img"
     BASE_MEM                = ".base-mem"
@@ -150,7 +149,7 @@ class Options(object):
 
 class VMOverlayCreationMode(object):
     PIPE_ONE_ELEMENT_SIZE = 4096*100 # 400KB == Max Pipe size is 1MB
-    EMULATED_BANDWIDTH_Mbps = 50 # Mbps
+    EMULATED_BANDWIDTH_Mbps = 100000 # Mbps
 
     def __init__(self):
         self.OUTPUT_DESTINATION                     = "file" # or "network"
