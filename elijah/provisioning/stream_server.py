@@ -73,12 +73,13 @@ class AckThread(threading.Thread):
     def start_sending_ack(self):
         while True:
             data = self.ack_queue.get()
+            bytes_recved= self.ack_queue.get()
             # send ack
-            ack_data = struct.pack("!Q", 1)
+            ack_data = struct.pack("!Q", bytes_recved)
             self.request.sendall(ack_data)
 
     def signal_ack(self):
-        self.ack_queue.put("a")
+        self.ack_queue.put(bytes_recved)
 
 
 class RecoverDeltaProc(multiprocessing.Process):
@@ -445,23 +446,24 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
     def _recv_all(self, recv_size):
         data = ''
         while len(data) < recv_size:
-            one_time_recv_size = min(recv_size-len(data), PERIODIC_ACK_BYTES)
-            tmp_data = self.request.recv(one_time_recv_size)
-
-            # to send ack for every PERIODIC_ACK_BYTES bytes
-            self.total_recved_size_cur += len(tmp_data)
-            recv_bytes_size = self.total_recved_size_cur - self.total_recved_size_prev
-            #print recv_bytes_size
-            if recv_bytes_size >= PERIODIC_ACK_BYTES:
-                self.ack_thread.signal_ack()
-                self.total_recved_size_prev = self.total_recved_size_cur
-                if recv_bytes_size >= PERIODIC_ACK_BYTES*2:
-                    print "we missed to send %d acks" % ((recv_bytes_size/PERIODIC_ACK_BYTES)-1)
+            #one_time_recv_size = min(recv_size-len(data), PERIODIC_ACK_BYTES)
+            #tmp_data = self.request.recv(one_time_recv_size)
+            tmp_data = self.request.recv(recv_size-len(data))
+            #print len(tmp_data)
 
             if tmp_data == None:
                 raise StreamSynthesisError("Cannot recv data at %s" % str(self))
             if len(tmp_data) == 0:
                 raise StreamSynthesisError("Recv 0 data at %s" % str(self))
+
+            # to send ack for every PERIODIC_ACK_BYTES bytes
+            self.total_recved_size_cur += len(tmp_data)
+            recv_bytes_size = self.total_recved_size_cur - self.total_recved_size_prev
+            if recv_bytes_size >= PERIODIC_ACK_BYTES:
+                self.ack_thread.signal_ack(recv_bytes_size)
+                self.total_recved_size_prev = self.total_recved_size_cur
+                if recv_bytes_size >= PERIODIC_ACK_BYTES*2:
+                    print "we missed to send %d acks" % ((recv_bytes_size/PERIODIC_ACK_BYTES)-1)
             data += tmp_data
         return data
 
@@ -490,6 +492,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         try:
             # variable
             self.ack_thread = AckThread(self.request)
+            self.ack_thread.daemon = True
             self.ack_thread.start()
             self.total_recved_size_cur = 0
             self.total_recved_size_prev = 0
