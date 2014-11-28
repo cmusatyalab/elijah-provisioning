@@ -364,9 +364,8 @@ class SynthesizedVM(threading.Thread):
         open(self.qemu_logfile, "w+").close()
         os.chmod(os.path.dirname(self.qemu_logfile), 0o771)
         os.chmod(self.qemu_logfile, 0o666)
-        #self.qmp_channel = os.path.abspath(os.path.join(temp_qemu_dir, "qmp-channel"))
-
-        self.qmp_channel = os.path.abspath("/tmp/cloudlet-qmp")
+        self.qmp_channel = os.path.abspath(os.path.join(temp_qemu_dir, "qmp-channel"))
+        #self.qmp_channel = os.path.abspath("/tmp/cloudlet-qmp")
         if os.path.exists(self.qmp_channel) == True:
             os.remove(self.qmp_channel)
         LOG.info("Launch disk: %s" % os.path.abspath(launch_disk))
@@ -1229,31 +1228,59 @@ class LibvirtThread(threading.Thread):
 
 
 class QmpThread(threading.Thread):
-    def __init__(self, qmp_path, fuse_stream_monitor, timeout):
+    def __init__(self, qmp_path, memory_snapshot_queue, overlay_mode, fuse_stream_monitor):
         self.qmp_path = qmp_path
-        self.timeout = timeout
-        self.qmp = qmp_af_unix.QmpAfUnix("/tmp/cloudlet-qmp")
+        self.memory_snapshot_queue = memory_snapshot_queue
+        self.overlay_mode = overlay_mode
+        self.stop = threading.Event()
+        self.qmp = qmp_af_unix.QmpAfUnix(self.qmp_path)
         self.fuse_stream_monitor = fuse_stream_monitor
-        threading.Thread.__init__(self, target=self.suspend_vm)
+        threading.Thread.__init__(self, target=self.control_migration)
 
-    def suspend_vm(self):
+    def control_migration(self):
         self.qmp.connect()
         ret = self.qmp.qmp_negotiate()
-        #if ret:
-        #    #self._waiting(self.timeout)
-        #    LOG.debug("[live] Send migration iteration signal")
-        #    ret = self.qmp.iterate_raw_live()
-        if ret:
-            self._waiting(self.timeout)
-            LOG.debug("[live] Send stop migration signal")
-            self.qmp.stop_raw_live()
-            self.fuse_stream_monitor.terminate()
+        if not ret:
+            raise CloudletGenerationError("failed to connect to qmp channel")
+        sleep(5)
+
+        if self.overlay_mode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
+            self._stop_migration()
+            LOG.debug("[live] Send migration iteration stop")
+        elif self.overlay_mode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE:
+            iteration_issue_time_list = list()
+            sleep_between_iteration = 2
+            while(not self.stop.wait(0.1)):
+                unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
+                    VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
+                if unprocessed_memory_snapshot_size < 1024*1024*100: # 100 MB
+                    LOG.debug("[live] Send migration iteration signal")
+                    ret = self.qmp.iterate_raw_live()
+                    iteration_issue_time_list.append(time())
+                    sleep(sleep_between_iteration)
+
+                if len(iteration_issue_time_list) > 2:
+                    latest_time_diff = iteration_issue_time_list[-1] - iteration_issue_time_list[-2]
+                    print "[live] stop signal? %f %f" % (latest_time_diff, sleep_between_iteration*1.4)
+                    if latest_time_diff < sleep_between_iteration*1.4:
+                        LOG.debug("[live] Send migration iteration stop")
+                        self._stop_migration()
+                        break
         self.qmp.disconnect()
+
+    def _stop_migration(self):
+        #self._waiting(self.timeout)
+        LOG.debug("[live] Send stop migration signal")
+        self.qmp.stop_raw_live()
+        self.fuse_stream_monitor.terminate()
 
     def _waiting(self, timeout):
         for index in range(timeout):
             sys.stdout.write("waiting %d/%d seconds\n" % (index, timeout))
             sleep(1)
+
+    def terminate(self):
+        self.stop.set()
 
 
 
@@ -1560,9 +1587,6 @@ def create_residue(base_disk, base_hashvalue,
     LOG.debug("* Overlay creation mode start\n%s" % str(overlay_mode))
     LOG.debug("* Overlay creation mode end")
 
-    qmp_thread = QmpThread(resumed_vm.qmp_channel, resumed_vm.monitor, timeout=60)
-    qmp_thread.daemon = True
-
     # 1. sanity check
     if (options == None) or (isinstance(options, Options) == False):
         raise CloudletGenerationError("Given option is invalid: %s" % str(options))
@@ -1587,6 +1611,10 @@ def create_residue(base_disk, base_hashvalue,
     LOG.debug("[time] serialized step (%f ~ %f): %f" % (time_start,
                                                            time_ss,
                                                            (time_ss-time_start)))
+
+    qmp_thread = QmpThread(resumed_vm.qmp_channel, memory_snapshot_queue,
+                           overlay_mode, resumed_vm.monitor)
+    qmp_thread.daemon = True
 
     memory_read_proc = save_mem_snapshot(resumed_vm.conn,
                                          resumed_vm.machine,
@@ -1630,7 +1658,7 @@ def create_residue(base_disk, base_hashvalue,
 
 
     time_packaging_start = time()
-    overlay_mode.OUTPUT_DESTINATION = "network"
+    overlay_mode.OUTPUT_DESTINATION = "file"
     if overlay_mode.OUTPUT_DESTINATION.startswith("network"):
         from stream_client import StreamSynthesisClient
         resume_disk_size = os.path.getsize(resumed_vm.resumed_disk)

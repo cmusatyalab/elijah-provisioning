@@ -149,9 +149,13 @@ class Options(object):
 
 class VMOverlayCreationMode(object):
     PIPE_ONE_ELEMENT_SIZE = 4096*100 # 400KB == Max Pipe size is 1MB
-    EMULATED_BANDWIDTH_Mbps = 100000 # Mbps
+    EMULATED_BANDWIDTH_Mbps = 10 # Mbps
+
+    LIVE_MIGRATION_FINISH_ASAP = 1
+    LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE = 2
 
     def __init__(self):
+        self.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
         self.OUTPUT_DESTINATION                     = "file" # or "network"
         self.PROCESS_PIPELINED                      = True # False: serialized processing
 
