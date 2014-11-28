@@ -20,6 +20,7 @@ import os
 import multiprocessing
 import threading
 import time
+import ctypes
 import sys
 import traceback
 import Queue
@@ -152,11 +153,29 @@ class ProcessManager(threading.Thread):
         sys.stdout.write("\n")
         return result
 
+    def _monitor_ratio_speed(self):
+        worker_names = ["DeltaDedup", "CreateMemoryDeltalist",
+                        "CreateDiskDeltalist", "CompressProc"]
+        ret_dict = dict()
+        for worker_name in worker_names:
+            worker = self.process_list.get(worker_name, None)
+            if worker == None:
+                continue
+            process_info = self.process_infos[worker_name]
+            #if process_info['is_alive'] == True:
+            ret_dict[worker_name] = (worker.monitor_total_time_block.value,
+                                        worker.monitor_total_ratio_block.value)
+        for name, (p, r) in ret_dict.iteritems():
+            sys.stdout.write("%s (%f, %f)\t" % (name, p, r))
+        sys.stdout.write("\n")
+
     def start_managing(self):
         time_s = time.time()
         self.cpu_statistics = list()
         try:
             while (not self.stop.wait(0.1)):
+                self._monitor_ratio_speed()
+
                 pass
                 #result = self._get_cpu_usage()
                 #self.cpu_statistics.append((time.time()-time_s, result))
@@ -197,13 +216,17 @@ class ProcWorker(multiprocessing.Process):
             process_manager.register(self)  # shared dictionary
 
         # measurement
+        self.monitor_total_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.monitor_total_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.in_size = 0
+        self.out_size = 0
+
+        # not used
         self.monitor_current_bw = float(0)
         self.monitor_current_inqueue_length = multiprocessing.Value('d', -1.0)
         self.monitor_current_outqueue_length = multiprocessing.Value('d', -1.0)
         self.monitor_current_get_time = multiprocessing.Value('d', -1.0)
         self.monitor_current_put_time = multiprocessing.Value('d', -1.0)
-        self.in_size = 0
-        self.out_size = 0
         super(ProcWorker, self).__init__(*args, **kwargs)
 
     def _handle_control_msg(self, control_msg):

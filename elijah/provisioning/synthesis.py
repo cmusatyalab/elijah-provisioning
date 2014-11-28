@@ -1242,11 +1242,10 @@ class QmpThread(threading.Thread):
         ret = self.qmp.qmp_negotiate()
         if not ret:
             raise CloudletGenerationError("failed to connect to qmp channel")
-        sleep(5)
+        #sleep(5)
 
         if self.overlay_mode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
             self._stop_migration()
-            LOG.debug("[live] Send migration iteration stop")
         elif self.overlay_mode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE:
             iteration_issue_time_list = list()
             sleep_between_iteration = 2
@@ -1254,7 +1253,6 @@ class QmpThread(threading.Thread):
                 unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
                     VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
                 if unprocessed_memory_snapshot_size < 1024*1024*100: # 100 MB
-                    LOG.debug("[live] Send migration iteration signal")
                     ret = self.qmp.iterate_raw_live()
                     iteration_issue_time_list.append(time())
                     sleep(sleep_between_iteration)
@@ -1263,14 +1261,13 @@ class QmpThread(threading.Thread):
                     latest_time_diff = iteration_issue_time_list[-1] - iteration_issue_time_list[-2]
                     print "[live] stop signal? %f %f" % (latest_time_diff, sleep_between_iteration*1.4)
                     if latest_time_diff < sleep_between_iteration*1.4:
-                        LOG.debug("[live] Send migration iteration stop")
                         self._stop_migration()
                         break
         self.qmp.disconnect()
 
     def _stop_migration(self):
         #self._waiting(self.timeout)
-        LOG.debug("[live] Send stop migration signal")
+        LOG.debug("[live] stop_raw_live")
         self.qmp.stop_raw_live()
         self.fuse_stream_monitor.terminate()
 

@@ -156,6 +156,8 @@ class VMOverlayCreationMode(object):
 
     def __init__(self):
         self.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
+        #self.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
+
         self.OUTPUT_DESTINATION                     = "file" # or "network"
         self.PROCESS_PIPELINED                      = True # False: serialized processing
 

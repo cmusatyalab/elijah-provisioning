@@ -72,31 +72,50 @@ class CompressProc(process_manager.ProcWorker):
                 self.proc_list.append((comp_proc, command_queue, mode_queue))
 
             total_read_size = 0
+            is_last_chunk = False
             input_list = [self.control_queue._reader.fileno(),
                             self.delta_list_queue._reader.fileno()]
-            while True:
+            while is_last_chunk == False:
                 (input_ready, [], []) = select.select(input_list, [], [])
-                if self.control_queue._reader.fileno() in input_ready:
-                    control_msg = self.control_queue.get()
-                    ret = self._handle_control_msg(control_msg)
-                    if ret == False:
-                        if control_msg == "change_mode":
-                            new_mode = self.control_queue.get()
-                            self.change_mode(new_mode)
-                if self.delta_list_queue._reader.fileno() in input_ready:
-                    deltaitem_list = self.delta_list_queue.get()
-                    if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
-                        break
-                    self.task_queue.put(deltaitem_list)
+                input_size = 0
+                input_deltalist = list()
+                # accumulate delta item to have more than self.block_size
+                while input_size < self.block_size:
+                    if self.control_queue._reader.fileno() in input_ready:
+                        control_msg = self.control_queue.get()
+                        ret = self._handle_control_msg(control_msg)
+                        if ret == False:
+                            if control_msg == "change_mode":
+                                new_mode = self.control_queue.get()
+                                self.change_mode(new_mode)
+                    if self.delta_list_queue._reader.fileno() in input_ready:
+                        deltaitem_list = self.delta_list_queue.get()
+                        if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
+                            is_last_chunk = True
+                            break
+                        input_deltalist += deltaitem_list
+                        recved_size = 0
+                        for item in deltaitem_list:
+                            recved_size += (item.data_len + 11 + 8)
+                        input_size += recved_size
 
-                    # measurement
-                    total_process_time_block = 0
-                    total_ratio_block = 0
-                    for (proc, c_queue, mode_queue) in self.proc_list:
-                        total_process_time_block += proc.child_process_time_block.value
-                        total_ratio_block += proc.child_ratio_block.value
-                    print "P: %f\tR: %f" % (total_process_time_block,
-                                            total_ratio_block/self.num_proc)
+                self.task_queue.put(input_deltalist)
+                # measurement
+                total_process_time_block = 0
+                total_ratio_block = 0
+                valid_child_proc = 0
+                for (proc, c_queue, mode_queue) in self.proc_list:
+                    process_time_block = proc.child_process_time_block.value
+                    ratio_block = proc.child_ratio_block.value
+                    if (process_time_block > 0) and (ratio_block > 0):
+                        valid_child_proc += 1
+                        total_process_time_block += process_time_block
+                        total_ratio_block += ratio_block
+                    #sys.stdout.write("(%d %d %d)\t" % (process_time_block, ratio_block, valid_child_proc))
+                if valid_child_proc > 0:
+                    self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
+                    self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
+                    #print "[comp] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
 
             # send end meesage to every process
             for index in self.proc_list:
@@ -187,6 +206,7 @@ class CompChildProc(multiprocessing.Process):
         outdata_size = 0
         child_total_block = 0
         time_process_total_time = 0
+        loop_counter = 0
         while is_proc_running:
             inready, outread, errready = select.select(input_list, [], [])
             if self.mode_queue._reader.fileno() in inready:
@@ -209,6 +229,7 @@ class CompChildProc(multiprocessing.Process):
                     break
                 deltaitem_list = input_task
                 comp_type_cur = self.comp_type
+                loop_counter += 1
 
                 # get compressor
                 if comp_type_cur == Const.COMPRESSION_LZMA:
@@ -226,9 +247,9 @@ class CompChildProc(multiprocessing.Process):
                 modified_disk_chunks = list()
                 output_data = ''
                 input_data = ''
-                time_process_start = time.time()
-                for delta_item in deltaitem_list:
 
+                for delta_item in deltaitem_list:
+                    time_process_start = time.time()
                     delta_bytes = delta_item.get_serialized()
                     offset = delta_item.offset/Const.CHUNK_SIZE
                     if delta_item.delta_type == DeltaItem.DELTA_DISK or\
@@ -237,36 +258,26 @@ class CompChildProc(multiprocessing.Process):
                     elif delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
                         delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
                         modified_memory_chunks.append(offset)
-                    input_data += delta_bytes
+                    compressed_bytes = comp.compress(delta_bytes)
+                    output_data += compressed_bytes
+
                     # measure for each block to have it ASAP
-                    '''
                     time_process_end = time.time()
                     indata_size += len(delta_bytes)
-                    outdata_size += len(delta_compressed)
+                    outdata_size += len(compressed_bytes)
                     child_total_block += 1
-                    print "in: %d, out: %d" % (indata_size, outdata_size)
+                    #print "in: %d, out: %d" % (indata_size, outdata_size)
                     time_process_total_time += (time_process_end - time_process_start)
                     self.child_process_time_block.value = time_process_total_time/child_total_block
-                    self.child_ratio_block.value = float(indata_size)/outdata_size
-                    '''
+                    self.child_ratio_block.value = outdata_size/float(indata_size)
 
-                output_data = comp.compress(input_data)
-                output_data += comp.flush()
-
-                time_process_end = time.time()
-                indata_size += len(input_data)
-                outdata_size += len(output_data)
-                child_total_block += len(deltaitem_list)
-
-                '''
                 time_process_start = time.time()
-                delta_compressed = comp.flush()
-                output_data += delta_compressed
-                outdata_size += len(delta_compressed)
-                print "flush in: %d, out: %d" % (indata_size, outdata_size)
+                compressed_bytes = comp.flush()
+                output_data += compressed_bytes
                 time_process_end = time.time()
-                '''
 
+                outdata_size += len(compressed_bytes)
+                #print "in: %d, out: %d" % (indata_size, outdata_size)
                 time_process_total_time += (time_process_end - time_process_start)
                 self.child_process_time_block.value = time_process_total_time/child_total_block
                 self.child_ratio_block.value = float(indata_size)/outdata_size
@@ -276,7 +287,7 @@ class CompChildProc(multiprocessing.Process):
                                        modified_memory_chunks))
 
         sys.stdout.write("[Comp][Child] child finished. process %d jobs\n" % \
-                         (child_total_block))
+                         (loop_counter))
         self.command_queue.put((indata_size, outdata_size, child_total_block))
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()

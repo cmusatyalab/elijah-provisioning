@@ -304,11 +304,18 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
 
                         total_process_time_block = 0
                         total_ratio_block = 0
+                        valid_child_proc = 0
                         for (proc, c_queue, mode_queue) in self.proc_list:
-                            total_process_time_block += proc.child_process_time_block.value
-                            total_ratio_block += proc.child_ratio_block.value
-                        #print "P: %f\tR: %f" % (total_process_time_block,
-                        #                        total_ratio_block/self.num_proc)
+                            process_time_block = proc.child_process_time_block.value
+                            ratio_block = proc.child_ratio_block.value
+                            if (process_time_block > 0) and (ratio_block > 0):
+                                valid_child_proc += 1
+                                total_process_time_block += process_time_block
+                                total_ratio_block += ratio_block
+                        if valid_child_proc > 0:
+                            self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
+                            self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
+                            #print "[disk] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
 
                     # measurement
                     modified_chunk_counter += 1
@@ -529,7 +536,7 @@ class DiskDiffProc(multiprocessing.Process):
                 time_process_end = time.time()
                 time_process_total_time += (time_process_end - time_process_start)
                 self.child_process_time_block.value = time_process_total_time/child_total_block
-                self.child_ratio_block.value = float(indata_size)/outdata_size
+                self.child_ratio_block.value = outdata_size/float(indata_size)
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Disk][Child] Child finished. process %d jobs" % (child_total_block))
         self.command_queue.put((indata_size, outdata_size, child_total_block))

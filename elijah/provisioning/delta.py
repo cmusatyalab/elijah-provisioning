@@ -891,14 +891,14 @@ class DeltaDedup(process_manager.ProcWorker):
 
                         # now delta item has new data length
                         self.out_size += (delta_item.data_len+11)
+                    time_process_finish = time.time()
+                    self.merged_deltalist_queue.put(deltaitem_list)
 
                     # measurement
-                    time_process_finish = time.time()
                     total_process_time += (time_process_finish/time_process_start)
-                    total_process_time_block = total_process_time/self.total_block_count
-                    total_ratio_block = (float(self.out_size)/self.in_size)
-                    #print "P: %f\tR: %f" % (total_process_time_block, total_ratio_block)
-                    self.merged_deltalist_queue.put(deltaitem_list)
+                    self.monitor_total_time_block.value = total_process_time/self.total_block_count
+                    self.monitor_total_ratio_block.value = (float(self.out_size)/self.in_size)
+                    #print "[delta] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
             self.monitor_is_alive = False
             self.process_info['is_alive'] = False
             self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)

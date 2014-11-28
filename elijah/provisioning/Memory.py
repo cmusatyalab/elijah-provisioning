@@ -649,27 +649,33 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             if len(memory_page_list) > 1:
                 tasks = memory_page_list[0:-1]
                 memory_page_list = memory_page_list[-1:]
-                # put task to child process
                 self.task_queue.put(tasks)
 
             total_process_time_block = 0
             total_ratio_block = 0
+            valid_child_proc = 0
             for (proc, c_queue, mode_queue) in self.proc_list:
-                total_process_time_block += proc.child_process_time_block.value
-                total_ratio_block += proc.child_ratio_block.value
-            #print "P: %f\tR: %f" % (total_process_time_block,
-            #                        total_ratio_block/self.num_proc)
+                process_time_block = proc.child_process_time_block.value
+                ratio_block = proc.child_ratio_block.value
+                if (process_time_block > 0) and (ratio_block > 0):
+                    valid_child_proc += 1
+                    total_process_time_block += process_time_block
+                    total_ratio_block += ratio_block
+            if valid_child_proc > 0:
+                self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
+                self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
+                #print "[memory] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
 
         # send last memory page
         # libvirt randomly add string starting with 'LibvirtQemudSave'
         # Therefore, process the last memory page only when it's aligned
         if len(memory_page_list) > 0 and len(memory_page_list[0]) == (Memory.RAM_PAGE_SIZE + Memory.CHUNK_HEADER_SIZE):
-            #LOG.debug("[Memory][child] send last data to child: %d" % len(memory_page_list))
+            LOG.debug("[Memory][child] send last data to child: %d" % len(memory_page_list))
             self.task_queue.put(memory_page_list)
 
         # send end meesage to every process
         for child_proc in self.proc_list:
-            #LOG.debug("[Memory] send end message to each child")
+            LOG.debug("[Memory] send end message to each child")
             self.task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         # after this for loop, all processing finished, but child process still
@@ -918,7 +924,8 @@ class MemoryDiffProc(multiprocessing.Process):
                 time_process_start = time.time()
                 deltaitem_list = list()
                 if type(memory_chunk_list) == type(1):
-                    LOG.debug("Invalid data at memory_chunk_list: %d" % memory_chunk_list)
+                    LOG.error("Invalid data at memory_chunk_list: %d" % memory_chunk_list)
+                    continue
                 for data in memory_chunk_list:
                     # header parsing
                     ram_offset, = struct.unpack(Memory.CHUNK_HEADER_FMT, data[0:Memory.CHUNK_HEADER_SIZE])
@@ -990,7 +997,7 @@ class MemoryDiffProc(multiprocessing.Process):
                 time_process_total_time += (time_process_end - time_process_start)
                 if child_total_block > 0:
                     self.child_process_time_block.value = time_process_total_time/child_total_block
-                    self.child_ratio_block.value = float(indata_size)/outdata_size
+                    self.child_ratio_block.value = outdata_size/float(indata_size)
                 if len(deltaitem_list) > 0:
                     self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Memory][Child] Child finished. process %d jobs" % (child_total_block))

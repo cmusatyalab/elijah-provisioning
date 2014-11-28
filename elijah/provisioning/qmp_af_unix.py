@@ -1,6 +1,8 @@
 #!/usr/bin/env python 
 #
 
+import traceback
+import sys
 import socket
 import json
 import time
@@ -46,13 +48,21 @@ class QmpAfUnix:
 
     # returns True on success, False otherwise
     def iterate_raw_live(self):
-        json_cmd = json.dumps({"execute":"iterate-raw-live"})
-        self.sock.sendall(json_cmd)
-        response = json.loads(self.sock.recv(1024))
-        if "return" in response:
-            return True
-        else:
-            return False
+        print "[live][qmp] iterate_raw_live"
+        try:
+            json_cmd = json.dumps({"execute":"iterate-raw-live"})
+            self.sock.sendall(json_cmd)
+            recved_data = self.sock.recv(1024)
+            response = json.loads(recved_data)
+            if "return" in response:
+                return True
+            else:
+                return False
+        except Exception as e:
+            print repr(recved_data)
+            sys.stderr.write(recved_data)
+            sys.stderr.write("failed at %s" % str(traceback.format_exc()))
+
 
     def stop_raw_live_once(self):
         self.connect()
