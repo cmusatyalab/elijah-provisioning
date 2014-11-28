@@ -657,7 +657,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             for (proc, c_queue, mode_queue) in self.proc_list:
                 total_process_time_block += proc.child_process_time_block.value
                 total_ratio_block += proc.child_ratio_block.value
-            #print "P: %f\tR: %f" % (total_process_time_block/self.num_proc,
+            #print "P: %f\tR: %f" % (total_process_time_block,
             #                        total_ratio_block/self.num_proc)
 
         # send last memory page
@@ -878,7 +878,7 @@ class MemoryDiffProc(multiprocessing.Process):
         self.free_pfn_dict = free_pfn_dict
         self.apply_free_memory = apply_free_memory
 
-        # share vairables
+        # shared variables between processes
         self.child_process_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
 

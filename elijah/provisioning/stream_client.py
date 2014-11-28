@@ -43,6 +43,9 @@ from Configuration import VMOverlayCreationMode
 from synthesis_protocol import Protocol
 
 
+ACK_DATA_SIZE = 100*1024
+
+
 class StreamSynthesisClientError(Exception):
     pass
 
@@ -56,14 +59,16 @@ class NetworkMeasurementThread(threading.Thread):
         measured_bw_list = list()
         ack_size = 8
         while True:
-            ack = self.sock.recv(ack_size)
-            ack_time_list.append(time.time())
-            if len(ack) != ack_size:
+            ack_data = self.sock.recv(ack_size)
+            if len(ack_data) != ack_size:
                 break
+            bytes_between_ack = struct.unpack("!Q", ack_data)[0]
+            ack_time_list.append(time.time())
             if len(ack_time_list) >= 2:
                 time_pings = ack_time_list[-1] - ack_time_list[-2]
-                bw_mbps = 100*1024*8.0/time_pings/1024/1024
-                print "estimated bw: %f" % bw_mbps
+                bw_mbps = bytes_between_ack*8.0/time_pings/1024/1024
+                print "bytes_betwee: %d (%f - %f = %f), estimated bw: %f" % \
+                    (bytes_between_ack, ack_time_list[-1], ack_time_list[-2], time_pings, bw_mbps)
                 measured_bw_list.append(bw_mbps)
 
     def recv_all(self, sock, recv_size):

@@ -8,6 +8,7 @@ import threading
 import msgpack
 import multiprocessing
 import traceback
+import ctypes
 
 from delta import DeltaItem
 
@@ -43,6 +44,7 @@ class CompressProc(process_manager.ProcWorker):
         self.comp_level = overlay_mode.COMPRESSION_ALGORITHM_SPEED
         self.block_size = block_size
         self.proc_list = list()
+
         super(CompressProc, self).__init__(target=self.compress_stream)
 
     def change_mode(self, new_mode):
@@ -50,51 +52,12 @@ class CompressProc(process_manager.ProcWorker):
             if proc.is_alive() == True:
                 m_queue.put(new_mode)
 
-    def _chunk_blob(self):
-        modified_disk_chunks = list()
-        modified_memory_chunks = list()
-        input_size = 0
-        is_last_blob = False
-        input_data = ''
-        input_list = [self.control_queue._reader.fileno(),
-                        self.delta_list_queue._reader.fileno()]
-        while input_size < self.block_size:
-            #self.monitor_current_inqueue_length.value = self.delta_list_queue.qsize()
-            #self.monitor_current_outqueue_length.value = self.comp_delta_queue.qsize()
-            (input_ready, [], []) = select.select(input_list, [], [], 0.01)
-            if self.control_queue._reader.fileno() in input_ready:
-                control_msg = self.control_queue.get()
-                ret = self._handle_control_msg(control_msg)
-                if ret == False:
-                    if control_msg == "change_mode":
-                        new_mode = self.control_queue.get()
-                        self.change_mode(new_mode)
-            if self.delta_list_queue._reader.fileno() in input_ready:
-                deltaitem_list = self.delta_list_queue.get()
-                if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
-                    is_last_blob = True
-                    break
-                for delta_item in deltaitem_list:
-                    delta_bytes = delta_item.get_serialized()
-                    offset = delta_item.offset/Const.CHUNK_SIZE
-                    if delta_item.delta_type == DeltaItem.DELTA_DISK or\
-                            delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
-                        modified_disk_chunks.append(offset)
-                    elif delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
-                        delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
-                        modified_memory_chunks.append(offset)
-                    input_data += delta_bytes
-                    input_size += len(delta_bytes)
-                self.total_block += len(deltaitem_list)
-        self.in_size += input_size
-        return is_last_blob, input_data, input_size, modified_disk_chunks, modified_memory_chunks
-
     def compress_stream(self):
+        self.in_size = 0
+        self.out_size = 0
+        self.total_block = 0
         try:
             time_start = time.time()
-            self.in_size = 0
-            self.total_block = 0
-            self.out_size = 0
 
             # launch child processes
             self.task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_COMPRESSION)
@@ -108,14 +71,32 @@ class CompressProc(process_manager.ProcWorker):
                 comp_proc.start()
                 self.proc_list.append((comp_proc, command_queue, mode_queue))
 
-            is_last_blob = False
             total_read_size = 0
-            while is_last_blob == False:
-                # read data
-                is_last_blob, input_data, input_size, modified_disk_chunks, modified_memory_chunks = self._chunk_blob()
+            input_list = [self.control_queue._reader.fileno(),
+                            self.delta_list_queue._reader.fileno()]
+            while True:
+                (input_ready, [], []) = select.select(input_list, [], [])
+                if self.control_queue._reader.fileno() in input_ready:
+                    control_msg = self.control_queue.get()
+                    ret = self._handle_control_msg(control_msg)
+                    if ret == False:
+                        if control_msg == "change_mode":
+                            new_mode = self.control_queue.get()
+                            self.change_mode(new_mode)
+                if self.delta_list_queue._reader.fileno() in input_ready:
+                    deltaitem_list = self.delta_list_queue.get()
+                    if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
+                        break
+                    self.task_queue.put(deltaitem_list)
 
-                if input_size > 0:
-                    self.task_queue.put((input_data, modified_disk_chunks, modified_memory_chunks))
+                    # measurement
+                    total_process_time_block = 0
+                    total_ratio_block = 0
+                    for (proc, c_queue, mode_queue) in self.proc_list:
+                        total_process_time_block += proc.child_process_time_block.value
+                        total_ratio_block += proc.child_ratio_block.value
+                    print "P: %f\tR: %f" % (total_process_time_block,
+                                            total_ratio_block/self.num_proc)
 
             # send end meesage to every process
             for index in self.proc_list:
@@ -146,8 +127,10 @@ class CompressProc(process_manager.ProcWorker):
                                 self.change_mode(new_mode)
                     else:
                         cq = finished_proc_dict[in_queue]
-                        processed_size = cq.get()
-                        self.out_size += processed_size
+                        (input_size, output_size, blocks) = cq.get()
+                        self.in_size += input_size
+                        self.out_size += output_size
+                        self.total_block += blocks
                         del finished_proc_dict[in_queue]
             self.process_info['is_alive'] = False
 
@@ -189,14 +172,21 @@ class CompChildProc(multiprocessing.Process):
         self.output_queue = output_queue
         self.comp_type = comp_type
         self.comp_level = comp_level
+
+        # shared variables between processes
+        self.child_process_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
+
         super(CompChildProc, self).__init__(target=self._comp)
 
     def _comp(self):
         is_proc_running = True
         input_list = [self.task_queue._reader.fileno(),
                       self.mode_queue._reader.fileno()]
-        loop_counter = 0
+        indata_size = 0
         outdata_size = 0
+        child_total_block = 0
+        time_process_total_time = 0
         while is_proc_running:
             inready, outread, errready = select.select(input_list, [], [])
             if self.mode_queue._reader.fileno() in inready:
@@ -217,33 +207,77 @@ class CompChildProc(multiprocessing.Process):
                     #sys.stdout.write("[Comp][Child] LZMA proc get end message\n")
                     is_proc_running = False
                     break
-                (input_data, modified_disk_chunks, modified_memory_chunks) = input_task
-                loop_counter += 1
+                deltaitem_list = input_task
+                comp_type_cur = self.comp_type
 
-                if self.comp_type == Const.COMPRESSION_LZMA:
+                # get compressor
+                if comp_type_cur == Const.COMPRESSION_LZMA:
                     # mode = 2 indicates LZMA_SYNC_FLUSH, which show all output right after input
                     comp = lzma.LZMACompressor(options={'format':'xz', 'level':self.comp_level})
-                    output_data = comp.compress(input_data)
-                    output_data += comp.flush()
-                elif self.comp_type == Const.COMPRESSION_BZIP2:
+                elif comp_type_cur == Const.COMPRESSION_BZIP2:
                     comp = bz2.BZ2Compressor(self.comp_level)
-                    output_data = comp.compress(input_data)
-                    output_data += comp.flush()
-                elif self.comp_type == Const.COMPRESSION_GZIP:
+                elif comp_type_cur == Const.COMPRESSION_GZIP:
                     comp = zlib.compressobj(self.comp_level, zlib.DEFLATED, zlib.MAX_WBITS | 16)
-                    output_data = comp.compress(input_data)
-                    output_data += comp.flush()
                 else:
                     raise CompressionError("Not supporting")
 
-                outdata_size += (len(output_data)+11)
-                self.output_queue.put((self.comp_type,
+                # compression for each block
+                modified_memory_chunks = list()
+                modified_disk_chunks = list()
+                output_data = ''
+                input_data = ''
+                time_process_start = time.time()
+                for delta_item in deltaitem_list:
+
+                    delta_bytes = delta_item.get_serialized()
+                    offset = delta_item.offset/Const.CHUNK_SIZE
+                    if delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                            delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+                        modified_disk_chunks.append(offset)
+                    elif delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                        delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
+                        modified_memory_chunks.append(offset)
+                    input_data += delta_bytes
+                    # measure for each block to have it ASAP
+                    '''
+                    time_process_end = time.time()
+                    indata_size += len(delta_bytes)
+                    outdata_size += len(delta_compressed)
+                    child_total_block += 1
+                    print "in: %d, out: %d" % (indata_size, outdata_size)
+                    time_process_total_time += (time_process_end - time_process_start)
+                    self.child_process_time_block.value = time_process_total_time/child_total_block
+                    self.child_ratio_block.value = float(indata_size)/outdata_size
+                    '''
+
+                output_data = comp.compress(input_data)
+                output_data += comp.flush()
+
+                time_process_end = time.time()
+                indata_size += len(input_data)
+                outdata_size += len(output_data)
+                child_total_block += len(deltaitem_list)
+
+                '''
+                time_process_start = time.time()
+                delta_compressed = comp.flush()
+                output_data += delta_compressed
+                outdata_size += len(delta_compressed)
+                print "flush in: %d, out: %d" % (indata_size, outdata_size)
+                time_process_end = time.time()
+                '''
+
+                time_process_total_time += (time_process_end - time_process_start)
+                self.child_process_time_block.value = time_process_total_time/child_total_block
+                self.child_ratio_block.value = float(indata_size)/outdata_size
+                self.output_queue.put((comp_type_cur,
                                        output_data,
                                        modified_disk_chunks,
                                        modified_memory_chunks))
+
         sys.stdout.write("[Comp][Child] child finished. process %d jobs\n" % \
-                         (loop_counter))
-        self.command_queue.put(outdata_size)
+                         (child_total_block))
+        self.command_queue.put((indata_size, outdata_size, child_total_block))
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()
             msg = "Empty new compression mode that does not refelected"

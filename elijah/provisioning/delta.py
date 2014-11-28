@@ -782,16 +782,17 @@ class DeltaDedup(process_manager.ProcWorker):
         super(DeltaDedup, self).__init__(target=self.perform_dedup)
 
     def perform_dedup(self):
+        total_process_time = 0
+        total_process_time_block = 0
+        total_ratio_block = 0
+        self.in_size = 0
+        self.total_block_count = 0
+        self.out_size = 0
+
         try:
             time_start = time.time()
             is_first_recv = False
             time_first_recv = 0
-            time_process_finish = 0
-            time_process_start = 0
-            time_prev_report = 0
-            processed_datasize = 0
-            processed_duration = float(0)
-            UPDATE_PERIOD = self.process_info['update_period']
 
             # get hashtable
             number_of_zero_page_disk = 0
@@ -812,9 +813,6 @@ class DeltaDedup(process_manager.ProcWorker):
             zero_hash_dict[zero_hash] = long(-1)
             is_memory_finished = False
             is_disk_finished = False
-            self.in_size = 0
-            self.total_block = 0
-            self.out_size = 0
             while is_memory_finished == False or is_disk_finished == False:
                 time_process_start = time.time()
                 #self.monitor_current_inqueue_length.value = max(self.memory_deltalist_queue.qsize(), self.disk_deltalist_queue.qsize())
@@ -845,7 +843,7 @@ class DeltaDedup(process_manager.ProcWorker):
                         is_first_recv = True
                         time_first_recv = time.time()
 
-                    self.total_block += len(deltaitem_list)
+                    self.total_block_count += len(deltaitem_list)
                     for delta_item in deltaitem_list:
                         self.in_size += (delta_item.data_len+11)
                         if deduplicate_deltaitem(zero_hash_dict, delta_item,
@@ -894,17 +892,13 @@ class DeltaDedup(process_manager.ProcWorker):
                         # now delta item has new data length
                         self.out_size += (delta_item.data_len+11)
 
-                    self.merged_deltalist_queue.put(deltaitem_list)
-
                     # measurement
                     time_process_finish = time.time()
-                    processed_datasize += (chunk_size * len(deltaitem_list))
-                    processed_duration += (time_process_finish - time_process_start)
-                    if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
-                        time_prev_report = time_process_finish
-                        #self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
-                        processed_datasize = 0
-                        processed_duration = float(0)
+                    total_process_time += (time_process_finish/time_process_start)
+                    total_process_time_block = total_process_time/self.total_block_count
+                    total_ratio_block = (float(self.out_size)/self.in_size)
+                    #print "P: %f\tR: %f" % (total_process_time_block, total_ratio_block)
+                    self.merged_deltalist_queue.put(deltaitem_list)
             self.monitor_is_alive = False
             self.process_info['is_alive'] = False
             self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
@@ -931,11 +925,11 @@ class DeltaDedup(process_manager.ProcWorker):
             LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
                     (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
             LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
-                                                                float(self.in_size)/self.total_block,
-                                                                float(self.out_size)/self.total_block,
-                                                                self.total_block))
+                                                                float(self.in_size)/self.total_block_count,
+                                                                float(self.out_size)/self.total_block_count,
+                                                                self.total_block_count))
             LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
-                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block))
+                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block_count))
         except Exception as e:
             LOG.error(str(e))
             LOG.error("failed at %s" % str(traceback.format_exc()))
