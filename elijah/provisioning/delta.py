@@ -840,7 +840,7 @@ class DeltaDedup(process_manager.ProcWorker):
                         is_first_recv = True
                         time_first_recv = time.time()
 
-                    time_process_start = time.time()
+                    time_process_start = time.clock()
                     self.total_block_count += len(deltaitem_list)
                     for delta_item in deltaitem_list:
                         self.in_size += (delta_item.data_len+11)
@@ -889,7 +889,7 @@ class DeltaDedup(process_manager.ProcWorker):
 
                         # now delta item has new data length
                         self.out_size += (delta_item.data_len+11)
-                    time_process_finish = time.time()
+                    time_process_finish = time.clock()
                     self.merged_deltalist_queue.put(deltaitem_list)
 
                     # measurement

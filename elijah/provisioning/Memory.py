@@ -615,8 +615,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                         processed_datasize = 0
                         processed_duration = float(0)
 
-                #self.monitor_current_inqueue_length.value = self.modified_mem_queue.qsize()
-                #self.monitor_current_outqueue_length.value = self.deltalist_queue.qsize()
                 input_fd = [self.control_queue._reader.fileno(), memory_data_queue._reader.fileno()]
                 input_ready, out_ready, err_ready = select.select(input_fd, [], [])
                 if self.control_queue._reader.fileno() in input_ready:
@@ -703,19 +701,18 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
         time_e = time.time()
-        total_time_per_core = self.total_time / self.num_proc
         LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
                                                          self.in_size,
                                                          self.out_size,
                                                          (self.out_size/float(self.in_size))))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_s, time_e, total_time_per_core))
+                  (self.__class__.__name__, time_s, time_e, self.total_time))
         LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
                                                          float(self.in_size)/self.total_block,
                                                          float(self.out_size)/self.total_block,
                                                          self.total_block))
         LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_s, time_e, total_time_per_core/self.total_block))
+                  (self.__class__.__name__, time_s, time_e, self.total_time/self.total_block))
 
         for (proc, c_queue, mode_queue) in self.proc_list:
             #LOG.debug("[Memory] waiting to dump all data to the next stage")
@@ -924,7 +921,7 @@ class MemoryDiffProc(multiprocessing.Process):
                     #LOG.debug("[Memory][Child] %d diff proc get end message" % (int(os.getpid())))
                     is_proc_running = False
                     break
-                time_process_start = time.time()
+                time_process_start = time.clock()
                 deltaitem_list = list()
                 if type(memory_chunk_list) == type(1):
                     LOG.error("Invalid data at memory_chunk_list: %d" % memory_chunk_list)
@@ -996,7 +993,7 @@ class MemoryDiffProc(multiprocessing.Process):
                                                live_seq=iter_seq)
                         deltaitem_list.append(delta_item)
                         #print "deltaitem: %d %d" % (diff_type, len(diff_data))
-                time_process_end = time.time()
+                time_process_end = time.clock()
                 time_process_total_time += (time_process_end - time_process_start)
                 if child_total_block > 0:
                     self.child_process_time_block.value = time_process_total_time/child_total_block

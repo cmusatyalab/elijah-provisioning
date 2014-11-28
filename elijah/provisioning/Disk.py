@@ -389,20 +389,19 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             in_out_ratio = self.out_size/float(self.in_size)
         else:
             in_out_ratio = 1
-        total_time_per_core = self.total_time / self.num_proc
         LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
                                                         self.in_size,
                                                         self.out_size,
                                                         in_out_ratio))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_start, time_end, total_time_per_core))
+                  (self.__class__.__name__, time_start, time_end, self.total_time))
         if self.total_block > 0:
             LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
                                                                 float(self.in_size)/self.total_block,
                                                                 float(self.out_size)/self.total_block,
                                                                 self.total_block))
             LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
-                    (self.__class__.__name__, time_start, time_end, total_time_per_core/self.total_block))
+                    (self.__class__.__name__, time_start, time_end, self.total_time/self.total_block))
         else:
             LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
                                                                  0,
@@ -495,7 +494,7 @@ class DiskDiffProc(multiprocessing.Process):
                     is_proc_running = False
                     break
 
-                time_process_start = time.time()
+                time_process_start = time.clock()
                 deltaitem_list = list()
                 for chunk in task_list:
                     offset = chunk * self.chunk_size
@@ -536,7 +535,7 @@ class DiskDiffProc(multiprocessing.Process):
                             data_len=diff_data_len,
                             data=diff_data)
                     deltaitem_list.append(delta_item)
-                time_process_end = time.time()
+                time_process_end = time.clock()
                 time_process_total_time += (time_process_end - time_process_start)
                 self.child_process_time_block.value = time_process_total_time/child_total_block
                 self.child_ratio_block.value = outdata_size/float(indata_size)

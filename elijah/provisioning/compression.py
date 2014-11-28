@@ -153,20 +153,19 @@ class CompressProc(process_manager.ProcWorker):
             self.process_info['is_alive'] = False
 
             time_end = time.time()
-            total_time_per_core = self.total_time / self.num_proc
             #sys.stdout.write("[Comp] effetively finished\n")
             LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
                                                             self.in_size,
                                                             self.out_size,
                                                             (float(self.in_size)/self.out_size)))
             LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
-                    (self.__class__.__name__, time_start, time_end, total_time_per_core))
+                    (self.__class__.__name__, time_start, time_end, self.total_time))
             LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
                                                                 float(self.in_size)/self.total_block,
                                                                 float(self.out_size)/self.total_block,
                                                                 self.total_block))
             LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
-                    (self.__class__.__name__, time_start, time_end, total_time_per_core/self.total_block))
+                    (self.__class__.__name__, time_start, time_end, self.total_time/self.total_block))
 
             for (proc, c_queue, m_queue) in self.proc_list:
                 #sys.stdout.write("[Comp] waiting to dump all data to the next stage\n")
@@ -246,7 +245,7 @@ class CompChildProc(multiprocessing.Process):
                 input_data = ''
 
                 for delta_item in deltaitem_list:
-                    time_process_start = time.time()
+                    time_process_start = time.clock()
                     delta_bytes = delta_item.get_serialized()
                     offset = delta_item.offset/Const.CHUNK_SIZE
                     if delta_item.delta_type == DeltaItem.DELTA_DISK or\
@@ -259,7 +258,7 @@ class CompChildProc(multiprocessing.Process):
                     output_data += compressed_bytes
 
                     # measure for each block to have it ASAP
-                    time_process_end = time.time()
+                    time_process_end = time.clock()
                     indata_size += len(delta_bytes)
                     outdata_size += len(compressed_bytes)
                     child_total_block += 1
@@ -268,10 +267,10 @@ class CompChildProc(multiprocessing.Process):
                     self.child_process_time_block.value = time_process_total_time/child_total_block
                     self.child_ratio_block.value = outdata_size/float(indata_size)
 
-                time_process_start = time.time()
+                time_process_start = time.clock()
                 compressed_bytes = comp.flush()
                 output_data += compressed_bytes
-                time_process_end = time.time()
+                time_process_end = time.clock()
 
                 outdata_size += len(compressed_bytes)
                 #print "in: %d, out: %d" % (indata_size, outdata_size)
