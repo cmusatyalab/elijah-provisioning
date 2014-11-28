@@ -2003,9 +2003,11 @@ def create_baseVM(disk_image_path):
 
 
 class PreloadResidueData(threading.Thread):
-    def __init__(self, base_diskmeta, base_memmeta):
-        self.base_diskmeta = base_diskmeta
-        self.base_memmeta = base_memmeta
+    def __init__(self, base_diskpath, overlay_filename):
+        (self.base_diskmeta, self.base_mem, self.base_memmeta) = \
+                Const.get_basepath(base_diskpath, check_exist=True)
+        self.base_diskpath = base_diskpath
+        self.overlay_filename = overlay_filename
         self.basedisk_hashdict = None
         self.basmem_hashdict = None
         threading.Thread.__init__(self, target=self.preloading)
@@ -2013,6 +2015,12 @@ class PreloadResidueData(threading.Thread):
     def preloading(self):
         self.basedisk_hashdict = delta.DeltaDedup.disk_import_hashdict(self.base_diskmeta)
         self.basemem_hashdict = delta.DeltaDedup.memory_import_hashdict(self.base_memmeta)
+        # FIX: currently we revisit all overlay to reconstruct hash information
+        # we can leverage Recovered_delta class reconstruction process,
+        # but that does not generate hash value
+        self.prev_mem_deltalist = _reconstruct_mem_deltalist(self.base_diskpath,
+                                                             self.base_mem,
+                                                             self.overlay_filename)
 
 
 def _reconstruct_mem_deltalist(base_disk, base_mem, overlay_filepath):
@@ -2175,9 +2183,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
     synthesized_VM.resume()
     if return_residue == True:
         # preload basevm hash dictionary for creating residue
-        (base_diskmeta, base_mem, base_memmeta) = \
-                Const.get_basepath(base_disk, check_exist=True)
-        preload_thread = PreloadResidueData(base_diskmeta, base_memmeta)
+        preload_thread = PreloadResidueData(base_disk, overlay_filename.name)
         preload_thread.daemon = True
         preload_thread.start()
 
@@ -2198,28 +2204,14 @@ def synthesis(base_disk, overlay_path, **kwargs):
         options.FREE_SUPPORT = True
         options.DISK_ONLY = False
         try:
-            # FIX: currently we revisit all overlay to reconstruct hash information
-            # we can leverage Recovered_delta class reconstruction process,
-            # but that does not generate hash value
-            (base_diskmeta, base_mem, base_memmeta) = \
-                    Const.get_basepath(base_disk, check_exist=True)
-            time_a = time()
-            prev_mem_deltalist = _reconstruct_mem_deltalist( \
-                    base_disk, base_mem, overlay_filename.name)
-            time_b = time()
-            LOG.debug("[time] Time for reconstructing previous deltalist (%f ~ %f): %f" %
-                      (time_b, time_a, (time_b-time_a)))
             preload_thread.join()
-            time_c = time()
-            LOG.debug("[time] Time for waiting to build hashdict: %f" %
-                      (time_c-time_b))
             residue_overlay = create_residue(base_disk,
                                              meta_info[Const.META_BASE_VM_SHA256],
                                              preload_thread.basedisk_hashdict,
                                              preload_thread.basemem_hashdict,
                                              synthesized_VM,
                                              options,
-                                             prev_mem_deltalist,
+                                             preload_thread.prev_mem_deltalist,
                                              overlay_mode=overlay_mode)
             if residue_overlay is not None:
                 LOG.info("[RESULT] Residue")
