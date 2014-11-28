@@ -23,6 +23,7 @@ import os
 import sys
 import time
 import mmap
+import ctypes
 import multiprocessing
 import select
 import Queue
@@ -301,6 +302,14 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                         task_queue.put(modified_chunk_list)
                         modified_chunk_list = []
 
+                        total_process_time_block = 0
+                        total_ratio_block = 0
+                        for (proc, c_queue, mode_queue) in self.proc_list:
+                            total_process_time_block += proc.child_process_time_block.value
+                            total_ratio_block += proc.child_ratio_block.value
+                        #print "P: %f\tR: %f" % (total_process_time_block/self.num_proc,
+                        #                        total_ratio_block/self.num_proc)
+
                     # measurement
                     modified_chunk_counter += 1
                     time_process_finish = time.time()
@@ -439,6 +448,11 @@ class DiskDiffProc(multiprocessing.Process):
         self.basedisk_path = basedisk_path
         self.modified_disk = modified_disk
         self.chunk_size = chunk_size
+
+        # share vairables
+        self.child_process_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
+
         super(DiskDiffProc, self).__init__(target=self.process_diff)
 
     def process_diff(self):
@@ -446,10 +460,12 @@ class DiskDiffProc(multiprocessing.Process):
         base_mmap = mmap.mmap(base_fd.fileno(), 0, prot=mmap.PROT_READ)
         modified_fd = open(self.modified_disk, "rb")
 
-        is_proc_running = True
+        time_process_total_time = float(0)
         child_total_block = 0
         indata_size = 0
         outdata_size = 0
+
+        is_proc_running = True
         input_list = [self.task_queue._reader.fileno(),
                       self.mode_queue._reader.fileno()]
         while is_proc_running:
@@ -469,6 +485,7 @@ class DiskDiffProc(multiprocessing.Process):
                     is_proc_running = False
                     break
 
+                time_process_start = time.time()
                 deltaitem_list = list()
                 for chunk in task_list:
                     offset = chunk * self.chunk_size
@@ -509,6 +526,10 @@ class DiskDiffProc(multiprocessing.Process):
                             data_len=diff_data_len,
                             data=diff_data)
                     deltaitem_list.append(delta_item)
+                time_process_end = time.time()
+                time_process_total_time += (time_process_end - time_process_start)
+                self.child_process_time_block.value = time_process_total_time/child_total_block
+                self.child_ratio_block.value = float(indata_size)/outdata_size
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Disk][Child] Child finished. process %d jobs" % (child_total_block))
         self.command_queue.put((indata_size, outdata_size, child_total_block))

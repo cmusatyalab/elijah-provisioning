@@ -652,11 +652,11 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 # put task to child process
                 self.task_queue.put(tasks)
 
-            #total_process_time_block = 0
-            #total_ratio_block = 0
-            #for (proc, c_queue, mode_queue) in self.proc_list:
-            #    total_process_time_block += proc.child_process_time_block.value
-            #    total_ratio_block += proc.child_ratio_block.value
+            total_process_time_block = 0
+            total_ratio_block = 0
+            for (proc, c_queue, mode_queue) in self.proc_list:
+                total_process_time_block += proc.child_process_time_block.value
+                total_ratio_block += proc.child_ratio_block.value
             #print "P: %f\tR: %f" % (total_process_time_block/self.num_proc,
             #                        total_ratio_block/self.num_proc)
 
