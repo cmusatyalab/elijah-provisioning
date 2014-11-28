@@ -1619,6 +1619,10 @@ def create_residue(base_disk, base_hashvalue,
                                          fuse_stream_monitor=resumed_vm.monitor)
 
     if overlay_mode.PROCESS_PIPELINED == False:
+        if overlay_mode.LIVE_MIGRATION_STOP is not VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
+            raise CloudletGenerationError("Use ASAP VM stop for pipelined approach")
+        sleep(5)
+        qmp_thread.start()
         _waiting_to_finish(process_controller, "MemoryReadProcess")
 
     # to be deleted
@@ -1669,7 +1673,8 @@ def create_residue(base_disk, base_hashvalue,
         LOG.debug("[time] Getting memory snapshot size (%f~%f):%f" % (time_start,
                                                                         time_memory_snapshot_size,
                                                                         (time_memory_snapshot_size-time_start)))
-        qmp_thread.start()
+        if overlay_mode.PROCESS_PIPELINED == True:
+            qmp_thread.start()
 
         metadata = dict()
         metadata[Const.META_BASE_VM_SHA256] = base_hashvalue
@@ -1707,7 +1712,8 @@ def create_residue(base_disk, base_hashvalue,
         LOG.debug("[time] Getting memory snapshot size (%f~%f):%f" % (time_start,
                                                                         time_memory_snapshot_size,
                                                                         (time_memory_snapshot_size-time_start)))
-        qmp_thread.start()
+        if overlay_mode.PROCESS_PIPELINED == True:
+            qmp_thread.start()
         # wait to finish creating files
         synthesis_file.join()
         time_end_transfer = time()

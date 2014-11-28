@@ -544,6 +544,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
         # measurement
         self.total_block = 0
+        self.total_time = float(0)
         self.iteration_datasize_list = list()
         self.iteration_size = 0
         self.iteration_seq = 0
@@ -694,25 +695,27 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     self._handle_control_msg(control_msg)
                 else:
                     cq = finished_proc_dict[in_queue]
-                    (input_size, output_size, blocks) = cq.get()
+                    (input_size, output_size, blocks, processed_time) = cq.get()
                     self.in_size += input_size
                     self.total_block += blocks
                     self.out_size += output_size
+                    self.total_time += processed_time
                     del finished_proc_dict[in_queue]
         self.process_info['is_alive'] = False
         time_e = time.time()
+        total_time_per_core = self.total_time / self.num_proc
         LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
                                                          self.in_size,
                                                          self.out_size,
-                                                         (float(self.in_size)/self.out_size)))
+                                                         (self.out_size/float(self.in_size))))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_s, time_e, (time_e-time_s)))
+                  (self.__class__.__name__, time_s, time_e, total_time_per_core))
         LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
                                                          float(self.in_size)/self.total_block,
                                                          float(self.out_size)/self.total_block,
                                                          self.total_block))
         LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_s, time_e, (time_e-time_s)/self.total_block))
+                  (self.__class__.__name__, time_s, time_e, total_time_per_core/self.total_block))
 
         for (proc, c_queue, mode_queue) in self.proc_list:
             #LOG.debug("[Memory] waiting to dump all data to the next stage")
@@ -1000,8 +1003,8 @@ class MemoryDiffProc(multiprocessing.Process):
                     self.child_ratio_block.value = outdata_size/float(indata_size)
                 if len(deltaitem_list) > 0:
                     self.deltalist_queue.put(deltaitem_list)
-        LOG.debug("[Memory][Child] Child finished. process %d jobs" % (child_total_block))
-        self.command_queue.put((indata_size, outdata_size, child_total_block))
+        LOG.debug("[Memory][Child] Child finished. process %d jobs (%f)" % (child_total_block, time_process_total_time))
+        self.command_queue.put((indata_size, outdata_size, child_total_block, time_process_total_time))
         self.task_queue.put(freed_page_counter)
         #out_fd.close()  # measurement
         while self.mode_queue.empty() == False:

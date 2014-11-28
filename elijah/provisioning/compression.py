@@ -53,9 +53,8 @@ class CompressProc(process_manager.ProcWorker):
                 m_queue.put(new_mode)
 
     def compress_stream(self):
-        self.in_size = 0
-        self.out_size = 0
         self.total_block = 0
+        self.total_time = 0
         try:
             time_start = time.time()
 
@@ -71,7 +70,6 @@ class CompressProc(process_manager.ProcWorker):
                 comp_proc.start()
                 self.proc_list.append((comp_proc, command_queue, mode_queue))
 
-            total_read_size = 0
             is_last_chunk = False
             input_list = [self.control_queue._reader.fileno(),
                             self.delta_list_queue._reader.fileno()]
@@ -146,30 +144,29 @@ class CompressProc(process_manager.ProcWorker):
                                 self.change_mode(new_mode)
                     else:
                         cq = finished_proc_dict[in_queue]
-                        (input_size, output_size, blocks) = cq.get()
+                        (input_size, output_size, blocks, processed_time) = cq.get()
                         self.in_size += input_size
                         self.out_size += output_size
                         self.total_block += blocks
+                        self.total_time += processed_time
                         del finished_proc_dict[in_queue]
             self.process_info['is_alive'] = False
 
             time_end = time.time()
+            total_time_per_core = self.total_time / self.num_proc
             #sys.stdout.write("[Comp] effetively finished\n")
-            sys.stdout.write("[time][compression] thread(%d), block(%d), level(%d), compression time (%f ~ %f): %f MB, %f MBps, %f s\n" % (
-                self.num_proc, self.block_size, self.comp_level, time_start, time_end, total_read_size/1024.0/1024, 
-                total_read_size/(time_end-time_start)/1024.0/1024, (time_end-time_start)))
             LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
                                                             self.in_size,
                                                             self.out_size,
                                                             (float(self.in_size)/self.out_size)))
             LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
-                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
+                    (self.__class__.__name__, time_start, time_end, total_time_per_core))
             LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
                                                                 float(self.in_size)/self.total_block,
                                                                 float(self.out_size)/self.total_block,
                                                                 self.total_block))
             LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
-                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block))
+                    (self.__class__.__name__, time_start, time_end, total_time_per_core/self.total_block))
 
             for (proc, c_queue, m_queue) in self.proc_list:
                 #sys.stdout.write("[Comp] waiting to dump all data to the next stage\n")
@@ -286,9 +283,9 @@ class CompChildProc(multiprocessing.Process):
                                        modified_disk_chunks,
                                        modified_memory_chunks))
 
-        sys.stdout.write("[Comp][Child] child finished. process %d jobs\n" % \
-                         (loop_counter))
-        self.command_queue.put((indata_size, outdata_size, child_total_block))
+        sys.stdout.write("[Comp][Child] child finished. process %d jobs (%f)\n" % \
+                         (loop_counter, time_process_total_time))
+        self.command_queue.put((indata_size, outdata_size, child_total_block, time_process_total_time))
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()
             msg = "Empty new compression mode that does not refelected"
@@ -429,7 +426,7 @@ def decomp_overlayzip(overlay_path, outfilename):
         comp_type = blob_info.get(Const.META_OVERLAY_FILE_COMPRESSION, Const.COMPRESSION_LZMA)
         #disk_chunks += blob_info.get(Const.META_OVERLAY_FILE_DISK_CHUNKS)
         #memory_chunks += blob_info.get(Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
-        sys.stdout.write("Decompression type: %d\n" % comp_type)
+        #sys.stdout.write("Decompression type: %d\n" % comp_type)
         if comp_type == Const.COMPRESSION_LZMA:
             comp_data = overlay_package.read_blob(comp_filename)
             decompressor = lzma.LZMADecompressor()

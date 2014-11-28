@@ -174,7 +174,7 @@ class ProcessManager(threading.Thread):
         self.cpu_statistics = list()
         try:
             while (not self.stop.wait(0.1)):
-                self._monitor_ratio_speed()
+                #self._monitor_ratio_speed()
 
                 pass
                 #result = self._get_cpu_usage()

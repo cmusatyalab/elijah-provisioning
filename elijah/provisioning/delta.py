@@ -814,9 +814,6 @@ class DeltaDedup(process_manager.ProcWorker):
             is_memory_finished = False
             is_disk_finished = False
             while is_memory_finished == False or is_disk_finished == False:
-                time_process_start = time.time()
-                #self.monitor_current_inqueue_length.value = max(self.memory_deltalist_queue.qsize(), self.disk_deltalist_queue.qsize())
-                #self.monitor_current_outqueue_length.value = self.merged_deltalist_queue.qsize()
                 input_list = [self.memory_deltalist_queue._reader.fileno(),
                             self.disk_deltalist_queue._reader.fileno(),
                             self.control_queue._reader.fileno()]
@@ -843,6 +840,7 @@ class DeltaDedup(process_manager.ProcWorker):
                         is_first_recv = True
                         time_first_recv = time.time()
 
+                    time_process_start = time.time()
                     self.total_block_count += len(deltaitem_list)
                     for delta_item in deltaitem_list:
                         self.in_size += (delta_item.data_len+11)
@@ -895,7 +893,7 @@ class DeltaDedup(process_manager.ProcWorker):
                     self.merged_deltalist_queue.put(deltaitem_list)
 
                     # measurement
-                    total_process_time += (time_process_finish/time_process_start)
+                    total_process_time += (time_process_finish-time_process_start)
                     self.monitor_total_time_block.value = total_process_time/self.total_block_count
                     self.monitor_total_ratio_block.value = (float(self.out_size)/self.in_size)
                     #print "[delta] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
@@ -921,15 +919,15 @@ class DeltaDedup(process_manager.ProcWorker):
             LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
                                                             self.in_size,
                                                             self.out_size,
-                                                            (float(self.in_size)/self.out_size)))
+                                                            (self.out_size/float(self.in_size))))
             LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
-                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
+                    (self.__class__.__name__, time_start, time_end, total_process_time))
             LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
                                                                 float(self.in_size)/self.total_block_count,
                                                                 float(self.out_size)/self.total_block_count,
                                                                 self.total_block_count))
             LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
-                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block_count))
+                    (self.__class__.__name__, time_start, time_end, total_process_time/self.total_block_count))
         except Exception as e:
             LOG.error(str(e))
             LOG.error("failed at %s" % str(traceback.format_exc()))

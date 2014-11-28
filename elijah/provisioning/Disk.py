@@ -221,6 +221,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
     def create_disk_deltalist(self):
         time_start = time.time()
         self.total_block = 0
+        self.total_time = float(0)
         is_first_recv = False
         time_first_recv = 0
         time_process_finish = 0
@@ -357,10 +358,11 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                         self._handle_control_msg(control_msg)
                     else:
                         cq = finished_proc_dict[in_queue]
-                        (input_size, output_size, blocks) = cq.get()
+                        (input_size, output_size, blocks, processed_time) = cq.get()
                         self.in_size += input_size
                         self.total_block += blocks
                         self.out_size += output_size
+                        self.total_time += processed_time
                         del finished_proc_dict[in_queue]
             self.process_info['is_alive'] = False
         except Exception as e:
@@ -384,22 +386,23 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         time_end = time.time()
         LOG.debug("[time] Disk first input at : %f" % (time_first_recv))
         if self.out_size != 0:
-            in_out_ratio = float(self.in_size)/self.out_size
+            in_out_ratio = self.out_size/float(self.in_size)
         else:
             in_out_ratio = 1
+        total_time_per_core = self.total_time / self.num_proc
         LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
                                                         self.in_size,
                                                         self.out_size,
                                                         in_out_ratio))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_start, time_end, (time_end-time_start)))
+                  (self.__class__.__name__, time_start, time_end, total_time_per_core))
         if self.total_block > 0:
             LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
                                                                 float(self.in_size)/self.total_block,
                                                                 float(self.out_size)/self.total_block,
                                                                 self.total_block))
             LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
-                    (self.__class__.__name__, time_start, time_end, (time_end-time_start)/self.total_block))
+                    (self.__class__.__name__, time_start, time_end, total_time_per_core/self.total_block))
         else:
             LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
                                                                  0,
@@ -538,8 +541,8 @@ class DiskDiffProc(multiprocessing.Process):
                 self.child_process_time_block.value = time_process_total_time/child_total_block
                 self.child_ratio_block.value = outdata_size/float(indata_size)
                 self.deltalist_queue.put(deltaitem_list)
-        LOG.debug("[Disk][Child] Child finished. process %d jobs" % (child_total_block))
-        self.command_queue.put((indata_size, outdata_size, child_total_block))
+        LOG.debug("[Disk][Child] Child finished. process %d jobs (%f)" % (child_total_block, time_process_total_time))
+        self.command_queue.put((indata_size, outdata_size, child_total_block, time_process_total_time))
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()
             msg = "Empty new compression mode that does not refelected"
