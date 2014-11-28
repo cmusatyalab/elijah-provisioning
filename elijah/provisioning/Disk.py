@@ -320,7 +320,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             # send end meesage to every process
             for index in self.proc_list:
                 task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-                LOG.debug("[Disk] send end message to each child")
+                #LOG.debug("[Disk] send end message to each child")
 
             # after this for loop, all processing finished, but child process still
             # alive until all data pass to the next step
@@ -353,7 +353,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
 
 
         for (proc, c_queue, m_queue) in self.proc_list:
-            LOG.debug("[Disk] waiting to dump all data to the next stage")
+            #LOG.debug("[Disk] waiting to dump all data to the next stage")
             proc.join()
         # send end message after the next stage finishes processing
         self.disk_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)

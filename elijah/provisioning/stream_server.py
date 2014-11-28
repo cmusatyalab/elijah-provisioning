@@ -109,7 +109,7 @@ class RecoverDeltaProc(multiprocessing.Process):
         self.zero_data = struct.pack("!s", chr(0x00)) * chunk_size
         self.recovered_delta_dict = dict()
         self.recovered_hash_dict = dict()
-        self.delta_list = list()
+        self.live_migration_iteration_dict = dict()
 
         multiprocessing.Process.__init__(self, target=self.recover_deltaitem)
 
@@ -175,7 +175,6 @@ class RecoverDeltaProc(multiprocessing.Process):
         if type(delta_item) != DeltaItem:
             raise StreamSynthesisError("Need list of DeltaItem")
 
-        #LOG.debug("recovering %ld/%ld" % (index, len(delta_list)))
         if (delta_item.ref_id == DeltaItem.REF_RAW):
             recover_data = delta_item.data
         elif (delta_item.ref_id == DeltaItem.REF_ZEROS):
@@ -264,6 +263,7 @@ class RecoverDeltaProc(multiprocessing.Process):
         if len(stream) == 0:
             return None, 999999
         offset = 0
+        live_seq = None
         data = stream[0:8+2+1]
         data_len = 0
         offset += (8+2+1)
@@ -289,14 +289,19 @@ class RecoverDeltaProc(multiprocessing.Process):
             data = struct.unpack("!32s", stream[offset:offset+32])[0]
             offset += 32
 
+        if delta_type == DeltaItem.DELTA_DISK_LIVE or\
+                delta_type == DeltaItem.DELTA_MEMORY_LIVE:
+            live_seq = struct.unpack("!H", stream[offset:offset+2])[0]
+            offset += 2
+
         # hash_value typically does not exist when recovered becuase we don't need it
         if with_hashvalue:
             # hash_value is only needed for residue case
             hash_value = struct.unpack("!32s", stream[offset:offset+32])[0]
             offset += 32
-            item = DeltaItem(delta_type, ram_offset, offset_len, hash_value, ref_id, data_len, data)
+            item = DeltaItem(delta_type, ram_offset, offset_len, hash_value, ref_id, data_len, live_seq=live_seq)
         else:
-            item = DeltaItem(delta_type, ram_offset, offset_len, None, ref_id, data_len, data)
+            item = DeltaItem(delta_type, ram_offset, offset_len, None, ref_id, data_len, data, live_seq=live_seq)
         return item, offset
 
     def process_deltaitem(self, delta_item, overlay_chunk_ids):
@@ -308,7 +313,16 @@ class RecoverDeltaProc(multiprocessing.Process):
         # save it to dictionary to find self_reference easily
         self.recovered_delta_dict[delta_item.index] = delta_item
         self.recovered_hash_dict[delta_item.hash_value] = delta_item
-        self.delta_list.append(delta_item)
+
+        # do nothing if the latest memory or disk are already process
+        prev_iter_item = self.live_migration_iteration_dict.get(delta_item.index)
+        if (prev_iter_item is not None):
+            prev_seq = getattr(prev_iter_item, 'live_seq', 0)
+            item_seq = getattr(delta_item, 'live_seq', 0)
+            if prev_seq > item_seq:
+                msg = "Latest version is already synthesized at %d (%d)" % (delta_item.offset, delta_item.delta_type)
+                LOG.debug(msg)
+                return
 
         # write to output file 
         overlay_chunk_id = long(delta_item.offset/self.chunk_size)
@@ -325,7 +339,17 @@ class RecoverDeltaProc(multiprocessing.Process):
             overlay_chunk_ids.append("%d:%ld" %
                     (RecoverDeltaProc.FUSE_INDEX_DISK, overlay_chunk_id))
 
+        # update the latest item for each memory page or disk block
+        self.live_migration_iteration_dict[delta_item.index] = delta_item
+
+
     def finish(self):
+        self.recovered_delta_dict.clear()
+        self.recovered_delta_dict = None
+        self.recovered_hash_dict.clear()
+        self.recovered_hash_dict = None
+        self.live_migration_iteration_dict.clear()
+        self.live_migration_iteration_dict = None
         if self.base_disk_fd is not None:
             self.base_disk_fd.close()
             self.base_disk_fd = None
@@ -543,11 +567,11 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         network_out_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
         delta_proc.join()
         print "deltaproc join"
-        '''
-        # We told FUSE that we have everything ready, so we need to wait until
-        # delta_proc fininshes
-        # we cannot start VM before delta_proc finishes, because we don't know
-        # what will be modified in the future
+
+
+        # We told to FUSE that we have everything ready, so we need to wait
+        # until delta_proc fininshes. we cannot start VM before delta_proc
+        # finishes, because we don't know what will be modified in the future
 
         time_fuse_start = time.time()
         disk_overlay_map = ','.join(disk_chunk_all)
@@ -572,7 +596,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         synthesized_VM.monitor.terminate()
         synthesized_VM.monitor.join()
         synthesized_VM.terminate()
-        '''
         print "finished"
 
     def terminate(self):

@@ -1244,7 +1244,7 @@ class QmpThread(threading.Thread):
         #    LOG.debug("[live] Send migration iteration signal")
         #    ret = self.qmp.iterate_raw_live()
         if ret:
-            #self._waiting(self.timeout)
+            self._waiting(self.timeout)
             LOG.debug("[live] Send stop migration signal")
             self.qmp.stop_raw_live()
             self.fuse_stream_monitor.terminate()
@@ -1560,7 +1560,7 @@ def create_residue(base_disk, base_hashvalue,
     LOG.debug("* Overlay creation mode start\n%s" % str(overlay_mode))
     LOG.debug("* Overlay creation mode end")
 
-    qmp_thread = QmpThread(resumed_vm.qmp_channel, resumed_vm.monitor, timeout=10)
+    qmp_thread = QmpThread(resumed_vm.qmp_channel, resumed_vm.monitor, timeout=60)
     qmp_thread.daemon = True
 
     # 1. sanity check
@@ -1630,7 +1630,7 @@ def create_residue(base_disk, base_hashvalue,
 
 
     time_packaging_start = time()
-    overlay_mode.OUTPUT_DESTINATION = "file"
+    overlay_mode.OUTPUT_DESTINATION = "network"
     if overlay_mode.OUTPUT_DESTINATION.startswith("network"):
         from stream_client import StreamSynthesisClient
         resume_disk_size = os.path.getsize(resumed_vm.resumed_disk)
@@ -1650,7 +1650,7 @@ def create_residue(base_disk, base_hashvalue,
         metadata[Const.META_BASE_VM_SHA256] = base_hashvalue
         metadata[Const.META_RESUME_VM_DISK_SIZE] = resume_disk_size
         metadata[Const.META_RESUME_VM_MEMORY_SIZE] = resume_memory_size
-        client = StreamSynthesisClient(metadata, compdata_queue)
+        client = StreamSynthesisClient("0.0.0.0", metadata, compdata_queue)
         client.start()
         client.join()
 

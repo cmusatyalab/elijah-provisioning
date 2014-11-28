@@ -655,12 +655,12 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         # libvirt randomly add string starting with 'LibvirtQemudSave'
         # Therefore, process the last memory page only when it's aligned
         if len(memory_page_list) > 0 and len(memory_page_list[0]) == (Memory.RAM_PAGE_SIZE + Memory.CHUNK_HEADER_SIZE):
-            LOG.debug("[Memory][child] send last data to child: %d" % len(memory_page_list))
+            #LOG.debug("[Memory][child] send last data to child: %d" % len(memory_page_list))
             self.task_queue.put(memory_page_list)
 
         # send end meesage to every process
         for child_proc in self.proc_list:
-            LOG.debug("[Memory] send end message to each child")
+            #LOG.debug("[Memory] send end message to each child")
             self.task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         # after this for loop, all processing finished, but child process still
@@ -700,7 +700,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                   (self.__class__.__name__, time_s, time_e, (time_e-time_s)/self.total_block))
 
         for (proc, c_queue, mode_queue) in self.proc_list:
-            LOG.debug("[Memory] waiting to dump all data to the next stage")
+            #LOG.debug("[Memory] waiting to dump all data to the next stage")
             proc.join()
         # send end message after the next stage finishes processing
         self.deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
