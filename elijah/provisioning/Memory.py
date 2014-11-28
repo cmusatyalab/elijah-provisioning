@@ -28,6 +28,7 @@ import subprocess
 import time
 import multiprocessing
 import traceback
+import ctypes
 from optparse import OptionParser
 from hashlib import sha256
 
@@ -645,11 +646,19 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                             memory_page_list.append(last_data)
                         memory_page_list += self.chunks(recved_data[required_length:], memory_chunk_size)
 
-            tasks = memory_page_list[0:-1]
-            memory_page_list = memory_page_list[-1:]
+            if len(memory_page_list) > 1:
+                tasks = memory_page_list[0:-1]
+                memory_page_list = memory_page_list[-1:]
+                # put task to child process
+                self.task_queue.put(tasks)
 
-            # put task to child process
-            self.task_queue.put(tasks)
+            #total_process_time_block = 0
+            #total_ratio_block = 0
+            #for (proc, c_queue, mode_queue) in self.proc_list:
+            #    total_process_time_block += proc.child_process_time_block.value
+            #    total_ratio_block += proc.child_ratio_block.value
+            #print "P: %f\tR: %f" % (total_process_time_block/self.num_proc,
+            #                        total_ratio_block/self.num_proc)
 
         # send last memory page
         # libvirt randomly add string starting with 'LibvirtQemudSave'
@@ -868,6 +877,11 @@ class MemoryDiffProc(multiprocessing.Process):
         self.libvirt_header_offset = libvirt_header_offset
         self.free_pfn_dict = free_pfn_dict
         self.apply_free_memory = apply_free_memory
+
+        # share vairables
+        self.child_process_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
+
         super(MemoryDiffProc, self).__init__(target=self.process_diff)
 
     def process_diff(self):
@@ -875,17 +889,15 @@ class MemoryDiffProc(multiprocessing.Process):
         self.raw_mmap = mmap.mmap(self.raw_file.fileno(), 0, prot=mmap.PROT_READ)
         self.raw_filesize = os.path.getsize(self.basemem_path)
 
-        # memory distribution measurement 
-        #time_m_start = time.time()
-        #out_fd = open("./memory_dist.txt", "w")
+        time_process_total_time = float(0)
+        child_total_block = 0
+        indata_size = 0
+        outdata_size = 0
 
         is_proc_running = True
         input_list = [self.task_queue._reader.fileno(),
                       self.mode_queue._reader.fileno()]
         freed_page_counter = 0
-        child_total_block = 0
-        indata_size = 0
-        outdata_size = 0
         while is_proc_running:
             inready, outread, errready = select.select(input_list, [], [])
             if self.mode_queue._reader.fileno() in inready:
@@ -900,7 +912,7 @@ class MemoryDiffProc(multiprocessing.Process):
                 memory_chunk_list = self.task_queue.get()
                 #print "getting a new job: %s %d" % (type(memory_chunk_list), len(memory_chunk_list))
                 if memory_chunk_list == Const.QUEUE_SUCCESS_MESSAGE:
-                    LOG.debug("[Memory][Child] %d diff proc get end message" % (int(os.getpid())))
+                    #LOG.debug("[Memory][Child] %d diff proc get end message" % (int(os.getpid())))
                     is_proc_running = False
                     break
                 time_process_start = time.time()
@@ -975,6 +987,10 @@ class MemoryDiffProc(multiprocessing.Process):
                         deltaitem_list.append(delta_item)
                         #print "deltaitem: %d %d" % (diff_type, len(diff_data))
                 time_process_end = time.time()
+                time_process_total_time += (time_process_end - time_process_start)
+                if child_total_block > 0:
+                    self.child_process_time_block.value = time_process_total_time/child_total_block
+                    self.child_ratio_block.value = float(indata_size)/outdata_size
                 if len(deltaitem_list) > 0:
                     self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Memory][Child] Child finished. process %d jobs" % (child_total_block))
