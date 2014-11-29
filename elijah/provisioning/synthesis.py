@@ -287,7 +287,6 @@ class VM_Overlay(threading.Thread):
         try:
             cache_manager = cache.CacheManager(Caching_Const.CACHE_ROOT, \
                     Caching_Const.REDIS_ADDR, Caching_Const.CACHE_FUSE_BINPATH)
-                    
             cache_manager.start()
             self.compiled_list = cache.Util.get_compiled_URIs( \
                     cache_manager.cache_dir, self.options.DATA_SOURCE_URI)

@@ -173,8 +173,16 @@ class ProcessManager(threading.Thread):
         throughput_per_cpu_per_block = 1/(time_cpu)
         throughput_per_cpu_MBps = (4096+11)*throughput_per_cpu_per_block/1024.0/1024
         throughput_cpus_MBps = self.overlay_creation_mode.NUM_PROC_COMPRESSION*throughput_per_cpu_MBps
-        sys.stdout.write("Process time/(block, core): %f\tCPU throughput: %f MBps\n" % \
-                         (time_cpu, throughput_cpus_MBps))
+        ratio = (0.5*r_dict['CreateDiskDeltalist'] + 0.5*r_dict['CreateMemoryDeltalist'])*r_dict['DeltaDedup']*r_dict['CompressProc']
+        throughput_network_MBps = throughput_cpus_MBps*ratio
+        sys.stdout.write("Process time/(block, core): %f, CPU: %f MBps\tRatio:%f, Network: %f MBps\t(%f, %f, %f, %f)\n" % \
+                         (time_cpu, throughput_cpus_MBps,
+                          ratio, throughput_network_MBps,
+                          r_dict['CreateDiskDeltalist'],
+                          r_dict['CreateMemoryDeltalist'],
+                          r_dict['DeltaDedup'],
+                          r_dict['CompressProc']
+                          ))
         #for name in worker_names:
         #    sys.stdout.write("%s (%f, %f)\t" % (name, p_dict[name], r_dict[name]))
         #sys.stdout.write("\n")

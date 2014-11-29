@@ -109,11 +109,12 @@ class CompressProc(process_manager.ProcWorker):
                         valid_child_proc += 1
                         total_process_time_block += process_time_block
                         total_ratio_block += ratio_block
-                    #sys.stdout.write("(%d %d %d)\t" % (process_time_block, ratio_block, valid_child_proc))
+                    sys.stdout.write("(%f)\t" % (ratio_block))
+                print "%d" % valid_child_proc
                 if valid_child_proc > 0:
                     self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
                     self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
-                    #print "[comp] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
+                    print "[comp] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
 
             # send end meesage to every process
             for index in self.proc_list:
@@ -262,7 +263,7 @@ class CompChildProc(multiprocessing.Process):
                     indata_size += len(delta_bytes)
                     outdata_size += len(compressed_bytes)
                     child_total_block += 1
-                    #print "in: %d, out: %d" % (indata_size, outdata_size)
+                    #print "%d in: %d, out: %d" % (os.getpid(), indata_size, outdata_size)
                     time_process_total_time += (time_process_end - time_process_start)
                     self.child_process_time_block.value = time_process_total_time/child_total_block
                     self.child_ratio_block.value = outdata_size/float(indata_size)
@@ -273,10 +274,10 @@ class CompChildProc(multiprocessing.Process):
                 time_process_end = time.clock()
 
                 outdata_size += len(compressed_bytes)
-                #print "in: %d, out: %d" % (indata_size, outdata_size)
                 time_process_total_time += (time_process_end - time_process_start)
                 self.child_process_time_block.value = time_process_total_time/child_total_block
-                self.child_ratio_block.value = float(indata_size)/outdata_size
+                self.child_ratio_block.value = outdata_size/float(indata_size)
+                #print "%d in: %d, out: %d, %f" % (os.getpid(), indata_size, outdata_size, self.child_ratio_block.value)
                 self.output_queue.put((comp_type_cur,
                                        output_data,
                                        modified_disk_chunks,
