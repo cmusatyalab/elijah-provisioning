@@ -26,6 +26,7 @@ import struct
 import threading
 import multiprocessing
 import msgpack
+import ctypes
 
 #if os.path.exists("../provisioning"):
 #    sys.path.insert(0, "../../")
@@ -41,6 +42,7 @@ from server import NetworkUtil
 from Configuration import Const
 from Configuration import VMOverlayCreationMode
 from synthesis_protocol import Protocol
+import process_manager
 
 
 ACK_DATA_SIZE = 100*1024
@@ -50,8 +52,12 @@ class StreamSynthesisClientError(Exception):
     pass
 
 class NetworkMeasurementThread(threading.Thread):
-    def __init__(self, sock):
+    def __init__(self, sock, blob_sent_time_dict, monitor_network_bw):
         self.sock = sock
+        self.blob_sent_time_dict = blob_sent_time_dict
+
+        # shared memory
+        self.monitor_network_bw = monitor_network_bw
         threading.Thread.__init__(self, target=self.receiving)
 
     def receiving(self):
@@ -60,33 +66,46 @@ class NetworkMeasurementThread(threading.Thread):
         ack_size = 8
         while True:
             ack_data = self.sock.recv(ack_size)
-            if len(ack_data) != ack_size:
-                break
-            bytes_between_ack = struct.unpack("!Q", ack_data)[0]
-            ack_time_list.append(time.time())
-            if len(ack_time_list) >= 2:
-                time_pings = ack_time_list[-1] - ack_time_list[-2]
-                bw_mbps = bytes_between_ack*8.0/time_pings/1024/1024
-                #print "bytes_between: %d (%f - %f = %f), estimated bw: %f" % \
-                #    (bytes_between_ack, ack_time_list[-1], ack_time_list[-2], time_pings, bw_mbps)
-                measured_bw_list.append(bw_mbps)
+            ack = struct.unpack("!Q", ack_data)[0]
+            time_recv_prev = time.time()
+            averaged_bw_list = list()
+            if (ack == 0x01):
+                # start receiving acks of new blob
+                while True:
+                    ack_data = self.sock.recv(ack_size)
+                    ack_recved_data = struct.unpack("!Q", ack_data)[0] 
+                    if ack_recved_data == 0x02:
+                        break
+                    time_recv_cur = time.time() 
+                    receive_duration = time_recv_cur - time_recv_prev
+                    bw_mbps = 8*ack_recved_data/receive_duration/1024.0/1024
+                    #print "ack: %f, %f, %f, %ld, %f mbps" % (
+                    #    time_recv_cur,
+                    #    time_recv_prev,
+                    #    receive_duration,
+                    #    ack_recved_data,
+                    #    bw_mbps)
+                    time_recv_prev = time_recv_cur
+                    averaged_bw_list.append(bw_mbps)
+                averaged_bw = sum(averaged_bw_list)/len(averaged_bw_list)
+                #print "average bw: %f" % averaged_bw
+                self.monitor_network_bw.value = averaged_bw
+            else:
+                print "error"
+                pass
 
-    def recv_all(self, sock, recv_size):
-        data = ''
-        while len(data) < recv_size:
-            tmp_data = sock.recv(recv_size - len(data))
-            if len(tmp_data) == 0:
-                break
-            data += tmp_data
-        return data
 
-
-class StreamSynthesisClient(multiprocessing.Process):
+class StreamSynthesisClient(process_manager.ProcWorker):
 
     def __init__(self, remote_addr, metadata, compdata_queue):
         self.remote_addr = remote_addr
         self.metadata = metadata
         self.compdata_queue = compdata_queue
+
+        # measurement
+        self.monitor_network_bw = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.monitor_network_bw.value = 0.0
+
         super(StreamSynthesisClient, self).__init__(target=self.transfer)
 
     def transfer(self):
@@ -96,10 +115,12 @@ class StreamSynthesisClient(multiprocessing.Process):
         print "Connecting to (%s).." % str(address)
         sock = socket.create_connection(address, 10)
         sock.setblocking(True)
-        self.receive_thread = NetworkMeasurementThread(sock)
+        self.blob_sent_time_dict = dict()
+        self.receive_thread = NetworkMeasurementThread(sock,
+                                                       self.blob_sent_time_dict,
+                                                       self.monitor_network_bw)
         self.receive_thread.daemon = True
         self.receive_thread.start()
-        self.blob_sent_time_list = list()
 
         # send header
         header_dict = {
@@ -128,14 +149,14 @@ class StreamSynthesisClient(multiprocessing.Process):
                 Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
                 Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
                 }
-            blob_counter += 1
             # send
             header = NetworkUtil.encoding(blob_header_dict)
             sock.sendall(struct.pack("!I", len(header)))
             sock.sendall(header)
-            self.blob_sent_time_list.append(time.time())
+            self.blob_sent_time_dict[blob_counter] = (time.time(), len(compdata))
             sock.sendall(compdata)
             transfer_size += (4+len(header)+len(compdata))
+            blob_counter += 1
             #print "transfer: %d" % transfer_size
 
             # wait to emulate network badwidth
@@ -157,5 +178,7 @@ class StreamSynthesisClient(multiprocessing.Process):
         sock.sendall(struct.pack("!I", len(header)))
         sock.sendall(header)
         sock.close()
+
+        self.process_info['is_alive'] = False
         #sys.stdout.write("Finish\n")
 

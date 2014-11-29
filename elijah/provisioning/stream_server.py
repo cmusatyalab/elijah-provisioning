@@ -443,11 +443,11 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         except socket.error as e:
             pass
 
-    def _recv_all(self, recv_size):
+    def _recv_all(self, recv_size, ack_size=sys.maxint):
+        prev_ack_sent_size = 0
         data = ''
         while len(data) < recv_size:
             tmp_data = self.request.recv(recv_size-len(data))
-
             if tmp_data == None:
                 raise StreamSynthesisError("Cannot recv data at %s" % str(self))
             if len(tmp_data) == 0:
@@ -455,14 +455,14 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             data += tmp_data
 
             # to send ack for every PERIODIC_ACK_BYTES bytes
-            #self.total_recved_size_cur += len(tmp_data)
-            #recv_bytes_size = self.total_recved_size_cur - self.total_recved_size_prev
-            #if recv_bytes_size >= PERIODIC_ACK_BYTES:
-            #    ack_data = struct.pack("!Q", recv_bytes_size)
-            #    self.request.sendall(ack_data)
-            #    self.total_recved_size_prev = self.total_recved_size_cur
-            #    if recv_bytes_size >= PERIODIC_ACK_BYTES*2:
-            #        print "we missed to send %d acks" % ((recv_bytes_size/PERIODIC_ACK_BYTES)-1)
+            cur_recv_size = len(data)
+            data_diff = cur_recv_size-prev_ack_sent_size
+            if  data_diff > ack_size:
+                ack_data = struct.pack("!Q", data_diff)
+                self.request.sendall(ack_data)
+                if (cur_recv_size-prev_ack_sent_size) >= ack_size*2:
+                    print "we missed to send acks"
+                prev_ack_sent_size = cur_recv_size
         return data
 
     def _check_validity(self, message):
@@ -537,6 +537,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             LOG.info("Start Synthesis process")
 
             # get each blob
+            recv_blob_counter = 0
             while True:
                 data = self.request.recv(4)
                 if data == None or len(data) != 4:
@@ -544,6 +545,13 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                     break
                 blob_header_size = struct.unpack("!I", data)[0]
                 blob_header_raw = self._recv_all(blob_header_size)
+                # send ack right before getting the blob
+                try:
+                    ack_data = struct.pack("!Q", 0x01)
+                    self.request.send(ack_data)
+                except socket.error as e:
+                    pass
+
                 blob_header = NetworkUtil.decoding(blob_header_raw)
                 blob_size = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_SIZE)
                 if blob_size == None:
@@ -554,13 +562,20 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
                 blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
                 blob_memory_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
-                compressed_blob = self._recv_all(blob_size)
+                compressed_blob = self._recv_all(blob_size, ack_size=100*1024) # send ack for every 100KB
+                # send ack right after getting the blob
+                try:
+                    ack_data = struct.pack("!Q", 0x02)
+                    self.request.send(ack_data)
+                except socket.error as e:
+                    pass
                 network_out_queue.put((blob_comp_type, compressed_blob))
                 memory_chunk_set = set(["%ld:1" % item for item in blob_memory_chunk])
                 disk_chunk_set = set(["%ld:1" % item for item in blob_disk_chunk])
                 memory_chunk_all.update(memory_chunk_set)
                 disk_chunk_all.update(disk_chunk_set)
                 sys.stdout.write("process one blob\n")
+                recv_blob_counter += 1
 
         except Exception, e:
             sys.stderr.write("%sn" % str(e))
@@ -573,7 +588,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         # We told to FUSE that we have everything ready, so we need to wait
         # until delta_proc fininshes. we cannot start VM before delta_proc
         # finishes, because we don't know what will be modified in the future
-
+        '''
         time_fuse_start = time.time()
         disk_overlay_map = ','.join(disk_chunk_all)
         memory_overlay_map = ','.join(memory_chunk_all)
@@ -599,6 +614,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         synthesized_VM.monitor.terminate()
         synthesized_VM.monitor.join()
         synthesized_VM.terminate()
+        '''
         print "finished"
 
     def terminate(self):

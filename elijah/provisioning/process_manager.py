@@ -195,7 +195,16 @@ class ProcessManager(threading.Thread):
         return p_dict, r_dict, throughput_network_MBps*8.0
 
     def get_network_speed(self):
-        return 30 # mbps
+        worker = self.process_list.get("StreamSynthesisClient", None)
+        if worker == None:
+            return None
+        process_info = self.process_infos["StreamSynthesisClient"]
+        if process_info['is_alive'] == False:
+            return None
+        network_bw_mbps = worker.monitor_network_bw.value
+        if network_bw_mbps <= 0:
+            return None
+        return network_bw_mbps # mbps
 
     def start_managing(self):
         time_s = time.time()
@@ -204,14 +213,15 @@ class ProcessManager(threading.Thread):
         count = 0 
         while (not self.stop.wait(0.1)):
             try:
-                '''
                 network_bw_mbps = self.get_network_speed()  # mega bit/s
                 system_speed = self.get_system_speed()
                 if system_speed == None or network_bw_mbps == None:
+                    sys.stdout.write("synthesis stream client is not working yet\n")
                     continue
                 p_dict, r_dict, system_bw_mbps = system_speed
                 print "system throughput : %f mbps\tnetwork throughput: %f mbps" % (system_bw_mbps, network_bw_mbps)
 
+                '''
                 if count == 100:
                     bw_diff = system_bw_mbps - network_bw_mbps
                     if bw_diff > 1: # network is bottleneck. Do more computation and
