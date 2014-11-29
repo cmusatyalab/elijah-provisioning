@@ -1680,6 +1680,7 @@ def create_residue(base_disk, base_hashvalue,
         metadata[Const.META_RESUME_VM_DISK_SIZE] = resume_disk_size
         metadata[Const.META_RESUME_VM_MEMORY_SIZE] = resume_memory_size
         client = StreamSynthesisClient("0.0.0.0", metadata, compdata_queue)
+        #client = StreamSynthesisClient("128.2.213.12", metadata, compdata_queue)
         client.start()
         client.join()
 

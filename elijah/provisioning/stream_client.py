@@ -67,8 +67,8 @@ class NetworkMeasurementThread(threading.Thread):
             if len(ack_time_list) >= 2:
                 time_pings = ack_time_list[-1] - ack_time_list[-2]
                 bw_mbps = bytes_between_ack*8.0/time_pings/1024/1024
-                print "bytes_betwee: %d (%f - %f = %f), estimated bw: %f" % \
-                    (bytes_between_ack, ack_time_list[-1], ack_time_list[-2], time_pings, bw_mbps)
+                #print "bytes_between: %d (%f - %f = %f), estimated bw: %f" % \
+                #    (bytes_between_ack, ack_time_list[-1], ack_time_list[-2], time_pings, bw_mbps)
                 measured_bw_list.append(bw_mbps)
 
     def recv_all(self, sock, recv_size):

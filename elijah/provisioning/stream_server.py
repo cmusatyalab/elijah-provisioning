@@ -460,7 +460,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             self.total_recved_size_cur += len(tmp_data)
             recv_bytes_size = self.total_recved_size_cur - self.total_recved_size_prev
             if recv_bytes_size >= PERIODIC_ACK_BYTES:
-                self.ack_thread.signal_ack(recv_bytes_size)
+                ack_data = struct.pack("!Q", recv_bytes_size)
+                self.request.sendall(ack_data)
                 self.total_recved_size_prev = self.total_recved_size_cur
                 if recv_bytes_size >= PERIODIC_ACK_BYTES*2:
                     print "we missed to send %d acks" % ((recv_bytes_size/PERIODIC_ACK_BYTES)-1)
@@ -491,9 +492,9 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         '''
         try:
             # variable
-            self.ack_thread = AckThread(self.request)
-            self.ack_thread.daemon = True
-            self.ack_thread.start()
+            #self.ack_thread = AckThread(self.request)
+            #self.ack_thread.daemon = True
+            #self.ack_thread.start()
             self.total_recved_size_cur = 0
             self.total_recved_size_prev = 0
 
@@ -571,7 +572,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         delta_proc.join()
         print "deltaproc join"
 
-
+        '''
         # We told to FUSE that we have everything ready, so we need to wait
         # until delta_proc fininshes. we cannot start VM before delta_proc
         # finishes, because we don't know what will be modified in the future
@@ -599,6 +600,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         synthesized_VM.monitor.terminate()
         synthesized_VM.monitor.join()
         synthesized_VM.terminate()
+        '''
         print "finished"
 
     def terminate(self):

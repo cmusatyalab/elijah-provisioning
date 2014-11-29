@@ -148,7 +148,7 @@ class ProcessManager(threading.Thread):
         sys.stdout.write("\n")
         return result
 
-    def _monitor_ratio_speed(self):
+    def get_required_network_bw(self):
         worker_names = ["DeltaDedup", "CreateMemoryDeltalist",
                         "CreateDiskDeltalist", "CompressProc"]
         p_dict = dict()
@@ -175,24 +175,26 @@ class ProcessManager(threading.Thread):
         throughput_cpus_MBps = self.overlay_creation_mode.NUM_PROC_COMPRESSION*throughput_per_cpu_MBps
         ratio = (0.5*r_dict['CreateDiskDeltalist'] + 0.5*r_dict['CreateMemoryDeltalist'])*r_dict['DeltaDedup']*r_dict['CompressProc']
         throughput_network_MBps = throughput_cpus_MBps*ratio
-        sys.stdout.write("Process time/(block, core): %f, CPU: %f MBps\tRatio:%f, Network: %f MBps\t(%f, %f, %f, %f)\n" % \
-                         (time_cpu, throughput_cpus_MBps,
-                          ratio, throughput_network_MBps,
-                          r_dict['CreateDiskDeltalist'],
-                          r_dict['CreateMemoryDeltalist'],
-                          r_dict['DeltaDedup'],
-                          r_dict['CompressProc']
-                          ))
+        #sys.stdout.write("Process time/(block, core): %f, CPU: %f MBps\tRatio:%f, Network: %f MBps\t(%f, %f, %f, %f)\n" % \
+        #                 (time_cpu, throughput_cpus_MBps,
+        #                  ratio, throughput_network_MBps,
+        #                  r_dict['CreateDiskDeltalist'],
+        #                  r_dict['CreateMemoryDeltalist'],
+        #                  r_dict['DeltaDedup'],
+        #                  r_dict['CompressProc']
+        #                  ))
         #for name in worker_names:
         #    sys.stdout.write("%s (%f, %f)\t" % (name, p_dict[name], r_dict[name]))
         #sys.stdout.write("\n")
+
+        return throughput_network_MBps
 
     def start_managing(self):
         time_s = time.time()
         self.cpu_statistics = list()
         try:
             while (not self.stop.wait(0.1)):
-                self._monitor_ratio_speed()
+                net_bw_mBps = self.get_required_network_bw()
 
                 pass
                 #result = self._get_cpu_usage()

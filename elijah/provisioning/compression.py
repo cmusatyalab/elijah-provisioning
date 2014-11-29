@@ -109,12 +109,12 @@ class CompressProc(process_manager.ProcWorker):
                         valid_child_proc += 1
                         total_process_time_block += process_time_block
                         total_ratio_block += ratio_block
-                    sys.stdout.write("(%f)\t" % (ratio_block))
-                print "%d" % valid_child_proc
+                    #sys.stdout.write("(%f)\t" % (ratio_block))
+                #print "%d" % valid_child_proc
                 if valid_child_proc > 0:
                     self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
                     self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
-                    print "[comp] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
+                    #print "[comp] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
 
             # send end meesage to every process
             for index in self.proc_list:
