@@ -560,7 +560,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 disk_chunk_set = set(["%ld:1" % item for item in blob_disk_chunk])
                 memory_chunk_all.update(memory_chunk_set)
                 disk_chunk_all.update(disk_chunk_set)
-                sys.stdout.write("process one blob")
+                sys.stdout.write("process one blob\n")
 
         except Exception, e:
             sys.stderr.write("%sn" % str(e))
@@ -582,15 +582,17 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 resumed_disk=launch_disk,  disk_overlay_map=disk_overlay_map,
                 resumed_memory=launch_mem, memory_overlay_map=memory_overlay_map)
         synthesized_VM = SynthesizedVM(launch_disk, launch_mem, fuse)
-        #fuse_proc = FuseFeedingProc(fuse, fuse_info_queue)
-        #fuse_proc.start()
-        #fuse_proc.join()
+        time_fuse_end = time.time()
+        #time.sleep(10)
 
         synthesized_VM.resume()
-        time_fuse_end = time.time()
-        LOG.info("[time] last, but non-pipelined time (%f ~ %f): %f" % (time_fuse_start,
-                                                                        time_fuse_end,
-                                                                        (time_fuse_end-time_fuse_start)))
+        time_resume_end = time.time()
+        LOG.info("[time] last, but non-pipelined time %f (%f ~ %f ~ %f)" % (\
+                                                                            time_resume_end-time_fuse_start,
+                                                                            time_fuse_start,
+                                                                            time_fuse_end,
+                                                                            time_resume_end,
+                                                                            ))
         connect_vnc(synthesized_VM.machine)
 
         # terminate

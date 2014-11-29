@@ -1241,7 +1241,7 @@ class QmpThread(threading.Thread):
         ret = self.qmp.qmp_negotiate()
         if not ret:
             raise CloudletGenerationError("failed to connect to qmp channel")
-        #sleep(5)
+        sleep(5)
 
         if self.overlay_mode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
             self._stop_migration()
@@ -1251,7 +1251,8 @@ class QmpThread(threading.Thread):
             while(not self.stop.wait(0.1)):
                 unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
                     VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
-                if unprocessed_memory_snapshot_size < 1024*1024*100: # 100 MB
+                #LOG.debug("[live] %d" % unprocessed_memory_snapshot_size)
+                if unprocessed_memory_snapshot_size < 1024*1024*50: # 50 MB
                     ret = self.qmp.iterate_raw_live()
                     iteration_issue_time_list.append(time())
                     sleep(sleep_between_iteration)
@@ -1560,6 +1561,7 @@ class StreamSynthesisFile(multiprocessing.Process):
 def create_residue(base_disk, base_hashvalue,
                    basedisk_hashdict, basemem_hashdict,
                    resumed_vm, options, original_deltalist,
+                   migration_addr,
                    overlay_mode=None):
     '''Get residue
     return overlay_metafile, overlay_files
@@ -1658,8 +1660,8 @@ def create_residue(base_disk, base_hashvalue,
 
 
     time_packaging_start = time()
-    overlay_mode.OUTPUT_DESTINATION = "network"
-    if overlay_mode.OUTPUT_DESTINATION.startswith("network"):
+    if migration_addr.startswith("network"):
+        migration_dest_ip = migration_addr.split(":")[-1]
         from stream_client import StreamSynthesisClient
         resume_disk_size = os.path.getsize(resumed_vm.resumed_disk)
 
@@ -1679,8 +1681,7 @@ def create_residue(base_disk, base_hashvalue,
         metadata[Const.META_BASE_VM_SHA256] = base_hashvalue
         metadata[Const.META_RESUME_VM_DISK_SIZE] = resume_disk_size
         metadata[Const.META_RESUME_VM_MEMORY_SIZE] = resume_memory_size
-        client = StreamSynthesisClient("0.0.0.0", metadata, compdata_queue)
-        #client = StreamSynthesisClient("128.2.213.12", metadata, compdata_queue)
+        client = StreamSynthesisClient(migration_dest_ip, metadata, compdata_queue)
         client.start()
         client.join()
 
@@ -1697,7 +1698,7 @@ def create_residue(base_disk, base_hashvalue,
         LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
                                                                 (time_end-time_start)))
         return None
-    elif overlay_mode.OUTPUT_DESTINATION.startswith("file"):
+    elif migration_addr.startswith("file"):
         temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")
         synthesis_file = StreamSynthesisFile(base_hashvalue, compdata_queue, temp_compfile_dir)
         synthesis_file.start()
@@ -2143,7 +2144,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
 
     disk_only = kwargs.get('disk_only', False)
     zip_container = kwargs.get('zip_container', False)
-    return_residue = kwargs.get('return_residue', False)
+    return_residue = kwargs.get('return_residue', None)
     qemu_args = kwargs.get('qemu_args', False)
     overlay_mode = kwargs.get('overlay_mode', None)
     is_profiling_test = kwargs.get('is_profiling_test', False)
@@ -2181,7 +2182,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
     fuse_thread.join()
 
     synthesized_VM.resume()
-    if return_residue == True:
+    if return_residue is not None:
         # preload basevm hash dictionary for creating residue
         preload_thread = PreloadResidueData(base_disk, overlay_filename.name)
         preload_thread.daemon = True
@@ -2198,7 +2199,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
     #synthesis_statistics(meta_info, overlay_filename.name, \
     #        mem_access_list, disk_access_list)
 
-    if return_residue == True:
+    if return_residue is not None:
         options = Options()
         options.TRIM_SUPPORT = True
         options.FREE_SUPPORT = True
@@ -2212,6 +2213,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
                                              synthesized_VM,
                                              options,
                                              preload_thread.prev_mem_deltalist,
+                                             return_residue,
                                              overlay_mode=overlay_mode)
             if residue_overlay is not None:
                 LOG.info("[RESULT] Residue")

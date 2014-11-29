@@ -155,10 +155,9 @@ class VMOverlayCreationMode(object):
     LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE = 2
 
     def __init__(self):
-        self.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
-        #self.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
+        #self.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
+        self.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
 
-        self.OUTPUT_DESTINATION                     = "file" # or "network"
         self.PROCESS_PIPELINED                      = True # False: serialized processing
 
         self.QUEUE_SIZE_MEMORY_SNAPSHOT             = -1 # always have infinite queue for communicating with QEMU
@@ -233,7 +232,6 @@ class VMOverlayCreationMode(object):
     @staticmethod
     def get_pipelined_multi_process_finite_queue():
         mode = VMOverlayCreationMode()
-        #mode.OUTPUT_DESTINATION = "network"
         mode.PROCESS_PIPELINED = True
         mode.NUM_PROC_MEMORY_DIFF = 4
         mode.NUM_PROC_DISK_DIFF = 4

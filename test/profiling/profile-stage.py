@@ -6,6 +6,7 @@ sys.path.insert(0, "../../")
 import traceback
 from datetime import datetime
 import json
+import time
 
 from elijah.provisioning.Configuration import Const
 Const.LOG_PATH = os.path.join(os.path.abspath(os.curdir), "log-%s" % str(datetime.now()))
@@ -35,7 +36,7 @@ def run_profile(base_path, overlay_path, overlay_mode):
 
     try:
         synthesis.synthesis(base_path, overlay_path,
-                            return_residue=True,
+                            return_residue="file",
                             zip_container=True,
                             overlay_mode=overlay_mode,
                             is_profiling_test=True)

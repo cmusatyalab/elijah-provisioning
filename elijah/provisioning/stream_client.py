@@ -99,6 +99,7 @@ class StreamSynthesisClient(multiprocessing.Process):
         self.receive_thread = NetworkMeasurementThread(sock)
         self.receive_thread.daemon = True
         self.receive_thread.start()
+        self.blob_sent_time_list = list()
 
         # send header
         header_dict = {
@@ -132,6 +133,7 @@ class StreamSynthesisClient(multiprocessing.Process):
             header = NetworkUtil.encoding(blob_header_dict)
             sock.sendall(struct.pack("!I", len(header)))
             sock.sendall(header)
+            self.blob_sent_time_list.append(time.time())
             sock.sendall(compdata)
             transfer_size += (4+len(header)+len(compdata))
             #print "transfer: %d" % transfer_size

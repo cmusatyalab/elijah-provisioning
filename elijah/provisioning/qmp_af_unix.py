@@ -59,9 +59,12 @@ class QmpAfUnix:
             else:
                 return False
         except Exception as e:
+            print "---"
             print repr(recved_data)
+            print "---"
             sys.stderr.write(recved_data)
-            sys.stderr.write("failed at %s" % str(traceback.format_exc()))
+            print "---"
+            #sys.stderr.write("failed at %s" % str(traceback.format_exc()))
 
 
     def stop_raw_live_once(self):
