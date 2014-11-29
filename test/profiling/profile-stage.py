@@ -61,24 +61,28 @@ def set_affiinity(num_cores):
 
 def generate_mode():
     mode_list = list()
-    for index in xrange(3):
-        for diff in ("xdelta3", "bsdiff", "none"):
-            for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
-                for comp_level in (1, 3, 5, 7, 9):
-                    overlay_mode = VMOverlayCreationMode.get_serial_single_process()
-                    overlay_mode.COMPRESSION_ALGORITHM_TYPE = comp_type
-                    overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
-                    overlay_mode.MEMORY_DIFF_ALGORITHM = diff
-                    overlay_mode.DISK_DIFF_ALGORITHM = diff
-                    mode_list.append(overlay_mode)
+    for diff in ("xdelta3", "bsdiff", "none"):
+        for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
+            for comp_level in (1, 3, 5, 7, 9):
+                overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+                overlay_mode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
+                overlay_mode.NUM_PROC_DISK_DIFF = 4
+                overlay_mode.NUM_PROC_MEMORY_DIFF = 4
+                overlay_mode.NUM_PROC_OPTIMIZATION = 4
+                overlay_mode.NUM_PROC_COMPRESSION = 4
+                overlay_mode.COMPRESSION_ALGORITHM_TYPE = comp_type
+                overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
+                overlay_mode.MEMORY_DIFF_ALGORITHM = diff
+                overlay_mode.DISK_DIFF_ALGORITHM = diff
+                mode_list.append(overlay_mode)
     return mode_list
 
 
 def validation_mode():
     mode_list = list()
-    core = 1
+    core = 4
 
-    mode = VMOverlayCreationMode.get_serial_single_process()
+    mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
     mode.NUM_PROC_DISK_DIFF = core
     mode.NUM_PROC_MEMORY_DIFF = core
     mode.NUM_PROC_OPTIMIZATION = core
@@ -113,6 +117,7 @@ if __name__ == "__main__":
 
 
     base_path = linux_base_path
+    overlay_path = moped
     mode_list = generate_mode()
     #mode_list = validation_mode()
 
@@ -131,3 +136,5 @@ if __name__ == "__main__":
             num_core = each_mode.NUM_PROC_COMPRESSION
             set_affiinity(num_core)
             run_profile(base_path, overlay_url, each_mode)
+            time.sleep(1)
+
