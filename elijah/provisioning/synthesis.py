@@ -1658,7 +1658,7 @@ def create_residue(base_disk, base_hashvalue,
 
 
     time_packaging_start = time()
-    overlay_mode.OUTPUT_DESTINATION = "file"
+    overlay_mode.OUTPUT_DESTINATION = "network"
     if overlay_mode.OUTPUT_DESTINATION.startswith("network"):
         from stream_client import StreamSynthesisClient
         resume_disk_size = os.path.getsize(resumed_vm.resumed_disk)
