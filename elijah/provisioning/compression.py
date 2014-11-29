@@ -52,6 +52,35 @@ class CompressProc(process_manager.ProcWorker):
             if proc.is_alive() == True:
                 m_queue.put(new_mode)
 
+    def _chunk_blob(self):
+        input_size = 0
+        input_deltalist = list()
+        is_last_blob = False
+        input_list = [self.control_queue._reader.fileno(),
+                        self.delta_list_queue._reader.fileno()]
+        while input_size < self.block_size:
+            #self.monitor_current_inqueue_length.value = self.delta_list_queue.qsize()
+            #self.monitor_current_outqueue_length.value = self.comp_delta_queue.qsize()
+            (input_ready, [], []) = select.select(input_list, [], [], 0.01)
+            if self.control_queue._reader.fileno() in input_ready:
+                control_msg = self.control_queue.get()
+                ret = self._handle_control_msg(control_msg)
+                if ret == False:
+                    if control_msg == "change_mode":
+                        new_mode = self.control_queue.get()
+                        self.change_mode(new_mode)
+            if self.delta_list_queue._reader.fileno() in input_ready:
+                deltaitem_list = self.delta_list_queue.get()
+                if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
+                    is_last_blob = True
+                    break
+                recved_size = 0
+                for delta_item in deltaitem_list:
+                    recved_size += (delta_item.data_len + 11 + 8)
+                input_size += recved_size
+                input_deltalist += deltaitem_list
+        return is_last_blob, input_deltalist
+
     def compress_stream(self):
         self.total_block = 0
         self.total_time = 0
@@ -70,51 +99,30 @@ class CompressProc(process_manager.ProcWorker):
                 comp_proc.start()
                 self.proc_list.append((comp_proc, command_queue, mode_queue))
 
-            is_last_chunk = False
-            input_list = [self.control_queue._reader.fileno(),
-                            self.delta_list_queue._reader.fileno()]
-            while is_last_chunk == False:
-                (input_ready, [], []) = select.select(input_list, [], [])
-                input_size = 0
-                input_deltalist = list()
-                # accumulate delta item to have more than self.block_size
-                while input_size < self.block_size:
-                    if self.control_queue._reader.fileno() in input_ready:
-                        control_msg = self.control_queue.get()
-                        ret = self._handle_control_msg(control_msg)
-                        if ret == False:
-                            if control_msg == "change_mode":
-                                new_mode = self.control_queue.get()
-                                self.change_mode(new_mode)
-                    if self.delta_list_queue._reader.fileno() in input_ready:
-                        deltaitem_list = self.delta_list_queue.get()
-                        if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
-                            is_last_chunk = True
-                            break
-                        input_deltalist += deltaitem_list
-                        recved_size = 0
-                        for item in deltaitem_list:
-                            recved_size += (item.data_len + 11 + 8)
-                        input_size += recved_size
+            is_last_blob = False
+            while is_last_blob == False:
+                # read data
+                is_last_blob, input_deltalist = self._chunk_blob()
 
-                self.task_queue.put(input_deltalist)
-                # measurement
-                total_process_time_block = 0
-                total_ratio_block = 0
-                valid_child_proc = 0
-                for (proc, c_queue, mode_queue) in self.proc_list:
-                    process_time_block = proc.child_process_time_block.value
-                    ratio_block = proc.child_ratio_block.value
-                    if (process_time_block > 0) and (ratio_block > 0):
-                        valid_child_proc += 1
-                        total_process_time_block += process_time_block
-                        total_ratio_block += ratio_block
-                    #sys.stdout.write("(%f)\t" % (ratio_block))
-                #print "%d" % valid_child_proc
-                if valid_child_proc > 0:
-                    self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
-                    self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
-                    #print "[comp] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
+                if len(input_deltalist) > 0:
+                    self.task_queue.put(input_deltalist)
+                    # measurement
+                    total_process_time_block = 0
+                    total_ratio_block = 0
+                    valid_child_proc = 0
+                    for (proc, c_queue, mode_queue) in self.proc_list:
+                        process_time_block = proc.child_process_time_block.value
+                        ratio_block = proc.child_ratio_block.value
+                        if (process_time_block > 0) and (ratio_block > 0):
+                            valid_child_proc += 1
+                            total_process_time_block += process_time_block
+                            total_ratio_block += ratio_block
+                        #sys.stdout.write("(%f)\t" % (ratio_block))
+                    #print "%d" % valid_child_proc
+                    if valid_child_proc > 0:
+                        self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
+                        self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
+                        #print "[comp] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
 
             # send end meesage to every process
             for index in self.proc_list:
@@ -226,6 +234,7 @@ class CompChildProc(multiprocessing.Process):
                     break
                 deltaitem_list = input_task
                 comp_type_cur = self.comp_type
+                #print "compression: %d %d" % (self.comp_type, self.comp_level)
                 loop_counter += 1
 
                 # get compressor
@@ -426,7 +435,7 @@ def decomp_overlayzip(overlay_path, outfilename):
         comp_type = blob_info.get(Const.META_OVERLAY_FILE_COMPRESSION, Const.COMPRESSION_LZMA)
         #disk_chunks += blob_info.get(Const.META_OVERLAY_FILE_DISK_CHUNKS)
         #memory_chunks += blob_info.get(Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
-        #sys.stdout.write("Decompression type: %d\n" % comp_type)
+        sys.stdout.write("Decompression type: %d\n" % comp_type)
         if comp_type == Const.COMPRESSION_LZMA:
             comp_data = overlay_package.read_blob(comp_filename)
             decompressor = lzma.LZMADecompressor()

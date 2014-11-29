@@ -94,12 +94,16 @@ class ProcessManager(threading.Thread):
                     sys.stderr.write(msg)
         return response_dict
 
-    def _change_comp_mode(self):
+    def _change_comp_mode(self, comp_type, comp_level):
         worker_names = self.process_list.keys()
         if "CompressProc" in worker_names:
             self._send_query("change_mode",
-                            ["CompressProc"],
-                            data={"comp_level":9, "comp_type":Const.COMPRESSION_BZIP2})
+                             ["CompressProc"],
+                             data={
+                                 "comp_type":comp_type,
+                                 "comp_level":comp_level
+                             }
+                             )
 
     def _change_diff_mode(self):
         worker_names = self.process_list.keys()
@@ -187,14 +191,39 @@ class ProcessManager(threading.Thread):
         #    sys.stdout.write("%s (%f, %f)\t" % (name, p_dict[name], r_dict[name]))
         #sys.stdout.write("\n")
 
-        return throughput_network_MBps
+        return throughput_network_MBps*8.0
 
     def start_managing(self):
         time_s = time.time()
         self.cpu_statistics = list()
         try:
+            mode_change_log = list()
             while (not self.stop.wait(0.1)):
-                net_bw_mBps = self.get_required_network_bw()
+                network_bw_mbps = 30 # mega bit/s
+                system_bw_mbps = self.get_required_network_bw()
+                if system_bw_mbps == None:
+                    continue
+                print "system throughput : %f mbps\tnetwork throughput: %f mbps" %\
+                    (system_bw_mbps, network_bw_mbps)
+
+                if len(mode_change_log) == 0:   # for testing
+                    bw_diff = system_bw_mbps - network_bw_mbps
+                    if bw_diff > 1:
+                        # network is bottleneck
+                        # Do more computation and
+                        print "network is bottleneck"
+                        self._change_comp_mode(Const.COMPRESSION_LZMA, 9)
+                        mode_change_log.append("compression")
+                    elif bw_diff < -1:
+                        # computation is bottlneck
+                        # speed up computation
+                        print "computing is bottleneck"
+                        self._change_comp_mode(Const.COMPRESSION_GZIP, 1)
+                        mode_change_log.append("compression")
+                    else:
+                        # stable
+                        print "current mode is stable"
+
 
                 pass
                 #result = self._get_cpu_usage()
