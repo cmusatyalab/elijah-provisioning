@@ -490,7 +490,7 @@ class DiskDiffProc(multiprocessing.Process):
             if self.task_queue._reader.fileno() in inready:
                 task_list = self.task_queue.get()
                 if task_list == Const.QUEUE_SUCCESS_MESSAGE:
-                    LOG.debug("[Disk][Child] diff proc get end message")
+                    #LOG.debug("[Disk][Child] diff proc get end message")
                     is_proc_running = False
                     break
 

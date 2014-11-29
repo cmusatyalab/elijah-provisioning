@@ -921,6 +921,7 @@ class MemoryDiffProc(multiprocessing.Process):
                     #LOG.debug("[Memory][Child] %d diff proc get end message" % (int(os.getpid())))
                     is_proc_running = False
                     break
+
                 time_process_start = time.clock()
                 deltaitem_list = list()
                 if type(memory_chunk_list) == type(1):

@@ -105,16 +105,16 @@ class ProcessManager(threading.Thread):
                              }
                              )
 
-    def _change_diff_mode(self):
+    def _change_diff_mode(self, diff_algorithm):
         worker_names = self.process_list.keys()
-        #if "CreateMemoryDeltalist" in worker_names:
-        #    self._send_query("change_mode",
-        #                    ["CreateMemoryDeltalist"],
-        #                    data={"diff_algorithm":"none"})
+        if "CreateMemoryDeltalist" in worker_names:
+            self._send_query("change_mode",
+                            ["CreateMemoryDeltalist"],
+                            data={"diff_algorithm":diff_algorithm})
         if "CreateDiskDeltalist" in worker_names:
             self._send_query("change_mode",
                             ["CreateDiskDeltalist"],
-                            data={"diff_algorithm":"none"})
+                            data={"diff_algorithm":diff_algorithm})
 
     def _get_cpu_usage(self):
         result = dict()
@@ -152,7 +152,7 @@ class ProcessManager(threading.Thread):
         sys.stdout.write("\n")
         return result
 
-    def get_required_network_bw(self):
+    def get_system_speed(self):
         worker_names = ["DeltaDedup", "CreateMemoryDeltalist",
                         "CreateDiskDeltalist", "CompressProc"]
         p_dict = dict()
@@ -179,65 +179,69 @@ class ProcessManager(threading.Thread):
         throughput_cpus_MBps = self.overlay_creation_mode.NUM_PROC_COMPRESSION*throughput_per_cpu_MBps
         ratio = (0.5*r_dict['CreateDiskDeltalist'] + 0.5*r_dict['CreateMemoryDeltalist'])*r_dict['DeltaDedup']*r_dict['CompressProc']
         throughput_network_MBps = throughput_cpus_MBps*ratio
-        #sys.stdout.write("Process time/(block, core): %f, CPU: %f MBps\tRatio:%f, Network: %f MBps\t(%f, %f, %f, %f)\n" % \
-        #                 (time_cpu, throughput_cpus_MBps,
+        #sys.stdout.write("CPU: %f MBps\tRatio:%f, Network: %f MBps\t(%f,%f), (%f,%f), (%f,%f), (%f,%f)\n" % \
+        #                 (throughput_cpus_MBps,
         #                  ratio, throughput_network_MBps,
+        #                  p_dict['CreateDiskDeltalist'],
         #                  r_dict['CreateDiskDeltalist'],
+        #                  p_dict['CreateMemoryDeltalist'],
         #                  r_dict['CreateMemoryDeltalist'],
+        #                  p_dict['DeltaDedup'],
         #                  r_dict['DeltaDedup'],
+        #                  p_dict['CompressProc'],
         #                  r_dict['CompressProc']
         #                  ))
-        #for name in worker_names:
-        #    sys.stdout.write("%s (%f, %f)\t" % (name, p_dict[name], r_dict[name]))
-        #sys.stdout.write("\n")
 
-        return throughput_network_MBps*8.0
+        return p_dict, r_dict, throughput_network_MBps*8.0
+
+    def get_network_speed(self):
+        return 30 # mbps
 
     def start_managing(self):
         time_s = time.time()
         self.cpu_statistics = list()
-        try:
-            mode_change_log = list()
-            while (not self.stop.wait(0.1)):
-                network_bw_mbps = 30 # mega bit/s
-                system_bw_mbps = self.get_required_network_bw()
-                if system_bw_mbps == None:
+        mode_change_log = list()
+        count = 0 
+        while (not self.stop.wait(0.1)):
+            try:
+                '''
+                network_bw_mbps = self.get_network_speed()  # mega bit/s
+                system_speed = self.get_system_speed()
+                if system_speed == None or network_bw_mbps == None:
                     continue
-                print "system throughput : %f mbps\tnetwork throughput: %f mbps" %\
-                    (system_bw_mbps, network_bw_mbps)
+                p_dict, r_dict, system_bw_mbps = system_speed
+                print "system throughput : %f mbps\tnetwork throughput: %f mbps" % (system_bw_mbps, network_bw_mbps)
 
-                if len(mode_change_log) == 0:   # for testing
+                if count == 100:
                     bw_diff = system_bw_mbps - network_bw_mbps
-                    if bw_diff > 1:
-                        # network is bottleneck
-                        # Do more computation and
+                    if bw_diff > 1: # network is bottleneck. Do more computation and
                         print "network is bottleneck"
-                        self._change_comp_mode(Const.COMPRESSION_LZMA, 9)
-                        mode_change_log.append("compression")
-                    elif bw_diff < -1:
-                        # computation is bottlneck
-                        # speed up computation
+                        #self._change_comp_mode(Const.COMPRESSION_LZMA, 9)
+                        self._change_diff_mode("bsdiff")
+                        mode_change_log.append("new")
+                    elif bw_diff < -1:  # computation is bottlneck. Speed up computation
                         print "computing is bottleneck"
-                        self._change_comp_mode(Const.COMPRESSION_GZIP, 1)
-                        mode_change_log.append("compression")
+                        self._change_diff_mode("none")
+                        #self._change_comp_mode(Const.COMPRESSION_GZIP, 1)
+                        mode_change_log.append("new")
                     else:
                         # stable
                         print "current mode is stable"
-
+                '''
 
                 pass
                 #result = self._get_cpu_usage()
                 #self.cpu_statistics.append((time.time()-time_s, result))
                 #time.sleep(1)
                 #self._change_comp_mode()
-                #self._change_diff_mode()
                 #break
                 #result = self._get_queue_length()
                 #time.sleep(0.1)
-        except Exception as e:
-            sys.stdout.write("[manager] Exception")
-            sys.stderr.write(traceback.format_exc())
-            sys.stderr.write("%s\n" % str(e))
+            except Exception as e:
+                sys.stdout.write("[manager] Exception")
+                sys.stderr.write(traceback.format_exc())
+                sys.stderr.write("%s\n" % str(e))
+            count += 1
 
     def register(self, worker):
         worker_name = getattr(worker, "worker_name", "NoName")
