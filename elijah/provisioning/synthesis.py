@@ -1573,10 +1573,10 @@ def create_residue(base_disk, base_hashvalue,
         #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
         #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
-        #overlay_mode.NUM_PROC_COMPRESSION = 1
-        #overlay_mode.NUM_PROC_DISK_DIFF = 1
-        #overlay_mode.NUM_PROC_MEMORY_DIFF = 1
-        #overlay_mode.NUM_PROC_OPTIMIZATION = 1
+        overlay_mode.NUM_PROC_COMPRESSION = 4
+        overlay_mode.NUM_PROC_DISK_DIFF = 4
+        overlay_mode.NUM_PROC_MEMORY_DIFF = 4
+        overlay_mode.NUM_PROC_OPTIMIZATION = 4
 
     process_controller.set_mode(overlay_mode)
     LOG.info("* Overlay creation configuration")

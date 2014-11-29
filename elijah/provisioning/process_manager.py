@@ -131,11 +131,6 @@ class ProcessManager(threading.Thread):
             worker = self.process_list.get(worker_name, None)
             response = (worker.monitor_current_inqueue_length.value, worker.monitor_current_outqueue_length.value)
             responses[worker_name] = response
-
-        #sys.stdout.write("[manager]\t")
-        #for (worker_name, response) in responses.iteritems():
-        #    sys.stdout.write("%s(%s)\t" % (worker_name[:10], str(response)))
-        #sys.stdout.write("\n")
         return responses
 
     def _get_queueing_time(self):
@@ -156,25 +151,40 @@ class ProcessManager(threading.Thread):
     def _monitor_ratio_speed(self):
         worker_names = ["DeltaDedup", "CreateMemoryDeltalist",
                         "CreateDiskDeltalist", "CompressProc"]
-        ret_dict = dict()
+        p_dict = dict()
+        r_dict = dict()
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
             if worker == None:
-                continue
+                #sys.stdout.write("pipe is not fully working yet\n")
+                return
             process_info = self.process_infos[worker_name]
             #if process_info['is_alive'] == True:
-            ret_dict[worker_name] = (worker.monitor_total_time_block.value,
-                                        worker.monitor_total_ratio_block.value)
-        for name, (p, r) in ret_dict.iteritems():
-            sys.stdout.write("%s (%f, %f)\t" % (name, p, r))
-        sys.stdout.write("\n")
+            time_block = worker.monitor_total_time_block.value
+            ratio_block = worker.monitor_total_ratio_block.value
+            if time_block <= 0 or ratio_block <=0:
+                #sys.stdout.write("pipe is not fully working yet\n")
+                return
+            p_dict[worker_name] = time_block
+            r_dict[worker_name] = ratio_block
+
+        # Get P and R
+        time_cpu = max(p_dict['CreateDiskDeltalist'], p_dict['CreateMemoryDeltalist']) + p_dict['DeltaDedup'] + p_dict['CompressProc']
+        throughput_per_cpu_per_block = 1/(time_cpu)
+        throughput_per_cpu_MBps = (4096+11)*throughput_per_cpu_per_block/1024.0/1024
+        throughput_cpus_MBps = self.overlay_creation_mode.NUM_PROC_COMPRESSION*throughput_per_cpu_MBps
+        sys.stdout.write("Process time/(block, core): %f\tCPU throughput: %f MBps\n" % \
+                         (time_cpu, throughput_cpus_MBps))
+        #for name in worker_names:
+        #    sys.stdout.write("%s (%f, %f)\t" % (name, p_dict[name], r_dict[name]))
+        #sys.stdout.write("\n")
 
     def start_managing(self):
         time_s = time.time()
         self.cpu_statistics = list()
         try:
             while (not self.stop.wait(0.1)):
-                #self._monitor_ratio_speed()
+                self._monitor_ratio_speed()
 
                 pass
                 #result = self._get_cpu_usage()
