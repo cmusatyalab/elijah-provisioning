@@ -85,7 +85,7 @@ class DeltaItem(object):
         elif delta_type == DeltaItem.DELTA_MEMORY or delta_type == DeltaItem.DELTA_MEMORY_LIVE:
             item_type = DeltaItem.DELTA_MEMORY
         else:
-            raise DeltaError("Invalid delta type")
+            raise DeltaError("Invalid delta type: %d" % delta_type)
         return long((offset << 1) | (item_type & 0x0F))
 
     def __getitem__(self, item):

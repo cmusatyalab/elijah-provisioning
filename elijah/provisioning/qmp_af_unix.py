@@ -48,7 +48,6 @@ class QmpAfUnix:
 
     # returns True on success, False otherwise
     def iterate_raw_live(self):
-        print "[live][qmp] iterate_raw_live"
         try:
             json_cmd = json.dumps({"execute":"iterate-raw-live"})
             self.sock.sendall(json_cmd)

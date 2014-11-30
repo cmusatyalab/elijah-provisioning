@@ -59,8 +59,6 @@ class CompressProc(process_manager.ProcWorker):
         input_list = [self.control_queue._reader.fileno(),
                         self.delta_list_queue._reader.fileno()]
         while input_size < self.block_size:
-            #self.monitor_current_inqueue_length.value = self.delta_list_queue.qsize()
-            #self.monitor_current_outqueue_length.value = self.comp_delta_queue.qsize()
             (input_ready, [], []) = select.select(input_list, [], [], 0.01)
             if self.control_queue._reader.fileno() in input_ready:
                 control_msg = self.control_queue.get()
@@ -70,6 +68,9 @@ class CompressProc(process_manager.ProcWorker):
                         new_mode = self.control_queue.get()
                         self.change_mode(new_mode)
             if self.delta_list_queue._reader.fileno() in input_ready:
+                if self.is_first_recv == False:
+                    self.is_first_recv = True
+                    self.time_first_recv = time.time()
                 deltaitem_list = self.delta_list_queue.get()
                 if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
                     is_last_blob = True
@@ -84,6 +85,8 @@ class CompressProc(process_manager.ProcWorker):
     def compress_stream(self):
         self.total_block = 0
         self.total_time = 0
+        self.is_first_recv = False
+        self.time_first_recv = 0
         try:
             time_start = time.time()
 
@@ -163,6 +166,7 @@ class CompressProc(process_manager.ProcWorker):
 
             time_end = time.time()
             #sys.stdout.write("[Comp] effetively finished\n")
+            LOG.debug("[time] Compression first input at : %f" % (self.time_first_recv))
             LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
                                                             self.in_size,
                                                             self.out_size,
@@ -219,9 +223,9 @@ class CompChildProc(multiprocessing.Process):
                 new_mode = self.mode_queue.get()
                 new_comp_type = new_mode.get("comp_type", None)
                 new_comp_level = new_mode.get("comp_level", None)
-                sys.stdout.write("Change Compression mode: from (%d, %d) to (%d, %d)\n" %
-                                 (self.comp_type, self.comp_level, new_comp_type,
-                                  new_comp_level))
+                sys.stdout.write("Change Compression mode: from (%s, %s) to (%s, %s)\n" %
+                                 (self.comp_type, self.comp_level,
+                                  new_comp_type, new_comp_level))
                 if new_comp_type is not None:
                     self.comp_type = new_comp_type
                 if new_comp_level is not None:
@@ -390,7 +394,6 @@ class DecompChildProc(multiprocessing.Process):
                 elif comp_type == Const.COMPRESSION_BZIP2:
                     decompressor = bz2.BZ2Decompressor()
                     decomp_data = decompressor.decompress(comp_data)
-                    decomp_data += decompressor.flush()
                 elif comp_type == Const.COMPRESSION_GZIP:
                     decomp_data = zlib.decompress(comp_data, zlib.MAX_WBITS|16)
                 else:
@@ -446,7 +449,6 @@ def decomp_overlayzip(overlay_path, outfilename):
             comp_data = overlay_package.read_blob(comp_filename)
             decompressor = bz2.BZ2Decompressor()
             decomp_data = decompressor.decompress(comp_data)
-            decomp_data += decompressor.flush()
             out_fd.write(decomp_data)
         elif comp_type == Const.COMPRESSION_GZIP:
             comp_data = overlay_package.read_blob(comp_filename)

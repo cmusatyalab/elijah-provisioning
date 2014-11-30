@@ -27,6 +27,10 @@ import Queue
 from Configuration import Const
 from Configuration import VMOverlayCreationMode
 
+from migration_profile import MigrationMode
+from migration_profile import ModeProfileError
+from migration_profile import ModeProfile
+
 
 _process_controller = None
 
@@ -55,9 +59,14 @@ class ProcessManager(threading.Thread):
         self.process_infos = self.manager.dict()
         self.process_control = dict()
         self.stop = threading.Event()
+        self.overlay_creation_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+        self.migration_dest = "network"
 
         # load profiling information
-        path = VMOverlayCreationMode.PROFILE_DATAPATH
+        profile_path = os.path.abspath(VMOverlayCreationMode.PROFILE_DATAPATH)
+        if os.path.exists(profile_path) == False:
+            raise ProcessManagerError("Cannot load profile at : %s" % profile_path)
+        self.mode_profile = ModeProfile.load_from_file(profile_path)
         super(ProcessManager, self).__init__(target=self.start_managing)
 
     def set_mode(self, new_mode, migration_dest):
@@ -110,15 +119,18 @@ class ProcessManager(threading.Thread):
                              }
                              )
 
-    def _change_diff_mode(self, diff_algorithm):
+    def _change_disk_diff_mode(self, diff_algorithm):
+        worker_names = self.process_list.keys()
+        if "CreateDiskDeltalist" in worker_names:
+            self._send_query("change_mode",
+                            ["CreateDiskDeltalist"],
+                            data={"diff_algorithm":diff_algorithm})
+
+    def _change_memory_diff_mode(self, diff_algorithm):
         worker_names = self.process_list.keys()
         if "CreateMemoryDeltalist" in worker_names:
             self._send_query("change_mode",
                             ["CreateMemoryDeltalist"],
-                            data={"diff_algorithm":diff_algorithm})
-        if "CreateDiskDeltalist" in worker_names:
-            self._send_query("change_mode",
-                            ["CreateDiskDeltalist"],
                             data={"diff_algorithm":diff_algorithm})
 
     def _get_cpu_usage(self):
@@ -176,12 +188,11 @@ class ProcessManager(threading.Thread):
             r_dict[worker_name] = ratio_block
 
         # Get P and R
-        time_cpu = max(p_dict['CreateDiskDeltalist'], p_dict['CreateMemoryDeltalist']) + p_dict['DeltaDedup'] + p_dict['CompressProc']
-        throughput_per_cpu_per_block = 1/(time_cpu)*1000.0  # ms -> s
-        throughput_per_cpu_MBps = (4096+11)*throughput_per_cpu_per_block/1024.0/1024
-        throughput_cpus_MBps = self.overlay_creation_mode.NUM_PROC_COMPRESSION*throughput_per_cpu_MBps
-        ratio = (0.5*r_dict['CreateDiskDeltalist'] + 0.5*r_dict['CreateMemoryDeltalist'])*r_dict['DeltaDedup']*r_dict['CompressProc']
-        throughput_network_MBps = throughput_cpus_MBps*ratio
+        total_p = MigrationMode.get_total_P(p_dict)
+        total_r = MigrationMode.get_total_R(r_dict)
+        system_out_bw_mbps = MigrationMode.get_system_throughput(self.overlay_creation_mode.NUM_PROC_COMPRESSION,
+                                                    total_p,
+                                                    total_r)
         #sys.stdout.write("CPU: %f MBps\tRatio:%f, Network: %f MBps\t(%f,%f), (%f,%f), (%f,%f), (%f,%f)\n" % \
         #                 (throughput_cpus_MBps,
         #                  ratio, throughput_network_MBps,
@@ -195,7 +206,7 @@ class ProcessManager(threading.Thread):
         #                  r_dict['CompressProc']
         #                  ))
 
-        return p_dict, r_dict, throughput_network_MBps*8.0
+        return p_dict, r_dict, system_out_bw_mbps
 
     def get_network_speed(self):
         if self.migration_dest.startswith("network"):
@@ -211,21 +222,82 @@ class ProcessManager(threading.Thread):
             return network_bw_mbps # mbps
         else:
             return 1024*1024*200*8 # disk speed (200 MBps)
+            #return 8.672088
+
+    def _averaged_bw(self, cur_time, duration, throughput_history):
+        avg_system_bw = float(0)
+        avg_network_bw = float(0)
+        counter = 0
+        for (measured_time, system_bw_mbps, network_bw_mbps) in reversed(throughput_history):
+            if cur_time - measured_time > 5:
+                break
+            avg_system_bw += system_bw_mbps
+            avg_network_bw += network_bw_mbps
+            counter += 1
+        return avg_system_bw/counter, avg_network_bw/counter
 
     def start_managing(self):
         time_s = time.time()
+        mode_change_history = list()
+        throughput_history = list()
+        time_prev_mode_change = time_s
+        count = 0
         self.cpu_statistics = list()
-        mode_change_log = list()
-        count = 0 
         while (not self.stop.wait(0.1)):
             try:
                 network_bw_mbps = self.get_network_speed()  # mega bit/s
                 system_speed = self.get_system_speed()
-                if system_speed == None or network_bw_mbps == None:
-                    sys.stdout.write("synthesis stream client is not working yet\n")
+                time_current_iter = time.time()
+                if system_speed == None:
+                    #sys.stdout.write("system speed is not measured\n")
+                    continue
+                if network_bw_mbps == None:
+                    #sys.stdout.write("network speed is not measured\n")
                     continue
                 p_dict, r_dict, system_bw_mbps = system_speed
-                print "system throughput : %f mbps\tnetwork throughput: %f mbps" % (system_bw_mbps, network_bw_mbps)
+                throughput_history.append((time_current_iter, system_bw_mbps, network_bw_mbps))
+                avg_system_bw, avg_network_bw = self._averaged_bw(time_current_iter, 5, throughput_history)
+                print "system : %f (%f)mbps \tnetwork : %f (%f) mbps" % (system_bw_mbps,
+                                                                         avg_system_bw,
+                                                                         network_bw_mbps,
+                                                                         avg_network_bw)
+
+                # get new mode
+                #if (time_prev_mode_change-time_current_iter) > 5 and len(mode_change_history) == 0:
+                if len(mode_change_history) == -1:
+                    new_mode = self.mode_profile.predict_new_mode(self.overlay_creation_mode,
+                                                                p_dict, r_dict,
+                                                                system_bw_mbps,
+                                                                network_bw_mbps)
+                    diff_mode = MigrationMode.mode_diff(self.overlay_creation_mode.__dict__, new_mode.__dict__)
+                    if diff_mode is not None and len(diff_mode) > 0:
+                        print "%s\n%s" % (new_mode, diff_mode)
+                        # check compression
+                        new_comp_level = None
+                        new_comp_type = None
+                        new_disk_diff = None
+                        new_memory_diff = None
+                        if "COMPRESSION_ALGORITHM_SPEED" in diff_mode.keys():
+                            new_comp_level = diff_mode["COMPRESSION_ALGORITHM_SPEED"]
+                        if "COMPRESSION_ALGORITHM_TYPE" in diff_mode.keys():
+                            new_comp_type = diff_mode["COMPRESSION_ALGORITHM_TYPE"]
+                        if "DISK_DIFF_ALGORITHM" in diff_mode.keys():
+                            new_disk_diff = diff_mode["DISK_DIFF_ALGORITHM"]
+                        if "MEMORY_DIFF_ALGORITHM" in diff_mode.keys():
+                            new_memory_diff = diff_mode["MEMORY_DIFF_ALGORITHM"]
+
+                        # apply change
+                        if new_comp_type is not None or new_comp_level is not None:
+                            self._change_comp_mode(new_comp_type, new_comp_level)
+                        if new_disk_diff is not None:
+                            self._change_disk_diff_mode(new_disk_diff)
+                        if new_memory_diff is not None:
+                            self._change_memory_diff_mode(new_memory_diff)
+
+                        mode_change_history.append((time_current_iter, self.overlay_creation_mode, new_mode))
+                        time_prev_mode_change = time_current_iter
+                        self.overlay_creation_mode = new_mode
+
 
                 '''
                 if count == 100:

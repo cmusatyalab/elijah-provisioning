@@ -43,6 +43,9 @@ from Configuration import Const
 from Configuration import VMOverlayCreationMode
 from synthesis_protocol import Protocol
 import process_manager
+import log as logging
+
+LOG = logging.getLogger(__name__)
 
 
 ACK_DATA_SIZE = 100*1024
@@ -108,6 +111,9 @@ class StreamSynthesisClient(process_manager.ProcWorker):
         self.monitor_network_bw = multiprocessing.RawValue(ctypes.c_double, 0)
         self.monitor_network_bw.value = 0.0
 
+        self.is_first_recv = False
+        self.time_first_recv = 0
+
         super(StreamSynthesisClient, self).__init__(target=self.transfer)
 
     def transfer(self):
@@ -136,6 +142,10 @@ class StreamSynthesisClient(process_manager.ProcWorker):
         blob_counter = 0
         while True:
             comp_task = self.compdata_queue.get()
+            if self.is_first_recv == False:
+                self.is_first_recv = True
+                self.time_first_recv = time.time()
+                LOG.debug("[time] Transfer first input at : %f" % (self.time_first_recv))
             time_process_start = time.time()
             transfer_size = 0
             if comp_task == Const.QUEUE_SUCCESS_MESSAGE:

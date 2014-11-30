@@ -1243,9 +1243,9 @@ class QmpThread(threading.Thread):
             raise CloudletGenerationError("failed to connect to qmp channel")
         sleep(5)
 
-        if self.overlay_mode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
+        if VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
             self._stop_migration()
-        elif self.overlay_mode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE:
+        elif VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE:
             iteration_issue_time_list = list()
             sleep_between_iteration = 2
             while(not self.stop.wait(0.1)):
@@ -1253,13 +1253,14 @@ class QmpThread(threading.Thread):
                     VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
                 #LOG.debug("[live] %d" % unprocessed_memory_snapshot_size)
                 if unprocessed_memory_snapshot_size < 1024*1024*50: # 50 MB
+                    LOG.debug("[live][qmp] iterate_raw_live")
                     ret = self.qmp.iterate_raw_live()
                     iteration_issue_time_list.append(time())
                     sleep(sleep_between_iteration)
 
                 if len(iteration_issue_time_list) > 2:
                     latest_time_diff = iteration_issue_time_list[-1] - iteration_issue_time_list[-2]
-                    print "[live] stop signal? %f %f" % (latest_time_diff, sleep_between_iteration*1.4)
+                    LOG.debug("[live] stop signal? %f %f" % (latest_time_diff, sleep_between_iteration*1.4))
                     if latest_time_diff < sleep_between_iteration*1.4:
                         self._stop_migration()
                         break
@@ -1570,16 +1571,22 @@ def create_residue(base_disk, base_hashvalue,
     process_controller = process_manager.get_instance()
     if overlay_mode == None:
         #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
-        #overlay_mode = VMOverlayCreationMode.get_serial_multi_process()
-        #overlay_mode = VMOverlayCreationMode.get_pipelined_single_process()
-        #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process()
+        #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
+
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+        VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
+        #overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_BZIP2
+        overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_LZMA
+        overlay_mode.COMPRESSION_ALGORITHM_SPEED = 9
+        overlay_mode.DISK_DIFF_ALGORITHM = "bsdiff"
+        overlay_mode.MEMORY_DIFF_ALGORITHM = "bsdiff"
         #overlay_mode.NUM_PROC_COMPRESSION = 1
         #overlay_mode.NUM_PROC_DISK_DIFF = 1
         #overlay_mode.NUM_PROC_MEMORY_DIFF = 1
         #overlay_mode.NUM_PROC_OPTIMIZATION = 1
 
     process_controller.set_mode(overlay_mode, migration_addr)
+    LOG.info("* LIVE MIGRATION STRATEGY: %d" % VMOverlayCreationMode.LIVE_MIGRATION_STOP)
     LOG.info("* Overlay creation configuration")
     LOG.info("  - %s" % str(options))
     LOG.debug("* Overlay creation mode start\n%s" % str(overlay_mode))
@@ -1621,7 +1628,9 @@ def create_residue(base_disk, base_hashvalue,
 
     if overlay_mode.PROCESS_PIPELINED == False:
         if overlay_mode.LIVE_MIGRATION_STOP is not VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
-            raise CloudletGenerationError("Use ASAP VM stop for pipelined approach")
+            msg = "Use ASAP VM stop for pipelined approach for serialized processing.\n"
+            msg += "Otherwise it won't fininsh at the memory dumping stage"
+            raise CloudletGenerationError(msg)
         sleep(5)
         qmp_thread.start()
         _waiting_to_finish(process_controller, "MemoryReadProcess")
@@ -1681,9 +1690,14 @@ def create_residue(base_disk, base_hashvalue,
         metadata[Const.META_BASE_VM_SHA256] = base_hashvalue
         metadata[Const.META_RESUME_VM_DISK_SIZE] = resume_disk_size
         metadata[Const.META_RESUME_VM_MEMORY_SIZE] = resume_memory_size
+        time_network_start = time()
         client = StreamSynthesisClient(migration_dest_ip, metadata, compdata_queue)
         client.start()
         client.join()
+        time_network_end = time()
+        LOG.debug("[time] Network transmission (%f~%f):%f" % (time_network_start,
+                                                              time_network_end,
+                                                              (time_network_end-time_network_start)))
 
         process_controller.terminate()
         cpu_stat = process_controller.cpu_statistics
@@ -1695,7 +1709,7 @@ def create_residue(base_disk, base_hashvalue,
         resumed_vm.machine = None   # protecting malaccess to machine 
         time_end = time()
 
-        LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
+        LOG.debug("[time] Time for finishing transferring (%f ~ %f): %f" % (time_start, time_end,
                                                                 (time_end-time_start)))
         return None
     elif migration_addr.startswith("file"):
@@ -2191,6 +2205,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
     if is_profiling_test == False:
         connect_vnc(synthesized_VM.machine)
     else:
+        preload_thread.join()
         sleep(10)
 
     # statistics

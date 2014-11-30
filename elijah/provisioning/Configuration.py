@@ -151,14 +151,13 @@ class VMOverlayCreationMode(object):
     PIPE_ONE_ELEMENT_SIZE = 4096*100 # 400KB == Max Pipe size is 1MB
     EMULATED_BANDWIDTH_Mbps = 100000 # Mbps
 
-    PROFILE_DATAPATH = os.path.abspath(os.path.join(Const.HOME_DIR, ".cloudlet/profile/moped-overlay"))
+    PROFILE_DATAPATH = os.path.abspath(os.path.join(Const.HOME_DIR, ".cloudlet/config/mode-profile"))
 
     LIVE_MIGRATION_FINISH_ASAP = 1
     LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE = 2
+    LIVE_MIGRATION_STOP = LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
 
     def __init__(self):
-        #self.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
-        self.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
 
         self.PROCESS_PIPELINED                      = True # False: serialized processing
 
@@ -181,11 +180,31 @@ class VMOverlayCreationMode(object):
         self.OPTIMIZATION_DEDUP_BASE_SELF            = True
 
         self.COMPRESSION_ALGORITHM_TYPE              = Const.COMPRESSION_LZMA
-        self.COMPRESSION_ALGORITHM_SPEED             = 4 # 1 (fastest) ~ 9
+        self.COMPRESSION_ALGORITHM_SPEED             = 5 # 1 (fastest) ~ 9
 
     def __str__(self):
         import pprint
         return pprint.pformat(self.__dict__)
+
+    def get_mode_id(self):
+        sorted_key = self.__dict__.keys()
+        sorted_key.sort()
+        mode_str = list()
+        for key in sorted_key:
+            value = self.__dict__[key]
+            mode_str.append("%s:%s" % (key, value))
+        return "|".join(mode_str)
+
+    @staticmethod
+    def from_dictionary(mode_dict):
+        mode = VMOverlayCreationMode()
+        diff = set(mode.__dict__.keys()) - set(mode_dict.keys())
+        if diff:
+            print "error, input dictionary is different: %s" % diff
+            return None
+        mode.__dict__.update(mode_dict)
+        return mode
+
 
     @staticmethod
     def get_default():
