@@ -151,6 +151,8 @@ class VMOverlayCreationMode(object):
     PIPE_ONE_ELEMENT_SIZE = 4096*100 # 400KB == Max Pipe size is 1MB
     EMULATED_BANDWIDTH_Mbps = 100000 # Mbps
 
+    PROFILE_DATAPATH = os.path.abspath(os.path.join(Const.HOME_DIR, ".cloudlet/profile/moped-overlay"))
+
     LIVE_MIGRATION_FINISH_ASAP = 1
     LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE = 2
 

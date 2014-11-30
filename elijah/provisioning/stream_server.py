@@ -545,13 +545,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                     break
                 blob_header_size = struct.unpack("!I", data)[0]
                 blob_header_raw = self._recv_all(blob_header_size)
-                # send ack right before getting the blob
-                try:
-                    ack_data = struct.pack("!Q", 0x01)
-                    self.request.send(ack_data)
-                except socket.error as e:
-                    pass
-
                 blob_header = NetworkUtil.decoding(blob_header_raw)
                 blob_size = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_SIZE)
                 if blob_size == None:
@@ -562,13 +555,15 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
                 blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
                 blob_memory_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
+
+                # send ack right before getting the blob
+                ack_data = struct.pack("!Q", 0x01)
+                self.request.send(ack_data)
                 compressed_blob = self._recv_all(blob_size, ack_size=100*1024) # send ack for every 100KB
                 # send ack right after getting the blob
-                try:
-                    ack_data = struct.pack("!Q", 0x02)
-                    self.request.send(ack_data)
-                except socket.error as e:
-                    pass
+                ack_data = struct.pack("!Q", 0x02)
+                self.request.send(ack_data)
+
                 network_out_queue.put((blob_comp_type, compressed_blob))
                 memory_chunk_set = set(["%ld:1" % item for item in blob_memory_chunk])
                 disk_chunk_set = set(["%ld:1" % item for item in blob_disk_chunk])
@@ -615,6 +610,11 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         synthesized_VM.monitor.join()
         synthesized_VM.terminate()
         '''
+
+        # send end message
+        ack_data = struct.pack("!Q", 0x10)
+        print "send ack to client: %d" % len(ack_data)
+        self.request.sendall(ack_data)
         print "finished"
 
     def terminate(self):

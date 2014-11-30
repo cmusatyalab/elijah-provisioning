@@ -25,6 +25,7 @@ import sys
 import traceback
 import Queue
 from Configuration import Const
+from Configuration import VMOverlayCreationMode
 
 
 _process_controller = None
@@ -54,6 +55,9 @@ class ProcessManager(threading.Thread):
         self.process_infos = self.manager.dict()
         self.process_control = dict()
         self.stop = threading.Event()
+
+        # load profiling information
+        path = VMOverlayCreationMode.PROFILE_DATAPATH
         super(ProcessManager, self).__init__(target=self.start_managing)
 
     def set_mode(self, new_mode):

@@ -90,6 +90,8 @@ class NetworkMeasurementThread(threading.Thread):
                 averaged_bw = sum(averaged_bw_list)/len(averaged_bw_list)
                 #print "average bw: %f" % averaged_bw
                 self.monitor_network_bw.value = averaged_bw
+            elif (ack == 0x10):
+                break
             else:
                 print "error"
                 pass
@@ -119,7 +121,6 @@ class StreamSynthesisClient(process_manager.ProcWorker):
         self.receive_thread = NetworkMeasurementThread(sock,
                                                        self.blob_sent_time_dict,
                                                        self.monitor_network_bw)
-        self.receive_thread.daemon = True
         self.receive_thread.start()
 
         # send header
@@ -177,8 +178,9 @@ class StreamSynthesisClient(process_manager.ProcWorker):
         header = NetworkUtil.encoding(end_header)
         sock.sendall(struct.pack("!I", len(header)))
         sock.sendall(header)
-        sock.close()
 
         self.process_info['is_alive'] = False
-        #sys.stdout.write("Finish\n")
+        sys.stdout.write("Finish transmission. Waiting for finishing migration\n")
+        self.receive_thread.join()
+        sock.close()
 
