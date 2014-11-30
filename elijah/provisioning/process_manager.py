@@ -60,8 +60,9 @@ class ProcessManager(threading.Thread):
         path = VMOverlayCreationMode.PROFILE_DATAPATH
         super(ProcessManager, self).__init__(target=self.start_managing)
 
-    def set_mode(self, new_mode):
+    def set_mode(self, new_mode, migration_dest):
         self.overlay_creation_mode = new_mode
+        self.migration_dest = migration_dest
 
     def _send_query(self, query, worker_names, data=None):
         sent_worker_name = list()
@@ -164,21 +165,19 @@ class ProcessManager(threading.Thread):
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
             if worker == None:
-                #sys.stdout.write("pipe is not fully working yet\n")
                 return
             process_info = self.process_infos[worker_name]
             #if process_info['is_alive'] == True:
             time_block = worker.monitor_total_time_block.value
             ratio_block = worker.monitor_total_ratio_block.value
             if time_block <= 0 or ratio_block <=0:
-                #sys.stdout.write("pipe is not fully working yet\n")
                 return
             p_dict[worker_name] = time_block
             r_dict[worker_name] = ratio_block
 
         # Get P and R
         time_cpu = max(p_dict['CreateDiskDeltalist'], p_dict['CreateMemoryDeltalist']) + p_dict['DeltaDedup'] + p_dict['CompressProc']
-        throughput_per_cpu_per_block = 1/(time_cpu)
+        throughput_per_cpu_per_block = 1/(time_cpu)*1000.0  # ms -> s
         throughput_per_cpu_MBps = (4096+11)*throughput_per_cpu_per_block/1024.0/1024
         throughput_cpus_MBps = self.overlay_creation_mode.NUM_PROC_COMPRESSION*throughput_per_cpu_MBps
         ratio = (0.5*r_dict['CreateDiskDeltalist'] + 0.5*r_dict['CreateMemoryDeltalist'])*r_dict['DeltaDedup']*r_dict['CompressProc']
@@ -199,16 +198,19 @@ class ProcessManager(threading.Thread):
         return p_dict, r_dict, throughput_network_MBps*8.0
 
     def get_network_speed(self):
-        worker = self.process_list.get("StreamSynthesisClient", None)
-        if worker == None:
-            return None
-        process_info = self.process_infos["StreamSynthesisClient"]
-        if process_info['is_alive'] == False:
-            return None
-        network_bw_mbps = worker.monitor_network_bw.value
-        if network_bw_mbps <= 0:
-            return None
-        return network_bw_mbps # mbps
+        if self.migration_dest.startswith("network"):
+            worker = self.process_list.get("StreamSynthesisClient", None)
+            if worker == None:
+                return None
+            process_info = self.process_infos["StreamSynthesisClient"]
+            if process_info['is_alive'] == False:
+                return None
+            network_bw_mbps = worker.monitor_network_bw.value
+            if network_bw_mbps <= 0:
+                return None
+            return network_bw_mbps # mbps
+        else:
+            return 1024*1024*200*8 # disk speed (200 MBps)
 
     def start_managing(self):
         time_s = time.time()

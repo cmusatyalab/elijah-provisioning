@@ -274,7 +274,7 @@ class CompChildProc(multiprocessing.Process):
                     child_total_block += 1
                     #print "%d in: %d, out: %d" % (os.getpid(), indata_size, outdata_size)
                     time_process_total_time += (time_process_end - time_process_start)
-                    self.child_process_time_block.value = time_process_total_time/child_total_block
+                    self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
                     self.child_ratio_block.value = outdata_size/float(indata_size)
 
                 time_process_start = time.clock()
@@ -284,7 +284,7 @@ class CompChildProc(multiprocessing.Process):
 
                 outdata_size += len(compressed_bytes)
                 time_process_total_time += (time_process_end - time_process_start)
-                self.child_process_time_block.value = time_process_total_time/child_total_block
+                self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
                 self.child_ratio_block.value = outdata_size/float(indata_size)
                 #print "%d in: %d, out: %d, %f" % (os.getpid(), indata_size, outdata_size, self.child_ratio_block.value)
                 self.output_queue.put((comp_type_cur,

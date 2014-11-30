@@ -1579,7 +1579,7 @@ def create_residue(base_disk, base_hashvalue,
         #overlay_mode.NUM_PROC_MEMORY_DIFF = 1
         #overlay_mode.NUM_PROC_OPTIMIZATION = 1
 
-    process_controller.set_mode(overlay_mode)
+    process_controller.set_mode(overlay_mode, migration_addr)
     LOG.info("* Overlay creation configuration")
     LOG.info("  - %s" % str(options))
     LOG.debug("* Overlay creation mode start\n%s" % str(overlay_mode))

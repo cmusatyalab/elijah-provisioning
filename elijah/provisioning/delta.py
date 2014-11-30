@@ -894,7 +894,7 @@ class DeltaDedup(process_manager.ProcWorker):
 
                     # measurement
                     total_process_time += (time_process_finish-time_process_start)
-                    self.monitor_total_time_block.value = total_process_time/self.total_block_count
+                    self.monitor_total_time_block.value = 1000.0*total_process_time/self.total_block_count
                     self.monitor_total_ratio_block.value = (float(self.out_size)/self.in_size)
                     #print "[delta] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
             self.monitor_is_alive = False

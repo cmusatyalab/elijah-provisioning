@@ -997,7 +997,7 @@ class MemoryDiffProc(multiprocessing.Process):
                 time_process_end = time.clock()
                 time_process_total_time += (time_process_end - time_process_start)
                 if child_total_block > 0:
-                    self.child_process_time_block.value = time_process_total_time/child_total_block
+                    self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
                     self.child_ratio_block.value = outdata_size/float(indata_size)
                 if len(deltaitem_list) > 0:
                     self.deltalist_queue.put(deltaitem_list)

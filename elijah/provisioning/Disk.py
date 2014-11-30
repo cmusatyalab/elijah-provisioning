@@ -537,7 +537,7 @@ class DiskDiffProc(multiprocessing.Process):
                     deltaitem_list.append(delta_item)
                 time_process_end = time.clock()
                 time_process_total_time += (time_process_end - time_process_start)
-                self.child_process_time_block.value = time_process_total_time/child_total_block
+                self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
                 self.child_ratio_block.value = outdata_size/float(indata_size)
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Disk][Child] Child finished. process %d jobs (%f)" % (child_total_block, time_process_total_time))
