@@ -64,7 +64,7 @@ def profiling_workload():
     mode_list = list()
     for diff in ("xdelta3", "bsdiff", "none"):
         for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
-            for comp_level in (1, 3, 5, 7, 9):
+            for comp_level in [1, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
                 overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
                 overlay_mode.NUM_PROC_DISK_DIFF = 4
                 overlay_mode.NUM_PROC_MEMORY_DIFF = 4
@@ -155,10 +155,10 @@ if __name__ == "__main__":
     speech = "/home/krha/cloudlet/image/overlay/vmhandoff/speech-overlay.zip"
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     workloads = [
-        #(windows_base_path, face),
-        #(windows_base_path, mar),
-        #(linux_base_path, moped),
+        (linux_base_path, moped),
         (linux_base_path, speech),
+        (windows_base_path, face),
+        (windows_base_path, mar),
         #(linux_base_path, fluid),
     ]
     for (base_path, overlay_path) in workloads:
@@ -193,5 +193,5 @@ if __name__ == "__main__":
             num_core = each_mode.NUM_PROC_COMPRESSION
             set_affiinity(num_core)
             run_profile(base_path, overlay_url, each_mode)
-            time.sleep(1)
+            time.sleep(10)
 

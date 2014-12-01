@@ -68,10 +68,11 @@ class CompressProc(process_manager.ProcWorker):
                         new_mode = self.control_queue.get()
                         self.change_mode(new_mode)
             if self.delta_list_queue._reader.fileno() in input_ready:
+                deltaitem_list = self.delta_list_queue.get()
                 if self.is_first_recv == False:
                     self.is_first_recv = True
                     self.time_first_recv = time.time()
-                deltaitem_list = self.delta_list_queue.get()
+                    LOG.debug("[time] Compression first input at : %f" % (self.time_first_recv))
                 if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
                     is_last_blob = True
                     break
@@ -166,7 +167,6 @@ class CompressProc(process_manager.ProcWorker):
 
             time_end = time.time()
             #sys.stdout.write("[Comp] effetively finished\n")
-            LOG.debug("[time] Compression first input at : %f" % (self.time_first_recv))
             LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
                                                             self.in_size,
                                                             self.out_size,
