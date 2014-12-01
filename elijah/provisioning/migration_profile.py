@@ -476,6 +476,7 @@ if __name__ == "__main__":
         mode_profile = ModeProfile.load_from_file(inputfile)
         pivot_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
         mode_profile.show_relative_ratio(pivot_mode)
+        import pdb;pdb.set_trace()
     elif command == "compare":
         another_inputfile = sys.argv[3]
         mode_profile1 = ModeProfile.load_from_file(inputfile)

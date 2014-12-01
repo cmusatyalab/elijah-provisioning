@@ -361,6 +361,8 @@ class ProcWorker(multiprocessing.Process):
         # measurement
         self.monitor_total_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
         self.monitor_total_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.monitor_total_time_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.monitor_total_ratio_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
         self.in_size = 0
         self.out_size = 0
 

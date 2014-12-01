@@ -841,9 +841,13 @@ class DeltaDedup(process_manager.ProcWorker):
                         time_first_recv = time.time()
 
                     time_process_start = time.clock()
-                    self.total_block_count += len(deltaitem_list)
+                    cur_block_count = len(deltaitem_list)
+                    self.total_block_count += cur_block_count
+
+                    indata_size_cur = 0
+                    outdata_size_cur = 0
                     for delta_item in deltaitem_list:
-                        self.in_size += (delta_item.data_len+11)
+                        indata_size_cur += (delta_item.data_len+11)
                         if deduplicate_deltaitem(zero_hash_dict, delta_item,
                                                 DeltaItem.REF_ZEROS) == True:
                             if delta_item.delta_type == DeltaItem.DELTA_DISK or\
@@ -888,15 +892,21 @@ class DeltaDedup(process_manager.ProcWorker):
                                     self.self_hashset.add(delta_item.hash_value)
 
                         # now delta item has new data length
-                        self.out_size += (delta_item.data_len+11)
+                        outdata_size_cur += (delta_item.data_len+11)
+                    self.in_size += indata_size_cur
+                    self.out_size += outdata_size_cur
                     time_process_finish = time.clock()
                     self.merged_deltalist_queue.put(deltaitem_list)
 
                     # measurement
-                    total_process_time += (time_process_finish-time_process_start)
-                    self.monitor_total_time_block.value = 1000.0*total_process_time/self.total_block_count
-                    self.monitor_total_ratio_block.value = (float(self.out_size)/self.in_size)
-                    #print "[delta] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
+                    total_process_time_cur = (time_process_finish-time_process_start)
+                    total_process_time += total_process_time_cur
+                    if total_process_time_cur > 0:
+                        self.monitor_total_time_block.value = 1000.0*total_process_time/self.total_block_count
+                        self.monitor_total_ratio_block.value = (float(self.out_size)/self.in_size)
+                        self.monitor_total_time_block_cur.value = 1000.0*total_process_time_cur/cur_block_count
+                        self.monitor_total_ratio_block_cur.value = (float(outdata_size_cur)/indata_size_cur)
+                        #print "[delta] P: %f (%f/%d %f)\tR: %f (%f)" % (self.monitor_total_time_block.value, total_process_time_cur, cur_block_count, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block.value, self.monitor_total_ratio_block_cur.value)
             self.monitor_is_alive = False
             self.process_info['is_alive'] = False
             self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)

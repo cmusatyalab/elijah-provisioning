@@ -305,18 +305,26 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
 
                         total_process_time_block = 0
                         total_ratio_block = 0
+                        total_process_time_block_cur = 0
+                        total_ratio_block_cur = 0
                         valid_child_proc = 0
                         for (proc, c_queue, mode_queue) in self.proc_list:
                             process_time_block = proc.child_process_time_block.value
                             ratio_block = proc.child_ratio_block.value
+                            process_time_block_cur = proc.child_process_time_block_cur.value
+                            ratio_block_cur = proc.child_ratio_block_cur.value
                             if (process_time_block > 0) and (ratio_block > 0):
                                 valid_child_proc += 1
                                 total_process_time_block += process_time_block
                                 total_ratio_block += ratio_block
+                                total_process_time_block_cur += process_time_block_cur
+                                total_ratio_block_cur += ratio_block_cur
                         if valid_child_proc > 0:
                             self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
                             self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
-                            #print "[disk] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
+                            self.monitor_total_time_block_cur.value = total_process_time_block_cur/valid_child_proc
+                            self.monitor_total_ratio_block_cur.value = total_ratio_block_cur/valid_child_proc
+                            #print "[disk] P: %f (%f)\tR: %f (%f)" % (self.monitor_total_time_block.value, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block.value, self.monitor_total_ratio_block_cur.value)
 
                     # measurement
                     modified_chunk_counter += 1
@@ -461,6 +469,8 @@ class DiskDiffProc(multiprocessing.Process):
         # shared variables between processes
         self.child_process_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_process_time_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_ratio_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
 
         super(DiskDiffProc, self).__init__(target=self.process_diff)
 
@@ -496,6 +506,9 @@ class DiskDiffProc(multiprocessing.Process):
 
                 time_process_start = time.clock()
                 deltaitem_list = list()
+                child_cur_block_count = 0
+                indata_size_cur = 0
+                outdata_size_cur = 0
                 for chunk in task_list:
                     offset = chunk * self.chunk_size
                     # check file system 
@@ -525,9 +538,9 @@ class DiskDiffProc(multiprocessing.Process):
                         diff_type = DeltaItem.REF_RAW
 
                     diff_data_len = len(diff_data)
-                    indata_size += (chunk_data_len+11)
-                    outdata_size += (diff_data_len+11)
-                    child_total_block += 1
+                    indata_size_cur += (chunk_data_len+11)
+                    outdata_size_cur += (diff_data_len+11)
+                    child_cur_block_count += 1
                     delta_item = DeltaItem(DeltaItem.DELTA_DISK,
                             offset, len(data),
                             hash_value=sha256(data).digest(),
@@ -536,9 +549,15 @@ class DiskDiffProc(multiprocessing.Process):
                             data=diff_data)
                     deltaitem_list.append(delta_item)
                 time_process_end = time.clock()
-                time_process_total_time += (time_process_end - time_process_start)
+                child_total_block += child_cur_block_count
+                time_process_cur_time = (time_process_end - time_process_start)
+                time_process_total_time += time_process_cur_time
+                indata_size += indata_size_cur
+                outdata_size += outdata_size_cur
                 self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
                 self.child_ratio_block.value = outdata_size/float(indata_size)
+                self.child_process_time_block_cur.value = 1000.0*time_process_cur_time/child_cur_block_count
+                self.child_ratio_block_cur.value = outdata_size_cur/float(indata_size_cur)
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Disk][Child] Child finished. process %d jobs (%f)" % (child_total_block, time_process_total_time))
         self.command_queue.put((indata_size, outdata_size, child_total_block, time_process_total_time))

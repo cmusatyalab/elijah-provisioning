@@ -113,20 +113,28 @@ class CompressProc(process_manager.ProcWorker):
                     # measurement
                     total_process_time_block = 0
                     total_ratio_block = 0
+                    total_process_time_block_cur = 0
+                    total_ratio_block_cur = 0
                     valid_child_proc = 0
                     for (proc, c_queue, mode_queue) in self.proc_list:
                         process_time_block = proc.child_process_time_block.value
                         ratio_block = proc.child_ratio_block.value
+                        process_time_block_cur = proc.child_process_time_block_cur.value
+                        ratio_block_cur = proc.child_ratio_block_cur.value
                         if (process_time_block > 0) and (ratio_block > 0):
                             valid_child_proc += 1
                             total_process_time_block += process_time_block
                             total_ratio_block += ratio_block
+                            total_process_time_block_cur += process_time_block_cur
+                            total_ratio_block_cur += ratio_block_cur
                         #sys.stdout.write("(%f)\t" % (ratio_block))
                     #print "%d" % valid_child_proc
                     if valid_child_proc > 0:
                         self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
                         self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
-                        #print "[comp] P: %f\tR: %f" % (self.monitor_total_time_block.value, self.monitor_total_ratio_block.value)
+                        self.monitor_total_time_block_cur.value = total_process_time_block_cur/valid_child_proc
+                        self.monitor_total_ratio_block_cur.value = total_ratio_block_cur/valid_child_proc
+                        print "[comp] P: %f (%f)\tR: %f (%f)" % (self.monitor_total_time_block.value, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block.value, self.monitor_total_ratio_block_cur.value)
 
             # send end meesage to every process
             for index in self.proc_list:
@@ -204,6 +212,8 @@ class CompChildProc(multiprocessing.Process):
         # shared variables between processes
         self.child_process_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_process_time_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_ratio_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
 
         super(CompChildProc, self).__init__(target=self._comp)
 
@@ -257,9 +267,13 @@ class CompChildProc(multiprocessing.Process):
                 modified_disk_chunks = list()
                 output_data = ''
                 input_data = ''
+                child_cur_block_count = 0
+                indata_size_cur = 0
+                outdata_size_cur = 0
+                time_process_cur_time = 0
 
+                time_process_start = time.clock()
                 for delta_item in deltaitem_list:
-                    time_process_start = time.clock()
                     delta_bytes = delta_item.get_serialized()
                     offset = delta_item.offset/Const.CHUNK_SIZE
                     if delta_item.delta_type == DeltaItem.DELTA_DISK or\
@@ -270,27 +284,26 @@ class CompChildProc(multiprocessing.Process):
                         modified_memory_chunks.append(offset)
                     compressed_bytes = comp.compress(delta_bytes)
                     output_data += compressed_bytes
+                    outdata_size_cur += len(compressed_bytes)
+                    indata_size_cur += len(delta_bytes)
+                    child_cur_block_count += 1
 
-                    # measure for each block to have it ASAP
-                    time_process_end = time.clock()
-                    indata_size += len(delta_bytes)
-                    outdata_size += len(compressed_bytes)
-                    child_total_block += 1
-                    #print "%d in: %d, out: %d" % (os.getpid(), indata_size, outdata_size)
-                    time_process_total_time += (time_process_end - time_process_start)
-                    self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
-                    self.child_ratio_block.value = outdata_size/float(indata_size)
-
-                time_process_start = time.clock()
                 compressed_bytes = comp.flush()
                 output_data += compressed_bytes
+                outdata_size_cur += len(compressed_bytes)
                 time_process_end = time.clock()
 
-                outdata_size += len(compressed_bytes)
-                time_process_total_time += (time_process_end - time_process_start)
+                time_process_cur_time = (time_process_end - time_process_start)
+                time_process_total_time += time_process_cur_time
+
+                indata_size += indata_size_cur
+                outdata_size += outdata_size_cur
+                child_total_block += child_cur_block_count
                 self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
                 self.child_ratio_block.value = outdata_size/float(indata_size)
-                #print "%d in: %d, out: %d, %f" % (os.getpid(), indata_size, outdata_size, self.child_ratio_block.value)
+                self.child_process_time_block_cur.value = 1000.0*time_process_cur_time/child_cur_block_count
+                self.child_ratio_block_cur.value = outdata_size_cur/float(indata_size_cur)
+                #print "%d in: %d, out: %d, %f %f" % (os.getpid(), indata_size_cur, outdata_size_cur, time_process_cur_time, self.child_process_time_block_cur.value)
                 self.output_queue.put((comp_type_cur,
                                        output_data,
                                        modified_disk_chunks,
