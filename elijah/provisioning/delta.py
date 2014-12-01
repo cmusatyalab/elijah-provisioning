@@ -904,9 +904,14 @@ class DeltaDedup(process_manager.ProcWorker):
                     if total_process_time_cur > 0:
                         self.monitor_total_time_block.value = 1000.0*total_process_time/self.total_block_count
                         self.monitor_total_ratio_block.value = (float(self.out_size)/self.in_size)
-                        self.monitor_total_time_block_cur.value = 1000.0*total_process_time_cur/cur_block_count
-                        self.monitor_total_ratio_block_cur.value = (float(outdata_size_cur)/indata_size_cur)
+
+                        # for delta, processing time for most cases are zero
+                        # so, current value will spike wherease average makes
+                        # sense
+                        self.monitor_total_time_block_cur.value = self.monitor_total_time_block.value
+                        self.monitor_total_ratio_block_cur.value = self.monitor_total_ratio_block.value
                         #print "[delta] P: %f (%f/%d %f)\tR: %f (%f)" % (self.monitor_total_time_block.value, total_process_time_cur, cur_block_count, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block.value, self.monitor_total_ratio_block_cur.value)
+            self.process_info['finish_processing_input'] = True
             self.monitor_is_alive = False
             self.process_info['is_alive'] = False
             self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)

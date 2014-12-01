@@ -40,6 +40,7 @@ from delta import DeltaList
 from delta import Recovered_delta
 from progressbar import AnimatedProgressBar
 from Configuration import Const
+from Configuration import VMOverlayCreationMode
 import log as logging
 
 LOG = logging.getLogger(__name__)
@@ -319,7 +320,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                                 total_ratio_block += ratio_block
                                 total_process_time_block_cur += process_time_block_cur
                                 total_ratio_block_cur += ratio_block_cur
-                        if valid_child_proc > 0:
+                        if valid_child_proc > 1:
                             self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
                             self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
                             self.monitor_total_time_block_cur.value = total_process_time_block_cur/valid_child_proc
@@ -336,6 +337,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                         #self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
                         processed_datasize = 0
                         processed_duration = float(0)
+            self.process_info['finish_processing_input'] = True
 
             # send last chunks
             if len(modified_chunk_list) > 0:
@@ -465,6 +467,7 @@ class DiskDiffProc(multiprocessing.Process):
         self.basedisk_path = basedisk_path
         self.modified_disk = modified_disk
         self.chunk_size = chunk_size
+        self.measure_history = list()
 
         # shared variables between processes
         self.child_process_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
@@ -556,16 +559,38 @@ class DiskDiffProc(multiprocessing.Process):
                 outdata_size += outdata_size_cur
                 self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
                 self.child_ratio_block.value = outdata_size/float(indata_size)
-                self.child_process_time_block_cur.value = 1000.0*time_process_cur_time/child_cur_block_count
-                self.child_ratio_block_cur.value = outdata_size_cur/float(indata_size_cur)
+
+                cur_p = 1000.0*time_process_cur_time/child_cur_block_count
+                cur_r = outdata_size_cur/float(indata_size_cur)
+                self.measure_history.append((time_process_end, cur_p, cur_r))
+                cur_p_avg, cur_r_avg = self.averaged_value(time_process_end)
+                self.child_process_time_block_cur.value = cur_p_avg
+                self.child_ratio_block_cur.value = cur_r_avg
+
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Disk][Child] Child finished. process %d jobs (%f)" % (child_total_block, time_process_total_time))
+        self.child_process_time_block.value = 0
+        self.child_ratio_block.value = 0
+        self.child_process_time_block_cur.value = 0
+        self.child_ratio_block_cur.value = 0
         self.command_queue.put((indata_size, outdata_size, child_total_block, time_process_total_time))
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()
             msg = "Empty new compression mode that does not refelected"
             sys.stdout.write(msg)
 
+    def averaged_value(self, cur_time):
+        avg_p = float(0)
+        avg_r = float(0)
+        counter = 0
+        for (measured_time, p, r) in reversed(self.measure_history):
+            if cur_time - measured_time > VMOverlayCreationMode.MEASURE_AVERAGE_TIME:
+                break
+            avg_p += p
+            avg_r += r
+            counter += 1
+        self.measure_history = self.measure_history[-1*counter:]
+        return avg_p/counter, avg_r/counter
 
 
 if __name__ == "__main__":

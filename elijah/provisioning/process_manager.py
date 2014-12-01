@@ -174,39 +174,61 @@ class ProcessManager(threading.Thread):
                         "CreateDiskDeltalist", "CompressProc"]
         p_dict = dict()
         r_dict = dict()
+        p_dict_cur = dict()
+        r_dict_cur = dict()
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
             if worker == None:
-                return
+                return None
             process_info = self.process_infos[worker_name]
-            #if process_info['is_alive'] == True:
+            if process_info['finish_processing_input'] == True:
+                #print "%s is finished" % worker_name
+                return None
             time_block = worker.monitor_total_time_block.value
             ratio_block = worker.monitor_total_ratio_block.value
+            time_block_cur = worker.monitor_total_time_block_cur.value
+            ratio_block_cur = worker.monitor_total_ratio_block_cur.value
             if time_block <= 0 or ratio_block <=0:
-                return
+                return None
             p_dict[worker_name] = time_block
             r_dict[worker_name] = ratio_block
+            p_dict_cur[worker_name] = time_block_cur
+            r_dict_cur[worker_name] = ratio_block_cur
 
         # Get P and R
         total_p = MigrationMode.get_total_P(p_dict)
         total_r = MigrationMode.get_total_R(r_dict)
+        total_p_cur = MigrationMode.get_total_P(p_dict_cur)
+        total_r_cur = MigrationMode.get_total_R(r_dict_cur)
         system_out_bw_mbps = MigrationMode.get_system_throughput(self.overlay_creation_mode.NUM_PROC_COMPRESSION,
                                                     total_p,
                                                     total_r)
-        #sys.stdout.write("CPU: %f MBps\tRatio:%f, Network: %f MBps\t(%f,%f), (%f,%f), (%f,%f), (%f,%f)\n" % \
-        #                 (throughput_cpus_MBps,
-        #                  ratio, throughput_network_MBps,
+        system_out_bw_mbps_cur = MigrationMode.get_system_throughput(self.overlay_creation_mode.NUM_PROC_COMPRESSION,
+                                                    total_p_cur,
+                                                    total_r_cur)
+        #sys.stdout.write("P: %f, %f \tR:%f, %f, BW: %f, %f mbps\t(%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f)\n" % \
+        #                 (total_p, total_p_cur,
+        #                  total_r, total_r_cur,
+        #                  system_out_bw_mbps, system_out_bw_mbps_cur,
         #                  p_dict['CreateDiskDeltalist'],
-        #                  r_dict['CreateDiskDeltalist'],
         #                  p_dict['CreateMemoryDeltalist'],
-        #                  r_dict['CreateMemoryDeltalist'],
         #                  p_dict['DeltaDedup'],
-        #                  r_dict['DeltaDedup'],
         #                  p_dict['CompressProc'],
-        #                  r_dict['CompressProc']
+        #                  r_dict['CreateDiskDeltalist'],
+        #                  r_dict['CreateMemoryDeltalist'],
+        #                  r_dict['DeltaDedup'],
+        #                  r_dict['CompressProc'],
+        #                  p_dict_cur['CreateDiskDeltalist'],
+        #                  p_dict_cur['CreateMemoryDeltalist'],
+        #                  p_dict_cur['DeltaDedup'],
+        #                  p_dict_cur['CompressProc'],
+        #                  r_dict_cur['CreateDiskDeltalist'],
+        #                  r_dict_cur['CreateMemoryDeltalist'],
+        #                  r_dict_cur['DeltaDedup'],
+        #                  r_dict_cur['CompressProc']
         #                  ))
 
-        return p_dict, r_dict, system_out_bw_mbps
+        return p_dict, r_dict, system_out_bw_mbps, p_dict_cur, r_dict_cur, system_out_bw_mbps_cur
 
     def get_network_speed(self):
         if self.migration_dest.startswith("network"):
@@ -224,28 +246,14 @@ class ProcessManager(threading.Thread):
             return 1024*1024*200*8 # disk speed (200 MBps)
             #return 8.672088
 
-    def _averaged_bw(self, cur_time, duration, throughput_history):
-        avg_system_bw = float(0)
-        avg_network_bw = float(0)
-        counter = 0
-        for (measured_time, system_bw_mbps, network_bw_mbps) in reversed(throughput_history):
-            if cur_time - measured_time > 5:
-                break
-            avg_system_bw += system_bw_mbps
-            avg_network_bw += network_bw_mbps
-            counter += 1
-        return avg_system_bw/counter, avg_network_bw/counter
-
     def start_managing(self):
         time_s = time.time()
         mode_change_history = list()
-        throughput_history = list()
         time_prev_mode_change = time_s
         count = 0
         self.cpu_statistics = list()
         while (not self.stop.wait(0.1)):
             try:
-                '''
                 network_bw_mbps = self.get_network_speed()  # mega bit/s
                 system_speed = self.get_system_speed()
                 time_current_iter = time.time()
@@ -255,13 +263,11 @@ class ProcessManager(threading.Thread):
                 if network_bw_mbps == None:
                     #sys.stdout.write("network speed is not measured\n")
                     continue
-                p_dict, r_dict, system_bw_mbps = system_speed
-                throughput_history.append((time_current_iter, system_bw_mbps, network_bw_mbps))
-                avg_system_bw, avg_network_bw = self._averaged_bw(time_current_iter, 5, throughput_history)
-                print "system : %f (%f)mbps \tnetwork : %f (%f) mbps" % (system_bw_mbps,
-                                                                         avg_system_bw,
-                                                                         network_bw_mbps,
-                                                                         avg_network_bw)
+                p_dict, r_dict, system_bw_mbps, p_duct_cur, r_dict_cur, system_bw_mbps_cur  = system_speed
+                print "system : %f (%f)mbps \tnetwork : %f mbps" % (system_bw_mbps,
+                                                                    system_bw_mbps_cur,
+                                                                    network_bw_mbps)
+                '''
 
                 # get new mode
                 #if (time_prev_mode_change-time_current_iter) > 5 and len(mode_change_history) == 0:
@@ -338,6 +344,7 @@ class ProcessManager(threading.Thread):
         process_info = self.manager.dict()
         process_info['update_period'] = 0.1 # seconds
         process_info['is_alive'] = True
+        process_info['finish_processing_input'] = False
         control_queue = multiprocessing.Queue()
         response_queue = multiprocessing.Queue()
         #print "[manager] register new process: %s" % worker_name

@@ -34,6 +34,7 @@ from hashlib import sha256
 
 import memory_util
 from Configuration import Const
+from Configuration import VMOverlayCreationMode
 from progressbar import AnimatedProgressBar
 from delta import DeltaItem
 from delta import DeltaList
@@ -667,7 +668,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     total_ratio_block += ratio_block
                     total_process_time_block_cur += process_time_block_cur
                     total_ratio_block_cur += ratio_block_cur
-            if valid_child_proc > 0:
+            if valid_child_proc > 1:
                 self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
                 self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
                 self.monitor_total_time_block_cur.value = total_process_time_block_cur/valid_child_proc
@@ -680,6 +681,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         if len(memory_page_list) > 0 and len(memory_page_list[0]) == (Memory.RAM_PAGE_SIZE + Memory.CHUNK_HEADER_SIZE):
             LOG.debug("[Memory][child] send last data to child: %d" % len(memory_page_list))
             self.task_queue.put(memory_page_list)
+        self.process_info['finish_processing_input'] = True
 
         # send end meesage to every process
         for child_proc in self.proc_list:
@@ -892,6 +894,7 @@ class MemoryDiffProc(multiprocessing.Process):
         self.libvirt_header_offset = libvirt_header_offset
         self.free_pfn_dict = free_pfn_dict
         self.apply_free_memory = apply_free_memory
+        self.measure_history = list()
 
         # shared variables between processes
         self.child_process_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
@@ -1015,14 +1018,23 @@ class MemoryDiffProc(multiprocessing.Process):
                 time_process_total_time += time_process_cur_time
                 indata_size += indata_size_cur
                 outdata_size += outdata_size_cur
-                if child_total_block > 0:
+                if child_cur_block_count > 0:
                     self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
                     self.child_ratio_block.value = outdata_size/float(indata_size)
-                    self.child_process_time_block_cur.value = 1000.0*time_process_cur_time/child_cur_block_count
-                    self.child_ratio_block_cur.value = outdata_size_cur/float(indata_size_cur)
+
+                    cur_p = 1000.0*time_process_cur_time/child_cur_block_count
+                    cur_r = outdata_size_cur/float(indata_size_cur)
+                    self.measure_history.append((time_process_end, cur_p, cur_r))
+                    cur_p_avg, cur_r_avg = self.averaged_value(time_process_end)
+                    self.child_process_time_block_cur.value = cur_p_avg
+                    self.child_ratio_block_cur.value = cur_r_avg
                 if len(deltaitem_list) > 0:
                     self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Memory][Child] Child finished. process %d jobs (%f)" % (child_total_block, time_process_total_time))
+        self.child_process_time_block.value = 0
+        self.child_ratio_block.value = 0
+        self.child_process_time_block_cur.value = 0
+        self.child_ratio_block_cur.value = 0
         self.command_queue.put((indata_size, outdata_size, child_total_block, time_process_total_time))
         self.task_queue.put(freed_page_counter)
         #out_fd.close()  # measurement
@@ -1030,6 +1042,21 @@ class MemoryDiffProc(multiprocessing.Process):
             self.mode_queue.get_nowait()
             msg = "Empty new compression mode that does not refelected"
             sys.stdout.write(msg)
+
+    def averaged_value(self, cur_time):
+        avg_p = float(0)
+        avg_r = float(0)
+        counter = 0
+        for (measured_time, p, r) in reversed(self.measure_history):
+            if cur_time - measured_time > VMOverlayCreationMode.MEASURE_AVERAGE_TIME:
+                break
+            avg_p += p
+            avg_r += r
+            counter += 1
+        self.measure_history = self.measure_history[-1*counter:]
+        #print "measure last %d" % counter
+        return avg_p/counter, avg_r/counter
+
 
 
     def get_raw_data(self, offset, length):
