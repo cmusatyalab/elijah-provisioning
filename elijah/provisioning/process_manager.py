@@ -245,6 +245,7 @@ class ProcessManager(threading.Thread):
         self.cpu_statistics = list()
         while (not self.stop.wait(0.1)):
             try:
+                '''
                 network_bw_mbps = self.get_network_speed()  # mega bit/s
                 system_speed = self.get_system_speed()
                 time_current_iter = time.time()
@@ -297,6 +298,7 @@ class ProcessManager(threading.Thread):
                         mode_change_history.append((time_current_iter, self.overlay_creation_mode, new_mode))
                         time_prev_mode_change = time_current_iter
                         self.overlay_creation_mode = new_mode
+                '''
 
 
                 '''
