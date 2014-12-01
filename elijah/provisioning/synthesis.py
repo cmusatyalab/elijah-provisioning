@@ -1575,11 +1575,6 @@ def create_residue(base_disk, base_hashvalue,
 
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
         VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
-        #overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_BZIP2
-        overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_LZMA
-        overlay_mode.COMPRESSION_ALGORITHM_SPEED = 9
-        overlay_mode.DISK_DIFF_ALGORITHM = "bsdiff"
-        overlay_mode.MEMORY_DIFF_ALGORITHM = "bsdiff"
         #overlay_mode.NUM_PROC_COMPRESSION = 1
         #overlay_mode.NUM_PROC_DISK_DIFF = 1
         #overlay_mode.NUM_PROC_MEMORY_DIFF = 1

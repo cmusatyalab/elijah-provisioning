@@ -264,7 +264,7 @@ class ProcessManager(threading.Thread):
 
                 # get new mode
                 #if (time_prev_mode_change-time_current_iter) > 5 and len(mode_change_history) == 0:
-                if len(mode_change_history) == -1:
+                if len(mode_change_history) == 0:
                     new_mode = self.mode_profile.predict_new_mode(self.overlay_creation_mode,
                                                                 p_dict, r_dict,
                                                                 system_bw_mbps,

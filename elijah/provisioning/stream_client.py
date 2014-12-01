@@ -90,8 +90,10 @@ class NetworkMeasurementThread(threading.Thread):
                     #    bw_mbps)
                     time_recv_prev = time_recv_cur
                     averaged_bw_list.append(bw_mbps)
-                averaged_bw = sum(averaged_bw_list)/len(averaged_bw_list)
-                #print "average bw: %f" % averaged_bw
+                if len(averaged_bw_list) > 0:
+                    averaged_bw = sum(averaged_bw_list)/len(averaged_bw_list)
+                    #print "average bw: %f" % averaged_bw
+
                 self.monitor_network_bw.value = averaged_bw
             elif (ack == 0x10):
                 break
