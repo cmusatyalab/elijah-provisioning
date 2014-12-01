@@ -584,7 +584,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         # We told to FUSE that we have everything ready, so we need to wait
         # until delta_proc fininshes. we cannot start VM before delta_proc
         # finishes, because we don't know what will be modified in the future
-        '''
         time_fuse_start = time.time()
         disk_overlay_map = ','.join(disk_chunk_all)
         memory_overlay_map = ','.join(memory_chunk_all)
@@ -610,6 +609,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         synthesized_VM.monitor.terminate()
         synthesized_VM.monitor.join()
         synthesized_VM.terminate()
+        '''
         '''
 
         # send end message

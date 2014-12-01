@@ -250,7 +250,6 @@ class ModeProfile(object):
         #    (each_mode, scaled_p, scaled_r, new_system_bw) = item
         #    diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, each_mode.mode)
         #    print "%s\t%s,%s --> (%s, %s) %s" % (diff_str, network_bw, system_out_bw, scaled_p, scaled_r, new_system_bw)
-        #import pdb;pdb.set_trace()
 
     def show_relative_ratio(self, input_mode):
         pivot_mode = self.find_same_mode(self.overlay_mode_list, input_mode)
@@ -258,7 +257,7 @@ class ModeProfile(object):
         pivot_p = MigrationMode.get_total_P(pivot_mode.block_time)
         pivot_r = MigrationMode.get_total_R(pivot_mode.block_size_ratio)
 
-        for other_mode in self.overlay_mode_list:
+        for index, other_mode in enumerate(self.overlay_mode_list):
             other_p = MigrationMode.get_total_P(other_mode.block_time)
             other_r = MigrationMode.get_total_R(other_mode.block_size_ratio)
             ratio_p = round(other_p/pivot_p, 4)
@@ -267,7 +266,7 @@ class ModeProfile(object):
             if len(mode_diff_str) == 0:
                 mode_diff_str = "original"
             comp_list[other_mode.get_mode_id()] = (ratio_p, ratio_r)
-            #print "%s\t(%s %s)/(%s %s) --> (%s, %s)" % (mode_diff_str[:],  pivot_p, pivot_r, other_p, other_r, ratio_p, ratio_r)
+            print "%d: %s\t(%s %s)/(%s %s) --> (%s, %s)" % (index, mode_diff_str[:],  pivot_p, pivot_r, other_p, other_r, ratio_p, ratio_r)
         return comp_list
 
 
@@ -436,7 +435,6 @@ def profiling(test_ret_list):
         ModeProfile.save_to_file(filename, fluid_exps)
         print "saved at %s" % filename
     if speech_exps:
-        import pdb;pdb.set_trace()
         ModeProfile.save_to_file(filename, speech_exps)
         print "saved at %s" % filename
 
@@ -476,7 +474,6 @@ if __name__ == "__main__":
         mode_profile = ModeProfile.load_from_file(inputfile)
         pivot_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
         mode_profile.show_relative_ratio(pivot_mode)
-        import pdb;pdb.set_trace()
     elif command == "compare":
         another_inputfile = sys.argv[3]
         mode_profile1 = ModeProfile.load_from_file(inputfile)
@@ -487,6 +484,7 @@ if __name__ == "__main__":
         mode_ratio_dict2 = mode_profile2.show_relative_ratio(pivot_mode)
         count_under_threashold = 0
         threshold_percent = 20
+        counter = 0
         for mode_id, (ratio_p1, ratio_r1) in mode_ratio_dict1.iteritems():
             item = mode_ratio_dict2.get(mode_id, None)
             if item is None:
@@ -498,8 +496,8 @@ if __name__ == "__main__":
             r_diff_percent = (r_diff/ratio_r1*100)
             if p_diff_percent < threshold_percent and r_diff_percent < threshold_percent:
                 count_under_threashold += 1
-            print "(%f, %f) - (%f, %f) == %f, %f (%f %f)" % (ratio_p1, ratio_r1, ratio_p2, ratio_r2, p_diff, r_diff, p_diff_percent, r_diff_percent)
-            #import pdb;pdb.set_trace()
+            print "%d: (%f, %f) - (%f, %f) == %f, %f (%f %f)" % (counter, ratio_p1, ratio_r1, ratio_p2, ratio_r2, p_diff, r_diff, p_diff_percent, r_diff_percent)
+            counter += 1
         print "number of item below threashold %d percent: %d out of %d (%f)" % (threshold_percent, count_under_threashold, len(mode_ratio_dict1), (float(count_under_threashold)/len(mode_ratio_dict1)))
     else:
         sys.stderr.write("Invalid command\n")

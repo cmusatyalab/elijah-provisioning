@@ -30,8 +30,10 @@ from Configuration import VMOverlayCreationMode
 from migration_profile import MigrationMode
 from migration_profile import ModeProfileError
 from migration_profile import ModeProfile
+import log as logging
 
 
+LOG = logging.getLogger(__name__)
 _process_controller = None
 
 
@@ -264,17 +266,17 @@ class ProcessManager(threading.Thread):
                     #sys.stdout.write("network speed is not measured\n")
                     continue
                 p_dict, r_dict, system_bw_mbps, p_duct_cur, r_dict_cur, system_bw_mbps_cur  = system_speed
-                print "system : %f (%f)mbps \tnetwork : %f mbps" % (system_bw_mbps,
+                LOG.debug("throughput\tsystem(mbps):%f,%f\tnetwork((mbps):%f" % (system_bw_mbps,
                                                                     system_bw_mbps_cur,
-                                                                    network_bw_mbps)
-                '''
+                                                                    network_bw_mbps))
 
                 # get new mode
                 #if (time_prev_mode_change-time_current_iter) > 5 and len(mode_change_history) == 0:
-                if len(mode_change_history) == 0:
+                if count == -1 and len(mode_change_history) == 0:
+                    # use current throughput
                     new_mode = self.mode_profile.predict_new_mode(self.overlay_creation_mode,
                                                                 p_dict, r_dict,
-                                                                system_bw_mbps,
+                                                                system_bw_mbps_cur,
                                                                 network_bw_mbps)
                     diff_mode = MigrationMode.mode_diff(self.overlay_creation_mode.__dict__, new_mode.__dict__)
                     if diff_mode is not None and len(diff_mode) > 0:
@@ -305,24 +307,6 @@ class ProcessManager(threading.Thread):
                         time_prev_mode_change = time_current_iter
                         self.overlay_creation_mode = new_mode
                 '''
-
-
-                '''
-                if count == 100:
-                    bw_diff = system_bw_mbps - network_bw_mbps
-                    if bw_diff > 1: # network is bottleneck. Do more computation and
-                        print "network is bottleneck"
-                        #self._change_comp_mode(Const.COMPRESSION_LZMA, 9)
-                        self._change_diff_mode("bsdiff")
-                        mode_change_log.append("new")
-                    elif bw_diff < -1:  # computation is bottlneck. Speed up computation
-                        print "computing is bottleneck"
-                        self._change_diff_mode("none")
-                        #self._change_comp_mode(Const.COMPRESSION_GZIP, 1)
-                        mode_change_log.append("new")
-                    else:
-                        # stable
-                        print "current mode is stable"
                 '''
 
                 pass

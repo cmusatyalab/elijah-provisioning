@@ -403,8 +403,8 @@ class DecompProc(multiprocessing.Process):
             proc.join()
         # send end message after the next stage finishes processing
         self.output_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-        sys.stdout.write("[time] Decomp (%s~%s): %s s\n" % \
-                (time_start, time_end, (time_end-time_start)))
+        sys.stdout.write("[time] Decomp using %d proc (%s~%s): %s s\n" % \
+                (self.num_proc, time_start, time_end, (time_end-time_start)))
 
 
 class DecompChildProc(multiprocessing.Process):
