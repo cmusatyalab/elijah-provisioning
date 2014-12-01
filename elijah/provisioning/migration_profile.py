@@ -250,37 +250,23 @@ class ModeProfile(object):
         #    print "%s\t%s,%s --> (%s, %s) %s" % (diff_str, network_bw, system_out_bw, scaled_p, scaled_r, new_system_bw)
         #import pdb;pdb.set_trace()
 
-    def profile(self):
-        pivot_mode = self.overlay_mode_list[0]
+    def show_relative_ratio(self, input_mode):
+        pivot_mode = self.find_same_mode(input_mode)
         comp_list = list()
-        pivot_P = pivot_mode.get_total_P()
-        network_bw, pivot_r = pivot_mode.get_system_throughput()
+        pivot_p = MigrationMode.get_total_P(pivot_mode.block_time)
+        pivot_r = MigrationMode.get_total_R(pivot_mode.block_size_ratio)
 
         for other_mode in self.overlay_mode_list:
-            other_p = other_mode.get_total_P()
-            other_network_bw, other_r = other_mode.get_system_throughput()
-            ratio_p = round(other_p/pivot_P, 4)
-            ratio_network_bw = round(other_network_bw/network_bw, 4)
+            other_p = MigrationMode.get_total_P(other_mode.block_time)
+            other_r = MigrationMode.get_total_R(other_mode.block_size_ratio)
+            ratio_p = round(other_p/pivot_p, 4)
             ratio_r = round(other_r/pivot_r, 4)
             mode_diff_str = MigrationMode.mode_diff_str(pivot_mode.mode, other_mode.mode)
             if len(mode_diff_str) == 0:
                 mode_diff_str = "original"
-            comp_list.append((other_mode, ratio_r, ratio_network_bw))
-            #print "%s\t(%s %s)/(%s %s) --> (%s, %s)" % (mode_diff_str[:], network_bw, pivot_r, other_network_bw, other_r, ratio_network_bw, ratio_r)
+            comp_list.append((other_mode, ratio_p, ratio_r))
+            print "%s\t(%s %s)/(%s %s) --> (%s, %s)" % (mode_diff_str[:],  pivot_p, pivot_r, other_p, other_r, ratio_p, ratio_r)
 
-        # networkBW:5 mbps, actual BW: 10 mps
-        # speed up computation, but do not loose R
-        selected_config = list()
-        for item in comp_list:
-            (mode_str, ratio_r, ratio_network_bw) = item
-            if ratio_network_bw > 1:
-                selected_config.append(item)
-
-        selected_config = sorted(selected_config, key=itemgetter(1))
-        for item in selected_config:
-            (each_mode, ratio_r, ratio_network_bw) = item
-            mode_diff_str = MigrationMode.mode_diff_str(pivot_mode.mode, each_mode.mode)
-            print "%s\t%s,%s" % (mode_diff_str, ratio_r, ratio_network_bw)
 
     @staticmethod
     def load_from_file(profile_path):
@@ -401,6 +387,7 @@ def profile_each_exp(each_exp_dict):
 def _split_experiment(test_ret_list):
     moped_exps = list()
     fluid_exps = list()
+    speech_exps = list()
     face_exps = list()
     mar_exps = list()
     for each_exp in test_ret_list:
@@ -412,8 +399,10 @@ def _split_experiment(test_ret_list):
             face_exps.append(each_exp)
         elif each_exp.workload.find("mar") !=  -1:
             mar_exps.append(each_exp)
+        elif each_exp.workload.find("speech") !=  -1:
+            speech_exps.append(each_exp)
         else:
-            msg = "Invalid workload %s" % each_exp['work']
+            msg = "Invalid workload %s" % each_exp.workload
             print msg
             sys.exit(1)
             raise ModeProfileError(msg)
@@ -422,22 +411,31 @@ def _split_experiment(test_ret_list):
     #    print msg
     #    sys.exit(1)
     #    raise ModeProfileError(msg)
-    return moped_exps, fluid_exps, face_exps, mar_exps
+    return moped_exps, fluid_exps, face_exps, mar_exps, speech_exps
 
 
 
 def profiling(test_ret_list):
     # how change in mode will affect system performance?
-    moped_exps, fluid_exps, face_exps, mar_exps = _split_experiment(test_ret_list)
+    moped_exps, fluid_exps, face_exps, mar_exps, speech_exps = _split_experiment(test_ret_list)
     comp_list = list()
+    filename = "profile.json"
     if moped_exps:
-        ModeProfile.save_to_file("moped-profile", moped_exps)
+        ModeProfile.save_to_file(filename, moped_exps)
+        print "saved at %s" % filename
     if face_exps:
-        ModeProfile.save_to_file("face-profile", face_exps)
+        ModeProfile.save_to_file(filename, face_exps)
+        print "saved at %s" % filename
     if mar_exps:
-        ModeProfile.save_to_file("mar-profile", mar_exps)
+        ModeProfile.save_to_file(filename, mar_exps)
+        print "saved at %s" % filename
     if fluid_exps:
-        ModeProfile.save_to_file("fluid-profile", fluid_exps)
+        ModeProfile.save_to_file(filename, fluid_exps)
+        print "saved at %s" % filename
+    if speech_exps:
+        import pdb;pdb.set_trace()
+        ModeProfile.save_to_file(filename, speech_exps)
+        print "saved at %s" % filename
 
 
 
@@ -471,6 +469,11 @@ if __name__ == "__main__":
         diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, new_mode.__dict__)
         diff = MigrationMode.mode_diff(cur_mode.__dict__, new_mode.__dict__)
         print "%s\n%s\n%s" % (new_mode, diff_str, diff)
+    elif command == "show":
+        mode_profile = ModeProfile.load_from_file(inputfile)
+        pivot_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+        mode_profile.show_relative_ratio(pivot_mode)
     else:
         sys.stderr.write("Invalid command\n")
+
         sys.exit(1)
