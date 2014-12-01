@@ -273,7 +273,8 @@ class RecoverDeltaProc(multiprocessing.Process):
         delta_type = ord(ref_info) & 0x0F
 
         if ref_id == DeltaItem.REF_RAW or \
-                ref_id == DeltaItem.REF_XDELTA:
+                ref_id == DeltaItem.REF_XDELTA or \
+                ref_id == DeltaItem.REF_BSDIFF:
             data_len = struct.unpack("!Q", stream[offset:offset+8])[0]
             offset += 8
             data = stream[offset:offset+data_len]
@@ -524,7 +525,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             network_out_queue = multiprocessing.Queue()
             decomp_queue = multiprocessing.Queue()
             fuse_info_queue = multiprocessing.Queue()
-            decomp_proc = DecompProc(network_out_queue, decomp_queue)
+            decomp_proc = DecompProc(network_out_queue, decomp_queue, num_proc=4)
             decomp_proc.start()
             LOG.info("Start Decompression process")
             delta_proc = RecoverDeltaProc(base_diskpath, base_mempath,
