@@ -3,6 +3,7 @@ import sys
 import os
 import ast
 import json
+import math
 from pprint import pprint
 from collections import defaultdict
 from Configuration import VMOverlayCreationMode
@@ -155,7 +156,7 @@ class ModeProfile(object):
 
 
     def predict_new_mode(self, cur_mode, cur_p, cur_r, system_out_bw, network_bw):
-        overlay_mode = self.find_same_mode(cur_mode)
+        overlay_mode = ModeProfile.find_same_mode(self.overlay_mode_list, cur_mode)
         if overlay_mode == None:
             msg = "Cannot find matching mode with %s" % str(cur_mode.__dict__)
             raise ModeProfileError(msg)
@@ -166,8 +167,9 @@ class ModeProfile(object):
                                            network_bw)
         return VMOverlayCreationMode.from_dictionary(new_mode.mode)
 
-    def find_same_mode(self, in_mode):
-        for overlay_mode in self.overlay_mode_list:
+    @staticmethod
+    def find_same_mode(overlay_mode_list, in_mode):
+        for overlay_mode in overlay_mode_list:
             id1 = overlay_mode.get_mode_id()
             id2 = in_mode.get_mode_id()
             if id1 == id2:
@@ -251,8 +253,8 @@ class ModeProfile(object):
         #import pdb;pdb.set_trace()
 
     def show_relative_ratio(self, input_mode):
-        pivot_mode = self.find_same_mode(input_mode)
-        comp_list = list()
+        pivot_mode = self.find_same_mode(self.overlay_mode_list, input_mode)
+        comp_list = dict()
         pivot_p = MigrationMode.get_total_P(pivot_mode.block_time)
         pivot_r = MigrationMode.get_total_R(pivot_mode.block_size_ratio)
 
@@ -264,8 +266,9 @@ class ModeProfile(object):
             mode_diff_str = MigrationMode.mode_diff_str(pivot_mode.mode, other_mode.mode)
             if len(mode_diff_str) == 0:
                 mode_diff_str = "original"
-            comp_list.append((other_mode, ratio_p, ratio_r))
-            print "%s\t(%s %s)/(%s %s) --> (%s, %s)" % (mode_diff_str[:],  pivot_p, pivot_r, other_p, other_r, ratio_p, ratio_r)
+            comp_list[other_mode.get_mode_id()] = (ratio_p, ratio_r)
+            #print "%s\t(%s %s)/(%s %s) --> (%s, %s)" % (mode_diff_str[:],  pivot_p, pivot_r, other_p, other_r, ratio_p, ratio_r)
+        return comp_list
 
 
     @staticmethod
@@ -440,7 +443,7 @@ def profiling(test_ret_list):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 3:
         sys.stderr.write("%prog [parse|test] filename\n")
         sys.exit(1)
     command = sys.argv[1]
@@ -473,6 +476,30 @@ if __name__ == "__main__":
         mode_profile = ModeProfile.load_from_file(inputfile)
         pivot_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
         mode_profile.show_relative_ratio(pivot_mode)
+    elif command == "compare":
+        another_inputfile = sys.argv[3]
+        mode_profile1 = ModeProfile.load_from_file(inputfile)
+        mode_profile2 = ModeProfile.load_from_file(another_inputfile)
+        pivot_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+
+        mode_ratio_dict1 = mode_profile1.show_relative_ratio(pivot_mode)
+        mode_ratio_dict2 = mode_profile2.show_relative_ratio(pivot_mode)
+        count_under_threashold = 0
+        threshold_percent = 20
+        for mode_id, (ratio_p1, ratio_r1) in mode_ratio_dict1.iteritems():
+            item = mode_ratio_dict2.get(mode_id, None)
+            if item is None:
+                sys.stderr.write("Failed to find matching mode with %s\n" % mode)
+            (ratio_p2, ratio_r2) = item
+            p_diff = math.fabs(ratio_p1 - ratio_p2)
+            r_diff = math.fabs(ratio_r1 - ratio_r2)
+            p_diff_percent = (p_diff/ratio_p1*100)
+            r_diff_percent = (r_diff/ratio_r1*100)
+            if p_diff_percent < threshold_percent and r_diff_percent < threshold_percent:
+                count_under_threashold += 1
+            print "(%f, %f) - (%f, %f) == %f, %f (%f %f)" % (ratio_p1, ratio_r1, ratio_p2, ratio_r2, p_diff, r_diff, p_diff_percent, r_diff_percent)
+            #import pdb;pdb.set_trace()
+        print "number of item below threashold %d percent: %d out of %d (%f)" % (threshold_percent, count_under_threashold, len(mode_ratio_dict1), (float(count_under_threashold)/len(mode_ratio_dict1)))
     else:
         sys.stderr.write("Invalid command\n")
 
