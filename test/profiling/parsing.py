@@ -86,6 +86,7 @@ def parse_each_experiement(lines):
 
     # process filtered log data
     exp = Experiment()
+    workload = lines[0].split(" ")[-1]
     setattr(exp, 'workload', os.path.basename(workload))
     setattr(exp, 'mode', config_dict)
     setattr(exp, 'stage_size_in', dict.fromkeys(stage_names, 0))

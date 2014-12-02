@@ -1260,8 +1260,9 @@ class QmpThread(threading.Thread):
 
                 if len(iteration_issue_time_list) > 2:
                     latest_time_diff = iteration_issue_time_list[-1] - iteration_issue_time_list[-2]
-                    LOG.debug("[live] stop signal? %f %f" % (latest_time_diff, sleep_between_iteration*1.4))
+                    #LOG.debug("[live] stop signal? %f %f" % (latest_time_diff, sleep_between_iteration*1.4))
                     if latest_time_diff < sleep_between_iteration*1.4:
+                        LOG.debug("[live] stop migration at %f" % time())
                         self._stop_migration()
                         break
         self.qmp.disconnect()

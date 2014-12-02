@@ -62,7 +62,7 @@ def set_affiinity(num_cores):
 
 def profiling_workload():
     mode_list = list()
-    for diff in ("xdelta3", "bsdiff", "none"):
+    for diff in ("xdelta3", "bsdiff"):
         for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
             for comp_level in [1, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
                 overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
@@ -156,9 +156,9 @@ if __name__ == "__main__":
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     workloads = [
         (linux_base_path, moped),
-        (linux_base_path, speech),
+        #(linux_base_path, speech),
         (windows_base_path, face),
-        (windows_base_path, mar),
+        #(windows_base_path, mar),
         #(linux_base_path, fluid),
     ]
     for (base_path, overlay_path) in workloads:
@@ -185,8 +185,8 @@ if __name__ == "__main__":
             msg = "Assign core should be equal to every stage for profiling"
             raise ProfilingError(msg)
 
-    #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
-    VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
+    VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
+    #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
     for (base_path, overlay_path) in workloads:
         for each_mode in mode_list:
             is_url, overlay_url = PackagingUtil.is_zip_contained(overlay_path)

@@ -160,12 +160,12 @@ class ModeProfile(object):
         if overlay_mode == None:
             msg = "Cannot find matching mode with %s" % str(cur_mode.__dict__)
             raise ModeProfileError(msg)
-        new_mode = self.find_matching_mode(overlay_mode,
+        new_mode, expected_bw = self.find_matching_mode(overlay_mode,
                                            cur_mode,
                                            cur_p, cur_r,
                                            system_out_bw,
                                            network_bw)
-        return VMOverlayCreationMode.from_dictionary(new_mode.mode)
+        return VMOverlayCreationMode.from_dictionary(new_mode.mode), expected_bw
 
     @staticmethod
     def find_same_mode(overlay_mode_list, in_mode):
@@ -180,11 +180,6 @@ class ModeProfile(object):
         return None
 
     def find_matching_mode(self, new_mode, cur_mode, cur_p, cur_r, system_out_bw, network_bw):
-        # to be deleted
-        for key, in_size in new_mode.block_size_in.iteritems():
-            out_size = new_mode.block_size_out[key] 
-            new_mode.block_size_ratio[key] = float(out_size)/float(in_size)
-
         # get scaling factor between current workload and profiled data
         new_total_P = new_mode.get_total_P(new_mode.block_time)
         new_total_R = new_mode.get_total_R(new_mode.block_size_ratio)
@@ -226,13 +221,13 @@ class ModeProfile(object):
                 if desirable_bw_increase > 0:
                     # chose the most fastest one
                     selected_item = sorted(scaled_mode_list, key=itemgetter(3), reverse=True)[0]
-                    return selected_item[0]
+                    return selected_item[0], selected_item[3]
                 else:
                     # choose the slowest one
                     selected_item = sorted(scaled_mode_list, key=itemgetter(3))[0]
-                    return selected_item[0]
+                    return selected_item[0], selected_item[3]
         elif len(candidate_mode_list) == 1:
-            return candidate_mode_list[0][0]
+            return candidate_mode_list[0][0], candidate_mode_list[0][3]
         else:
             if desirable_bw_increase > 0:
                 # increase system speed to use more network BW
@@ -244,7 +239,7 @@ class ModeProfile(object):
                 # choose the one that has the shortest speed (minimal P)
                 # --> more compression, but little cpu usage
                 sorted_candidate = sorted(candidate_mode_list, key=itemgetter(1))
-            return sorted_candidate[0][0]
+            return sorted_candidate[0][0], candidate_mode_list[0][3]
 
         #for item in sorted_candidate:
         #    (each_mode, scaled_p, scaled_r, new_system_bw) = item
@@ -454,8 +449,10 @@ if __name__ == "__main__":
         mode_profile = ModeProfile.load_from_file(inputfile)
 
         # measured information
-        cur_p = {'CreateMemoryDeltalist': 0.5540335827711419, 'CreateDiskDeltalist': 0.5118202023133814, 'DeltaDedup': 0.0024018974990242282, 'CompressProc': 0.45448795749054516}
-        cur_r = {'CreateMemoryDeltalist': 0.48741149800555605, 'CreateDiskDeltalist': 0.3919707506873821, 'DeltaDedup': 0.6054054544199231, 'CompressProc': 0.7024070026179592}
+        #cur_p = {'CreateMemoryDeltalist': 0.5540335827711419, 'CreateDiskDeltalist': 0.5118202023133814, 'DeltaDedup': 0.0024018974990242282, 'CompressProc': 0.45448795749054516}
+        #cur_r = {'CreateMemoryDeltalist': 0.48741149800555605, 'CreateDiskDeltalist': 0.3919707506873821, 'DeltaDedup': 0.6054054544199231, 'CompressProc': 0.7024070026179592}
+        cur_p = {'CreateMemoryDeltalist': 0.4783808994407537, 'CreateDiskDeltalist': 0.570339626736111, 'DeltaDedup': 0.002555257442187298, 'CompressProc' : 0.3812372962072634}
+        cur_r = {'CreateMemoryDeltalist': 0.38805050540961844, 'CreateDiskDeltalist': 0.5385452558238136, 'DeltaDedup': 0.44503177663442506, 'CompressProc': 0.705690302854004}
         cur_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
 
         # get system throughput using P and R
@@ -463,13 +460,13 @@ if __name__ == "__main__":
         total_r= MigrationMode.get_total_R(cur_r)
 
         system_out_bw = MigrationMode.get_system_throughput(cur_mode.NUM_PROC_COMPRESSION, total_p, total_r)
-        network_bw = 100 # mbps
+        network_bw = 50 # mbps
 
         # get new mode
-        new_mode = mode_profile.predict_new_mode(cur_mode, cur_p, cur_r, system_out_bw, network_bw)
+        new_mode, expected_bw = mode_profile.predict_new_mode(cur_mode, cur_p, cur_r, system_out_bw, network_bw)
         diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, new_mode.__dict__)
         diff = MigrationMode.mode_diff(cur_mode.__dict__, new_mode.__dict__)
-        print "%s\n%s\n%s" % (new_mode, diff_str, diff)
+        print "%f mbps (expected), %s\n%s\n%s" % (expected_bw, new_mode, diff_str, diff)
     elif command == "show":
         mode_profile = ModeProfile.load_from_file(inputfile)
         pivot_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
