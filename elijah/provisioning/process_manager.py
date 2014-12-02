@@ -266,12 +266,13 @@ class ProcessManager(threading.Thread):
                     #sys.stdout.write("network speed is not measured\n")
                     continue
                 p_dict, r_dict, system_bw_mbps, p_duct_cur, r_dict_cur, system_bw_mbps_cur  = system_speed
-                LOG.debug("throughput\tsystem(mbps):%f,%f\tnetwork((mbps):%f" % (system_bw_mbps,
-                                                                    system_bw_mbps_cur,
-                                                                    network_bw_mbps))
+                LOG.debug("throughput\t%f\tsystem(mbps):%f,%f\tnetwork((mbps):%f" % (time_current_iter,
+                                                                                     system_bw_mbps,
+                                                                                     system_bw_mbps_cur,
+                                                                                     network_bw_mbps))
 
                 # get new mode
-                #if (time_prev_mode_change-time_current_iter) > 5 and len(mode_change_history) == 0:
+                #if (time_current_iter-time_prev_mode_change) > 5:   # apply after 5 seconds
                 if count == -1 and len(mode_change_history) == 0:
                     # use current throughput
                     new_mode = self.mode_profile.predict_new_mode(self.overlay_creation_mode,
