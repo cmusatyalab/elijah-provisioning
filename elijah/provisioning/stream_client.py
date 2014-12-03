@@ -55,12 +55,13 @@ class StreamSynthesisClientError(Exception):
     pass
 
 class NetworkMeasurementThread(threading.Thread):
-    def __init__(self, sock, blob_sent_time_dict, monitor_network_bw):
+    def __init__(self, sock, blob_sent_time_dict, monitor_network_bw, vm_resume_time_at_dest):
         self.sock = sock
         self.blob_sent_time_dict = blob_sent_time_dict
 
         # shared memory
         self.monitor_network_bw = monitor_network_bw
+        self.vm_resume_time_at_dest = vm_resume_time_at_dest
         threading.Thread.__init__(self, target=self.receiving)
 
     def receiving(self):
@@ -96,6 +97,10 @@ class NetworkMeasurementThread(threading.Thread):
 
                 self.monitor_network_bw.value = averaged_bw
             elif (ack == 0x10):
+                data = self.sock.recv(8)
+                vm_resume_time = struct.unpack("!d", data)[0]
+                self.vm_resume_time_at_dest.value = float(vm_resume_time)
+                print "migration resume time: %f" % vm_resume_time
                 break
             else:
                 print "error"
@@ -112,6 +117,7 @@ class StreamSynthesisClient(process_manager.ProcWorker):
         # measurement
         self.monitor_network_bw = multiprocessing.RawValue(ctypes.c_double, 0)
         self.monitor_network_bw.value = 0.0
+        self.vm_resume_time_at_dest = multiprocessing.RawValue(ctypes.c_double, 0)
 
         self.is_first_recv = False
         self.time_first_recv = 0
@@ -128,7 +134,8 @@ class StreamSynthesisClient(process_manager.ProcWorker):
         self.blob_sent_time_dict = dict()
         self.receive_thread = NetworkMeasurementThread(sock,
                                                        self.blob_sent_time_dict,
-                                                       self.monitor_network_bw)
+                                                       self.monitor_network_bw,
+                                                       self.vm_resume_time_at_dest)
         self.receive_thread.start()
 
         # send header
@@ -195,4 +202,3 @@ class StreamSynthesisClient(process_manager.ProcWorker):
         sys.stdout.write("Finish transmission. Waiting for finishing migration\n")
         self.receive_thread.join()
         sock.close()
-

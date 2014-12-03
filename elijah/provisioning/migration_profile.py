@@ -206,7 +206,8 @@ class ModeProfile(object):
             each_r = new_mode.get_total_R(each_mode.block_size_ratio)
             scaled_each_p = each_p * scale_p
             scaled_each_r = each_r * scale_r
-            new_system_bw = MigrationMode.get_system_throughput(cur_mode.NUM_PROC_COMPRESSION,
+            num_cores = VMOverlayCreationMode.get_num_cores()
+            new_system_bw = MigrationMode.get_system_throughput(num_cores,
                                                                 scaled_each_p,
                                                                 scaled_each_r)
             diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, each_mode.mode)
@@ -469,6 +470,7 @@ if __name__ == "__main__":
         total_p = MigrationMode.get_total_P(cur_p)
         total_r= MigrationMode.get_total_R(cur_r)
 
+        num_cores = VMOverlayCreationMode.get_num_cores()
         system_out_bw = MigrationMode.get_system_throughput(cur_mode.NUM_PROC_COMPRESSION, total_p, total_r)
         network_bw = 1# mbps
 

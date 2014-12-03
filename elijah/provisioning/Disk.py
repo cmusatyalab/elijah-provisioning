@@ -240,7 +240,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         xrayed_list = []
 
         # launch child processes
-        task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_DISK_DIFF)
+        task_queue = multiprocessing.Queue(maxsize=VMOverlayCreationMode.MAX_CPU_CORE)
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
             mode_queue = multiprocessing.Queue()
@@ -491,12 +491,19 @@ class DiskDiffProc(multiprocessing.Process):
             inready, outread, errready = select.select(input_list, [], [])
             if self.mode_queue._reader.fileno() in inready:
                 # change mode
-                new_mode = self.mode_queue.get()
-                new_diff_algorithm = new_mode.get("diff_algorithm", None)
-                sys.stdout.write("Change diff algorithm for disk from (%s) to (%s)\n" %
-                                 (self.diff_algorithm, new_diff_algorithm))
-                if new_diff_algorithm is not None:
-                    self.diff_algorithm = new_diff_algorithm
+                (command, value) = self.mode_queue.get()
+                if command == "new_mode":
+                    new_mode = value
+                    new_diff_algorithm = new_mode.get("diff_algorithm", None)
+                    sys.stdout.write("Change diff algorithm for disk from (%s) to (%s)\n" %
+                                    (self.diff_algorithm, new_diff_algorithm))
+                    if new_diff_algorithm is not None:
+                        self.diff_algorithm = new_diff_algorithm
+                elif command == "new_num_cores":
+                    new_num_cores = value
+                    #print "[disk] child receives new num cores: %s" % (new_num_cores)
+                    if new_num_cores is not None:
+                        VMOverlayCreationMode.set_num_cores(new_num_cores)
             if self.task_queue._reader.fileno() in inready:
                 task_list = self.task_queue.get()
                 if task_list == Const.QUEUE_SUCCESS_MESSAGE:

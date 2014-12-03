@@ -473,7 +473,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
     def change_mode(self, new_mode):
         for (proc, c_queue, m_queue) in self.proc_list:
             if proc.is_alive() == True:
-                m_queue.put(new_mode)
+                m_queue.put(("new_mode", new_mode))
 
     def _process_libvirt_header(self, libvirt_header_list):
         base_memory_fd = open(self.basemem_path)
@@ -587,7 +587,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         # launch child processes
         output_fd_list = list()
         base_hashlist_length = len(self.memory_hashlist)
-        self.task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_MEMORY_DIFF)
+        self.task_queue = multiprocessing.Queue(maxsize=VMOverlayCreationMode.MAX_CPU_CORE)
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
             mode_queue = multiprocessing.Queue()
@@ -630,6 +630,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                         if control_msg == "change_mode":
                             new_mode = self.control_queue.get()
                             self.change_mode(new_mode)
+
                 if memory_data_queue._reader.fileno() in input_ready:
                     recved_data = memory_data_queue.get()
                     if is_first_recv == False:
@@ -938,12 +939,19 @@ class MemoryDiffProc(multiprocessing.Process):
             inready, outread, errready = select.select(input_list, [], [])
             if self.mode_queue._reader.fileno() in inready:
                 # change mode
-                new_mode = self.mode_queue.get()
-                new_diff_algorithm = new_mode.get("diff_algorithm", None)
-                sys.stdout.write("Change diff algorithm for memory from (%s) to (%s)\n" %
-                                 (self.diff_algorithm, new_diff_algorithm))
-                if new_diff_algorithm is not None:
-                    self.diff_algorithm = new_diff_algorithm
+                (command, value) = self.mode_queue.get()
+                if command == "new_mode":
+                    new_mode = value
+                    new_diff_algorithm = new_mode.get("diff_algorithm", None)
+                    sys.stdout.write("Change diff algorithm for memory from (%s) to (%s)\n" %
+                                    (self.diff_algorithm, new_diff_algorithm))
+                    if new_diff_algorithm is not None:
+                        self.diff_algorithm = new_diff_algorithm
+                elif command == "new_num_cores":
+                    new_num_cores = value
+                    #print "[memory] child receives new num cores: %s" % (new_num_cores)
+                    if new_num_cores is not None:
+                        VMOverlayCreationMode.set_num_cores(new_num_cores)
             if self.task_queue._reader.fileno() in inready:
                 memory_chunk_list = self.task_queue.get()
                 #print "getting a new job: %s %d" % (type(memory_chunk_list), len(memory_chunk_list))

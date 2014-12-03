@@ -1226,13 +1226,15 @@ class LibvirtThread(threading.Thread):
 
 
 class QmpThread(threading.Thread):
-    def __init__(self, qmp_path, memory_snapshot_queue, overlay_mode, fuse_stream_monitor):
+    def __init__(self, qmp_path, memory_snapshot_queue, compdata_queue, overlay_mode, fuse_stream_monitor):
         self.qmp_path = qmp_path
         self.memory_snapshot_queue = memory_snapshot_queue
+        self.compdata_queue = compdata_queue
         self.overlay_mode = overlay_mode
         self.stop = threading.Event()
         self.qmp = qmp_af_unix.QmpAfUnix(self.qmp_path)
         self.fuse_stream_monitor = fuse_stream_monitor
+        self.migration_stop_time = 0
         threading.Thread.__init__(self, target=self.control_migration)
 
     def control_migration(self):
@@ -1243,7 +1245,7 @@ class QmpThread(threading.Thread):
         sleep(5)
 
         if VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
-            self._stop_migration()
+            self.migration_stop_time = self._stop_migration()
         elif VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE:
             iteration_issue_time_list = list()
             sleep_between_iteration = 2
@@ -1251,19 +1253,23 @@ class QmpThread(threading.Thread):
                 unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
                     VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
                 #LOG.debug("[live] %d" % unprocessed_memory_snapshot_size)
-                if unprocessed_memory_snapshot_size < 1024*1024*50: # 50 MB
+                if unprocessed_memory_snapshot_size < 1024*1024*10: # 10 MB
                     LOG.debug("[live][qmp] iterate_raw_live")
                     ret = self.qmp.iterate_raw_live()
                     iteration_issue_time_list.append(time())
                     sleep(sleep_between_iteration)
 
-                if len(iteration_issue_time_list) > 2:
-                    latest_time_diff = iteration_issue_time_list[-1] - iteration_issue_time_list[-2]
-                    #LOG.debug("[live] stop signal? %f %f" % (latest_time_diff, sleep_between_iteration*1.4))
-                    if latest_time_diff < sleep_between_iteration*1.4:
-                        self._stop_migration()
+                if len(iteration_issue_time_list) < 2:
+                    continue
+
+                latest_time_diff = iteration_issue_time_list[-1] - iteration_issue_time_list[-2]
+                if latest_time_diff < sleep_between_iteration*1.4:
+                    if self.compdata_queue.qsize() == 0:
+                        # stop after transmitting everything
+                        self.migration_stop_time = self._stop_migration()
                         break
         self.qmp.disconnect()
+
 
     def _stop_migration(self):
         #self._waiting(self.timeout)
@@ -1271,6 +1277,7 @@ class QmpThread(threading.Thread):
         stop_time = self.qmp.stop_raw_live()
         LOG.debug("[live] stop migration at %f" % stop_time)
         self.fuse_stream_monitor.terminate()
+        return stop_time
 
     def _waiting(self, timeout):
         for index in range(timeout):
@@ -1573,7 +1580,7 @@ def create_residue(base_disk, base_hashvalue,
         #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
         #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
 
-        NUM_CORES = 2
+        NUM_CORES = 4
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CORES)
         VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
 
@@ -1610,7 +1617,7 @@ def create_residue(base_disk, base_hashvalue,
                                                            (time_ss-time_start)))
 
     qmp_thread = QmpThread(resumed_vm.qmp_channel, memory_snapshot_queue,
-                           overlay_mode, resumed_vm.monitor)
+                           compdata_queue, overlay_mode, resumed_vm.monitor)
     qmp_thread.daemon = True
 
     memory_read_proc = save_mem_snapshot(resumed_vm.conn,
@@ -1703,6 +1710,12 @@ def create_residue(base_disk, base_hashvalue,
 
         LOG.debug("[time] Time for finishing transferring (%f ~ %f): %f" % (time_start, time_end,
                                                                 (time_end-time_start)))
+        qmp_thread.join()
+        migration_stop_command_time = qmp_thread.migration_stop_time
+        vm_resume_time_at_dest = client.vm_resume_time_at_dest.value
+        LOG.debug("migration stop time: %f" % migration_stop_command_time)
+        LOG.debug("VM resume time at dest: %f" %vm_resume_time_at_dest)
+        LOG.debug("migration downtime: %f" % (vm_resume_time_at_dest-migration_stop_command_time))
         return None
     elif migration_addr.startswith("file"):
         temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")

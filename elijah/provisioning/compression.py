@@ -71,6 +71,9 @@ class CompressProc(process_manager.ProcWorker):
                     if control_msg == "change_mode":
                         new_mode = self.control_queue.get()
                         self.change_mode(new_mode)
+                    elif control_msg == "change_cores":
+                        num_cores = self.control_queue.get()
+                        self.change_affinity(num_cores)
             if self.delta_list_queue._reader.fileno() in input_ready:
                 deltaitem_list = self.delta_list_queue.get()
                 if self.is_first_recv == False:
@@ -97,7 +100,7 @@ class CompressProc(process_manager.ProcWorker):
             time_start = time.time()
 
             # launch child processes
-            self.task_queue = multiprocessing.Queue(maxsize=self.overlay_mode.NUM_PROC_COMPRESSION)
+            self.task_queue = multiprocessing.Queue(maxsize=VMOverlayCreationMode.MAX_CPU_CORE)
             for i in range(self.num_proc):
                 command_queue = multiprocessing.Queue()
                 mode_queue = multiprocessing.Queue()
@@ -248,16 +251,23 @@ class CompChildProc(multiprocessing.Process):
             inready, outread, errready = select.select(input_list, [], [])
             if self.mode_queue._reader.fileno() in inready:
                 # change mode
-                new_mode = self.mode_queue.get()
-                new_comp_type = new_mode.get("comp_type", None)
-                new_comp_level = new_mode.get("comp_level", None)
-                sys.stdout.write("Change Compression mode: from (%s, %s) to (%s, %s)\n" %
-                                 (self.comp_type, self.comp_level,
-                                  new_comp_type, new_comp_level))
-                if new_comp_type is not None:
-                    self.comp_type = new_comp_type
-                if new_comp_level is not None:
-                    self.comp_level = new_comp_level
+                (command, value) = self.mode_queue.get()
+                if command == "new_mode":
+                    new_mode = value
+                    new_comp_type = new_mode.get("comp_type", None)
+                    new_comp_level = new_mode.get("comp_level", None)
+                    sys.stdout.write("Change Compression mode: from (%s, %s) to (%s, %s)\n" %
+                                    (self.comp_type, self.comp_level,
+                                    new_comp_type, new_comp_level))
+                    if new_comp_type is not None:
+                        self.comp_type = new_comp_type
+                    if new_comp_level is not None:
+                        self.comp_level = new_comp_level
+                elif command == "new_num_cores":
+                    new_num_cores = value
+                    print "[comp] child receives new num cores: %s" % (new_num_cores)
+                    if new_num_cores is not None:
+                        VMOverlayCreationMode.set_num_cores(new_num_cores)
             if self.task_queue._reader.fileno() in inready:
                 input_task = self.task_queue.get()
                 if input_task == Const.QUEUE_SUCCESS_MESSAGE:

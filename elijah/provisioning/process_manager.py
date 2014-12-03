@@ -110,6 +110,14 @@ class ProcessManager(threading.Thread):
                     sys.stderr.write(msg)
         return response_dict
 
+    def _change_num_cores(self, new_num_cores):
+        worker_names = self.process_list.keys()
+        for worker_name in ["CreateMemoryDeltalist", "CreateDiskDeltalist", "CompressProc", "DeltaDedup"]:
+            if worker_name in worker_names:
+                self._send_query("change_cores",
+                                [worker_name],
+                                data={"num_cores":new_num_cores})
+
     def _change_comp_mode(self, comp_type, comp_level):
         worker_names = self.process_list.keys()
         if "CompressProc" in worker_names:
@@ -209,10 +217,10 @@ class ProcessManager(threading.Thread):
         total_r = MigrationMode.get_total_R(r_dict)
         total_p_cur = MigrationMode.get_total_P(p_dict_cur)
         total_r_cur = MigrationMode.get_total_R(r_dict_cur)
-        system_out_bw_mbps = MigrationMode.get_system_throughput(self.overlay_creation_mode.get_num_cores(),
+        system_out_bw_mbps = MigrationMode.get_system_throughput(VMOverlayCreationMode.get_num_cores(),
                                                                  total_p,
                                                                  total_r)
-        system_out_bw_mbps_cur = MigrationMode.get_system_throughput(self.overlay_creation_mode.get_num_cores(),
+        system_out_bw_mbps_cur = MigrationMode.get_system_throughput(VMOverlayCreationMode.get_num_cores(),
                                                                      total_p_cur,
                                                                      total_r_cur)
         #sys.stdout.write("P: %f, %f \tR:%f, %f, BW: %f, %f mbps\t(%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f)\n" % \
@@ -259,7 +267,6 @@ class ProcessManager(threading.Thread):
             return network_bw_mbps # mbps
         else:
             return 1024*1024*200*8 # disk speed (200 MBps)
-            #return 8.672088
 
     def start_managing(self):
         time_s = time.time()
@@ -301,29 +308,31 @@ class ProcessManager(threading.Thread):
                                                                                   system_bw_mbps_cur,
                                                                                   network_bw_mbps)
                     (new_mode_object, new_total_p, new_total_r, expected_bw) = item
+                    LOG.debug("Mode prediction result: %d\tExpected BW: %f" % (predict_status, expected_bw))
                     diff_mode = MigrationMode.mode_diff(self.overlay_creation_mode.__dict__, new_mode_object.mode)
-
-
 
                     if diff_mode is not None and len(diff_mode) > 0:
                         # cannot find proper mode
                         if predict_status == ModeProfile.MATCHING_BEST_EFFORT:
-                            cur_cores = self.overlay_creation_mode.get_num_cores()
+                            cur_core_num = VMOverlayCreationMode.get_num_cores()
+                            new_core_num = cur_core_num
                             max_cores = 4
                             diff_bw_ratio = network_bw_mbps/system_bw_mbps_cur
                             if diff_bw_ratio > 1:
                                 # increase system throughput --> more cores
-                                wanted_core = math.ceil(cur_cores * diff_bw_ratio)
+                                wanted_core = math.ceil(cur_core_num * diff_bw_ratio)
                                 new_core_num = min(wanted_core, max_cores)
                                 self.overlay_creation_mode.set_num_cores(new_core_num)
-                                LOG.debug("Allocate more cores: from %d to %d" % (cur_cores, new_core_num))
+                                LOG.debug("Allocate more cores: from %d to %d" % (cur_core_num, new_core_num))
                             else:
                                 # decurease system throughput --> less cores
-                                wanted_core = math.floor(cur_cores * diff_bw_ratio)
+                                wanted_core = math.floor(cur_core_num * diff_bw_ratio)
                                 new_core_num = max(wanted_core, 1)
                                 self.overlay_creation_mode.set_num_cores(new_core_num)
-                                LOG.debug("Deallocate cores: from %d to %d" % (cur_cores, new_core_num))
+                                LOG.debug("Deallocate cores: from %d to %d" % (cur_core_num, new_core_num))
                             # print log
+                            if cur_core_num != new_core_num:
+                                self._change_num_cores(new_core_num)
                         else:
                             # check compression
                             new_comp_level = None
@@ -353,7 +362,6 @@ class ProcessManager(threading.Thread):
                             time_prev_mode_change = time_current_iter
 
                             # print log
-                            LOG.debug("Mode prediction result: %d\tExpected BW: %f" % (predict_status, expected_bw))
                             diff_str = MigrationMode.mode_diff_str(old_mode_dict, self.overlay_creation_mode.__dict__)
                             LOG.debug("Mode change %s" % (diff_str))
                 '''
@@ -417,6 +425,11 @@ class ProcWorker(multiprocessing.Process):
         self.monitor_current_put_time = multiprocessing.Value('d', -1.0)
         super(ProcWorker, self).__init__(*args, **kwargs)
 
+    def change_affinity_child(self, new_num_cores):
+        for (proc, c_queue, m_queue) in self.proc_list:
+            if proc.is_alive() == True:
+                m_queue.put(("new_num_cores", new_num_cores))
+
     def _handle_control_msg(self, control_msg):
         if control_msg == "current_bw":
             self.response_queue.put(self.monitor_current_bw)
@@ -427,6 +440,15 @@ class ProcWorker(multiprocessing.Process):
             #(utime, stime, child_utime, child_stime, elaspe_time) = os.times()
             #all_times = utime+stime+child_utime+child_stime
             self.response_queue.put(os.times())
+            return True
+        elif control_msg == "change_cores":
+            new_num_cores = self.control_queue.get()
+            num_cores = new_num_cores.get("num_cores", None)
+            if num_cores is not None:
+                #print "[%s] itself receives new num cores: %s" % (self, num_cores)
+                VMOverlayCreationMode.set_num_cores(num_cores)
+                if getattr(self, "proc_list", None):
+                    self.change_affinity_child(num_cores)
             return True
         else:
             #sys.stdout.write("Cannot be handled in super class\n")

@@ -19,11 +19,7 @@
 #
 
 import os
-try:
-    import affinity
-except ImportError as e:
-    sys.stderr.write("Cannot find affinity package\n")
-    sys.exit(1)
+import affinity
 
 
 class ConfigurationError(Exception):
@@ -175,7 +171,11 @@ class VMOverlayCreationMode(object):
         self.QUEUE_SIZE_COMPRESSION                 = -1 # one per DeltaImte
 
         # number of CPU allocated
-        self.set_num_cores(num_cores)
+        VMOverlayCreationMode.set_num_cores(num_cores)
+        #self.NUM_PROC_MEMORY_DIFF = num_cores
+        #self.NUM_PROC_DISK_DIFF = num_cores
+        #self.NUM_PROC_OPTIMIZATION = num_cores
+        #self.NUM_PROC_COMPRESSION = num_cores
 
         self.MEMORY_DIFF_ALGORITHM                  = "xdelta3" # "xdelta3", "bsdiff", "none"
         self.DISK_DIFF_ALGORITHM                    = "xdelta3" # "xdelta3", "bsdiff", "none"
@@ -198,7 +198,8 @@ class VMOverlayCreationMode(object):
                 del new_mode_dict[key]
         self.__dict__.update(new_mode_dict)
 
-    def set_num_cores(self, num_cores):
+    @staticmethod
+    def set_num_cores(num_cores):
         # assuming 8 cores
         affinity_mask = 0x01
         if num_cores == 1:
@@ -210,20 +211,17 @@ class VMOverlayCreationMode(object):
         elif num_cores ==4:
             affinity_mask = 0x1e # cpu 1,2,3,4
         else:
-            raise IOException("Do not allocate more than 4 cores at this experiement")
+            raise Exception("Do not allocate more than 4 cores at this experiement")
 
         affinity.set_process_affinity_mask(os.getpid(), affinity_mask)
         updated_mask = affinity.get_process_affinity_mask(os.getpid())
         if affinity_mask != updated_mask:
             raise Exception("Cannot not set affinity mask: from %s to %s" % (affinity_mask, updated_mask))
 
-        print "change num core to %d, affinity: %s, %s" % (num_cores, affinity_mask, updated_mask)
-        self.NUM_PROC_MEMORY_DIFF = num_cores
-        self.NUM_PROC_DISK_DIFF = num_cores
-        self.NUM_PROC_OPTIMIZATION = num_cores
-        self.NUM_PROC_COMPRESSION = num_cores
+        print "[%d] change num core to %d, affinity: %s, %s" % (os.getpid(), num_cores, affinity_mask, updated_mask)
 
-    def get_num_cores(self):
+    @staticmethod
+    def get_num_cores():
         num_cores = 0
         affinity_mask = affinity.get_process_affinity_mask(os.getpid())
         if affinity_mask == 0x02:     # cpu 1
@@ -268,7 +266,7 @@ class VMOverlayCreationMode(object):
     @staticmethod
     def get_serial_single_process():
         mode = VMOverlayCreationMode(num_cores=1)
-        num_cores = mode.get_num_cores()
+        num_cores = VMOverlayCreationMode.get_num_cores()
         if num_cores is not 1:
             raise CloudletGenerationError("Cannot allocate only 1 core")
         mode.PROCESS_PIPELINED = False
@@ -277,7 +275,7 @@ class VMOverlayCreationMode(object):
     @staticmethod
     def get_serial_multi_process(num_cores=4):
         mode = VMOverlayCreationMode(num_cores)
-        update_cores = mode.get_num_cores()
+        update_cores = VMOverlayCreationMode.get_num_cores()
         if update_cores != num_cores:
             raise CloudletGenerationError("Cannot allocate %d core" % num_cores)
 

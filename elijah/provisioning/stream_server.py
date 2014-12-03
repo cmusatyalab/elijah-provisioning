@@ -591,11 +591,12 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 base_diskpath, launch_disk_size, base_mempath, launch_memory_size,
                 resumed_disk=launch_disk,  disk_overlay_map=disk_overlay_map,
                 resumed_memory=launch_mem, memory_overlay_map=memory_overlay_map)
-        synthesized_VM = SynthesizedVM(launch_disk, launch_mem, fuse)
         time_fuse_end = time.time()
-        #time.sleep(10)
 
-        synthesized_VM.resume()
+        synthesized_VM = SynthesizedVM(launch_disk, launch_mem, fuse)
+        synthesized_VM.start()
+        synthesized_VM.join()
+        #time.sleep(10)
         time_resume_end = time.time()
         LOG.info("[time] last, but non-pipelined time %f (%f ~ %f ~ %f)" % (\
                                                                             time_resume_end-time_fuse_start,
@@ -603,7 +604,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                                                                             time_fuse_end,
                                                                             time_resume_end,
                                                                             ))
-        connect_vnc(synthesized_VM.machine)
+        #connect_vnc(synthesized_VM.machine)
+        raw_input("Enter to finish VM")
 
         # terminate
         synthesized_VM.monitor.terminate()
@@ -613,7 +615,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         '''
 
         # send end message
-        ack_data = struct.pack("!Q", 0x10)
+        ack_data = struct.pack("!Qd", 0x10, time_resume_end)
         print "send ack to client: %d" % len(ack_data)
         self.request.sendall(ack_data)
         print "finished"
