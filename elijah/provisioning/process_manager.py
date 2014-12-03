@@ -246,8 +246,6 @@ class ProcessManager(threading.Thread):
         return p_dict, r_dict, system_out_bw_mbps, p_dict_cur, r_dict_cur, system_out_bw_mbps_cur, system_out_throughput_measured
 
     def get_network_speed(self):
-        return 50
-        '''
         if self.migration_dest.startswith("network"):
             worker = self.process_list.get("StreamSynthesisClient", None)
             if worker == None:
@@ -262,7 +260,6 @@ class ProcessManager(threading.Thread):
         else:
             return 1024*1024*200*8 # disk speed (200 MBps)
             #return 8.672088
-        '''
 
     def start_managing(self):
         time_s = time.time()

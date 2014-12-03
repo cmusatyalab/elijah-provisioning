@@ -1261,15 +1261,15 @@ class QmpThread(threading.Thread):
                     latest_time_diff = iteration_issue_time_list[-1] - iteration_issue_time_list[-2]
                     #LOG.debug("[live] stop signal? %f %f" % (latest_time_diff, sleep_between_iteration*1.4))
                     if latest_time_diff < sleep_between_iteration*1.4:
-                        LOG.debug("[live] stop migration at %f" % time())
                         self._stop_migration()
                         break
         self.qmp.disconnect()
 
     def _stop_migration(self):
         #self._waiting(self.timeout)
-        LOG.debug("[live] stop_raw_live")
-        self.qmp.stop_raw_live()
+        LOG.debug("[live] sent stop_raw_live signal at %f" % time())
+        stop_time = self.qmp.stop_raw_live()
+        LOG.debug("[live] stop migration at %f" % stop_time)
         self.fuse_stream_monitor.terminate()
 
     def _waiting(self, timeout):
