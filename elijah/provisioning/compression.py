@@ -130,7 +130,7 @@ class CompressProc(process_manager.ProcWorker):
                             total_ratio_block_cur += ratio_block_cur
                         #sys.stdout.write("(%f)\t" % (ratio_block))
                     #print "%d" % valid_child_proc
-                    if valid_child_proc > 1:
+                    if valid_child_proc > 0:
                         self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
                         self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
                         self.monitor_total_time_block_cur.value = total_process_time_block_cur/valid_child_proc
@@ -304,6 +304,8 @@ class CompChildProc(multiprocessing.Process):
                 child_total_block += child_cur_block_count
                 self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
                 self.child_ratio_block.value = outdata_size/float(indata_size)
+                #print "comp-size %d %d %d %d" % (indata_size_cur, indata_size, outdata_size_cur, outdata_size)
+                #print "comp-time %f %f %f %f" % (time_process_total_time, time_process_cur_time,  child_total_block, child_cur_block_count)
 
                 cur_p = 1000.0*time_process_cur_time/child_cur_block_count
                 cur_r = outdata_size_cur/float(indata_size_cur)

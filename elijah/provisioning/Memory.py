@@ -668,7 +668,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     total_ratio_block += ratio_block
                     total_process_time_block_cur += process_time_block_cur
                     total_ratio_block_cur += ratio_block_cur
-            if valid_child_proc > 1:
+            if valid_child_proc > 0:
                 self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
                 self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
                 self.monitor_total_time_block_cur.value = total_process_time_block_cur/valid_child_proc

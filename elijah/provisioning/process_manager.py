@@ -181,6 +181,7 @@ class ProcessManager(threading.Thread):
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
             if worker == None:
+                #print "%s is not available"
                 return None
             process_info = self.process_infos[worker_name]
             if process_info['finish_processing_input'] == True:
@@ -191,6 +192,7 @@ class ProcessManager(threading.Thread):
             time_block_cur = worker.monitor_total_time_block_cur.value
             ratio_block_cur = worker.monitor_total_ratio_block_cur.value
             if time_block <= 0 or ratio_block <=0:
+                #print "%s has wront data" % worker_name
                 return None
             p_dict[worker_name] = time_block
             r_dict[worker_name] = ratio_block
@@ -271,6 +273,8 @@ class ProcessManager(threading.Thread):
                                                                                      system_bw_mbps_cur,
                                                                                      network_bw_mbps))
 
+                #LOG.debug("p_and_r\t%f\tp:%s,%s\tr:%s,%s" % (time_current_iter, p_dict, p_dict_cur, r_dict, r_dict_cur))
+                '''
                 # get new mode
                 #if (time_current_iter-time_prev_mode_change) > 5:   # apply after 5 seconds
                 if count == -1 and len(mode_change_history) == 0:
@@ -311,7 +315,6 @@ class ProcessManager(threading.Thread):
                         mode_change_history.append((time_current_iter, self.overlay_creation_mode, new_mode))
                         time_prev_mode_change = time_current_iter
                         self.overlay_creation_mode = new_mode
-                '''
                 '''
 
                 pass
