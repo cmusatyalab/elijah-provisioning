@@ -225,11 +225,8 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         self.total_time = float(0)
         is_first_recv = False
         time_first_recv = 0
-        time_process_finish = 0
         time_process_start = 0
         time_prev_report = 0
-        processed_datasize = 0
-        processed_duration = float(0)
         UPDATE_PERIOD = self.process_info['update_period']
 
         # 0. get info from qemu log file
@@ -258,7 +255,6 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
 
         # 1. get modified page
         try:
-            modified_chunk_counter = 0
             modified_chunk_list = []
             input_fd = [self.modified_chunk_queue._reader.fileno(), self.control_queue._reader.fileno()]
             while True:
@@ -308,35 +304,34 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                         total_ratio_block = 0
                         total_process_time_block_cur = 0
                         total_ratio_block_cur = 0
+                        total_input_size = 0
+                        total_output_size = 0
                         valid_child_proc = 0
                         for (proc, c_queue, mode_queue) in self.proc_list:
                             process_time_block = proc.child_process_time_block.value
                             ratio_block = proc.child_ratio_block.value
                             process_time_block_cur = proc.child_process_time_block_cur.value
                             ratio_block_cur = proc.child_ratio_block_cur.value
+                            input_size = proc.child_input_size.value
+                            output_size = proc.child_output_size.value
                             if (process_time_block > 0) and (ratio_block > 0):
                                 valid_child_proc += 1
                                 total_process_time_block += process_time_block
                                 total_ratio_block += ratio_block
                                 total_process_time_block_cur += process_time_block_cur
                                 total_ratio_block_cur += ratio_block_cur
+                                total_input_size += input_size
+                                total_output_size += output_size
                         if valid_child_proc > 0:
                             self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
                             self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
                             self.monitor_total_time_block_cur.value = total_process_time_block_cur/valid_child_proc
                             self.monitor_total_ratio_block_cur.value = total_ratio_block_cur/valid_child_proc
                             #print "[disk] P: %f (%f)\tR: %f (%f)" % (self.monitor_total_time_block.value, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block.value, self.monitor_total_ratio_block_cur.value)
+                        self.monitor_total_input_size.value = total_input_size
+                        self.monitor_total_output_size.value = total_output_size
+                        #print "[disk] total input size: %d, total_output size: %d" % (self.monitor_total_input_size.value, self.monitor_total_output_size.value)
 
-                    # measurement
-                    modified_chunk_counter += 1
-                    time_process_finish = time.time()
-                    processed_datasize += self.chunk_size
-                    processed_duration += (time_process_finish - time_process_start)
-                    if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
-                        time_prev_report = time_process_finish
-                        #self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
-                        processed_datasize = 0
-                        processed_duration = float(0)
             self.process_info['finish_processing_input'] = True
 
             # send last chunks
@@ -474,6 +469,8 @@ class DiskDiffProc(multiprocessing.Process):
         self.child_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_process_time_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_ratio_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_input_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
+        self.child_output_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
 
         super(DiskDiffProc, self).__init__(target=self.process_diff)
 
@@ -557,15 +554,18 @@ class DiskDiffProc(multiprocessing.Process):
                 time_process_total_time += time_process_cur_time
                 indata_size += indata_size_cur
                 outdata_size += outdata_size_cur
-                self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
-                self.child_ratio_block.value = outdata_size/float(indata_size)
+                self.child_input_size.value = indata_size
+                self.child_output_size.value = outdata_size
+                if child_cur_block_count > 0:
+                    self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
+                    self.child_ratio_block.value = outdata_size/float(indata_size)
 
-                cur_p = 1000.0*time_process_cur_time/child_cur_block_count
-                cur_r = outdata_size_cur/float(indata_size_cur)
-                self.measure_history.append((time_process_end, cur_p, cur_r))
-                cur_p_avg, cur_r_avg = self.averaged_value(time_process_end)
-                self.child_process_time_block_cur.value = cur_p_avg
-                self.child_ratio_block_cur.value = cur_r_avg
+                    cur_p = 1000.0*time_process_cur_time/child_cur_block_count
+                    cur_r = outdata_size_cur/float(indata_size_cur)
+                    self.measure_history.append((time_process_end, cur_p, cur_r))
+                    cur_p_avg, cur_r_avg = self.averaged_value(time_process_end)
+                    self.child_process_time_block_cur.value = cur_p_avg
+                    self.child_ratio_block_cur.value = cur_r_avg
 
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Disk][Child] Child finished. process %d jobs (%f)" % (child_total_block, time_process_total_time))

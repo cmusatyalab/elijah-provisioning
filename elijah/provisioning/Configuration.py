@@ -19,6 +19,11 @@
 #
 
 import os
+try:
+    import affinity
+except ImportError as e:
+    sys.stderr.write("Cannot find affinity package\n")
+    sys.exit(1)
 
 
 class ConfigurationError(Exception):
@@ -158,7 +163,7 @@ class VMOverlayCreationMode(object):
     LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE = 2
     LIVE_MIGRATION_STOP = LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
 
-    def __init__(self):
+    def __init__(self, num_max_cores=4):
 
         self.PROCESS_PIPELINED                      = True # False: serialized processing
 
@@ -168,10 +173,8 @@ class VMOverlayCreationMode(object):
         self.QUEUE_SIZE_OPTIMIZATION                = -1 # one per DeltaImte
         self.QUEUE_SIZE_COMPRESSION                 = -1 # one per DeltaImte
 
-        self.NUM_PROC_MEMORY_DIFF                   = 4
-        self.NUM_PROC_DISK_DIFF                     = 4
-        self.NUM_PROC_OPTIMIZATION                  = 4
-        self.NUM_PROC_COMPRESSION                   = 4
+        # number of CPU allocated
+        self.set_num_cores(num_max_cores)
 
         self.MEMORY_DIFF_ALGORITHM                  = "xdelta3" # "xdelta3", "bsdiff", "none"
         self.DISK_DIFF_ALGORITHM                    = "xdelta3" # "xdelta3", "bsdiff", "none"
@@ -186,6 +189,46 @@ class VMOverlayCreationMode(object):
     def __str__(self):
         import pprint
         return pprint.pformat(self.__dict__)
+
+    def set_num_cores(self, num_cores):
+        # assuming 8 cores
+        affinity_mask = 0x01
+        if num_cores == 1:
+            affinity_mask = 0x02     # cpu 1
+        elif num_cores ==2:
+            affinity_mask = 0x06    # cpu 1,2
+        elif num_cores ==3:
+            affinity_mask = 0x0e    # cpu 1,2,3
+        elif num_cores ==4:
+            affinity_mask = 0x1e # cpu 1,2,3,4
+        else:
+            raise IOException("Do not allocate more than 4 cores at this experiement")
+
+        affinity.set_process_affinity_mask(0, affinity_mask)
+        updated_mask = affinity.get_process_affinity_mask(os.getpid())
+        if affinity_mask != updated_mask:
+            raise IOException("Cannot not set affinity mask: %s" % affinity_mask)
+
+        self.NUM_PROC_MEMORY_DIFF = num_cores
+        self.NUM_PROC_DISK_DIFF = num_cores
+        self.NUM_PROC_OPTIMIZATION = num_cores
+        self.NUM_PROC_COMPRESSION = num_cores
+
+    def get_num_cores(self):
+        num_cores = 0
+        affinity_mask = affinity.get_process_affinity_mask(os.getpid())
+        if affinity_mask == 0x02:     # cpu 1
+            num_cores = 1
+        elif affinity_mask == 0x06:    # cpu 1,2
+            num_cores = 2
+        elif affinity_mask == 0x0e:    # cpu 1,2,3
+            num_cores = 3
+        elif affinity_mask == 0x1e: # cpu 1,2,3,4
+            num_cores = 4
+        else:
+            raise IOException("Do not allocate more than 4 cores at this experiement")
+        return num_cores
+
 
     def get_mode_id(self):
         sorted_key = self.__dict__.keys()
@@ -213,52 +256,31 @@ class VMOverlayCreationMode(object):
 
     @staticmethod
     def get_serial_single_process():
-        mode = VMOverlayCreationMode()
+        mode = VMOverlayCreationMode(num_max_cores=1)
+        num_cores = mode.get_num_cores()
+        if num_cores is not 1:
+            raise CloudletGenerationError("Cannot allocate only 1 core")
         mode.PROCESS_PIPELINED = False
-        mode.NUM_PROC_MEMORY_DIFF = 1
-        mode.NUM_PROC_DISK_DIFF = 1
-        mode.NUM_PROC_OPTIMIZATION = 1
-        mode.NUM_PROC_COMPRESSION = 1
         return mode
 
     @staticmethod
-    def get_serial_multi_process():
-        mode = VMOverlayCreationMode()
+    def get_serial_multi_process(num_max_cores=4):
+        mode = VMOverlayCreationMode(num_max_cores)
+        update_cores = mode.get_num_cores()
+        if update_cores != num_cores:
+            raise CloudletGenerationError("Cannot allocate %d core" % num_cores)
+
         mode.PROCESS_PIPELINED = False
-        mode.NUM_PROC_MEMORY_DIFF = 4
-        mode.NUM_PROC_DISK_DIFF = 4
-        mode.NUM_PROC_OPTIMIZATION = 4
-        mode.NUM_PROC_COMPRESSION = 4
         return mode
 
     @staticmethod
-    def get_pipelined_single_process():
-        mode = VMOverlayCreationMode()
-        mode.PROCESS_PIPELINED = True
-        mode.NUM_PROC_MEMORY_DIFF = 1
-        mode.NUM_PROC_DISK_DIFF = 1
-        mode.NUM_PROC_OPTIMIZATION = 1
-        mode.NUM_PROC_COMPRESSION = 1
-        return mode
+    def get_pipelined_multi_process_finite_queue(num_max_cores=4):
+        mode = VMOverlayCreationMode(num_max_cores)
+        update_cores = mode.get_num_cores()
+        if update_cores != num_max_cores:
+            raise CloudletGenerationError("Cannot allocate %d core" % num_cores)
 
-    @staticmethod
-    def get_pipelined_multi_process():
-        mode = VMOverlayCreationMode()
         mode.PROCESS_PIPELINED = True
-        mode.NUM_PROC_MEMORY_DIFF = 4
-        mode.NUM_PROC_DISK_DIFF = 4
-        mode.NUM_PROC_OPTIMIZATION = 4
-        mode.NUM_PROC_COMPRESSION = 4
-        return mode
-
-    @staticmethod
-    def get_pipelined_multi_process_finite_queue():
-        mode = VMOverlayCreationMode()
-        mode.PROCESS_PIPELINED = True
-        mode.NUM_PROC_MEMORY_DIFF = 4
-        mode.NUM_PROC_DISK_DIFF = 4
-        mode.NUM_PROC_OPTIMIZATION = 4
-        mode.NUM_PROC_COMPRESSION = 4
         mode.QUEUE_SIZE_MEMORY_SNAPSHOT = -1    # always have infinite queue for communicating with QEMU
                                                 # Otherwise, QEMU will be automatically throttled
         mode.QUEUE_SIZE_DISK_DELTA_LIST = 4

@@ -116,18 +116,24 @@ class CompressProc(process_manager.ProcWorker):
                     total_ratio_block = 0
                     total_process_time_block_cur = 0
                     total_ratio_block_cur = 0
+                    total_input_size = 0
+                    total_output_size = 0
                     valid_child_proc = 0
                     for (proc, c_queue, mode_queue) in self.proc_list:
                         process_time_block = proc.child_process_time_block.value
                         ratio_block = proc.child_ratio_block.value
                         process_time_block_cur = proc.child_process_time_block_cur.value
                         ratio_block_cur = proc.child_ratio_block_cur.value
+                        input_size = proc.child_input_size.value
+                        output_size = proc.child_output_size.value
                         if (process_time_block > 0) and (ratio_block > 0):
                             valid_child_proc += 1
                             total_process_time_block += process_time_block
                             total_ratio_block += ratio_block
                             total_process_time_block_cur += process_time_block_cur
                             total_ratio_block_cur += ratio_block_cur
+                            total_input_size += input_size
+                            total_output_size += output_size
                         #sys.stdout.write("(%f)\t" % (ratio_block))
                     #print "%d" % valid_child_proc
                     if valid_child_proc > 0:
@@ -136,6 +142,9 @@ class CompressProc(process_manager.ProcWorker):
                         self.monitor_total_time_block_cur.value = total_process_time_block_cur/valid_child_proc
                         self.monitor_total_ratio_block_cur.value = total_ratio_block_cur/valid_child_proc
                         #print "[comp] P: %f (%f)\tR: %f (%f)" % (self.monitor_total_time_block.value, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block.value, self.monitor_total_ratio_block_cur.value)
+                    self.monitor_total_input_size.value = total_input_size
+                    self.monitor_total_output_size.value = total_output_size
+                    #print "[compression] total input size: %d, total_output size: %d" % (self.monitor_total_input_size.value, self.monitor_total_output_size.value)
             self.process_info['finish_processing_input'] = True
 
             # send end meesage to every process
@@ -217,6 +226,8 @@ class CompChildProc(multiprocessing.Process):
         self.child_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_process_time_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_ratio_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_input_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
+        self.child_output_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
 
         super(CompChildProc, self).__init__(target=self._comp)
 
@@ -301,6 +312,9 @@ class CompChildProc(multiprocessing.Process):
 
                 indata_size += indata_size_cur
                 outdata_size += outdata_size_cur
+                self.child_input_size.value = indata_size
+                self.child_output_size.value = outdata_size
+
                 child_total_block += child_cur_block_count
                 self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
                 self.child_ratio_block.value = outdata_size/float(indata_size)

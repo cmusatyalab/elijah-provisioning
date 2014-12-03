@@ -61,7 +61,6 @@ class ProcessManager(threading.Thread):
         self.process_infos = self.manager.dict()
         self.process_control = dict()
         self.stop = threading.Event()
-        self.overlay_creation_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
         self.migration_dest = "network"
 
         # load profiling information
@@ -174,6 +173,7 @@ class ProcessManager(threading.Thread):
     def get_system_speed(self):
         worker_names = ["DeltaDedup", "CreateMemoryDeltalist",
                         "CreateDiskDeltalist", "CompressProc"]
+        total_size_dict = dict()
         p_dict = dict()
         r_dict = dict()
         p_dict_cur = dict()
@@ -198,18 +198,19 @@ class ProcessManager(threading.Thread):
             r_dict[worker_name] = ratio_block
             p_dict_cur[worker_name] = time_block_cur
             r_dict_cur[worker_name] = ratio_block_cur
+            total_size_dict[worker_name] = (worker.monitor_total_input_size.value, worker.monitor_total_output_size.value)
 
-        # Get P and R
+        # Get total P and total R
         total_p = MigrationMode.get_total_P(p_dict)
         total_r = MigrationMode.get_total_R(r_dict)
         total_p_cur = MigrationMode.get_total_P(p_dict_cur)
         total_r_cur = MigrationMode.get_total_R(r_dict_cur)
-        system_out_bw_mbps = MigrationMode.get_system_throughput(self.overlay_creation_mode.NUM_PROC_COMPRESSION,
-                                                    total_p,
-                                                    total_r)
-        system_out_bw_mbps_cur = MigrationMode.get_system_throughput(self.overlay_creation_mode.NUM_PROC_COMPRESSION,
-                                                    total_p_cur,
-                                                    total_r_cur)
+        system_out_bw_mbps = MigrationMode.get_system_throughput(self.overlay_creation_mode.get_num_cores(),
+                                                                 total_p,
+                                                                 total_r)
+        system_out_bw_mbps_cur = MigrationMode.get_system_throughput(self.overlay_creation_mode.get_num_cores(),
+                                                                     total_p_cur,
+                                                                     total_r_cur)
         #sys.stdout.write("P: %f, %f \tR:%f, %f, BW: %f, %f mbps\t(%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f)\n" % \
         #                 (total_p, total_p_cur,
         #                  total_r, total_r_cur,
@@ -232,7 +233,11 @@ class ProcessManager(threading.Thread):
         #                  r_dict_cur['CompressProc']
         #                  ))
 
-        return p_dict, r_dict, system_out_bw_mbps, p_dict_cur, r_dict_cur, system_out_bw_mbps_cur
+        # get actual system throughput using in out size
+        (comp_in_size, comp_out_size) = total_size_dict['CompressProc']
+        system_output_size = comp_out_size
+
+        return p_dict, r_dict, system_out_bw_mbps, p_dict_cur, r_dict_cur, system_out_bw_mbps_cur, system_output_size
 
     def get_network_speed(self):
         if self.migration_dest.startswith("network"):
@@ -267,14 +272,16 @@ class ProcessManager(threading.Thread):
                 if network_bw_mbps == None:
                     #sys.stdout.write("network speed is not measured\n")
                     continue
-                p_dict, r_dict, system_bw_mbps, p_dict_cur, r_dict_cur, system_bw_mbps_cur  = system_speed
-                LOG.debug("throughput\t%f\tsystem(mbps):%f,%f\tnetwork((mbps):%f" % (time_current_iter,
-                                                                                     system_bw_mbps,
-                                                                                     system_bw_mbps_cur,
-                                                                                     network_bw_mbps))
+                p_dict, r_dict, system_bw_mbps, p_dict_cur, r_dict_cur, system_bw_mbps_cur, system_out_size  = system_speed
+                measured_throughput = 8.0*system_out_size/(time_current_iter-time_s)/1024/1024
+                msg = "throughput\t%f\tsystem(mbps):%f,%f\tnetwork(mbps):%f\tmeasured:%f" % (time_current_iter,
+                                                                                             system_bw_mbps,
+                                                                                             system_bw_mbps_cur,
+                                                                                             network_bw_mbps,
+                                                                                             measured_throughput)
+                LOG.debug(msg)
 
                 #LOG.debug("p_and_r\t%f\tp:%s,%s\tr:%s,%s" % (time_current_iter, p_dict, p_dict_cur, r_dict, r_dict_cur))
-                '''
                 # get new mode
                 #if (time_current_iter-time_prev_mode_change) > 5:   # apply after 5 seconds
                 if count == -1 and len(mode_change_history) == 0:
@@ -315,6 +322,7 @@ class ProcessManager(threading.Thread):
                         mode_change_history.append((time_current_iter, self.overlay_creation_mode, new_mode))
                         time_prev_mode_change = time_current_iter
                         self.overlay_creation_mode = new_mode
+                '''
                 '''
 
                 pass
@@ -362,6 +370,8 @@ class ProcWorker(multiprocessing.Process):
         self.monitor_total_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
         self.monitor_total_time_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
         self.monitor_total_ratio_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.monitor_total_input_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
+        self.monitor_total_output_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
         self.in_size = 0
         self.out_size = 0
 

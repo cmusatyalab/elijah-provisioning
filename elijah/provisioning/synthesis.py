@@ -1574,12 +1574,9 @@ def create_residue(base_disk, base_hashvalue,
         #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
         #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
 
-        overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+        NUM_MAX_CORES = 1
+        overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_max_cores=NUM_MAX_CORES)
         VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
-        #overlay_mode.NUM_PROC_COMPRESSION = 1
-        #overlay_mode.NUM_PROC_DISK_DIFF = 1
-        #overlay_mode.NUM_PROC_MEMORY_DIFF = 1
-        #overlay_mode.NUM_PROC_OPTIMIZATION = 1
 
     process_controller.set_mode(overlay_mode, migration_addr)
     LOG.info("* LIVE MIGRATION STRATEGY: %d" % VMOverlayCreationMode.LIVE_MIGRATION_STOP)

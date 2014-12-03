@@ -478,6 +478,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
     def _process_libvirt_header(self, libvirt_header_list):
         base_memory_fd = open(self.basemem_path)
         delta_list = list()
+        header_in_size = 0
+        header_out_size = 0
         for index, libvirt_header_chunk in enumerate(libvirt_header_list):
             data = libvirt_header_chunk
             offset = index*Memory.RAM_PAGE_SIZE
@@ -508,8 +510,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 diff_data = data
                 diff_type = DeltaItem.REF_RAW
 
-            self.in_size += (len(data)+11)
-            self.out_size += (len(diff_data)+11)
+            header_in_size += (len(data)+11)
+            header_out_size += (len(diff_data)+11)
             delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
                     offset, len(data),
                     hash_value=chunk_hashvalue,
@@ -520,6 +522,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         base_memory_fd.close()
         self.total_block += len(delta_list)
         self.deltalist_queue.put(delta_list)
+        return header_in_size, header_out_size
 
     def chunks(self, l, n):
         ret_chunks = list()
@@ -571,7 +574,9 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             libvirt_header_list.append(chunked_data)
         libvirt_header_offset = len(libvirt_header_list)*Memory.RAM_PAGE_SIZE
         time_header_start = time.time()
-        self._process_libvirt_header(libvirt_header_list)
+        header_in_size, header_out_size = self._process_libvirt_header(libvirt_header_list)
+        self.in_size += header_in_size
+        self.out_size += header_out_size
         time_header_end = time.time()
 
         memory_page_list = list()
@@ -655,12 +660,16 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             total_ratio_block = 0
             total_process_time_block_cur = 0
             total_ratio_block_cur = 0
+            total_input_size = 0
+            total_output_size = 0
             valid_child_proc = 0
             for (proc, c_queue, mode_queue) in self.proc_list:
                 process_time_block = proc.child_process_time_block.value
                 ratio_block = proc.child_ratio_block.value
                 process_time_block_cur = proc.child_process_time_block_cur.value
                 ratio_block_cur = proc.child_ratio_block_cur.value
+                input_size = proc.child_input_size.value
+                output_size = proc.child_output_size.value
                 # averaging
                 if (process_time_block > 0) and (ratio_block > 0):
                     valid_child_proc += 1
@@ -668,12 +677,17 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     total_ratio_block += ratio_block
                     total_process_time_block_cur += process_time_block_cur
                     total_ratio_block_cur += ratio_block_cur
+                    total_input_size += input_size
+                    total_output_size += output_size
             if valid_child_proc > 0:
                 self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
                 self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
                 self.monitor_total_time_block_cur.value = total_process_time_block_cur/valid_child_proc
                 self.monitor_total_ratio_block_cur.value = total_ratio_block_cur/valid_child_proc
                 #print "[memory] P: %f (%f)\tR: %f (%f)" % (self.monitor_total_time_block.value, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block.value, self.monitor_total_ratio_block_cur.value)
+            self.monitor_total_input_size.value = total_input_size + header_in_size
+            self.monitor_total_output_size.value = total_output_size + header_out_size
+            #print "[memory] total input size: %d, total_output size: %d" % (self.monitor_total_input_size.value, self.monitor_total_output_size.value)
 
         # send last memory page
         # libvirt randomly add string starting with 'LibvirtQemudSave'
@@ -901,6 +915,8 @@ class MemoryDiffProc(multiprocessing.Process):
         self.child_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_process_time_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_ratio_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_input_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
+        self.child_output_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
 
         super(MemoryDiffProc, self).__init__(target=self.process_diff)
 
@@ -1018,6 +1034,8 @@ class MemoryDiffProc(multiprocessing.Process):
                 time_process_total_time += time_process_cur_time
                 indata_size += indata_size_cur
                 outdata_size += outdata_size_cur
+                self.child_input_size.value = indata_size
+                self.child_output_size.value = outdata_size
                 if child_cur_block_count > 0:
                     self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
                     self.child_ratio_block.value = outdata_size/float(indata_size)
