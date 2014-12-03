@@ -156,6 +156,7 @@ class VMOverlayCreationMode(object):
     PIPE_ONE_ELEMENT_SIZE = 4096*100 # 400KB == Max Pipe size is 1MB
     EMULATED_BANDWIDTH_Mbps = 100000 # Mbps
     MEASURE_AVERAGE_TIME    = 1 # seconds
+    MAX_CPU_CORE = 4
 
     PROFILE_DATAPATH = os.path.abspath(os.path.join(Const.HOME_DIR, ".cloudlet/config/mode-profile"))
 
@@ -163,7 +164,7 @@ class VMOverlayCreationMode(object):
     LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE = 2
     LIVE_MIGRATION_STOP = LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
 
-    def __init__(self, num_max_cores=4):
+    def __init__(self, num_cores=4):
 
         self.PROCESS_PIPELINED                      = True # False: serialized processing
 
@@ -174,7 +175,7 @@ class VMOverlayCreationMode(object):
         self.QUEUE_SIZE_COMPRESSION                 = -1 # one per DeltaImte
 
         # number of CPU allocated
-        self.set_num_cores(num_max_cores)
+        self.set_num_cores(num_cores)
 
         self.MEMORY_DIFF_ALGORITHM                  = "xdelta3" # "xdelta3", "bsdiff", "none"
         self.DISK_DIFF_ALGORITHM                    = "xdelta3" # "xdelta3", "bsdiff", "none"
@@ -190,6 +191,13 @@ class VMOverlayCreationMode(object):
         import pprint
         return pprint.pformat(self.__dict__)
 
+    def update_mode(self, new_mode_dict):
+        invalid_keys = ["NUM_PROC_DISK_DIFF", "NUM_PROC_MEMORY_DIFF", "NUM_PROC_COMPRESSION", "NUM_PROC_OPTIMIZATION"]
+        for key in invalid_keys:
+            if new_mode_dict.get(key, None) is not None:
+                del new_mode_dict[key]
+        self.__dict__.update(new_mode_dict)
+
     def set_num_cores(self, num_cores):
         # assuming 8 cores
         affinity_mask = 0x01
@@ -204,11 +212,12 @@ class VMOverlayCreationMode(object):
         else:
             raise IOException("Do not allocate more than 4 cores at this experiement")
 
-        affinity.set_process_affinity_mask(0, affinity_mask)
+        affinity.set_process_affinity_mask(os.getpid(), affinity_mask)
         updated_mask = affinity.get_process_affinity_mask(os.getpid())
         if affinity_mask != updated_mask:
-            raise IOException("Cannot not set affinity mask: %s" % affinity_mask)
+            raise Exception("Cannot not set affinity mask: from %s to %s" % (affinity_mask, updated_mask))
 
+        print "change num core to %d, affinity: %s, %s" % (num_cores, affinity_mask, updated_mask)
         self.NUM_PROC_MEMORY_DIFF = num_cores
         self.NUM_PROC_DISK_DIFF = num_cores
         self.NUM_PROC_OPTIMIZATION = num_cores
@@ -226,7 +235,7 @@ class VMOverlayCreationMode(object):
         elif affinity_mask == 0x1e: # cpu 1,2,3,4
             num_cores = 4
         else:
-            raise IOException("Do not allocate more than 4 cores at this experiement")
+            raise Exception("Do not allocate more than 4 cores at this experiement")
         return num_cores
 
 
@@ -235,6 +244,8 @@ class VMOverlayCreationMode(object):
         sorted_key.sort()
         mode_str = list()
         for key in sorted_key:
+            if key in ["NUM_PROC_DISK_DIFF", "NUM_PROC_MEMORY_DIFF", "NUM_PROC_COMPRESSION", "NUM_PROC_OPTIMIZATION"]:
+                continue
             value = self.__dict__[key]
             mode_str.append("%s:%s" % (key, value))
         return "|".join(mode_str)
@@ -256,7 +267,7 @@ class VMOverlayCreationMode(object):
 
     @staticmethod
     def get_serial_single_process():
-        mode = VMOverlayCreationMode(num_max_cores=1)
+        mode = VMOverlayCreationMode(num_cores=1)
         num_cores = mode.get_num_cores()
         if num_cores is not 1:
             raise CloudletGenerationError("Cannot allocate only 1 core")
@@ -264,8 +275,8 @@ class VMOverlayCreationMode(object):
         return mode
 
     @staticmethod
-    def get_serial_multi_process(num_max_cores=4):
-        mode = VMOverlayCreationMode(num_max_cores)
+    def get_serial_multi_process(num_cores=4):
+        mode = VMOverlayCreationMode(num_cores)
         update_cores = mode.get_num_cores()
         if update_cores != num_cores:
             raise CloudletGenerationError("Cannot allocate %d core" % num_cores)
@@ -274,10 +285,10 @@ class VMOverlayCreationMode(object):
         return mode
 
     @staticmethod
-    def get_pipelined_multi_process_finite_queue(num_max_cores=4):
-        mode = VMOverlayCreationMode(num_max_cores)
+    def get_pipelined_multi_process_finite_queue(num_cores=4):
+        mode = VMOverlayCreationMode(num_cores)
         update_cores = mode.get_num_cores()
-        if update_cores != num_max_cores:
+        if update_cores != num_cores:
             raise CloudletGenerationError("Cannot allocate %d core" % num_cores)
 
         mode.PROCESS_PIPELINED = True

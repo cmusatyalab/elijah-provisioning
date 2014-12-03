@@ -207,7 +207,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         self.used_blocks_dict = used_blocks_dict
         self.proc_list = list()
         self.overlay_mode = overlay_mode
-        self.num_proc = overlay_mode.NUM_PROC_DISK_DIFF
+        self.num_proc = VMOverlayCreationMode.MAX_CPU_CORE
         self.diff_algorithm = overlay_mode.DISK_DIFF_ALGORITHM
 
         self.manager = multiprocessing.Manager()

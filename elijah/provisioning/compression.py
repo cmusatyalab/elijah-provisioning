@@ -40,11 +40,14 @@ class CompressProc(process_manager.ProcWorker):
         self.delta_list_queue = delta_list_queue
         self.comp_delta_queue = comp_delta_queue
         self.overlay_mode = overlay_mode
+        self.num_proc = VMOverlayCreationMode.MAX_CPU_CORE
         self.comp_type = overlay_mode.COMPRESSION_ALGORITHM_TYPE
-        self.num_proc = overlay_mode.NUM_PROC_COMPRESSION
         self.comp_level = overlay_mode.COMPRESSION_ALGORITHM_SPEED
         self.block_size = block_size
         self.proc_list = list()
+
+        # monitor value specific to compression
+        self.monitor_time_first_input_recved = multiprocessing.RawValue(ctypes.c_double, 0)
 
         super(CompressProc, self).__init__(target=self.compress_stream)
 
@@ -73,6 +76,7 @@ class CompressProc(process_manager.ProcWorker):
                 if self.is_first_recv == False:
                     self.is_first_recv = True
                     self.time_first_recv = time.time()
+                    self.monitor_time_first_input_recved.value = self.time_first_recv
                     LOG.debug("[time] Compression first input at : %f" % (self.time_first_recv))
                 if deltaitem_list == Const.QUEUE_SUCCESS_MESSAGE:
                     is_last_blob = True

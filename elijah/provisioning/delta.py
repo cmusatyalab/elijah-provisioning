@@ -753,7 +753,6 @@ class DeltaDedup(process_manager.ProcWorker):
                  disk_deltalist_queue, disk_chunk_size,
                  merged_deltalist_queue,
                  overlay_creation_mode,
-                 num_proc=1,
                  basedisk_hashdict=None, basemem_hashdict=None):
         self.memory_deltalist_queue = memory_deltalist_queue
         self.memory_chunk_size = memory_chunk_size
@@ -761,7 +760,6 @@ class DeltaDedup(process_manager.ProcWorker):
         self.disk_chunk_size = disk_chunk_size
         self.merged_deltalist_queue = merged_deltalist_queue
         self.overlay_creation_mode = overlay_creation_mode
-        self.num_proc = num_proc
         self.basedisk_hashdict = basedisk_hashdict
         self.basemem_hashdict= basemem_hashdict
 

@@ -883,7 +883,6 @@ def get_overlay_deltalist(monitoring_info, options,
     dedup_proc = delta.DeltaDedup(memory_deltalist_queue, Memory.Memory.RAM_PAGE_SIZE,
                                   disk_deltalist_queue, Const.CHUNK_SIZE,
                                   merged_deltalist_queue,
-                                  overlay_mode.NUM_PROC_OPTIMIZATION,
                                   overlay_mode,
                                   basedisk_hashdict=basedisk_hashdict,
                                   basemem_hashdict=basemem_hashdict)
@@ -1574,8 +1573,8 @@ def create_residue(base_disk, base_hashvalue,
         #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
         #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
 
-        NUM_MAX_CORES = 1
-        overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_max_cores=NUM_MAX_CORES)
+        NUM_CORES = 2
+        overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CORES)
         VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
 
     process_controller.set_mode(overlay_mode, migration_addr)

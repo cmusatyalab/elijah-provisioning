@@ -32,6 +32,11 @@ class MigrationMode(object):
         sorted_key.sort()
         mode_str = list()
         for key in sorted_key:
+            # ignore numer of process for each stage since this is a maximum
+            # number of thread. Also this does not be consider to get P and R
+            # since we get per block P and per block R
+            if key in ["NUM_PROC_DISK_DIFF", "NUM_PROC_MEMORY_DIFF", "NUM_PROC_COMPRESSION", "NUM_PROC_OPTIMIZATION"]:
+                continue
             value = self.mode[key]
             mode_str.append("%s:%s" % (key, value))
         return "|".join(mode_str)
@@ -151,6 +156,10 @@ class ModeProfileError(Exception):
 
 
 class ModeProfile(object):
+    MATCHING_BEST_EFFORT = 1
+    MATCHING_ONE = 2
+    MATCHING_MULTIPLE = 3
+
     def __init__(self, overlay_mode_list):
         self.overlay_mode_list = overlay_mode_list
 
@@ -158,14 +167,15 @@ class ModeProfile(object):
     def predict_new_mode(self, cur_mode, cur_p, cur_r, system_out_bw, network_bw):
         overlay_mode = ModeProfile.find_same_mode(self.overlay_mode_list, cur_mode)
         if overlay_mode == None:
-            msg = "Cannot find matching mode with %s" % str(cur_mode.__dict__)
+            msg = "Cannot find matching mode : %s" % str(cur_mode.get_mode_id())
             raise ModeProfileError(msg)
-        new_mode, expected_bw = self.find_matching_mode(overlay_mode,
+        matching_condition, item = self.find_matching_mode(overlay_mode,
                                            cur_mode,
                                            cur_p, cur_r,
                                            system_out_bw,
                                            network_bw)
-        return VMOverlayCreationMode.from_dictionary(new_mode.mode), expected_bw
+        (new_mode, new_total_p, new_total_r, expected_bw) = item
+        return matching_condition, item
 
     @staticmethod
     def find_same_mode(overlay_mode_list, in_mode):
@@ -205,7 +215,7 @@ class ModeProfile(object):
 
         # find candidate
         candidate_mode_list = list()
-        for margin in [0.1, 0.2, 0.3, 0.4, 0.6]:
+        for margin in [0.1, 0.2]:
             for item  in scaled_mode_list:
                 (each_mode, scaled_p, scaled_r, new_system_bw) = item
                 if network_bw*(1-margin) < new_system_bw and new_system_bw < network_bw*(1+margin):
@@ -221,13 +231,14 @@ class ModeProfile(object):
                 if desirable_bw_increase > 0:
                     # chose the most fastest one
                     selected_item = sorted(scaled_mode_list, key=itemgetter(3), reverse=True)[0]
-                    return selected_item[0], selected_item[3]
+                    return self.MATCHING_BEST_EFFORT, selected_item
                 else:
                     # choose the slowest one
                     selected_item = sorted(scaled_mode_list, key=itemgetter(3))[0]
-                    return selected_item[0], selected_item[3]
+                    return self.MATCHING_BEST_EFFORT, selected_item
+                    #return selected_item[0], selected_item[3]
         elif len(candidate_mode_list) == 1:
-            return candidate_mode_list[0][0], candidate_mode_list[0][3]
+            return self.MATCHING_ONE, candidate_mode_list[0]
         else:
             if desirable_bw_increase > 0:
                 # increase system speed to use more network BW
@@ -239,7 +250,8 @@ class ModeProfile(object):
                 # choose the one that has the shortest speed (minimal P)
                 # --> more compression, but little cpu usage
                 sorted_candidate = sorted(candidate_mode_list, key=itemgetter(1))
-            return sorted_candidate[0][0], candidate_mode_list[0][3]
+            return self.MATCHING_MULTIPLE, sorted_candidate[0]
+            #return sorted_candidate[0][0], candidate_mode_list[0][3]
 
         #for item in sorted_candidate:
         #    (each_mode, scaled_p, scaled_r, new_system_bw) = item
@@ -449,10 +461,8 @@ if __name__ == "__main__":
         mode_profile = ModeProfile.load_from_file(inputfile)
 
         # measured information
-        #cur_p = {'CreateMemoryDeltalist': 0.5540335827711419, 'CreateDiskDeltalist': 0.5118202023133814, 'DeltaDedup': 0.0024018974990242282, 'CompressProc': 0.45448795749054516}
-        #cur_r = {'CreateMemoryDeltalist': 0.48741149800555605, 'CreateDiskDeltalist': 0.3919707506873821, 'DeltaDedup': 0.6054054544199231, 'CompressProc': 0.7024070026179592}
-        cur_p = {'CreateMemoryDeltalist': 0.4783808994407537, 'CreateDiskDeltalist': 0.570339626736111, 'DeltaDedup': 0.002555257442187298, 'CompressProc' : 0.3812372962072634}
-        cur_r = {'CreateMemoryDeltalist': 0.38805050540961844, 'CreateDiskDeltalist': 0.5385452558238136, 'DeltaDedup': 0.44503177663442506, 'CompressProc': 0.705690302854004}
+        cur_p = {'CreateMemoryDeltalist': 0.5540335827711419, 'CreateDiskDeltalist': 0.5118202023133814, 'DeltaDedup': 0.0024018974990242282, 'CompressProc': 0.45448795749054516}
+        cur_r = {'CreateMemoryDeltalist': 0.48741149800555605, 'CreateDiskDeltalist': 0.3919707506873821, 'DeltaDedup': 0.6054054544199231, 'CompressProc': 0.7024070026179592}
         cur_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
 
         # get system throughput using P and R
@@ -460,13 +470,17 @@ if __name__ == "__main__":
         total_r= MigrationMode.get_total_R(cur_r)
 
         system_out_bw = MigrationMode.get_system_throughput(cur_mode.NUM_PROC_COMPRESSION, total_p, total_r)
-        network_bw = 50 # mbps
+        network_bw = 1# mbps
 
         # get new mode
-        new_mode, expected_bw = mode_profile.predict_new_mode(cur_mode, cur_p, cur_r, system_out_bw, network_bw)
+        matching_condition, item = mode_profile.predict_new_mode(cur_mode, cur_p, cur_r, system_out_bw, network_bw)
+        (new_mode_object, new_total_p, new_total_r, expected_bw) = item
+        new_mode = VMOverlayCreationMode.from_dictionary(new_mode_object.mode)
+
+        # print result
         diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, new_mode.__dict__)
         diff = MigrationMode.mode_diff(cur_mode.__dict__, new_mode.__dict__)
-        print "%f mbps (expected), %s\n%s\n%s" % (expected_bw, new_mode, diff_str, diff)
+        print "%d, %f mbps (expected), %s\n%s\n%s" % (matching_condition, expected_bw, new_mode, diff_str, diff)
     elif command == "show":
         mode_profile = ModeProfile.load_from_file(inputfile)
         pivot_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()

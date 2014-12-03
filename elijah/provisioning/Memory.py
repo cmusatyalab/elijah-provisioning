@@ -429,7 +429,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         self.basemem_path = basemem_path
         self.proc_list = list()
         self.overlay_mode = overlay_mode
-        self.num_proc = overlay_mode.NUM_PROC_MEMORY_DIFF
+        self.num_proc = VMOverlayCreationMode.MAX_CPU_CORE
         self.diff_algorithm = overlay_mode.MEMORY_DIFF_ALGORITHM
 
         super(CreateMemoryDeltalist, self).__init__(target=self.create_memory_deltalist)
@@ -1054,7 +1054,7 @@ class MemoryDiffProc(multiprocessing.Process):
         self.child_process_time_block_cur.value = 0
         self.child_ratio_block_cur.value = 0
         self.command_queue.put((indata_size, outdata_size, child_total_block, time_process_total_time))
-        self.task_queue.put(freed_page_counter)
+        #self.task_queue.put(freed_page_counter)
         #out_fd.close()  # measurement
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()
