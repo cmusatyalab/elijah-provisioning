@@ -152,7 +152,7 @@ class CompressProc(process_manager.ProcWorker):
                     self.monitor_total_input_size.value = total_input_size
                     self.monitor_total_output_size.value = total_output_size
                     #print "[compression] total input size: %d, total_output size: %d" % (self.monitor_total_input_size.value, self.monitor_total_output_size.value)
-            self.process_info['finish_processing_input'] = True
+            self.finish_processing_input.value = True
 
             # send end meesage to every process
             for index in self.proc_list:
@@ -189,7 +189,7 @@ class CompressProc(process_manager.ProcWorker):
                         self.total_block += blocks
                         self.total_time += processed_time
                         del finished_proc_dict[in_queue]
-            self.process_info['is_alive'] = False
+            self.is_processing_alive.value = False
 
             time_end = time.time()
             #sys.stdout.write("[Comp] effetively finished\n")

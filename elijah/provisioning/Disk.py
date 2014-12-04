@@ -227,7 +227,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         time_first_recv = 0
         time_process_start = 0
         time_prev_report = 0
-        UPDATE_PERIOD = self.process_info['update_period']
+        UPDATE_PERIOD = 10
 
         # 0. get info from qemu log file
         # dictionary : (chunk_%, discarded_time)
@@ -332,7 +332,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                         self.monitor_total_output_size.value = total_output_size
                         #print "[disk] total input size: %d, total_output size: %d" % (self.monitor_total_input_size.value, self.monitor_total_output_size.value)
 
-            self.process_info['finish_processing_input'] = True
+            self.finish_processing_input.value = True
 
             # send last chunks
             if len(modified_chunk_list) > 0:
@@ -369,7 +369,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                         self.out_size += output_size
                         self.total_time += processed_time
                         del finished_proc_dict[in_queue]
-            self.process_info['is_alive'] = False
+            self.is_processing_alive.value = False
         except Exception as e:
             print str(e)
             LOG.error("failed at %s" % str(traceback.format_exc()))

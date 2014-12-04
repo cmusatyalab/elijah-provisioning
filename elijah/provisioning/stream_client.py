@@ -198,7 +198,7 @@ class StreamSynthesisClient(process_manager.ProcWorker):
         sock.sendall(struct.pack("!I", len(header)))
         sock.sendall(header)
 
-        self.process_info['is_alive'] = False
+        self.is_processing_alive.value = False
         sys.stdout.write("Finish transmission. Waiting for finishing migration\n")
         self.receive_thread.join()
         sock.close()

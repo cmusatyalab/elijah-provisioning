@@ -909,9 +909,9 @@ class DeltaDedup(process_manager.ProcWorker):
                         self.monitor_total_time_block_cur.value = self.monitor_total_time_block.value
                         self.monitor_total_ratio_block_cur.value = self.monitor_total_ratio_block.value
                         #print "[delta] P: %f (%f/%d %f)\tR: %f (%f)" % (self.monitor_total_time_block.value, total_process_time_cur, cur_block_count, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block.value, self.monitor_total_ratio_block_cur.value)
-            self.process_info['finish_processing_input'] = True
+            self.is_processing_alive.value = False
+            self.finish_processing_input.value = True
             self.monitor_is_alive = False
-            self.process_info['is_alive'] = False
             self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
             self.statistics['number_of_zero_page_disk'] = number_of_zero_page_disk

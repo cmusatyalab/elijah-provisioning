@@ -562,8 +562,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         time_process_finish = 0
         time_process_start = 0
         time_prev_report = 0
-        UPDATE_PERIOD = self.process_info['update_period']
-        #UPDATE_PERIOD = 10
+        UPDATE_PERIOD = 10
 
         # Due to the header of each memory page, memory chunk size is not 4KB +
         # 8 bytes. Also, we need to follow this format for libvirt header.
@@ -620,7 +619,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     processed_duration += (time_process_finish - time_process_start)
                     if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
                         time_prev_report = time_process_finish
-                        #self.process_info['current_bw'] = processed_datasize/processed_duration/1024.0/1024
                         self.monitor_current_bw = processed_datasize/processed_duration/1024.0/1024
                         processed_datasize = 0
                         processed_duration = float(0)
@@ -700,7 +698,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         if len(memory_page_list) > 0 and len(memory_page_list[0]) == (Memory.RAM_PAGE_SIZE + Memory.CHUNK_HEADER_SIZE):
             LOG.debug("[Memory][child] send last data to child: %d" % len(memory_page_list))
             self.task_queue.put(memory_page_list)
-        self.process_info['finish_processing_input'] = True
+        self.finish_processing_input.value = True
 
         # send end meesage to every process
         for child_proc in self.proc_list:
@@ -729,7 +727,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     self.out_size += output_size
                     self.total_time += processed_time
                     del finished_proc_dict[in_queue]
-        self.process_info['is_alive'] = False
+        self.is_processing_alive.value = False
         time_e = time.time()
         LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % (self.__class__.__name__,
                                                          self.in_size,

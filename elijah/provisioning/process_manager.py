@@ -57,9 +57,8 @@ class ProcessManagerError(Exception):
 class ProcessManager(threading.Thread):
     def __init__(self):
         self.overlay_creation_mode = None
-        self.manager = multiprocessing.Manager()
         self.process_list = dict()
-        self.process_infos = self.manager.dict()
+        self.process_infos = dict()
         self.process_control = dict()
         self.stop = threading.Event()
         self.migration_dest = "network"
@@ -78,10 +77,9 @@ class ProcessManager(threading.Thread):
     def _send_query(self, query, worker_names, data=None):
         sent_worker_name = list()
         for worker_name in worker_names:
-            worker = self.process_list.get(worker_name, None)
             control_queue, response_queue = self.process_control[worker_name]
-            process_info = self.process_infos[worker_name]
-            if process_info['is_alive'] == True:
+            worker_info = self.process_infos[worker_name]
+            if worker_info['is_processing_alive'].value == True:
                 control_queue.put(query)
                 if data is not None:
                     control_queue.put(data)
@@ -98,8 +96,8 @@ class ProcessManager(threading.Thread):
             worker = self.process_list.get(worker_name, None)
             control_queue, response_queue = self.process_control[worker_name]
             response_dict[worker_name] = (None, 0)
-            process_info = self.process_infos[worker_name]
-            if process_info['is_alive'] == True:
+            worker_info = self.process_infos[worker_name]
+            if worker_info['is_processing_alive'].value == True:
                 try:
                     if worker.is_alive():
                         response = response_queue.get(timeout=1)
@@ -193,8 +191,8 @@ class ProcessManager(threading.Thread):
             if worker == None:
                 #print "%s is not available"
                 return None
-            process_info = self.process_infos[worker_name]
-            if process_info['finish_processing_input'] == True:
+            worker_info = self.process_infos[worker_name]
+            if worker_info['finish_processing_input'].value == True:
                 #print "%s is finished" % worker_name
                 return None
             time_block = worker.monitor_total_time_block.value
@@ -258,8 +256,8 @@ class ProcessManager(threading.Thread):
             worker = self.process_list.get("StreamSynthesisClient", None)
             if worker == None:
                 return None
-            process_info = self.process_infos["StreamSynthesisClient"]
-            if process_info['is_alive'] == False:
+            worker_info = self.process_infos["StreamSynthesisClient"]
+            if worker_info['is_processing_alive'].value == False:
                 return None
             network_bw_mbps = worker.monitor_network_bw.value
             if network_bw_mbps <= 0:
@@ -298,7 +296,7 @@ class ProcessManager(threading.Thread):
                 #LOG.debug("p_and_r\t%f\tp:%s,%s\tr:%s,%s" % (time_current_iter, p_dict, p_dict_cur, r_dict, r_dict_cur))
                 # get new mode
                 #if (time_current_iter-time_prev_mode_change) > 5:   # apply after 5 seconds
-                if count == 20 and len(mode_change_history) == 0:
+                if count == -1 and len(mode_change_history) == 0:
                     # use current throughput
                     LOG.debug("Update mode to change bw from %f to %f" % (system_bw_mbps_cur, network_bw_mbps))
                     LOG.debug("currect p: %s" % (p_dict_cur))
@@ -383,18 +381,17 @@ class ProcessManager(threading.Thread):
 
     def register(self, worker):
         worker_name = getattr(worker, "worker_name", "NoName")
-        process_info = self.manager.dict()
-        process_info['update_period'] = 0.1 # seconds
-        process_info['is_alive'] = True
-        process_info['finish_processing_input'] = False
+        worker_info = dict()
+        worker_info['is_processing_alive'] = worker.is_processing_alive
+        worker_info['finish_processing_input'] = worker.finish_processing_input
         control_queue = multiprocessing.Queue()
         response_queue = multiprocessing.Queue()
         #print "[manager] register new process: %s" % worker_name
 
         self.process_list[worker_name] = worker
-        self.process_infos[worker_name] = (process_info)
+        self.process_infos[worker_name] = (worker_info)
         self.process_control[worker_name] = (control_queue, response_queue)
-        return process_info, control_queue, response_queue
+        return control_queue, response_queue
 
     def terminate(self):
         self.stop.set()
@@ -402,11 +399,6 @@ class ProcessManager(threading.Thread):
 
 class ProcWorker(multiprocessing.Process):
     def __init__(self, *args, **kwargs):
-        self.worker_name = str(kwargs.pop('worker_name', self.__class__.__name__))
-        process_manager = get_instance()
-        (self.process_info, self.control_queue, self.response_queue) = \
-            process_manager.register(self)  # shared dictionary
-
         # measurement
         self.monitor_total_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
         self.monitor_total_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
@@ -416,8 +408,16 @@ class ProcWorker(multiprocessing.Process):
         self.monitor_total_output_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
         self.in_size = 0
         self.out_size = 0
-        #self.is_alive = multiprocessing.RawValue(ctypes.c_bool)
-        #self.finish_processing_input = multiprocessing.RawValue(ctypes.c_bool)
+        self.is_processing_alive = multiprocessing.RawValue(ctypes.c_bool)
+        self.finish_processing_input = multiprocessing.RawValue(ctypes.c_bool)
+        self.is_processing_alive.value = True
+        self.finish_processing_input.value = False
+
+        self.worker_name = str(kwargs.pop('worker_name', self.__class__.__name__))
+        process_manager = get_instance()
+        (self.control_queue, self.response_queue) = \
+            process_manager.register(self)  # shared dictionary
+
 
 
         # not used

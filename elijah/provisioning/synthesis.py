@@ -1195,7 +1195,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.result_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         time_e = time()
-        self.process_info['is_alive'] = False
+        self.is_processing_alive.value = False
         LOG.debug("[time] Memory snapshotting first input at : %f" % (time_first_recv))
         LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % \
                   (self.__class__.__name__, self.total_write_size, self.total_write_size, 1))
@@ -1490,10 +1490,10 @@ def copy_with_xml(in_path, out_path, xml):
 
 def _waiting_to_finish(process_controller, worker_name):
     while True:
-        process_info = process_controller.process_infos.get(worker_name, None)
-        if process_info == None:
+        worker_info = process_controller.process_infos.get(worker_name, None)
+        if worker_info == None:
             raise CloudletGenerationError("Failed to access %s worker" % worker_name)
-        if process_info['is_alive'] == False:
+        if worker_info['is_processing_alive'].value == False:
             break
         else:
             sleep(0.01)
