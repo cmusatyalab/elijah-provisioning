@@ -416,6 +416,9 @@ class ProcWorker(multiprocessing.Process):
         self.monitor_total_output_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
         self.in_size = 0
         self.out_size = 0
+        #self.is_alive = multiprocessing.RawValue(ctypes.c_bool)
+        #self.finish_processing_input = multiprocessing.RawValue(ctypes.c_bool)
+
 
         # not used
         self.monitor_current_bw = float(0)

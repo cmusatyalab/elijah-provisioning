@@ -528,7 +528,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         ret_chunks = list()
         for index in range(0, len(l), n):
             chunked_data = l[index:index+n]
-            if len(chunked_data) == n:
+            chunked_data_size = len(chunked_data)
+            if chunked_data_size == n:
                 header = chunked_data[0:Memory.CHUNK_HEADER_SIZE] 
                 blob_offset, = struct.unpack(Memory.CHUNK_HEADER_FMT, header)
                 iter_seq = (blob_offset & Memory.ITER_SEQ_MASK) >> Memory.ITER_SEQ_SHIFT
@@ -536,7 +537,10 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     msg = "[live][memory] new iteration %d -> %d" % (self.iteration_seq, iter_seq)
                     self.iteration_seq = iter_seq
                     LOG.debug(msg)
+                    LOG.debug("[live][memory] size of each iteration: %d" % self.iteration_size)
+                    self.iteration_size = 0
             ret_chunks.append(chunked_data)
+            self.iteration_size += chunked_data_size
         return ret_chunks
 
     def _get_modified_memory_page(self, fin):
