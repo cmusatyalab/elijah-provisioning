@@ -217,7 +217,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
     def change_mode(self, new_mode):
         for (proc, c_queue, m_queue) in self.proc_list:
             if proc.is_alive() == True:
-                m_queue.put(new_mode)
+                m_queue.put(("new_mode", new_mode))
 
     def create_disk_deltalist(self):
         time_start = time.time()

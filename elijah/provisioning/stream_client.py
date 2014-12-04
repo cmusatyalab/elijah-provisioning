@@ -118,6 +118,7 @@ class StreamSynthesisClient(process_manager.ProcWorker):
         self.monitor_network_bw = multiprocessing.RawValue(ctypes.c_double, 0)
         self.monitor_network_bw.value = 0.0
         self.vm_resume_time_at_dest = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.time_finish_transmission = multiprocessing.RawValue(ctypes.c_double, 0)
 
         self.is_first_recv = False
         self.time_first_recv = 0
@@ -199,6 +200,7 @@ class StreamSynthesisClient(process_manager.ProcWorker):
         sock.sendall(header)
 
         self.is_processing_alive.value = False
+        self.time_finish_transmission.value = time.time()
         sys.stdout.write("Finish transmission. Waiting for finishing migration\n")
         self.receive_thread.join()
         sock.close()

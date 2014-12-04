@@ -285,10 +285,14 @@ class StreamMonitor(threading.Thread):
         self.disk_access_chunk_list.append(chunk)
 
     def _handle_memory_access(self, line):
-        ctime, chunk = line.split("\t")
-        ctime = float(ctime)
-        chunk = int(chunk)
-        self.mem_access_chunk_list.append(chunk)
+        try:
+            ctime, chunk = line.split("\t")
+            ctime = float(ctime)
+            chunk = int(chunk)
+            self.mem_access_chunk_list.append(chunk)
+        except ValueError as e:
+            #LOG.warning("failed to handle memory access")
+            pass
 
     def terminate(self):
         self.stop = True

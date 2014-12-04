@@ -294,9 +294,9 @@ class ProcessManager(threading.Thread):
                 LOG.debug(msg)
 
                 #LOG.debug("p_and_r\t%f\tp:%s,%s\tr:%s,%s" % (time_current_iter, p_dict, p_dict_cur, r_dict, r_dict_cur))
-                # get new mode
-                #if (time_current_iter-time_prev_mode_change) > 5:   # apply after 5 seconds
-                if count == -1 and len(mode_change_history) == 0:
+
+                # first predict at 2 seconds and then for every 5 seconds
+                if count == -1 : # or (time_prev_mode_change-time_current_iter) > 5:
                     # use current throughput
                     LOG.debug("Update mode to change bw from %f to %f" % (system_bw_mbps_cur, network_bw_mbps))
                     LOG.debug("currect p: %s" % (p_dict_cur))

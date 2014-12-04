@@ -1598,7 +1598,6 @@ def create_residue(base_disk, base_hashvalue,
             Const.get_basepath(base_disk, check_exist=True)
     qemu_logfile = resumed_vm.qemu_logfile
 
-    # 2. suspend VM and get monitoring information
     memory_snapshot_queue = multiprocessing.Queue(overlay_mode.QUEUE_SIZE_MEMORY_SNAPSHOT)
     residue_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_OPTIMIZATION)
     compdata_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_COMPRESSION)
@@ -1708,14 +1707,17 @@ def create_residue(base_disk, base_hashvalue,
         resumed_vm.machine = None   # protecting malaccess to machine 
         time_end = time()
 
-        LOG.debug("[time] Time for finishing transferring (%f ~ %f): %f" % (time_start, time_end,
-                                                                (time_end-time_start)))
         qmp_thread.join()
         migration_stop_command_time = qmp_thread.migration_stop_time
         vm_resume_time_at_dest = client.vm_resume_time_at_dest.value
-        LOG.debug("migration stop time: %f" % migration_stop_command_time)
-        LOG.debug("VM resume time at dest: %f" %vm_resume_time_at_dest)
-        LOG.debug("migration downtime: %f" % (vm_resume_time_at_dest-migration_stop_command_time))
+        time_finish_transmission = client.time_finish_transmission.value
+        LOG.debug("[time] migration stop time: %f" % migration_stop_command_time)
+        LOG.debug("[time] VM resume time at dest: %f" % vm_resume_time_at_dest)
+        LOG.debug("[time] migration downtime: %f" % (vm_resume_time_at_dest-migration_stop_command_time))
+        LOG.debug("[time] Start ~ Finish tranmission (%f ~ %f): %f" % (time_start, time_finish_transmission,
+                                                                (time_finish_transmission-time_start)))
+        LOG.debug("[time] Start ~ return ack (%f ~ %f): %f" % (time_start, vm_resume_time_at_dest,
+                                                                (vm_resume_time_at_dest-time_start)))
         return None
     elif migration_addr.startswith("file"):
         temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")

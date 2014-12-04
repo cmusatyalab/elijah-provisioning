@@ -26,6 +26,7 @@ import struct
 import Queue
 import SocketServer
 import socket
+import subprocess
 
 import tempfile
 import multiprocessing
@@ -62,6 +63,21 @@ PERIODIC_ACK_BYTES = 100 * 1024 # every 100 KB
 
 class StreamSynthesisError(Exception):
     pass
+
+class DummyMemoryReadThread(multiprocessing.Process):
+    def __init__(self, filename):
+        self.filename = filename
+        multiprocessing.Process.__init__(self, target=self.read_file)
+
+    def read_file(self):
+        FNULL = open(os.devnull, 'w')
+        time_start = time.time()
+        ret = subprocess.call(["cat", "%s" % self.filename], stdout=FNULL, stderr=FNULL)
+        if ret != 0:
+            raise IOError("cannot read %s" % self.filename)
+        time_end = time.time()
+        print "memory read time: %s %f" % (self.filename, (time_end-time_start))
+
 
 
 class AckThread(threading.Thread):
@@ -592,18 +608,29 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 resumed_disk=launch_disk,  disk_overlay_map=disk_overlay_map,
                 resumed_memory=launch_mem, memory_overlay_map=memory_overlay_map)
         time_fuse_end = time.time()
+        memory_path = os.path.join(fuse.mountpoint, 'memory', 'image')
+        #dummy_thread = DummyMemoryReadThread(memory_path)
+        #dummy_thread.daemon=True
+        #dummy_thread.start()
 
         synthesized_VM = SynthesizedVM(launch_disk, launch_mem, fuse)
         synthesized_VM.start()
         synthesized_VM.join()
-        #time.sleep(10)
+
+        # since libvirt does not return immediately after resuming VM, we
+        # measure resume time directly from QEMU
+        actual_resume_time = 0
+        splited_log = open("/tmp/qemu_debug_messages", "r").read().split("\n")
+        for line in splited_log:
+            if line.startswith("INCOMING_FINISH"):
+                actual_resume_time = float(line.split(" ")[-1])
         time_resume_end = time.time()
-        LOG.info("[time] last, but non-pipelined time %f (%f ~ %f ~ %f)" % (\
-                                                                            time_resume_end-time_fuse_start,
-                                                                            time_fuse_start,
-                                                                            time_fuse_end,
-                                                                            time_resume_end,
-                                                                            ))
+        LOG.info("[time] non-pipelined time %f (%f ~ %f ~ %f)" % (\
+                                                                  actual_resume_time-time_fuse_start,
+                                                                  time_fuse_start,
+                                                                  time_fuse_end,
+                                                                  actual_resume_time,
+                                                                  ))
         #connect_vnc(synthesized_VM.machine)
         raw_input("Enter to finish VM")
 
@@ -615,7 +642,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         '''
 
         # send end message
-        ack_data = struct.pack("!Qd", 0x10, time_resume_end)
+        ack_data = struct.pack("!Qd", 0x10, actual_resume_time)
         print "send ack to client: %d" % len(ack_data)
         self.request.sendall(ack_data)
         print "finished"

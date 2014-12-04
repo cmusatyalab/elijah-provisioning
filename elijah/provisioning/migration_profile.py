@@ -69,6 +69,18 @@ class MigrationMode(object):
 
 
     @staticmethod
+    def get_total_P_new(p_dict, indata_size_dict):
+        # get total P considering input data
+        memory_in_size = long(indata_size_dict['CreateMemoryDeltalist'])
+        disk_in_blocks = long(indata_size_dict['CreateDiskDeltalist'])
+        alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
+        total_P_from_each_stage = (p_dict['CreateMemoryDeltalist']*alpha +  p_dict['CreateDiskDeltalist']*(1-alpha))\
+            + p_dict['DeltaDedup'] + p_dict['CompressProc']
+        return total_P_from_each_stage
+
+
+
+    @staticmethod
     def get_total_R(r_dict):
         # weight using input size
         #disk_memory_ratio = float(disk_diff)/(disk_diff+memory_diff)
@@ -77,6 +89,22 @@ class MigrationMode(object):
         #disk_r = self.stage_size_ratio['CreateDiskDeltalist']
         #delta_r = self.stage_size_ratio['DeltaDedup']
         #comp_r = self.stage_size_ratio['CompressProc']
+        #total_R = (disk_r*disk_memory_ratio+memory_r*memory_disk_ratio)*delta_r*comp_r
+
+        total_R_from_each_stage = (r_dict['CreateMemoryDeltalist']/2+
+                                   r_dict['CreateDiskDeltalist']/2)\
+                                * r_dict['DeltaDedup']\
+                                * r_dict['CompressProc']
+        #print "%f == %f --> %f" % (total_R, total_R_from_each_stage, (total_R-total_R_from_each_stage))
+
+        return total_R_from_each_stage
+
+    @staticmethod
+    def get_total_R_new(r_dict, indata_size_dict):
+        # weight using input size
+        memory_in_size = long(indata_size_dict['CreateMemoryDeltalist'])
+        disk_in_blocks = long(indata_size_dict['CreateDiskDeltalist'])
+        alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
         #total_R = (disk_r*disk_memory_ratio+memory_r*memory_disk_ratio)*delta_r*comp_r
 
         total_R_from_each_stage = (r_dict['CreateMemoryDeltalist']/2+
@@ -210,6 +238,7 @@ class ModeProfile(object):
             new_system_bw = MigrationMode.get_system_throughput(num_cores,
                                                                 scaled_each_p,
                                                                 scaled_each_r)
+            #source_bw = min(new_system_bw, network_bw)/scaled_each_r
             diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, each_mode.mode)
             scaled_mode_list.append((each_mode, scaled_each_p, scaled_each_r, new_system_bw))
             #print "%f %f --> (%s) %f %f, %f" % (system_out_bw, network_bw, diff_str, scaled_each_p, scaled_each_r, new_system_bw)
