@@ -557,12 +557,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         self.iteration_size = 0
         self.iteration_seq = 0
 
-        processed_datasize = 0
-        processed_duration = 0
-        time_process_finish = 0
         time_process_start = 0
-        time_prev_report = 0
-        UPDATE_PERIOD = 10
 
         # Due to the header of each memory page, memory chunk size is not 4KB +
         # 8 bytes. Also, we need to follow this format for libvirt header.
@@ -612,16 +607,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         while is_end_of_stream == False and len(memory_page_list) != 0:
             # get data from the stream
             if len(memory_page_list) < 2: # empty or partial data
-                # measurement
-                if recved_data_size > 0:
-                    processed_datasize += recved_data_size
-                    time_process_finish = time.time()
-                    processed_duration += (time_process_finish - time_process_start)
-                    if (time_process_finish - time_prev_report) > UPDATE_PERIOD:
-                        time_prev_report = time_process_finish
-                        self.monitor_current_bw = processed_datasize/processed_duration/1024.0/1024
-                        processed_datasize = 0
-                        processed_duration = float(0)
 
                 input_fd = [self.control_queue._reader.fileno(), memory_data_queue._reader.fileno()]
                 input_ready, out_ready, err_ready = select.select(input_fd, [], [])

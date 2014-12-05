@@ -180,7 +180,8 @@ class ProcessManager(threading.Thread):
     def get_system_speed(self):
         worker_names = ["DeltaDedup", "CreateMemoryDeltalist",
                         "CreateDiskDeltalist", "CompressProc"]
-        total_size_dict = dict()
+        total_size_dict_in = dict()
+        total_size_dict_out = dict()
         compression_first_input_time = 0
         p_dict = dict()
         r_dict = dict()
@@ -206,21 +207,23 @@ class ProcessManager(threading.Thread):
             r_dict[worker_name] = ratio_block
             p_dict_cur[worker_name] = time_block_cur
             r_dict_cur[worker_name] = ratio_block_cur
-            total_size_dict[worker_name] = (worker.monitor_total_input_size.value, worker.monitor_total_output_size.value)
+            total_size_dict_in[worker_name] = worker.monitor_total_input_size.value
+            total_size_dict_out[worker_name] = worker.monitor_total_output_size.value
             if worker_name == "CompressProc":
                 compression_first_input_time = worker.monitor_time_first_input_recved.value
 
         # Get total P and total R
-        total_p = MigrationMode.get_total_P(p_dict)
-        total_r = MigrationMode.get_total_R(r_dict)
-        total_p_cur = MigrationMode.get_total_P(p_dict_cur)
-        total_r_cur = MigrationMode.get_total_R(r_dict_cur)
-        system_out_bw_mbps = MigrationMode.get_system_throughput(VMOverlayCreationMode.get_num_cores(),
-                                                                 total_p,
-                                                                 total_r)
-        system_out_bw_mbps_cur = MigrationMode.get_system_throughput(VMOverlayCreationMode.get_num_cores(),
-                                                                     total_p_cur,
-                                                                     total_r_cur)
+        total_p = MigrationMode.get_total_P(p_dict, total_size_dict_in)
+        total_r = MigrationMode.get_total_R(r_dict, total_size_dict_in)
+        #total_p_cur = MigrationMode.get_total_P(p_dict_cur)
+        #total_r_cur = MigrationMode.get_total_R(r_dict_cur)
+        num_cores = VMOverlayCreationMode.get_num_cores()
+        system_block_per_sec, system_in_mbps, system_out_mbps = MigrationMode.get_system_throughput(num_cores,
+                                                                                                    total_p,
+                                                                                                    total_r)
+        #system_out_bw_mbps_cur = MigrationMode.get_system_throughput(VMOverlayCreationMode.get_num_cores(),
+        #                                                             total_p_cur,
+        #                                                             total_r_cur)
         #sys.stdout.write("P: %f, %f \tR:%f, %f, BW: %f, %f mbps\t(%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f)\n" % \
         #                 (total_p, total_p_cur,
         #                  total_r, total_r_cur,
@@ -244,12 +247,12 @@ class ProcessManager(threading.Thread):
         #                  ))
 
         # get actual system throughput using in out size
-        (comp_in_size, comp_out_size) = total_size_dict['CompressProc']
+        comp_in_size = total_size_dict_in['CompressProc']
+        comp_out_size = total_size_dict_out['CompressProc']
         system_output_size = comp_out_size
         system_out_throughput_measured = 8.0*system_output_size/(time.time()-compression_first_input_time)/1024/1024
 
-
-        return p_dict, r_dict, system_out_bw_mbps, p_dict_cur, r_dict_cur, system_out_bw_mbps_cur, system_out_throughput_measured
+        return p_dict, r_dict, total_size_dict_in, system_block_per_sec, system_out_mbps, system_out_throughput_measured
 
     def get_network_speed(self):
         if self.migration_dest.startswith("network"):
@@ -285,83 +288,71 @@ class ProcessManager(threading.Thread):
                 if network_bw_mbps == None:
                     #sys.stdout.write("network speed is not measured\n")
                     continue
-                p_dict, r_dict, system_bw_mbps, p_dict_cur, r_dict_cur, system_bw_mbps_cur, system_bw_measured = system_speed
-                msg = "throughput\t%f\tsystem(mbps):%f,%f\tnetwork(mbps):%f\tmeasured:%f" % (time_current_iter,
-                                                                                             system_bw_mbps,
-                                                                                             system_bw_mbps_cur,
-                                                                                             network_bw_mbps,
-                                                                                             system_bw_measured)
+                p_dict, r_dict, total_size_dict_in, system_block_per_sec, system_out_mbps, system_bw_measured = system_speed
+                msg = "throughput\t%f(%f)\tsystem(mbps):%f mbps, %f block/sec\tnetwork(mbps):%f\tmeasured:%f" % (time_current_iter,
+                                                                                                                 (time_current_iter-time_prev_mode_change),
+                                                                                                             system_out_mbps,
+                                                                                                             system_block_per_sec,
+                                                                                                             network_bw_mbps,
+                                                                                                             system_bw_measured)
                 LOG.debug(msg)
-
-                #LOG.debug("p_and_r\t%f\tp:%s,%s\tr:%s,%s" % (time_current_iter, p_dict, p_dict_cur, r_dict, r_dict_cur))
+                if time_first_measurement == 0:
+                    time_first_measurement = time.time()
 
                 # first predict at 2 seconds and then for every 5 seconds
-                if count == -1 : # or (time_prev_mode_change-time_current_iter) > 5:
+                if (time_current_iter-time_first_measurement) > 2 and (time_current_iter - time_prev_mode_change) > 5:
                     # use current throughput
-                    LOG.debug("Update mode to change bw from %f to %f" % (system_bw_mbps_cur, network_bw_mbps))
-                    LOG.debug("currect p: %s" % (p_dict_cur))
-                    LOG.debug("currect r: %s" % (r_dict_cur))
-                    predict_status, item = self.mode_profile.predict_new_mode(self.overlay_creation_mode,
-                                                                                  p_dict, r_dict,
-                                                                                  system_bw_mbps_cur,
-                                                                                  network_bw_mbps)
-                    (new_mode_object, new_total_p, new_total_r, expected_bw) = item
-                    LOG.debug("Mode prediction result: %d\tExpected BW: %f" % (predict_status, expected_bw))
-                    diff_mode = MigrationMode.mode_diff(self.overlay_creation_mode.__dict__, new_mode_object.mode)
+                    LOG.debug("Update mode to change bw from %f to %f" % (system_out_mbps, network_bw_mbps))
+                    LOG.debug("currect p: %s" % (p_dict))
+                    LOG.debug("currect r: %s" % (r_dict))
+                    item = self.mode_profile.predict_new_mode(self.overlay_creation_mode,
+                                                                         p_dict, r_dict, total_size_dict_in,
+                                                                         network_bw_mbps)
+                    diff_mode = None
+                    if item is not None:
+                        (new_mode_obj, new_block_per_sec, misc) = item
+                        (new_system_block_per_sec, new_system_in_mbps, new_system_out_mbps, network_block_per_sec, network_bw) = misc
+                        diff_str = MigrationMode.mode_diff_str(self.overlay_creation_mode.__dict__, new_mode_obj.mode)
+                        diff = MigrationMode.mode_diff(self.overlay_creation_mode.__dict__, new_mode_obj.mode)
+                        LOG.debug("[adaptation] Change conf: %s" % diff_str)
+                        LOG.debug("[adaptation] output bandwidth(%f, %f), block_per_sec:(%f --> %f), (%f, %f)" % \
+                                  (system_out_mbps, network_bw, system_block_per_sec,
+                                  new_block_per_sec, new_system_block_per_sec, network_block_per_sec))
+                        diff_mode = MigrationMode.mode_diff(self.overlay_creation_mode.__dict__, new_mode_obj.mode)
 
+                    # change mode
+                    time_prev_mode_change = time_current_iter
                     if diff_mode is not None and len(diff_mode) > 0:
-                        # cannot find proper mode
-                        if predict_status == ModeProfile.MATCHING_BEST_EFFORT:
-                            cur_core_num = VMOverlayCreationMode.get_num_cores()
-                            new_core_num = cur_core_num
-                            max_cores = 4
-                            diff_bw_ratio = network_bw_mbps/system_bw_mbps_cur
-                            if diff_bw_ratio > 1:
-                                # increase system throughput --> more cores
-                                wanted_core = math.ceil(cur_core_num * diff_bw_ratio)
-                                new_core_num = min(wanted_core, max_cores)
-                                self.overlay_creation_mode.set_num_cores(new_core_num)
-                                LOG.debug("Allocate more cores: from %d to %d" % (cur_core_num, new_core_num))
-                            else:
-                                # decurease system throughput --> less cores
-                                wanted_core = math.floor(cur_core_num * diff_bw_ratio)
-                                new_core_num = max(wanted_core, 1)
-                                self.overlay_creation_mode.set_num_cores(new_core_num)
-                                LOG.debug("Deallocate cores: from %d to %d" % (cur_core_num, new_core_num))
-                            # print log
-                            if cur_core_num != new_core_num:
-                                self._change_num_cores(new_core_num)
-                        else:
-                            # check compression
-                            new_comp_level = None
-                            new_comp_type = None
-                            new_disk_diff = None
-                            new_memory_diff = None
-                            if "COMPRESSION_ALGORITHM_SPEED" in diff_mode.keys():
-                                new_comp_level = diff_mode["COMPRESSION_ALGORITHM_SPEED"]
-                            if "COMPRESSION_ALGORITHM_TYPE" in diff_mode.keys():
-                                new_comp_type = diff_mode["COMPRESSION_ALGORITHM_TYPE"]
-                            if "DISK_DIFF_ALGORITHM" in diff_mode.keys():
-                                new_disk_diff = diff_mode["DISK_DIFF_ALGORITHM"]
-                            if "MEMORY_DIFF_ALGORITHM" in diff_mode.keys():
-                                new_memory_diff = diff_mode["MEMORY_DIFF_ALGORITHM"]
+                        new_comp_level = None
+                        new_comp_type = None
+                        new_disk_diff = None
+                        new_memory_diff = None
+                        if "COMPRESSION_ALGORITHM_SPEED" in diff_mode.keys():
+                            new_comp_level = diff_mode["COMPRESSION_ALGORITHM_SPEED"]
+                        if "COMPRESSION_ALGORITHM_TYPE" in diff_mode.keys():
+                            new_comp_type = diff_mode["COMPRESSION_ALGORITHM_TYPE"]
+                        if "DISK_DIFF_ALGORITHM" in diff_mode.keys():
+                            new_disk_diff = diff_mode["DISK_DIFF_ALGORITHM"]
+                        if "MEMORY_DIFF_ALGORITHM" in diff_mode.keys():
+                            new_memory_diff = diff_mode["MEMORY_DIFF_ALGORITHM"]
 
-                            # apply change
-                            if new_comp_type is not None or new_comp_level is not None:
-                                self._change_comp_mode(new_comp_type, new_comp_level)
-                            if new_disk_diff is not None:
-                                self._change_disk_diff_mode(new_disk_diff)
-                            if new_memory_diff is not None:
-                                self._change_memory_diff_mode(new_memory_diff)
+                        # apply change
+                        if new_comp_type is not None or new_comp_level is not None:
+                            self._change_comp_mode(new_comp_type, new_comp_level)
+                        if new_disk_diff is not None:
+                            self._change_disk_diff_mode(new_disk_diff)
+                        if new_memory_diff is not None:
+                            self._change_memory_diff_mode(new_memory_diff)
 
-                            old_mode_dict = self.overlay_creation_mode.__dict__.copy()
-                            self.overlay_creation_mode.update_mode(new_mode_object.mode)
-                            mode_change_history.append((time_current_iter, old_mode_dict, new_mode_object.mode))
-                            time_prev_mode_change = time_current_iter
+                        old_mode_dict = self.overlay_creation_mode.__dict__.copy()
+                        self.overlay_creation_mode.update_mode(new_mode_obj.mode)
+                        mode_change_history.append((time_current_iter, old_mode_dict, new_mode_obj.mode))
 
-                            # print log
-                            diff_str = MigrationMode.mode_diff_str(old_mode_dict, self.overlay_creation_mode.__dict__)
-                            LOG.debug("Mode change %s" % (diff_str))
+                        # print log
+                        diff_str = MigrationMode.mode_diff_str(old_mode_dict, self.overlay_creation_mode.__dict__)
+                        LOG.debug("[adaptation] Mode change %s" % (diff_str))
+                    else:
+                        LOG.debug("[adaptation] current mode is the best")
                 '''
                 '''
 
