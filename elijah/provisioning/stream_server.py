@@ -58,7 +58,7 @@ from delta import DeltaItem
 LOG = logging.getLogger(__name__)
 session_resources = dict()   # dict[session_id] = obj(SessionResource)
 
-PERIODIC_ACK_BYTES = 100 * 1024 # every 100 KB
+PERIODIC_ACK_BYTES = 200 * 1024 # every 100 KB
 
 
 class StreamSynthesisError(Exception):
