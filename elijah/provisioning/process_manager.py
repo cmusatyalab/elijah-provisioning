@@ -256,7 +256,7 @@ class ProcessManager(threading.Thread):
         system_output_size = comp_out_size
         system_in_size = total_size_dict_in['CreateDiskDeltalist'] + total_size_dict_in['CreateMemoryDeltalist']
         cur_time = time.time()
-        system_out_throughput_measured = 8.0*system_output_size/(cur_time-compression_first_input_time)/1024/1024
+        system_out_throughput_measured = 8.0*system_output_size/(cur_time-self.time_start)/1024/1024
         system_in_throughput_measured = 8.0*system_in_size/(cur_time-self.time_start)/1024/1024
 
 
