@@ -50,7 +50,7 @@ class MigrationMode(object):
         memory_in_size = long(indata_size_dict['CreateMemoryDeltalist'])
         disk_in_size = long(indata_size_dict['CreateDiskDeltalist'])
         alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
-        total_P_from_each_stage = (p_dict['CreateMemoryDeltalist']*alpha +  p_dict['CreateDiskDeltalist']*(1-alpha))\
+        total_P_from_each_stage = (p_dict['CreateMemoryDeltalist']*alpha + p_dict['CreateDiskDeltalist']*(1-alpha))\
             + p_dict['DeltaDedup'] + p_dict['CompressProc']
         return total_P_from_each_stage
 
@@ -62,8 +62,8 @@ class MigrationMode(object):
         alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
         #total_R = (disk_r*disk_memory_ratio+memory_r*memory_disk_ratio)*delta_r*comp_r
 
-        total_R_from_each_stage = (r_dict['CreateMemoryDeltalist']/2+
-                                   r_dict['CreateDiskDeltalist']/2)\
+        total_R_from_each_stage = (r_dict['CreateMemoryDeltalist']*alpha +\
+                                   r_dict['CreateDiskDeltalist']*(1-alpha))\
                                 * r_dict['DeltaDedup']\
                                 * r_dict['CompressProc']
         #print "%f == %f --> %f" % (total_R, total_R_from_each_stage, (total_R-total_R_from_each_stage))

@@ -1239,6 +1239,7 @@ class QmpThread(threading.Thread):
 
     def control_migration(self):
         self.qmp.connect()
+        counter_check_comp_size = 0
         ret = self.qmp.qmp_negotiate()
         if not ret:
             raise CloudletGenerationError("failed to connect to qmp channel")
@@ -1264,10 +1265,15 @@ class QmpThread(threading.Thread):
 
                 latest_time_diff = iteration_issue_time_list[-1] - iteration_issue_time_list[-2]
                 if latest_time_diff < sleep_between_iteration*1.4:
+                    counter_check_comp_size += 1
                     if self.compdata_queue.qsize() == 0:
                         # stop after transmitting everything
                         self.migration_stop_time = self._stop_migration()
                         break
+                    if len(iteration_issue_time_list) > 5:
+                        self.migration_stop_time = self._stop_migration()
+                        break
+
         self.qmp.disconnect()
 
 
@@ -1716,7 +1722,7 @@ def create_residue(base_disk, base_hashvalue,
         LOG.debug("[time] migration downtime: %f" % (vm_resume_time_at_dest-migration_stop_command_time))
         LOG.debug("[time] Start ~ Finish tranmission (%f ~ %f): %f" % (time_start, time_finish_transmission,
                                                                 (time_finish_transmission-time_start)))
-        LOG.debug("[time] Start ~ return ack (%f ~ %f): %f" % (time_start, vm_resume_time_at_dest,
+        LOG.debug("[time] Start ~ Finish migration (%f ~ %f): %f" % (time_start, vm_resume_time_at_dest,
                                                                 (vm_resume_time_at_dest-time_start)))
         return None
     elif migration_addr.startswith("file"):

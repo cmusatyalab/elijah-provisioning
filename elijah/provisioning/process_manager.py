@@ -182,6 +182,8 @@ class ProcessManager(threading.Thread):
                         "CreateDiskDeltalist", "CompressProc"]
         total_size_dict_in = dict()
         total_size_dict_out = dict()
+        cur_size_dict_in = dict()
+        cur_size_dict_out = dict()
         compression_first_input_time = 0
         p_dict = dict()
         r_dict = dict()
@@ -209,21 +211,23 @@ class ProcessManager(threading.Thread):
             r_dict_cur[worker_name] = ratio_block_cur
             total_size_dict_in[worker_name] = worker.monitor_total_input_size.value
             total_size_dict_out[worker_name] = worker.monitor_total_output_size.value
+            cur_size_dict_in[worker_name] = worker.monitor_total_input_size_cur.value
+            cur_size_dict_out[worker_name] = worker.monitor_total_output_size_cur.value
             if worker_name == "CompressProc":
                 compression_first_input_time = worker.monitor_time_first_input_recved.value
 
         # Get total P and total R
         total_p = MigrationMode.get_total_P(p_dict, total_size_dict_in)
         total_r = MigrationMode.get_total_R(r_dict, total_size_dict_in)
-        #total_p_cur = MigrationMode.get_total_P(p_dict_cur)
-        #total_r_cur = MigrationMode.get_total_R(r_dict_cur)
+        total_p_cur = MigrationMode.get_total_P(p_dict_cur, cur_size_dict_in)
+        total_r_cur = MigrationMode.get_total_R(r_dict_cur, cur_size_dict_in)
         num_cores = VMOverlayCreationMode.get_num_cores()
         system_block_per_sec, system_in_mbps, system_out_mbps = MigrationMode.get_system_throughput(num_cores,
                                                                                                     total_p,
                                                                                                     total_r)
-        #system_out_bw_mbps_cur = MigrationMode.get_system_throughput(VMOverlayCreationMode.get_num_cores(),
-        #                                                             total_p_cur,
-        #                                                             total_r_cur)
+        system_block_per_sec_cur, system_in_mbps_cur, system_out_mbps_cur = MigrationMode.get_system_throughput(num_cores,
+                                                                     total_p_cur,
+                                                                     total_r_cur)
         #sys.stdout.write("P: %f, %f \tR:%f, %f, BW: %f, %f mbps\t(%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f)\n" % \
         #                 (total_p, total_p_cur,
         #                  total_r, total_r_cur,
@@ -252,7 +256,8 @@ class ProcessManager(threading.Thread):
         system_output_size = comp_out_size
         system_out_throughput_measured = 8.0*system_output_size/(time.time()-compression_first_input_time)/1024/1024
 
-        return p_dict, r_dict, total_size_dict_in, system_block_per_sec, system_out_mbps, system_out_throughput_measured
+        #return p_dict, r_dict, total_size_dict_in, system_block_per_sec, system_out_mbps, system_out_throughput_measured
+        return p_dict_cur, r_dict_cur, cur_size_dict_in, system_block_per_sec_cur, system_out_mbps_cur, system_out_throughput_measured
 
     def get_network_speed(self):
         if self.migration_dest.startswith("network"):
@@ -306,8 +311,8 @@ class ProcessManager(threading.Thread):
                     LOG.debug("currect p: %s" % (p_dict))
                     LOG.debug("currect r: %s" % (r_dict))
                     item = self.mode_profile.predict_new_mode(self.overlay_creation_mode,
-                                                                         p_dict, r_dict, total_size_dict_in,
-                                                                         network_bw_mbps)
+                                                              p_dict, r_dict, total_size_dict_in,
+                                                              network_bw_mbps)
                     diff_mode = None
                     if item is not None:
                         (new_mode_obj, new_block_per_sec, misc) = item
@@ -315,9 +320,12 @@ class ProcessManager(threading.Thread):
                         diff_str = MigrationMode.mode_diff_str(self.overlay_creation_mode.__dict__, new_mode_obj.mode)
                         diff = MigrationMode.mode_diff(self.overlay_creation_mode.__dict__, new_mode_obj.mode)
                         LOG.debug("[adaptation] Change conf: %s" % diff_str)
-                        LOG.debug("[adaptation] output bandwidth(%f, %f), block_per_sec:(%f --> %f), (%f, %f)" % \
-                                  (system_out_mbps, network_bw, system_block_per_sec,
-                                  new_block_per_sec, new_system_block_per_sec, network_block_per_sec))
+                        LOG.debug("[adaptation] Change in output bps: %f, %f" % \
+                                  (system_out_mbps, new_system_out_mbps))
+                        LOG.debug("[adaptation] Change in block/sec: %f, %f" % \
+                                  (system_block_per_sec, new_block_per_sec))
+                        LOG.debug("[adaptation] Change in block/sec: %f, %f" % \
+                                  (network_block_per_sec, new_block_per_sec))
                         diff_mode = MigrationMode.mode_diff(self.overlay_creation_mode.__dict__, new_mode_obj.mode)
 
                     # change mode
@@ -397,6 +405,8 @@ class ProcWorker(multiprocessing.Process):
         self.monitor_total_ratio_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
         self.monitor_total_input_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
         self.monitor_total_output_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
+        self.monitor_total_input_size_cur = multiprocessing.RawValue(ctypes.c_ulong, 0)
+        self.monitor_total_output_size_cur = multiprocessing.RawValue(ctypes.c_ulong, 0)
         self.in_size = 0
         self.out_size = 0
         self.is_processing_alive = multiprocessing.RawValue(ctypes.c_bool)

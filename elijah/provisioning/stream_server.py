@@ -632,7 +632,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                                                                   actual_resume_time,
                                                                   ))
         #connect_vnc(synthesized_VM.machine)
-        raw_input("Enter to finish VM")
+        print "finishing VM in 3 seconds"
+        time.sleep(3)
 
         # terminate
         synthesized_VM.monitor.terminate()

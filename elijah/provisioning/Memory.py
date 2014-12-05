@@ -650,6 +650,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             total_ratio_block_cur = 0
             total_input_size = 0
             total_output_size = 0
+            total_input_size_cur = 0
+            total_output_size_cur = 0
             valid_child_proc = 0
             for (proc, c_queue, mode_queue) in self.proc_list:
                 process_time_block = proc.child_process_time_block.value
@@ -658,6 +660,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 ratio_block_cur = proc.child_ratio_block_cur.value
                 input_size = proc.child_input_size.value
                 output_size = proc.child_output_size.value
+                input_size_cur = proc.child_input_size_cur.value
+                output_size_cur = proc.child_output_size_cur.value
                 # averaging
                 if (process_time_block > 0) and (ratio_block > 0):
                     valid_child_proc += 1
@@ -667,6 +671,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     total_ratio_block_cur += ratio_block_cur
                     total_input_size += input_size
                     total_output_size += output_size
+                    total_input_size_cur += input_size_cur
+                    total_output_size_cur += output_size_cur
             if valid_child_proc > 0:
                 self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
                 self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
@@ -675,6 +681,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 #print "[memory] P: %f (%f)\tR: %f (%f)" % (self.monitor_total_time_block.value, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block.value, self.monitor_total_ratio_block_cur.value)
             self.monitor_total_input_size.value = total_input_size + header_in_size
             self.monitor_total_output_size.value = total_output_size + header_out_size
+            self.monitor_total_input_size_cur.value = total_input_size_cur
+            self.monitor_total_output_size_cur.value = total_output_size_cur
             #print "[memory] total input size: %d, total_output size: %d" % (self.monitor_total_input_size.value, self.monitor_total_output_size.value)
 
         # send last memory page
@@ -905,6 +913,8 @@ class MemoryDiffProc(multiprocessing.Process):
         self.child_ratio_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_input_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
         self.child_output_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
+        self.child_input_size_cur = multiprocessing.RawValue(ctypes.c_ulong, 0)
+        self.child_output_size_cur = multiprocessing.RawValue(ctypes.c_ulong, 0)
 
         super(MemoryDiffProc, self).__init__(target=self.process_diff)
 
@@ -1029,6 +1039,8 @@ class MemoryDiffProc(multiprocessing.Process):
                 time_process_total_time += time_process_cur_time
                 indata_size += indata_size_cur
                 outdata_size += outdata_size_cur
+                self.child_input_size_cur.value = indata_size_cur
+                self.child_output_size_cur.value = outdata_size_cur
                 self.child_input_size.value = indata_size
                 self.child_output_size.value = outdata_size
                 if child_cur_block_count > 0:
