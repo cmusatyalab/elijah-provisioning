@@ -2181,6 +2181,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
     base_mem = kwargs.get('base_mem', None)
     base_diskmeta = kwargs.get('base_diskmeta', None)
     base_memmeta = kwargs.get('base_memmeta', None)
+    LOG.debug("Input file name: %s" % os.path.abspath(overlay_path))
 
     overlay_filename = NamedTemporaryFile(prefix="cloudlet-overlay-file-")
     decompe_time_s = time()

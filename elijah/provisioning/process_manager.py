@@ -189,6 +189,7 @@ class ProcessManager(threading.Thread):
         r_dict = dict()
         p_dict_cur = dict()
         r_dict_cur = dict()
+
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
             if worker == None:
@@ -259,6 +260,13 @@ class ProcessManager(threading.Thread):
         system_out_throughput_measured = 8.0*system_output_size/(cur_time-self.time_start)/1024/1024
         system_in_throughput_measured = 8.0*system_in_size/(cur_time-self.time_start)/1024/1024
 
+        if cur_time - self.prev_measured_time > 1:
+            self.cur_system_out_throughput_measured.append(8.0*(system_output_size-self.prev_system_out_size)/(cur_time-self.prev_measured_time)/1024/1024)
+            self.cur_system_in_throughput_measured.append(8.0*(system_in_size-self.prev_system_in_size)/(cur_time-self.prev_measured_time)/1024/1024)
+            self.prev_system_out_size = system_output_size
+            self.prev_system_in_size = system_in_size
+            self.prev_measured_time = cur_time
+
 
         # use accumulated input size even when we use curren p and r value.
         # input size will be used only for getting alpha, accumulated size is
@@ -283,6 +291,12 @@ class ProcessManager(threading.Thread):
 
     def start_managing(self):
         self.time_start = time.time()
+        self.prev_system_out_size = 0
+        self.prev_system_in_size = 0
+        self.prev_measured_time = self.time_start
+        self.cur_system_in_throughput_measured = list()
+        self.cur_system_out_throughput_measured = list()
+        LOG.debug("adaptation start time: %f" % self.time_start)
         time_first_measurement = 0
         measured_throughput = 0
         mode_change_history = list()
@@ -303,14 +317,23 @@ class ProcessManager(threading.Thread):
                 if time_first_measurement == 0:
                     time_first_measurement = time.time()
                 time_from_start = time_current_iter-time_first_measurement
+                if len(self.cur_system_in_throughput_measured) < 10:
+                    average_cur_system_in = sum(self.cur_system_in_throughput_measured)/len(self.cur_system_in_throughput_measured)
+                    average_cur_system_out = sum(self.cur_system_out_throughput_measured)/len(self.cur_system_out_throughput_measured)
+                else:
+                    average_cur_system_in = sum(self.cur_system_in_throughput_measured[-10:])/10
+                    average_cur_system_out = sum(self.cur_system_out_throughput_measured[-10:])/10
+
 
                 p_dict, r_dict, total_size_dict_in, system_block_per_sec, system_out_mbps, system_out_bw_measured, system_in_bw_measured = system_speed
-                msg = "throughput\t%f\tsystem:%f(mbps),%f(block/sec)\tnetwork(mbps):%f\tmeasured:%f,%f" % (time_current_iter,
+                msg = "throughput\t%f\tsystem:%f(mbps),%f(block/sec)\tnetwork(mbps):%f\tmeasured:%f,%f\tcur:%f,%f" % (time_current_iter,
                                                                                                              system_out_mbps,
                                                                                                              system_block_per_sec,
                                                                                                              network_bw_mbps,
                                                                                                              system_in_bw_measured,
-                                                                                                             system_out_bw_measured)
+                                                                                                             system_out_bw_measured,
+                                                                                                           average_cur_system_in,
+                                                                                                           average_cur_system_out)
                 LOG.debug(msg)
 
                 # first predict at 2 seconds and then for every 5 seconds
