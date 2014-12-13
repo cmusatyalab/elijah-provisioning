@@ -410,7 +410,7 @@ class QmpThread(threading.Thread):
 
         if VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
             self.migration_stop_time = self._stop_migration()
-        elif VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE:
+        elif VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE:
             iteration_issue_time_list = list()
             sleep_between_iteration = 2
             while(not self.stop.wait(0.1)):
@@ -733,9 +733,10 @@ def create_residue(base_disk, base_hashvalue,
         #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
         #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
 
-        NUM_CORES = 4
-        overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CORES)
-        VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
+        VMOverlayCreationMode.MAX_THREAD_NUM = 4
+        NUM_CPU_CORES = 4
+        overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
+        VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
         overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_BZIP2
         overlay_mode.COMPRESSION_ALGORITHM_SPEED = 5
 

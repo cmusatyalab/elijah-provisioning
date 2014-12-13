@@ -43,7 +43,7 @@ def which(program):
 
 
 class Const(object):
-    VERSION = str("0.9.1")
+    VERSION = str("0.9.2")
     HOME_DIR = os.path.abspath(os.path.expanduser("~"))
     CONFIGURATION_DIR = os.path.join('/', 'var', 'lib', 'cloudlet', 'conf')
     QUEUE_SUCCESS_MESSAGE       = "!!@#^&!MemorySnapshot Transfer SUCCESS Marker!!@#^&!"
@@ -152,13 +152,13 @@ class VMOverlayCreationMode(object):
     PIPE_ONE_ELEMENT_SIZE = 4096*100 # 400KB == Max Pipe size is 1MB
     EMULATED_BANDWIDTH_Mbps = 100000 # Mbps
     MEASURE_AVERAGE_TIME    = 1 # seconds
-    MAX_CPU_CORE = 4
+    MAX_THREAD_NUM = 4
 
     PROFILE_DATAPATH = os.path.abspath(os.path.join(Const.HOME_DIR, ".cloudlet/config/mode-profile"))
 
     LIVE_MIGRATION_FINISH_ASAP = 1
-    LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE = 2
-    LIVE_MIGRATION_STOP = LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
+    LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE = 2
+    LIVE_MIGRATION_STOP = LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
 
     def __init__(self, num_cores=4):
 
@@ -172,10 +172,6 @@ class VMOverlayCreationMode(object):
 
         # number of CPU allocated
         VMOverlayCreationMode.set_num_cores(num_cores)
-        #self.NUM_PROC_MEMORY_DIFF = num_cores
-        #self.NUM_PROC_DISK_DIFF = num_cores
-        #self.NUM_PROC_OPTIMIZATION = num_cores
-        #self.NUM_PROC_COMPRESSION = num_cores
 
         self.MEMORY_DIFF_ALGORITHM                  = "xdelta3" # "xdelta3", "bsdiff", "none"
         self.DISK_DIFF_ALGORITHM                    = "xdelta3" # "xdelta3", "bsdiff", "none"

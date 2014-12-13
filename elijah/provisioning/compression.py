@@ -40,7 +40,7 @@ class CompressProc(process_manager.ProcWorker):
         self.delta_list_queue = delta_list_queue
         self.comp_delta_queue = comp_delta_queue
         self.overlay_mode = overlay_mode
-        self.num_proc = VMOverlayCreationMode.MAX_CPU_CORE
+        self.num_proc = VMOverlayCreationMode.MAX_THREAD_NUM
         self.comp_type = overlay_mode.COMPRESSION_ALGORITHM_TYPE
         self.comp_level = overlay_mode.COMPRESSION_ALGORITHM_SPEED
         self.block_size = block_size
@@ -100,7 +100,7 @@ class CompressProc(process_manager.ProcWorker):
             time_start = time.time()
 
             # launch child processes
-            self.task_queue = multiprocessing.Queue(maxsize=VMOverlayCreationMode.MAX_CPU_CORE)
+            self.task_queue = multiprocessing.Queue(maxsize=VMOverlayCreationMode.MAX_THREAD_NUM)
             for i in range(self.num_proc):
                 command_queue = multiprocessing.Queue()
                 mode_queue = multiprocessing.Queue()

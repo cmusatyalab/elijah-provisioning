@@ -44,37 +44,20 @@ def run_profile(base_path, overlay_path, overlay_mode):
         sys.stderr.write("%s\n" % str(e))
         sys.stderr.write("%s\nFailed to synthesize" % str(traceback.format_exc()))
 
-def set_affiinity(num_cores):
-    affinity_mask = 0x01
-    if num_cores == 1:
-        affinity_mask = 0x02     # cpu 1
-    elif num_cores ==2:
-        affinity_mask = 0x06    # cpu 1,2
-    elif num_cores ==3:
-        affinity_mask = 0x0e    # cpu 1,2,3
-    elif num_cores ==4:
-        affinity_mask = 0x1e # cpu 1,2,3,4
-    else:
-        raise IOException("Do not allocate more than 4 cores at this experiement")
-    affinity.set_process_affinity_mask(0, affinity_mask)
-
-
 
 def profiling_workload():
+    NUM_CPU_CORES = 1
     mode_list = list()
-    for diff in ("xdelta3", "bsdiff"):
-        for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
-            for comp_level in [1, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
-                overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
-                overlay_mode.NUM_PROC_DISK_DIFF = 4
-                overlay_mode.NUM_PROC_MEMORY_DIFF = 4
-                overlay_mode.NUM_PROC_OPTIMIZATION = 4
-                overlay_mode.NUM_PROC_COMPRESSION = 4
-                overlay_mode.COMPRESSION_ALGORITHM_TYPE = comp_type
-                overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
-                overlay_mode.MEMORY_DIFF_ALGORITHM = diff
-                overlay_mode.DISK_DIFF_ALGORITHM = diff
-                mode_list.append(overlay_mode)
+    for repeat in xrange(3):
+        for diff in ("xdelta3", "bsdiff", "none"):
+            for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
+                for comp_level in [1, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+                    overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
+                    overlay_mode.COMPRESSION_ALGORITHM_TYPE = comp_type
+                    overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
+                    overlay_mode.MEMORY_DIFF_ALGORITHM = diff
+                    overlay_mode.DISK_DIFF_ALGORITHM = diff
+                    mode_list.append(overlay_mode)
     return mode_list
 
 
@@ -92,7 +75,6 @@ def validation_mode():
     return mode_list
 
 def serial_vs_pipe():
-
     # serial vs pipeline
     mode = VMOverlayCreationMode.get_serial_single_process()
     mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_LZMA
@@ -155,18 +137,17 @@ if __name__ == "__main__":
     speech = "/home/krha/cloudlet/image/overlay/vmhandoff/speech-overlay.zip"
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     workloads = [
+        (linux_base_path, speech),
+        (windows_base_path, mar),
         (linux_base_path, moped),
-        #(linux_base_path, speech),
         (windows_base_path, face),
-        #(windows_base_path, mar),
-        #(linux_base_path, fluid),
+        (linux_base_path, fluid),
     ]
     for (base_path, overlay_path) in workloads:
         if os.path.exists(base_path) == False:
             raise ProfilingError("Invalid path to %s" % base_path)
         if os.path.exists(overlay_path) == False:
             raise ProfilingError("Invalid path to %s" % overlay_path)
-
 
     # generate mode
     mode_list = profiling_workload()
@@ -176,22 +157,12 @@ if __name__ == "__main__":
     #mode_list = scaling_test()
     #mode_list = serial_vs_pipe()
 
-    # check modes are valid
-    for each_mode in mode_list:
-        comp_core = each_mode.NUM_PROC_COMPRESSION
-        disk_diff_core = each_mode.NUM_PROC_DISK_DIFF
-        memory_diff_core = each_mode.NUM_PROC_MEMORY_DIFF
-        if (comp_core == disk_diff_core == memory_diff_core) == False:
-            msg = "Assign core should be equal to every stage for profiling"
-            raise ProfilingError(msg)
-
-    VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SMAPSHOT_SIZE
+    VMOverlayCreationMode.MAX_THREAD_NUM = 1
     #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
+    VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
     for (base_path, overlay_path) in workloads:
         for each_mode in mode_list:
             is_url, overlay_url = PackagingUtil.is_zip_contained(overlay_path)
-            num_core = each_mode.NUM_PROC_COMPRESSION
-            set_affiinity(num_core)
             run_profile(base_path, overlay_url, each_mode)
             time.sleep(10)
 

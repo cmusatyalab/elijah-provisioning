@@ -316,7 +316,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         self.used_blocks_dict = used_blocks_dict
         self.proc_list = list()
         self.overlay_mode = overlay_mode
-        self.num_proc = VMOverlayCreationMode.MAX_CPU_CORE
+        self.num_proc = VMOverlayCreationMode.MAX_THREAD_NUM
         self.diff_algorithm = overlay_mode.DISK_DIFF_ALGORITHM
 
         self.manager = multiprocessing.Manager()
@@ -349,7 +349,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         xrayed_list = []
 
         # launch child processes
-        task_queue = multiprocessing.Queue(maxsize=VMOverlayCreationMode.MAX_CPU_CORE)
+        task_queue = multiprocessing.Queue(maxsize=VMOverlayCreationMode.MAX_THREAD_NUM)
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
             mode_queue = multiprocessing.Queue()

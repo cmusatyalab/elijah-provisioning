@@ -429,7 +429,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         self.basemem_path = basemem_path
         self.proc_list = list()
         self.overlay_mode = overlay_mode
-        self.num_proc = VMOverlayCreationMode.MAX_CPU_CORE
+        self.num_proc = VMOverlayCreationMode.MAX_THREAD_NUM
         self.diff_algorithm = overlay_mode.MEMORY_DIFF_ALGORITHM
 
         super(CreateMemoryDeltalist, self).__init__(target=self.create_memory_deltalist)
@@ -585,7 +585,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         # launch child processes
         output_fd_list = list()
         base_hashlist_length = len(self.memory_hashlist)
-        self.task_queue = multiprocessing.Queue(maxsize=VMOverlayCreationMode.MAX_CPU_CORE)
+        self.task_queue = multiprocessing.Queue(maxsize=VMOverlayCreationMode.MAX_THREAD_NUM)
         for i in range(self.num_proc):
             command_queue = multiprocessing.Queue()
             mode_queue = multiprocessing.Queue()

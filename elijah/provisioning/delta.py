@@ -306,7 +306,8 @@ class DeltaList(object):
                     delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
                 memory_count += 1
                 mem_overlay_size += len(delta_item.get_serialized())
-            elif delta_item.delta_type == DeltaItem.DELTA_DISK:
+            elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                    delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
                 disk_count += 1
                 disk_overlay_size+= len(delta_item.get_serialized())
 
@@ -374,7 +375,7 @@ class DeltaList(object):
 
         try:
             LOG.info("-"*50)
-            LOG.info(" Total Modified Disk #     : %ld\t( 100 %%, %f MB )" % 
+            LOG.info("Total Modified Disk #     : %ld\t( 100 %%, %f MB )" % 
                     (total_disk_count, disk_overlay_size/1024.0/1024))
             LOG.info("TRIM discard              : %ld\t( %f %% )" % 
                     (disk_discarded, disk_discarded*100.0/total_disk_count))

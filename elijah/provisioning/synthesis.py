@@ -39,7 +39,6 @@ from db import api as db_api
 from db import table_def as db_table
 from Configuration import Const
 from Configuration import Options
-from Configuration import VMOverlayCreationMode
 from Configuration import Caching_Const
 from delta import DeltaList
 from delta import DeltaItem
@@ -1563,7 +1562,15 @@ def validate_congifuration():
         LOG.error("KVM validation Error: %s" % (err))
         return False
     if out.find("Cloudlet") < 0:
-        LOG.error("KVM validation Error, Incorrect Version:\n%s" % (out))
+        LOG.error("KVM validation Error, Need custom KVM")
+        return False
+    version = out.split("Cloudlet Edition")[-1].strip()
+    if version == None or len(version) == 0:
+        LOG.error("KVM validation Error, Upgrade QEMU to latest version")
+        return False
+    version = float(version)
+    if version < 0.9:
+        LOG.error("KVM validation Error, Upgrade QEMU to latest version:\n%s" % (out))
         return False
     return True
 
@@ -1690,7 +1697,6 @@ def synthesis(base_disk, overlay_path, **kwargs):
     base_mem = kwargs.get('base_mem', None)
     base_diskmeta = kwargs.get('base_diskmeta', None)
     base_memmeta = kwargs.get('base_memmeta', None)
-    LOG.debug("Input file name: %s" % os.path.abspath(overlay_path))
 
     overlay_filename = NamedTemporaryFile(prefix="cloudlet-overlay-file-")
     decompe_time_s = time()
@@ -1728,9 +1734,6 @@ def synthesis(base_disk, overlay_path, **kwargs):
 
     if is_profiling_test == False:
         connect_vnc(synthesized_VM.machine)
-    else:
-        preload_thread.join()
-        sleep(10)
 
     # statistics
     #mem_access_list = synthesized_VM.monitor.mem_access_chunk_list
@@ -1758,6 +1761,8 @@ def synthesis(base_disk, overlay_path, **kwargs):
                 LOG.info("[RESULT] Residue")
                 LOG.info("[RESULT]   Metafile : %s" % \
                         (os.path.abspath(residue_overlay)))
+            if is_profiling_test == False:
+                os.remove(residue_overlay)
         except CloudletGenerationError, e:
             LOG.error("Cannot create residue : %s" % (str(e)))
 

@@ -60,6 +60,7 @@ def parse_each_experiement(lines):
     config_lines = ""
     is_start_config_line = False
     workload = lines[0].split(" ")[-1]
+    migration_total_time = 0
     for line in lines[1:]:
         if line.find("* Overlay creation mode start") != -1:
             is_start_config_line = True
@@ -76,18 +77,20 @@ def parse_each_experiement(lines):
         # see only DEBUG message
         if line.find("DEBUG") == -1:
             continue
-        if line.find("profiling") == -1:
-            continue
-
-        # see only profiling message
-        profile_dic = dict()
-        log = line.split("profiling")[1].strip()
-        profile_lines.append(log)
+        if line.find("profiling") != -1:
+            # see only profiling message
+            profile_dic = dict()
+            log = line.split("profiling")[1].strip()
+            profile_lines.append(log)
+        elif line.find("ime for finishing transferring") != -1:
+            log = line.split(":")[-1]
+            migration_total_time = float(log.strip())
 
     # process filtered log data
     exp = Experiment()
     workload = lines[0].split(" ")[-1]
     setattr(exp, 'workload', os.path.basename(workload))
+    setattr(exp, 'migration_total_time', migration_total_time)
     setattr(exp, 'mode', config_dict)
     setattr(exp, 'stage_size_in', dict.fromkeys(stage_names, 0))
     setattr(exp, 'stage_size_out', dict.fromkeys(stage_names, 0))
@@ -158,6 +161,7 @@ def profile_each_exp(each_exp_dict):
 
 def _split_experiment(test_ret_list):
     moped_exps = list()
+    speech_exps = list()
     fluid_exps = list()
     face_exps = list()
     mar_exps = list()
@@ -170,8 +174,10 @@ def _split_experiment(test_ret_list):
             face_exps.append(each_exp)
         elif each_exp.workload.find("mar") !=  -1:
             mar_exps.append(each_exp)
+        elif each_exp.workload.find("speech") !=  -1:
+            speech_exps.append(each_exp)
         else:
-            msg = "Invalid workload %s" % each_exp['work']
+            msg = "Invalid workload %s" % each_exp['workload']
             print msg
             sys.exit(1)
             raise ProfilingError(msg)
@@ -180,14 +186,53 @@ def _split_experiment(test_ret_list):
     #    print msg
     #    sys.exit(1)
     #    raise ProfilingError(msg)
-    return moped_exps, fluid_exps, face_exps, mar_exps
+    return moped_exps, speech_exps, fluid_exps, face_exps, mar_exps
+
+def multikeysort(items, columns):
+    from operator import itemgetter
+    comparers = [ ((itemgetter(col[1:].strip()), -1) if col.startswith('-') else (itemgetter(col.strip()), 1)) for col in columns]  
+    def comparer(left, right):
+        for fn, mult in comparers:
+            result = cmp(fn(left), fn(right))
+            if result:
+                return mult * result
+            else:
+                return 0
+    return sorted(items, cmp=comparer)
 
 
 def profiling(test_ret_list):
     # how change in mode will affect system performance?
-    moped_exps, fluid_exps, face_exps, mar_exps = _split_experiment(test_ret_list)
+    moped_exps, speech_exps, fluid_exps, face_exps, mar_exps = _split_experiment(test_ret_list)
     comparison = defaultdict(list)
 
+    exps = moped_exps
+
+    # sort by compression algorithm gzip 1, .., gzip9, .., lzma1, .., lzma9
+    def compare_comp_algorithm(a):
+        d = {"xdelta3":2,
+             "bsdiff":3,
+             "none":1}
+        return (d[a.mode['DISK_DIFF_ALGORITHM']], -a.mode['COMPRESSION_ALGORITHM_TYPE'], a.mode['COMPRESSION_ALGORITHM_SPEED'])
+    exps.sort(key=compare_comp_algorithm)
+    for each_exp in exps:
+        in_data_size = each_exp.stage_size_in['CreateMemoryDeltalist'] + each_exp.stage_size_in['CreateDiskDeltalist']
+        in_data_disk = each_exp.stage_size_in['CreateDiskDeltalist']
+        in_data_mem = each_exp.stage_size_in['CreateMemoryDeltalist']
+        alpha = float(in_data_mem)/in_data_size
+        out_data_size = each_exp.stage_size_out['CompressProc']
+        duration = each_exp.migration_total_time
+        est_duration1 = each_exp.stage_time['CreateMemoryDeltalist'] + each_exp.stage_time['CreateDiskDeltalist']+\
+            each_exp.stage_time['DeltaDedup'] + each_exp.stage_time['CompressProc']
+        print "(%d,%d,%s)\tin_size:%ld\tout_size:%ld\tduration:%f,%f,%f\tthroughput(Mbps):%f" %\
+            (each_exp.mode['COMPRESSION_ALGORITHM_TYPE'],
+             each_exp.mode['COMPRESSION_ALGORITHM_SPEED'],\
+             each_exp.mode['DISK_DIFF_ALGORITHM'],\
+             in_data_size, out_data_size, duration, est_duration1, float(duration)/est_duration1,
+             8*float(out_data_size)/1024.0/1024/duration)
+
+
+    '''
     pivot_mode = moped_exps[0]
     pivot_R = pivot_mode.get_total_R()
     pivot_P = pivot_mode.get_total_P()
@@ -237,6 +282,7 @@ def profiling(test_ret_list):
         p_diff = abs(o_p-ratio_p)/o_p*100
         #print "%s\t%f %f" % (mode_diff_str, round(r_diff, 0), round(p_diff, 0))
         #print "%s\t%f %f" % (mode_diff_str, ratio_r, ratio_p)
+    '''
 
 
 def get_ratio(in_config, out_configs):
