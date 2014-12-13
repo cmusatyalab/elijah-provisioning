@@ -512,14 +512,13 @@ def decomp_overlayzip(overlay_path, outfilename):
     #disk_chunks = list()
     #memory_chunks = list()
 
-
     out_fd = open(outfilename, "w+b")
     for blob_info in comp_overlay_files:
         comp_filename = blob_info[Const.META_OVERLAY_FILE_NAME]
         comp_type = blob_info.get(Const.META_OVERLAY_FILE_COMPRESSION, Const.COMPRESSION_LZMA)
         #disk_chunks += blob_info.get(Const.META_OVERLAY_FILE_DISK_CHUNKS)
         #memory_chunks += blob_info.get(Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
-        sys.stdout.write("Decompression type: %d\n" % comp_type)
+        #sys.stdout.write("Decompression type: %d\n" % comp_type)
         if comp_type == Const.COMPRESSION_LZMA:
             comp_data = overlay_package.read_blob(comp_filename)
             decompressor = lzma.LZMADecompressor()
