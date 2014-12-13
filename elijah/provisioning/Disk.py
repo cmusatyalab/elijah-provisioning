@@ -179,6 +179,115 @@ def parse_qemu_log(qemu_logfile, chunk_size):
     return dma_dict, discard_dict
 
 
+def create_disk_deltalist(modified_disk, 
+            modified_chunk_dict, chunk_size,
+            basedisk_hashlist=None, basedisk_path=None,
+            trim_dict=None, dma_dict=None,
+            apply_discard=True,
+            used_blocks_dict=None,
+            ret_statistics=None):
+    # get disk delta
+    # base_diskmeta : hash list of base disk
+    # base_disk: path to base VM disk
+    # modified_disk_path : path to modified VM disk
+    # modified_chunk_dict : chunk dict of modified
+    # overlay_path : path to destination of overlay disk
+    # dma_dict : dma information, 
+    #           dma_dict[disk_chunk] = {'time':time, 'memory_chunk':memory chunk number, 'read': True if read from disk'}
+    base_fd = open(basedisk_path, "rb")
+    base_mmap = mmap.mmap(base_fd.fileno(), 0, prot=mmap.PROT_READ)
+    modified_fd = open(modified_disk, "rb")
+
+    # 0. get info from qemu log file
+    # dictionary : (chunk_%, discarded_time)
+    trim_counter = 0
+    overwritten_after_trim = 0
+    xray_counter = 0
+
+    # TO BE DELETED
+    trimed_list = []
+    xrayed_list = []
+
+    # 1. get modified page
+    LOG.debug("1.get modified disk page")
+    delta_list = list()
+    for index, chunk in enumerate(modified_chunk_dict.keys()):
+        offset = chunk * chunk_size
+        ctime = modified_chunk_dict[chunk]
+
+        # check TRIM discard
+        is_discarded = False
+        if trim_dict:
+            trim_time = trim_dict.get(chunk, None)
+            if trim_time:
+                if (trim_time > ctime):
+                    trimed_list.append(chunk)
+                    trim_counter += 1
+                    is_discarded = True
+                else:
+                    overwritten_after_trim += 1
+
+        # check xray discard
+        if used_blocks_dict:
+            start_sector = offset/512
+            if used_blocks_dict.get(start_sector) != True:
+                xrayed_list.append(chunk)
+                xray_counter +=1
+                is_discarded = True
+
+        if is_discarded == True:
+            # only apply when it is true
+            if apply_discard:
+                continue
+
+        # check file system 
+        modified_fd.seek(offset)
+        data = modified_fd.read(chunk_size)
+        source_data = base_mmap[offset:offset+len(data)]
+        try:
+            patch = tool.diff_data(source_data, data, 2*len(source_data))
+            if len(patch) < len(data):
+                delta_item = DeltaItem(DeltaItem.DELTA_DISK,
+                        offset, len(data),
+                        hash_value=sha256(data).digest(),
+                        ref_id=DeltaItem.REF_XDELTA,
+                        data_len=len(patch),
+                        data=patch)
+            else:
+                raise IOError("xdelta3 patch is bigger than origianl")
+        except IOError as e:
+            #LOG.info("xdelta failed, so save it as raw (%s)" % str(e))
+            delta_item = DeltaItem(DeltaItem.DELTA_DISK,
+                    offset, len(data),
+                    hash_value=sha256(data).digest(),
+                    ref_id=DeltaItem.REF_RAW,
+                    data_len=len(data),
+                    data=data)
+        delta_list.append(delta_item)
+    if ret_statistics != None:
+        ret_statistics['trimed'] = trim_counter
+        ret_statistics['xrayed'] = xray_counter
+        ret_statistics['trimed_list'] = trimed_list
+        ret_statistics['xrayed_list'] = xrayed_list
+    LOG.debug("1-1. Trim(%d, overwritten after trim(%d)), Xray(%d)" % \
+            (trim_counter, overwritten_after_trim, xray_counter))
+
+    return delta_list
+
+
+def base_hashlist(base_meta):
+    hash_list = list()
+    fd = open(base_meta, "rb")
+    while True:
+        header = fd.read(8+4)
+        if not header:
+            break
+        offset, length = struct.unpack("!QI", header)
+        sha256 = fd.read(32)
+        hash_list.append((offset, length, sha256))
+    return hash_list
+
+
 class CreateDiskDeltalist(process_manager.ProcWorker):
     def __init__(self, modified_disk, 
                  modified_chunk_queue, chunk_size,

@@ -339,14 +339,14 @@ class DeltaList(object):
                     disk_from_zeros += 1
             elif delta_item.ref_id == DeltaItem.REF_BASE_DISK:
                 if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
-                        (ref_delta.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
+                        (delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
                     memory_from_base_disk += 1
                 elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
                     (delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE):
                     disk_from_base_disk += 1
             elif delta_item.ref_id == DeltaItem.REF_BASE_MEM:
                 if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
-                        (ref_delta.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
+                        (delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
                     memory_from_base_mem += 1
                 elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
                     (delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE):
@@ -354,7 +354,7 @@ class DeltaList(object):
             elif delta_item.ref_id == DeltaItem.REF_XDELTA or \
                 delta_item.ref_id == DeltaItem.REF_BSDIFF:
                 if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
-                        (ref_delta.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
+                        (delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
                     memory_from_xdelta += 1
                 elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
                     (delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE):
@@ -362,7 +362,7 @@ class DeltaList(object):
                 xdelta_size += len(delta_item.data)
             elif delta_item.ref_id == DeltaItem.REF_RAW:
                 if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
-                        (ref_delta.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
+                        (delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE):
                     memory_from_raw += 1
                 elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
                     (delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE):
@@ -499,6 +499,34 @@ def diff_with_hashlist(base_hashlist, delta_list, ref_id):
         s_index += 1
 
     LOG.debug("matching (%d/%d) with base" % (matching_count, len(delta_list)))
+    return delta_list
+
+
+def create_overlay(memory_deltalist, memory_chunk_size,
+        disk_deltalist, disk_chunk_size,
+        basedisk_hashlist=None, basemem_hashlist=None):
+
+    if memory_chunk_size != disk_chunk_size:
+        raise DeltaError("Expect same chunk size for Disk and Memory")
+    chunk_size = disk_chunk_size
+    delta_list = memory_deltalist+disk_deltalist
+
+    #Memory
+    # Create Base Memory from meta file
+    LOG.debug("2-1.Find zero page")
+    zero_hash = sha256(struct.pack("!s", chr(0x00))*chunk_size).digest()
+    zero_hash_list = [(-1, chunk_size, zero_hash)]
+    diff_with_hashlist(zero_hash_list, delta_list, ref_id=DeltaItem.REF_ZEROS)
+
+    LOG.debug("2-2.get delta from base Memory")
+    diff_with_hashlist(basemem_hashlist, delta_list, ref_id=DeltaItem.REF_BASE_MEM)
+    LOG.debug("2-3.get delta from base Disk")
+    diff_with_hashlist(basedisk_hashlist, delta_list, ref_id=DeltaItem.REF_BASE_DISK)
+
+    # 3.find shared within self
+    LOG.debug("3.get delta from itself")
+    DeltaList.get_self_delta(delta_list)
+
     return delta_list
 
 
@@ -1183,10 +1211,11 @@ def divide_blobs(delta_list, overlay_path, blob_size_kb,
         file_size = os.path.getsize(blob_name)
         blob_dict = {
             Const.META_OVERLAY_FILE_NAME:os.path.basename(blob_name),
+            Const.META_OVERLAY_FILE_COMPRESSION: Const.COMPRESSION_LZMA,
             Const.META_OVERLAY_FILE_SIZE:file_size,
             Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
             Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
-            }
+        }
         overlay_list.append(blob_dict)
         blob_output_size += file_size
     end_time = time.time()

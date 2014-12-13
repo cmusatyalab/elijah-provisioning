@@ -99,103 +99,78 @@ class Memory(object):
                     return position
             start_index += len(memdata)
 
-    #def _get_mem_hash(self, fin, deltalist_queue,
-    #                  apply_free_memory, free_pfn_dict):
-    #    LOG.info("Get hash list of memory page")
-    #    #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
+    def _get_mem_hash(self, fin, end_offset, hash_list, **kwargs):
+        # kwargs
+        #  diff: compare hash_list with self object
+        #  free_pfn_dict: free memory physical frame number as a dictionary {'#':1, ... }
+        diff = kwargs.get("diff", None)
+        apply_free_memory = kwargs.get("apply_free_memory", True)
+        free_pfn_dict = kwargs.get("free_pfn_dict", None)
+        LOG.info("Get hash list of memory page")
+        prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
 
-    #    # data structure to handle pipelined data
-    #    def chunks(l, n):
-    #        return [l[i:i + n] for i in range(0, len(l), n)]
-    #    memory_data = fin.data_buffer
-    #    memory_data_queue = fin.data_queue
-    #    memory_page_list = chunks(memory_data, Memory.RAM_PAGE_SIZE)
+        total_size = end_offset
+        ram_offset = 0
+        freed_page_counter = 0
+        base_hashlist_length = len(self.hash_list)
+        while total_size != ram_offset:
+            data = fin.read(Memory.RAM_PAGE_SIZE)
+            if not diff:
+                hash_list.append((ram_offset, len(data), sha256(data).digest()))
+            else:
+                # compare input with hash or corresponding base memory, save only when it is different
+                hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
+                if hash_list_index < base_hashlist_length:
+                    self_hash_value = self.hash_list[hash_list_index][2]
+                else:
+                    self_hash_value = None
 
-    #    ram_offset = 0
-    #    freed_page_counter = 0
-    #    base_hashlist_length = len(self.hash_list)
-    #    is_end_of_stream = False
-    #    time_s = time.time()
-    #    while is_end_of_stream == False and len(memory_page_list) != 0:
-    #        # get data from the stream
-    #        if len(memory_page_list) < 2: # empty or partial data
-    #            recved_data = memory_data_queue.get()
-    #            if len(recved_data) == Const.QUEUE_SUCCESS_MESSAGE_LEN and recved_data == Const.QUEUE_SUCCESS_MESSAGE:
-    #                # End of the stream
-    #                is_end_of_stream = True
-    #            else:
-    #                required_length = 0
-    #                if len(memory_page_list) == 1: # handle partial data
-    #                    last_data = memory_page_list.pop(0)
-    #                    required_length = Memory.RAM_PAGE_SIZE-len(last_data)
-    #                    last_data += recved_data[0:required_length]
-    #                    memory_page_list.append(last_data)
-    #                memory_page_list += chunks(recved_data[required_length:], Memory.RAM_PAGE_SIZE)
-    #        data = memory_page_list.pop(0)
+                if self_hash_value != sha256(data).digest():
+                    is_free_memory = False
+                    if (free_pfn_dict != None) and \
+                            (free_pfn_dict.get(long(ram_offset/Memory.RAM_PAGE_SIZE), None) == 1):
+                        is_free_memory = True
 
-    #        # compare input with hash or corresponding base memory, save only when it is different
-    #        hash_list_index = ram_offset/Memory.RAM_PAGE_SIZE
-    #        if hash_list_index < base_hashlist_length:
-    #            self_hash_value = self.hash_list[hash_list_index][2]
-    #        else:
-    #            self_hash_value = None
-    #        chunk_hashvalue = sha256(data).digest()
-    #        if self_hash_value != chunk_hashvalue:
-    #            is_free_memory = False
-    #            if (free_pfn_dict != None) and \
-    #                    (free_pfn_dict.get(long(ram_offset/Memory.RAM_PAGE_SIZE), None) == 1):
-    #                is_free_memory = True
+                    if is_free_memory and apply_free_memory:
+                        # Do not compare. It is free memory
+                        freed_page_counter += 1
+                    else:
+                        #get xdelta comparing self.raw
+                        source_data = self.get_raw_data(ram_offset, len(data))
+                        #save xdelta as DeltaItem only when it gives smaller
+                        try:
+                            if source_data == None:
+                                raise IOError("launch memory snapshot is bigger than base vm")
+                            patch = tool.diff_data(source_data, data, 2*len(source_data))
+                            if len(patch) < len(data):
+                                delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
+                                        ram_offset, len(data),
+                                        hash_value=sha256(data).digest(),
+                                        ref_id=DeltaItem.REF_XDELTA,
+                                        data_len=len(patch),
+                                        data=patch)
+                            else:
+                                raise IOError("xdelta3 patch is bigger than origianl")
+                        except IOError as e:
+                            #LOG.info("xdelta failed, so save it as raw (%s)" % str(e))
+                            delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
+                                    ram_offset, len(data),
+                                    hash_value=sha256(data).digest(),
+                                    ref_id=DeltaItem.REF_RAW,
+                                    data_len=len(data),
+                                    data=data)
+                        hash_list.append(delta_item)
 
-    #            if is_free_memory and apply_free_memory:
-    #                # Do not compare. It is free memory
-    #                freed_page_counter += 1
-    #            else:
-    #                #get xdelta comparing self.raw
-    #                source_data = self.get_raw_data(ram_offset, len(data))
-    #                try:
-    #                    if source_data == None:
-    #                        raise IOError("launch memory snapshot is bigger than base vm")
-    #                    patch = tool.diff_data(source_data, data, 2*len(source_data))
-    #                    if len(patch) < len(data):
-    #                        delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
-    #                                ram_offset, len(data),
-    #                                hash_value=chunk_hashvalue,
-    #                                ref_id=DeltaItem.REF_XDELTA,
-    #                                data_len=len(patch),
-    #                                data=patch)
-    #                    else:
-    #                        raise IOError("xdelta3 patch is bigger than origianl")
-    #                except IOError as e:
-    #                    #LOG.info("xdelta failed, so save it as raw (%s)" % str(e))
-    #                    delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
-    #                            ram_offset, len(data),
-    #                            hash_value=chunk_hashvalue,
-    #                            ref_id=DeltaItem.REF_RAW,
-    #                            data_len=len(data),
-    #                            data=data)
-    #                '''
-    #                delta_item = DeltaItem(DeltaItem.DELTA_MEMORY,
-    #                        ram_offset, len(data),
-    #                        hash_value=chunk_hashvalue,
-    #                        ref_id=DeltaItem.REF_RAW,
-    #                        data_len=len(data),
-    #                        data=data)
-    #                '''
-
-    #                deltalist_queue.put(delta_item)
-
-    #        # memory over-usage protection
-    #        ram_offset += len(data)
-    #        # print progress bar for every 100 page
-    #        '''
-    #        if (ram_offset % (Memory.RAM_PAGE_SIZE*100)) == 0:
-    #            prog_bar.set_percent(100.0*ram_offset/total_size)
-    #            prog_bar.show_progress()
-    #        '''
-    #    #prog_bar.finish()
-    #    time_e = time.time()
-    #    deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-    #    return freed_page_counter
+                # memory over-usage protection
+                if len(hash_list) > Memory.RAM_PAGE_SIZE*1000000: # 400MB for hashlist
+                    raise MemoryError("possibly comparing with wrong base VM")
+            ram_offset += len(data)
+            # print progress bar for every 100 page
+            if (ram_offset % (Memory.RAM_PAGE_SIZE*100)) == 0:
+                prog_bar.set_percent(100.0*ram_offset/total_size)
+                prog_bar.show_progress()
+        prog_bar.finish()
+        return freed_page_counter
 
     @staticmethod
     def _seek_to_end_of_ram(fin):
@@ -219,8 +194,6 @@ class Memory(object):
             read_ramlen_size += mem_size
 
         read_mem_size = 0
-        # Skip since it prevent streaming of memory snapshot
-        '''
         while total_mem_size != read_mem_size:
             raw_ram_flag = struct.unpack(">Q", fin.read(8))[0]
             if raw_ram_flag & Memory.RAM_SAVE_FLAG_EOS:
@@ -243,14 +216,25 @@ class Memory(object):
             memory_size = block_info['length']
             fin.seek(cur_offset + memory_size)
             read_mem_size += memory_size
-        '''
-        return ram_info
 
-    def _load_file(self, fin, **kwargs):
+        return fin.tell(), ram_info
+
+
+    def _load_file(self, filepath, **kwargs):
+        # Load KVM Memory snapshot file and 
+        # extract hashlist of each memory page while interpreting the format
+        # filepath = file path of the loading file
+        # kwargs
+        #  diff_file: compare filepath(modified ram) with self hash
+        ####
+        diff = kwargs.get("diff", None)
         apply_free_memory = kwargs.get("apply_free_memory", True)
+        if diff and len(self.hash_list) == 0:
+            raise MemoryError("Cannot compare give file this self.hashlist")
 
         # Sanity check
-        #file_size = os.path.getsize(filepath)
+        fin = open(filepath, "rb")
+        file_size = os.path.getsize(filepath)
         libvirt_mem_hdr = memory_util._QemuMemoryHeader(fin)
         libvirt_mem_hdr.seek_body(fin)
         libvirt_header_len = fin.tell()
@@ -266,15 +250,38 @@ class Memory(object):
 
         # get memory meta data from snapshot
         fin.seek(libvirt_header_len)
-        ram_info = Memory._seek_to_end_of_ram(fin)
+        hash_list = []
+        ram_end_offset, ram_info = Memory._seek_to_end_of_ram(fin)
+        if ram_end_offset == Memory.RAM_PAGE_SIZE:
+            LOG.debug("end offset: %ld" % (ram_end_offset))
+            raise MemoryError("ram header+data is not aligned with page size")
 
-        freed_counter = 0
-        freed_counter = self._get_mem_hash(fin)
+        if diff:
+            # case for getting modified memory list
+            if apply_free_memory == True:
+                # get free memory list
+                mem_size_mb = ram_info.get('pc.ram').get('length')/1024/1024
+                mem_abs_offset = ram_info.get('pc.ram').get('offset')
+                self.free_pfn_dict = get_free_pfn_dict(filepath, mem_size_mb, \
+                        mem_abs_offset)
+            else:
+                self.free_pfn_dict = None
+
+            fin.seek(0)
+            freed_counter = self._get_mem_hash(fin, file_size, hash_list, \
+                    diff=diff, free_pfn_dict=self.free_pfn_dict, \
+                    apply_free_memory=apply_free_memory)
+        else:
+            # case for generating base memory hash list
+            fin.seek(0)
+            freed_counter = self._get_mem_hash(fin, file_size, hash_list, \
+                    diff=diff, free_pfn_dict=None)
 
         # get hash of memory area
         self.freed_counter = freed_counter
-        #LOG.debug("FREE Memory Counter: %ld(%ld)" % \
-        #        (freed_counter, freed_counter*Memory.RAM_PAGE_SIZE))
+        LOG.debug("FREE Memory Counter: %ld(%ld)" % \
+                (freed_counter, freed_counter*Memory.RAM_PAGE_SIZE))
+        return hash_list
 
     @staticmethod
     def import_from_metafile(meta_path, raw_path):
@@ -333,49 +340,21 @@ class Memory(object):
         else:
             return None
 
-    def get_modified(self, modified_memory_fd, deltalist_queue, 
-                     apply_free_memory=True, free_memory_info=None):
-
+    def get_modified(self, new_kvm_file, apply_free_memory=True, free_memory_info=None):
         # get modified pages 
-        libvirt_mem_hdr = memory_util._QemuMemoryHeader(modified_memory_fd)
-        libvirt_mem_hdr.seek_body(modified_memory_fd)
-        libvirt_header_len = modified_memory_fd.tell()
-        if ((libvirt_header_len %  Memory.RAM_PAGE_SIZE) != 0):
-            # TODO: need to modify libvirt migration file header 
-            # in case it is not aligned with memory page size
-            msg = "Error description:\n"
-            msg += "libvirt header length : %ld\n" % (libvirt_header_len)
-            msg += "This happends when resiude generated multiple times\n"
-            msg += "It's not easy to fix since header length change will make VM's memory snapshot size\n"
-            msg += "different from base VM"
-            raise MemoryError(msg)
-
-        # get memory meta data from snapshot
-        modified_memory_fd.seek(libvirt_header_len)
-        ram_info = Memory._seek_to_end_of_ram(modified_memory_fd)
-
-        # TODO: support getting free memory for streaming case
-        free_pfn_dict = None
-        '''
-        if apply_free_memory == True:
-            # get free memory list
-            mem_size_mb = ram_info.get('pc.ram').get('length')/1024/1024
-            mem_abs_offset = ram_info.get('pc.ram').get('offset')
-            free_pfn_dict = get_free_pfn_dict(filepath, mem_size_mb,
-                    mem_abs_offset)
-        else:
-            free_pfn_dict = None
-        '''
-
-        freed_counter = 0
-        freed_counter = self._get_mem_hash(modified_memory_fd, deltalist_queue,
-                                           apply_free_memory, free_pfn_dict)
-
-        LOG.debug("FREE Memory Counter: %ld(%ld)" % \
-                (freed_counter, freed_counter*Memory.RAM_PAGE_SIZE))
+        hash_list = self._load_file(new_kvm_file, diff=True, \
+                apply_free_memory=apply_free_memory)
         if free_memory_info != None:
-            free_memory_info['free_pfn_dict'] = free_pfn_dict
-            free_memory_info['freed_counter'] = freed_counter
+            free_memory_info['free_pfn_dict'] = self.free_pfn_dict
+            free_memory_info['freed_counter'] = self.freed_counter
+
+        return hash_list
+
+
+def base_hashlist(base_memmeta_path):
+    # get the hash list from the meta file
+    hashlist = Memory.import_hashlist(base_memmeta_path)
+    return hashlist
 
 
 def hashing(filepath):
@@ -411,6 +390,27 @@ def _process_cmd(argv):
     if command not in COMMANDS:
         parser.error("Invalid Command: %s, supporing %s" % (command, ' '.join(COMMANDS)))
     return settings, command
+
+
+def create_memory_deltalist(modified_mempath,
+            basemem_meta=None, basemem_path=None,
+            apply_free_memory=True,
+            free_memory_info=None):
+    # get memory delta
+    # modified_mempath : file path for modified memory
+    # basemem_meta : hashlist file for base mem
+    # basemem_path : raw base memory path
+    # freed_counter_ret : return pointer for freed counter
+
+    # Create Base Memory from meta file
+    base = Memory.import_from_metafile(basemem_meta, basemem_path)
+
+    # 1.get modified page
+    LOG.debug("1.get modified page list")
+    delta_list = base.get_modified(modified_mempath,
+            apply_free_memory=apply_free_memory,
+            free_memory_info=free_memory_info)
+    return delta_list
 
 
 class CreateMemoryDeltalist(process_manager.ProcWorker):

@@ -266,7 +266,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
         self.conn = conn
         self.machine = machine
 
-        self.manager = multiprocessing.Manager()
         self.memory_snapshot_size = multiprocessing.Value('d', 0.0)
         self.memory_snapshot_size.value = long(0)
         super(MemoryReadProcess, self).__init__(target=self.read_mem_snapshot)
@@ -275,7 +274,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
         # create memory snapshot aligned with 4KB
         time_s = time.time()
         is_first_recv = False
-        is_qmp_msg_sent = False
         time_first_recv = 0
         UPDATE_SIZE  = 1024*1024*10 # 10MB
         prev_processed_size = 0
@@ -331,10 +329,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     self.total_write_size += current_size
                     #prog_bar.set_percent(100.0*self.total_write_size/mem_snapshot_size)
                     #prog_bar.show_progress()
-
-                    if (is_qmp_msg_sent == False) and\
-                            (self.total_write_size > (mem_snapshot_size + Const.LIBVIRT_HEADER_SIZE)):
-                        is_qmp_msg_sent = True
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time.time()
@@ -649,11 +643,6 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
     if ret != 0:
         raise CloudletGenerationError("Cannot set migration speed : %s", machine.name())
 
-    # Pause VM
-    #state, reason = machine.state(0)
-    #if state != libvirt.VIR_DOMAIN_PAUSED:
-    #    machine.suspend()
-
     # Stop monitoring for memory access (snapshot will create a lot of access)
     fuse_stream_monitor.del_path(cloudletfs.StreamMonitor.MEMORY_ACCESS)
     #if fuse_stream_monitor is not None:
@@ -691,15 +680,6 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
         # that by using named pipe
         if str(e).startswith('unable to seek') == False:
             raise CloudletGenerationError("libvirt memory save : " + str(e))
-    finally:
-        pass
-
-    # TODO: update this to work with streaming
-    try:
-        if nova_util != None:
-            nova_util.chown(fout_path, os.getuid())
-    except memory_util.MachineGenerationError, e:
-        raise CloudletGenerationError("Machine Generation Error: " + str(e))
     finally:
         pass
 

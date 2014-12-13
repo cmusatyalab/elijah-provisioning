@@ -33,6 +33,7 @@ import shutil
 import multiprocessing
 import struct
 import json
+from operator import itemgetter
 
 from db import api as db_api
 from db import table_def as db_table
@@ -46,6 +47,7 @@ import msgpack
 from progressbar import AnimatedProgressBar
 from package import VMOverlayPackage
 import handoff
+import qmp_af_unix
 
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
@@ -157,6 +159,10 @@ class VM_Overlay(threading.Thread):
         open(self.qemu_logfile, "w+").close()
         os.chmod(os.path.dirname(self.qemu_logfile), 0o771)
         os.chmod(self.qemu_logfile, 0o666)
+        self.qmp_channel = os.path.abspath(os.path.join(temp_qemu_dir, "qmp-channel"))
+        if os.path.exists(self.qmp_channel) == True:
+            os.remove(self.qmp_channel)
+        LOG.info("QMP channel: %s" % self.qmp_channel)
 
         # option for data-intensive application
         self.cache_manager = None
@@ -186,44 +192,51 @@ class VM_Overlay(threading.Thread):
         # 1. resume & get modified disk
         LOG.info("* Overlay creation configuration")
         LOG.info("  - %s" % str(self.options))
-        self.old_xml_str, self.new_xml_str = _convert_xml(self.modified_disk, \
-                mem_snapshot=self.base_mem_fuse, \
-                qemu_logfile=self.qemu_logfile, \
-                qemu_args=self.qemu_args, \
-                nova_xml=self.nova_xml)
+        self.old_xml_str, self.new_xml_str = _convert_xml(self.modified_disk,
+                                                          mem_snapshot=self.base_mem_fuse,
+                                                          qemu_logfile=self.qemu_logfile,
+                                                          qemu_args=self.qemu_args,
+                                                          qmp_channel=self.qmp_channel,
+                                                          nova_xml=self.nova_xml)
         self.machine = run_snapshot(self.conn, self.modified_disk, 
                 self.base_mem_fuse, self.new_xml_str)
         return self.machine
 
     @wrap_vm_fault
     def create_overlay(self):
+        qmp_thread = QmpThreadSerial(self.qmp_channel, self.fuse_stream_monitor)
+        qmp_thread.daemon = True
+        qmp_thread.start()
+
         # 2. get montoring info
-        monitoring_info = _get_monitoring_info(self.conn, self.machine, 
-                self.options,
-                self.base_memmeta, self.base_diskmeta,
-                self.fuse_stream_monitor,
-                self.base_disk, self.base_mem,
-                self.modified_disk, self.modified_mem.name,
-                self.qemu_logfile, 
-                nova_util=self.nova_util)
+        monitoring_info = _get_overlay_monitoring_info(self.conn, self.machine, 
+                                                       self.options,
+                                                       self.base_memmeta, self.base_diskmeta,
+                                                       self.fuse_stream_monitor,
+                                                       self.base_disk, self.base_mem,
+                                                       self.modified_disk, self.modified_mem.name,
+                                                       self.qemu_logfile,
+                                                       self.qmp_channel,
+                                                       nova_util=self.nova_util)
 
         # 3. get overlay VM
         overlay_deltalist = get_overlay_deltalist(monitoring_info, self.options,
-                                                  self.base_disk, self.base_mem, 
-                                                  self.base_diskmeta, self.base_memmeta, 
-                                                  self.modified_disk, self.modified_mem.name)
+                                                  self.base_disk, self.base_mem,
+                                                  self.base_memmeta, self.modified_disk,
+                                                  self.modified_mem.name)
 
         # 4. create_overlayfile
         temp_dir = mkdtemp(prefix="cloudlet-overlay-")
         overlay_prefix = os.path.join(temp_dir, Const.OVERLAY_FILE_PREFIX)
         overlay_metapath = os.path.join(temp_dir, Const.OVERLAY_META)
 
-        self.overlay_files, overlay_info = _generate_overlayfile(overlay_deltalist, overlay_prefix)
-        self.overlay_metafile = handoff._generate_overlaymeta(overlay_metapath, overlay_info,
-                                                      self.base_hashvalue,
-                                                      os.path.getsize(self.modified_disk),
-                                                      os.path.getsize(self.modified_mem.name))
-
+        self.overlay_metafile, self.overlay_files = generate_overlayfile(overlay_deltalist,
+                                                                         self.options,
+                                                                         self.base_hashvalue,
+                                                                         os.path.getsize(self.modified_disk),
+                                                                         os.path.getsize(self.modified_mem.name),
+                                                                         overlay_metapath,
+                                                                         overlay_prefix)
         # packaging VM overlay into a single zip file
         if self.options.ZIP_CONTAINER == True:
             self.overlay_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
@@ -318,6 +331,27 @@ class VM_Overlay(threading.Thread):
         return overlay_uri_meta
 
 
+class OverlayMonitoringInfo(object):
+    BASEDISK_HASHLIST       = "basedisk_hashlist"
+    BASEMEM_HASHLIST        = "basemem_hashlist"
+    DISK_MODIFIED_BLOCKS    = "disk_modified_block" # from fuse monitoring
+    DISK_USED_BLOCKS        = "disk_used_block" # from xray support
+    DISK_FREE_BLOCKS        = "disk_free_block"
+    MEMORY_FREE_BLOCKS      = "memory_free_block"
+
+    def __init__(self, properties):
+        for k, v in properties.iteritems():
+            setattr(self, k, v)
+
+    def __str__(self):
+        ret = ""
+        for k, v in self.__dict__.iteritems():
+            ret += "%s\t:\t%s\n" % (str(k), str(v))
+        return ret
+
+    def __getitem__(self, item):
+        return self.__dict__[item]
+
 
 class SynthesizedVM(threading.Thread):
     def __init__(self, launch_disk, launch_mem, fuse, disk_only=False, qemu_args=None, **kwargs):
@@ -342,7 +376,6 @@ class SynthesizedVM(threading.Thread):
         os.chmod(os.path.dirname(self.qemu_logfile), 0o771)
         os.chmod(self.qemu_logfile, 0o666)
         self.qmp_channel = os.path.abspath(os.path.join(temp_qemu_dir, "qmp-channel"))
-        #self.qmp_channel = os.path.abspath("/tmp/cloudlet-qmp")
         if os.path.exists(self.qmp_channel) == True:
             os.remove(self.qmp_channel)
         LOG.info("Launch disk: %s" % os.path.abspath(launch_disk))
@@ -713,6 +746,53 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
     return original_xml_backup, new_xml_str
 
 
+def _get_overlay_monitoring_info(conn, machine, options,
+                                 base_memmeta, base_diskmeta,
+                                 fuse_stream_monitor,
+                                 base_disk, base_mem,
+                                 modified_disk, modified_mem,
+                                 qemu_logfile, qmp_channel, nova_util=None):
+    ''' return montioring information including
+        1) base vm hash list
+        2) used/freed disk block list
+        3) freed memory page
+    '''
+
+    # TODO: support stream of modified memory rather than tmp file
+    if not options.DISK_ONLY:
+        save_mem_snapshot(conn, machine, modified_mem, nova_util=nova_util,
+                fuse_stream_monitor=fuse_stream_monitor, qmp_channel=qmp_channel)
+
+    # 1-3. get hashlist of base memory and disk
+    basemem_hashlist = Memory.base_hashlist(base_memmeta)
+    basedisk_hashlist = Disk.base_hashlist(base_diskmeta)
+
+    # 1-4. get dma & discard information
+    if options.TRIM_SUPPORT:
+        dma_dict, trim_dict = Disk.parse_qemu_log(qemu_logfile, Const.CHUNK_SIZE)
+        if len(trim_dict) == 0:
+            LOG.warning("No TRIM Discard, Check /etc/fstab configuration")
+    else:
+        trim_dict = dict()
+    free_memory_dict = dict()
+
+    # 1-5. get used sector information from x-ray
+    used_blocks_dict = None
+    if options.XRAY_SUPPORT:
+        import xray
+        used_blocks_dict = xray.get_used_blocks(modified_disk)
+
+    info_dict = dict()
+    info_dict[OverlayMonitoringInfo.BASEDISK_HASHLIST] = basedisk_hashlist
+    info_dict[OverlayMonitoringInfo.BASEMEM_HASHLIST] = basemem_hashlist
+    info_dict[OverlayMonitoringInfo.DISK_USED_BLOCKS] = used_blocks_dict
+    info_dict[OverlayMonitoringInfo.DISK_MODIFIED_BLOCKS] =\
+            fuse_stream_monitor.modified_chunk_dict
+    info_dict[OverlayMonitoringInfo.DISK_FREE_BLOCKS] = trim_dict
+    info_dict[OverlayMonitoringInfo.MEMORY_FREE_BLOCKS] = free_memory_dict
+    monitoring_info = OverlayMonitoringInfo(info_dict)
+    return monitoring_info
+
 
 def copy_disk(in_path, out_path):
     LOG.info("Copying disk image to %s" % out_path)
@@ -729,9 +809,9 @@ def get_libvirt_connection():
 
 
 def get_overlay_deltalist(monitoring_info, options,
-        base_image, base_mem, base_memmeta, 
-        modified_disk, modified_mem,
-        old_deltalist=None):
+                          base_image, base_mem,
+                          base_memmeta, modified_disk,
+                          modified_mem, old_deltalist=None):
     '''return overlay deltalist
     Get difference between base vm (base_image, base_mem) and 
     launch vm (modified_disk, modified_mem) using monitoring information
@@ -743,7 +823,7 @@ def get_overlay_deltalist(monitoring_info, options,
             we need previous memory deltalist
     '''
 
-    INFO = vmhandoff._MonitoringInfo
+    INFO = OverlayMonitoringInfo
     basedisk_hashlist = getattr(monitoring_info, INFO.BASEDISK_HASHLIST, None)
     basemem_hashlist = getattr(monitoring_info, INFO.BASEMEM_HASHLIST, None)
     free_memory_dict = getattr(monitoring_info, INFO.MEMORY_FREE_BLOCKS, None)
@@ -775,23 +855,69 @@ def get_overlay_deltalist(monitoring_info, options,
         dma_dict=dma_dict,
         used_blocks_dict=used_blocks_dict,
         ret_statistics=disk_statistics)
-        
     LOG.info("Generate VM overlay using deduplication")
     merged_deltalist = delta.create_overlay(
             mem_deltalist, Memory.Memory.RAM_PAGE_SIZE,
             disk_deltalist, Const.CHUNK_SIZE,
             basedisk_hashlist=basedisk_hashlist,
             basemem_hashlist=basemem_hashlist)
-            
     LOG.info("Print statistics")
-    free_memory_dict = getattr(monitoring_info, _MonitoringInfo.MEMORY_FREE_BLOCKS, None)
+    free_memory_dict = getattr(monitoring_info, OverlayMonitoringInfo.MEMORY_FREE_BLOCKS, None)
     free_pfn_counter = long(free_memory_dict.get("freed_counter", 0))
     disk_discarded_count = disk_statistics.get('trimed', 0)
-    DeltaList.statistics(merged_deltalist, 
+    DeltaList.statistics(merged_deltalist,
             mem_discarded=free_pfn_counter,
             disk_discarded=disk_discarded_count)
 
     return merged_deltalist
+
+
+def _create_overlay_meta(overlay_metafile, base_hash, modified_disksize,
+                         modified_memsize, blob_info):
+    fout = open(overlay_metafile, "wrb")
+
+    meta_dict = dict()
+    meta_dict[Const.META_BASE_VM_SHA256] = base_hash
+    meta_dict[Const.META_RESUME_VM_DISK_SIZE] = long(modified_disksize)
+    meta_dict[Const.META_RESUME_VM_MEMORY_SIZE] = long(modified_memsize)
+    meta_dict[Const.META_OVERLAY_FILES] = blob_info
+
+    serialized = msgpack.packb(meta_dict)
+    fout.write(serialized)
+    fout.close()
+
+
+def generate_overlayfile(overlay_deltalist,
+                         options, 
+                         base_hashvalue,
+                         launchdisk_size,
+                         launchmem_size,
+                         overlay_metapath,
+                         overlayfile_prefix):
+    ''' generate overlay metafile and file
+    Return:
+        [overlay_metapath, [overlayfilepath1, overlayfilepath2]]
+    '''
+
+    # Compression
+    LOG.info("[LZMA] Compressing overlay blobs (%s)", overlay_metapath)
+    blob_list = delta.divide_blobs(overlay_deltalist, overlayfile_prefix,
+            Const.OVERLAY_BLOB_SIZE_KB, Const.CHUNK_SIZE,
+            Memory.Memory.RAM_PAGE_SIZE)
+
+    # create metadata
+    if not options.DISK_ONLY:
+        _create_overlay_meta(overlay_metapath, base_hashvalue,
+                             launchdisk_size, launchmem_size, blob_list)
+    else:
+        _create_overlay_meta(overlay_metapath, base_hashvalue,
+                             launchdisk_size, launchmem_size, blob_list)
+
+    overlay_files = [item[Const.META_OVERLAY_FILE_NAME] for item in blob_list]
+    dirpath = os.path.dirname(overlayfile_prefix)
+    overlay_files = [os.path.join(dirpath, item) for item in overlay_files]
+
+    return overlay_metapath, overlay_files
 
 
 
@@ -968,69 +1094,137 @@ def run_vm(conn, domain_xml, **kwargs):
                 machine.destroy()
     return machine
 
+class QmpThreadSerial(threading.Thread):
+    def __init__(self, qmp_path, fuse_stream_monitor):
+        self.qmp_path = qmp_path
+        self.stop = threading.Event()
+        self.qmp = qmp_af_unix.QmpAfUnix(self.qmp_path)
+        self.fuse_stream_monitor = fuse_stream_monitor
+        threading.Thread.__init__(self, target=self.stop_migration)
 
-class MemoryReadProcessDELETE(multiprocessing.Process):
+    def stop_migration(self):
+        self.qmp.connect()
+        counter_check_comp_size = 0
+        ret = self.qmp.qmp_negotiate()
+        if not ret:
+            raise CloudletGenerationError("failed to connect to qmp channel")
+        sleep(2)
+        self.migration_stop_time = self._stop_migration()
+        self.qmp.disconnect()
+
+    def _stop_migration(self):
+        LOG.debug("[live] sent stop_raw_live signal at %f" % time())
+        stop_time = self.qmp.stop_raw_live()
+        LOG.debug("[live] stop migration at %f" % stop_time)
+        self.fuse_stream_monitor.terminate()
+        return stop_time
+
+    def terminate(self):
+        self.stop.set()
+
+class MemoryReadProcessSerial(multiprocessing.Process):
+#class MemoryReadProcessSerial(threading.Thread):
     RET_SUCCESS = 1
     RET_ERRROR = 2
 
     def __init__(self, input_path, output_path, 
-            machine_memory_size, output_queue):
+                 machine_memory_size, result_queue, qmp_path):
         self.input_path = input_path
         self.output_path = output_path
-        self.output_queue = output_queue
+        self.result_queue = result_queue
         self.machine_memory_size = machine_memory_size*1024
+        self.memory_snapshot_size = 0
+        self.header_chunk_size = Memory.Memory.CHUNK_HEADER_SIZE + Memory.Memory.RAM_PAGE_SIZE
+        self.aligned_libvirt_header_size = Memory.Memory.RAM_PAGE_SIZE*2
+        self.temp_memory_dict = dict()
+
         multiprocessing.Process.__init__(self, target=self.read_mem_snapshot)
+        #threading.Thread.__init__(self, target=self.read_mem_snapshot)
+
+    def chunking(self, data):
+        for index in range(0, len(data), self.header_chunk_size):
+            chunked_data = data[index:index+self.header_chunk_size]
+            chunked_data_size = len(chunked_data)
+            header = chunked_data[0:Memory.Memory.CHUNK_HEADER_SIZE]
+            blob_offset, = struct.unpack(Memory.Memory.CHUNK_HEADER_FMT, header)
+            blob_offset = (blob_offset & Memory.Memory.CHUNK_POS_MASK) + self.aligned_libvirt_header_size
+            self.temp_memory_dict[blob_offset] = chunked_data[Memory.Memory.CHUNK_HEADER_SIZE:]
 
     def read_mem_snapshot(self):
+        time_start = time()
         retry_counter = 0
-        while os.path.isfile(self.input_path) == False:
-            retry_counter += 1
-            sleep(1)
-            if retry_counter > 10:
-                self.output_queue.put(self.RET_ERRROR)
-                self.output_queue.put("Cannot open named pipe")
-                return
+
+        for repeat in xrange(100):
+            if os.path.exists(self.input_path) == False:
+                print "waiting for %s: " % self.input_path
+                time.sleep(0.1)
 
         # create memory snapshot aligned with 4KB
         try:
             self.in_fd = open(self.input_path, 'rb')
             self.out_fd = open(self.output_path, 'wb')
 
-            total_read_size = 0
+            total_write_size = 0
             # read first 40KB and aligen header with 4KB
             data = self.in_fd.read(Memory.Memory.RAM_PAGE_SIZE*10)
             libvirt_header = memory_util._QemuMemoryHeaderData(data)
             original_header = libvirt_header.get_header()
-            align_size = Memory.Memory.RAM_PAGE_SIZE*2
-            new_header = libvirt_header.get_aligned_header(align_size)
-            self.out_fd.write(new_header)
-            total_read_size += len(new_header)
-            self.out_fd.write(data[len(original_header):])
-            total_read_size += len(data[len(original_header):])
-            LOG.info("Header size of memory snapshot is %s" % len(new_header))
+            new_header = libvirt_header.get_aligned_header(self.aligned_libvirt_header_size)
+            self.temp_memory_dict[0] = new_header
+            total_write_size += len(new_header)
+
+            # get memory snapshot size
+            original_header_len = len(original_header)
+            memory_size_data = data[original_header_len:original_header_len+Memory.Memory.CHUNK_HEADER_SIZE]
+            mem_snapshot_size, = struct.unpack(Memory.Memory.CHUNK_HEADER_FMT, memory_size_data)
+            self.memory_snapshot_size = long(mem_snapshot_size + len(new_header))
+
+
+            # get memory snapshot aligned with chunk size
+            new_data = data[original_header_len+Memory.Memory.CHUNK_HEADER_SIZE:]
+            chunk_aligned_size = self.header_chunk_size - (len(new_data) % self.header_chunk_size)
+            new_data += self.in_fd.read(chunk_aligned_size)
+            self.chunking(new_data)
+            total_write_size += len(new_data)
+            LOG.info("Memory snapshot size: %ld, header size: %ld at %f" % \
+                     (self.memory_snapshot_size, len(new_header), time()))
 
             # write rest of the memory data
             prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
-                data = self.in_fd.read(1024 * 10)
+                data = self.in_fd.read(self.header_chunk_size*250)
                 if data == None or len(data) <= 0:
                     break
-                self.out_fd.write(data)
-                total_read_size += len(data)
-                prog_bar.set_percent(100.0*total_read_size/self.machine_memory_size)
+                self.chunking(data)
+                total_write_size += len(data)
+                prog_bar.set_percent(100.0*total_write_size/self.memory_snapshot_size)
                 prog_bar.show_progress()
-            self.out_fd.flush()
             prog_bar.finish()
-            if total_read_size != self.out_fd.tell():
-                raise Exception("output file size is different from stream size")
+            time_end = time()
+            print "memory snapshotting time: %f" % (time_end-time_start)
+
+            prev_data_offset = 0
+            for (offset, data) in iter(sorted(self.temp_memory_dict.iteritems())): 
+                if len(data) < Memory.Memory.RAM_PAGE_SIZE:
+                    # Libvirt generate garbage at the end of the stream
+                    continue
+                if (offset != prev_data_offset):
+                    import pdb;pdb.set_trace()
+                    msg = "Received memory is not aligned at %ld" % offset
+                    raise CloudletGenerationError(msg)
+                self.out_fd.write(data)
+                prev_data_offset = offset + len(data)
+            self.temp_memory_dict.clear()
+            self.temp_memory_dict = None
         except Exception, e:
             LOG.error(str(e))
-            self.output_queue.put(self.RET_ERRROR)
-            self.output_queue.put(str(e))
+            self.result_queue.put(self.RET_ERRROR)
+            self.result_queue.put(str(e))
         else:
-            self.output_queue.put(self.RET_SUCCESS)
+            self.result_queue.put(self.RET_SUCCESS)
 
-def save_mem_snapshot(conn, machine, fout_path, **kwargs):
+
+def save_mem_snapshot(conn, machine, fout_path, qmp_channel, **kwargs):
     #Set migration speed
     nova_util = kwargs.get('nova_util', None)
     fuse_stream_monitor = kwargs.get('fuse_stream_monitor', None)
@@ -1038,14 +1232,11 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
     if ret != 0:
         raise CloudletGenerationError("Cannot set migration speed : %s", machine.name())
 
-    # Pause VM
-    machine.suspend()
-
     # Stop monitoring for memory access (snapshot will create a lot of access)
     fuse_stream_monitor.del_path(cloudletfs.StreamMonitor.MEMORY_ACCESS)
-    if fuse_stream_monitor is not None:
-        fuse_stream_monitor.terminate()
-        fuse_stream_monitor.join()
+    #if fuse_stream_monitor is not None:
+    #    fuse_stream_monitor.terminate()
+    #    fuse_stream_monitor.join()
 
     # get VM information
     machine_memory_size = machine.memoryStats().get('actual', None)
@@ -1057,27 +1248,27 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
             machine_memory_size = long(memory_element.text)
 
     #Save memory state
+    LOG.info("save VM memory state")
     try:
-        output_queue = multiprocessing.Queue()
-        fout_path_intermediate = fout_path + ".inter"
-        if os.path.exists(fout_path_intermediate):
-            os.remove(fout_path_intermediate)
-        # wait until libvirt finishes its operation 
-        LOG.info("save VM memory state at %s" % fout_path)
-        LOG.info("This could take up to minute depend on VM's memory size")
-        LOG.info("(Check file at %s)" % fout_path_intermediate)
-        ret = machine.save(fout_path_intermediate) 
+        result_queue = multiprocessing.Queue()
+        fifo_path = NamedTemporaryFile(prefix="cloudlet-memory-snapshot-",
+                                       delete=True)
+        named_pipe_output = fifo_path.name + ".fifo"
+        if os.path.exists(named_pipe_output):
+            os.remove(named_pipe_output)
+        os.mkfifo(named_pipe_output)
         if nova_util != None:
             # OpenStack runs VM with nova account and snapshot 
             # is generated from system connection
-            nova_util.chown(fout_path_intermediate, os.getuid())
-
-        LOG.info("Start post processing of memory snapshot at %s" % fout_path)
-        # TODO: no reason to use multiprocess
-        # but somehow, using process for post process expedites save operation
-        memory_read_proc = MemoryReadProcessDELETE(fout_path_intermediate, fout_path, 
-                machine_memory_size, output_queue)
+            nova_util.chown(named_pipe_output, os.getuid())
+        memory_read_proc = MemoryReadProcessSerial(named_pipe_output,
+                                                   fout_path,
+                                                   machine_memory_size,
+                                                   result_queue,
+                                                   qmp_channel)
         memory_read_proc.start()
+        libvirt_thread = handoff.LibvirtThread(machine, named_pipe_output)
+        libvirt_thread.start()
         memory_read_proc.join()
     except libvirt.libvirtError, e:
         # we intentionally ignore seek error from libvirt since we have cause
@@ -1085,16 +1276,13 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
         if str(e).startswith('unable to seek') == False:
             raise CloudletGenerationError("libvirt memory save : " + str(e))
     finally:
-        if os.path.exists(fout_path_intermediate):
-            os.remove(fout_path_intermediate)
-        if machine is not None:
-            _terminate_vm(conn, machine)
-            machine = None
+        if os.path.exists(named_pipe_output):
+            os.remove(named_pipe_output)
 
     try:
-        proc_ret = output_queue.get()
-        if proc_ret != MemoryReadProcessDELETE.RET_SUCCESS:
-            error_reason = output_queue.get()
+        proc_ret = result_queue.get()
+        if proc_ret != MemoryReadProcessSerial.RET_SUCCESS:
+            error_reason = result_queue.get()
             msg = "Failed to create memory snapshot : %s" % str(error_reason)
             LOG.error(msg)
             raise CloudletGenerationError(msg)
@@ -1104,13 +1292,6 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
             nova_util.chown(fout_path, os.getuid())
     except memory_util.MachineGenerationError, e:
         raise CloudletGenerationError("Machine Generation Error: " + str(e))
-    finally:
-        if machine is not None:
-            _terminate_vm(conn, machine)
-            machine = None
-
-    if ret != 0:
-        raise CloudletGenerationError("libvirt: Cannot save memory state")
 
 
 def run_snapshot(conn, disk_image, mem_snapshot, new_xml_string, resume_time=None):
