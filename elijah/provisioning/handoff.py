@@ -730,15 +730,19 @@ def create_residue(base_disk, base_hashvalue,
     time_start = time.time()
     process_controller = process_manager.get_instance()
     if overlay_mode == None:
-        #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
-        #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
+        # serial mode for testing
+        VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
+        overlay_mode = VMOverlayCreationMode.get_serial_single_process()
 
-        VMOverlayCreationMode.MAX_THREAD_NUM = 4
-        NUM_CPU_CORES = 4
-        overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
-        VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
+        # multi-processing
+        #NUM_CPU_CORES = 4
+        #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
+        #overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
+
         overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_BZIP2
         overlay_mode.COMPRESSION_ALGORITHM_SPEED = 5
+        overlay_mode.MEMORY_DIFF_ALGORITHM = "none"
+        overlay_mode.DISK_DIFF_ALGORITHM = "none"
 
     process_controller.set_mode(overlay_mode, migration_addr)
     LOG.info("* LIVE MIGRATION STRATEGY: %d" % VMOverlayCreationMode.LIVE_MIGRATION_STOP)

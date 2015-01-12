@@ -726,8 +726,9 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                                                          self.in_size,
                                                          self.out_size,
                                                          (self.out_size/float(self.in_size))))
-        LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
-                  (self.__class__.__name__, time_s, time_e, self.total_time))
+        LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f\t%f" %\
+                  (self.__class__.__name__, time_s, time_e,\
+                   (time_e-time_s), self.total_time))
         LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
                                                          float(self.in_size)/self.total_block,
                                                          float(self.out_size)/self.total_block,

@@ -261,6 +261,8 @@ class VMOverlayCreationMode(object):
 
     @staticmethod
     def get_serial_single_process():
+        VMOverlayCreationMode.MAX_THREAD_NUM = 1
+        VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
         mode = VMOverlayCreationMode(num_cores=1)
         num_cores = VMOverlayCreationMode.get_num_cores()
         if num_cores is not 1:
@@ -269,17 +271,8 @@ class VMOverlayCreationMode(object):
         return mode
 
     @staticmethod
-    def get_serial_multi_process(num_cores=4):
-        mode = VMOverlayCreationMode(num_cores)
-        update_cores = VMOverlayCreationMode.get_num_cores()
-        if update_cores != num_cores:
-            raise CloudletGenerationError("Cannot allocate %d core" % num_cores)
-
-        mode.PROCESS_PIPELINED = False
-        return mode
-
-    @staticmethod
     def get_pipelined_multi_process_finite_queue(num_cores=4):
+        VMOverlayCreationMode.MAX_THREAD_NUM = num_cores
         mode = VMOverlayCreationMode(num_cores)
         update_cores = mode.get_num_cores()
         if update_cores != num_cores:

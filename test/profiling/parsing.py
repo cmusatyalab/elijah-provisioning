@@ -4,6 +4,9 @@ import os
 import ast
 from pprint import pprint
 from collections import defaultdict
+from collections import OrderedDict
+from operator import itemgetter
+
 
 stage_names = ["CreateMemoryDeltalist", "CreateDiskDeltalist", "DeltaDedup", "CompressProc"]
 
@@ -20,21 +23,48 @@ class Experiment(object):
         return "%s,R:%s,P:%s" % (self.workload, self.get_total_R(), self.get_total_P())
 
     def get_total_P(self):
-        # total P: max(disk_diff, memory_diff)+delta+compression
+        # get processing time per block using total time of stages
+
+        #memory_in_size = self.stage_size_in['CreateMemoryDeltalist']
+        #disk_in_size = self.stage_size_in['CreateDiskDeltalist']
+        #alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
+
         disk_diff = self.stage_time['CreateMemoryDeltalist']
         memory_diff = self.stage_time['CreateDiskDeltalist']
         delta = self.stage_time['DeltaDedup']
         comp = self.stage_time['CompressProc']
-        total_p = max(disk_diff, memory_diff)+delta+comp
-        return total_p
+        total_processing_time = memory_diff+disk_diff+delta+comp # should not weight using alpha
+        total_block = self.block['CreateDiskDeltalist'] + self.block['CreateMemoryDeltalist']
+        total_p_block = float(total_processing_time) / total_block
+        return total_p_block*1000
+
+    def estimate_total_P(self):
+        # estimate processing time per block using block processing time of
+        # each stage
+        memory_in_size = self.stage_size_in['CreateMemoryDeltalist']
+        disk_in_size = self.stage_size_in['CreateDiskDeltalist']
+        alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
+        total_P_from_each_stage = (self.block_time['CreateMemoryDeltalist']*alpha + self.block_time['CreateDiskDeltalist']*(1-alpha))\
+            + self.block_time['DeltaDedup'] + self.block_time['CompressProc']
+        return total_P_from_each_stage
 
     def get_total_R(self):
-        # R: (disk_in + memor_in)/compressed_out
         disk_diff = self.stage_size_in['CreateMemoryDeltalist']
         memory_diff = self.stage_size_in['CreateDiskDeltalist']
         comp = self.stage_size_out['CompressProc']
         total_R = float(comp)/(disk_diff+memory_diff)
         return round(total_R, 4)
+
+    def estimate_total_R(self):
+        # weight using input size
+        memory_in_size = self.stage_size_in['CreateMemoryDeltalist']
+        disk_in_size = self.stage_size_in['CreateDiskDeltalist']
+        alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
+        total_R_from_each_stage = (self.block_size_ratio['CreateMemoryDeltalist']*alpha +\
+                                   self.block_size_ratio['CreateDiskDeltalist']*(1-alpha))\
+                                * self.block_size_ratio['DeltaDedup']\
+                                * self.block_size_ratio['CompressProc']
+        return total_R_from_each_stage
 
     @staticmethod
     def mode_diff_str(exp1, exp2):
@@ -117,19 +147,17 @@ def parse_each_experiement(lines):
         if profile_type == "block-size":
             in_size = float(log[2])
             out_size = float(log[3])
-            block_count = log[4]
+            block_count = long(log[4])
             exp.block[stage_name] = block_count
             exp.block_size_in[stage_name] = in_size
             exp.block_size_out[stage_name] = out_size
-            exp.block_size_ratio[stage_name] = float(in_size)/out_size
+            exp.block_size_ratio[stage_name] = out_size/float(in_size)
         if profile_type == "time":
             duration = float(log[-1])
             exp.stage_time[stage_name] = duration
         if profile_type == "block-time":
             duration = round(float(log[-1])*1000, 6)
             exp.block_time[stage_name] = duration
-    #print "%s: %s, %s" % (exp.workload, exp.stage_time, exp.get_total_P())
-    #print "%s: %s, %s" % (exp.workload, exp.stage_size_in, exp.get_total_R())
     return exp
 
 
@@ -189,7 +217,6 @@ def _split_experiment(test_ret_list):
     return moped_exps, speech_exps, fluid_exps, face_exps, mar_exps
 
 def multikeysort(items, columns):
-    from operator import itemgetter
     comparers = [ ((itemgetter(col[1:].strip()), -1) if col.startswith('-') else (itemgetter(col.strip()), 1)) for col in columns]  
     def comparer(left, right):
         for fn, mult in comparers:
@@ -201,13 +228,7 @@ def multikeysort(items, columns):
     return sorted(items, cmp=comparer)
 
 
-def profiling(test_ret_list):
-    # how change in mode will affect system performance?
-    moped_exps, speech_exps, fluid_exps, face_exps, mar_exps = _split_experiment(test_ret_list)
-    comparison = defaultdict(list)
-
-    exps = moped_exps
-
+def print_bw(exps):
     # sort by compression algorithm gzip 1, .., gzip9, .., lzma1, .., lzma9
     def compare_comp_algorithm(a):
         d = {"xdelta3":2,
@@ -215,6 +236,7 @@ def profiling(test_ret_list):
              "none":1}
         return (d[a.mode['DISK_DIFF_ALGORITHM']], -a.mode['COMPRESSION_ALGORITHM_TYPE'], a.mode['COMPRESSION_ALGORITHM_SPEED'])
     exps.sort(key=compare_comp_algorithm)
+    result_dict = OrderedDict()
     for each_exp in exps:
         in_data_size = each_exp.stage_size_in['CreateMemoryDeltalist'] + each_exp.stage_size_in['CreateDiskDeltalist']
         in_data_disk = each_exp.stage_size_in['CreateDiskDeltalist']
@@ -224,13 +246,86 @@ def profiling(test_ret_list):
         duration = each_exp.migration_total_time
         est_duration1 = each_exp.stage_time['CreateMemoryDeltalist'] + each_exp.stage_time['CreateDiskDeltalist']+\
             each_exp.stage_time['DeltaDedup'] + each_exp.stage_time['CompressProc']
-        print "(%d,%d,%s)\tin_size:%ld\tout_size:%ld\tduration:%f,%f,%f\tthroughput(Mbps):%f" %\
-            (each_exp.mode['COMPRESSION_ALGORITHM_TYPE'],
-             each_exp.mode['COMPRESSION_ALGORITHM_SPEED'],\
-             each_exp.mode['DISK_DIFF_ALGORITHM'],\
-             in_data_size, out_data_size, duration, est_duration1, float(duration)/est_duration1,
-             8*float(out_data_size)/1024.0/1024/duration)
+        key = "%s,%d,%d" % (each_exp.mode['DISK_DIFF_ALGORITHM'], each_exp.mode['COMPRESSION_ALGORITHM_TYPE'],each_exp.mode['COMPRESSION_ALGORITHM_SPEED'])
+        value = (in_data_size, out_data_size, duration, 8*float(out_data_size)/1024.0/1024/duration)
+        item_list = result_dict.get(key, list())
+        item_list.append(value)
+        result_dict[key] = item_list
 
+        #print "%s,%d,%d\t%ld\t%ld\t%f,%f,%f\t%f" %\
+        #    (each_exp.mode['DISK_DIFF_ALGORITHM'],\
+        #    each_exp.mode['COMPRESSION_ALGORITHM_TYPE'],\
+        #     each_exp.mode['COMPRESSION_ALGORITHM_SPEED'],\
+        #     in_data_size, out_data_size, duration, est_duration1, float(duration)/est_duration1,
+        #     8*float(out_data_size)/1024.0/1024/duration) 
+
+    # chose the median throughput value
+    for (key, value_list) in result_dict.iteritems():
+        value_list.sort(key=itemgetter(3))
+        value_len = len(value_list)
+        value = value_list[value_len/2]
+        print "%s\t%s\t%s\t%s\t%s" % ("\t".join(key.split(",")), value[0], value[1], value[2], value[3])
+
+
+def print_bw_block(exps):
+    # sort by compression algorithm gzip 1, .., gzip9, .., lzma1, .., lzma9
+    def compare_comp_algorithm(a):
+        d = {"xdelta3":2,
+             "bsdiff":3,
+             "none":1}
+        return (d[a.mode['DISK_DIFF_ALGORITHM']], -a.mode['COMPRESSION_ALGORITHM_TYPE'], a.mode['COMPRESSION_ALGORITHM_SPEED'])
+    exps.sort(key=compare_comp_algorithm)
+    result_dict = OrderedDict()
+    for each_exp in exps:
+        in_data_size = each_exp.stage_size_in['CreateMemoryDeltalist'] + each_exp.stage_size_in['CreateDiskDeltalist']
+        in_data_disk = each_exp.stage_size_in['CreateDiskDeltalist']
+        in_data_mem = each_exp.stage_size_in['CreateMemoryDeltalist']
+        alpha = float(in_data_mem)/in_data_size
+        out_data_size = each_exp.stage_size_out['CompressProc']
+        duration = each_exp.migration_total_time
+        est_duration = each_exp.stage_time['CreateMemoryDeltalist'] + each_exp.stage_time['CreateDiskDeltalist']+\
+            each_exp.stage_time['DeltaDedup'] + each_exp.stage_time['CompressProc']
+        est_duration += 14 # serial part
+        total_r = each_exp.get_total_R()
+        total_p = each_exp.get_total_P()
+        total_r_est = each_exp.estimate_total_R()
+        total_p_est = each_exp.estimate_total_P()
+        key = "%s,%d,%d" % (each_exp.mode['DISK_DIFF_ALGORITHM'], each_exp.mode['COMPRESSION_ALGORITHM_TYPE'],each_exp.mode['COMPRESSION_ALGORITHM_SPEED'])
+        value = (in_data_size, out_data_size, duration, est_duration,
+                 8*float(out_data_size)/1024.0/1024/duration,
+                 total_p, total_r)
+        item_list = result_dict.get(key, list())
+        item_list.append(value)
+        result_dict[key] = item_list
+
+        #print "%s,%d,%d\t%ld\t%ld\t%f,%f,%f\t%f\t%f,%f\t%f,%f" %\
+        #    (each_exp.mode['DISK_DIFF_ALGORITHM'],\
+        #    each_exp.mode['COMPRESSION_ALGORITHM_TYPE'],\
+        #     each_exp.mode['COMPRESSION_ALGORITHM_SPEED'],\
+        #     in_data_size, out_data_size, duration, est_duration, float(duration)/est_duration1,
+        #     8*float(out_data_size)/1024.0/1024/duration,\
+        #     total_p, total_p_est,
+        #     total_r, total_r_est)
+
+    # chose the median throughput value
+    for (key, value_list) in result_dict.iteritems():
+        value_list.sort(key=itemgetter(3))
+        value_len = len(value_list)
+        (insize, outsize, duration, est_duration, bw, total_p, total_r) = value_list[value_len/2]
+        print "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ("\t".join(key.split(",")),
+                                                      insize, outsize, duration,
+                                                      est_duration,
+                                                      float(duration)/float(est_duration),
+                                                      bw, total_p, total_r)
+
+
+def profiling(test_ret_list):
+    # how change in mode will affect system performance?
+    moped_exps, speech_exps, fluid_exps, face_exps, mar_exps = _split_experiment(test_ret_list)
+    comparison = defaultdict(list)
+
+    #print_bw(face_exps)
+    print_bw_block(moped_exps)
 
     '''
     pivot_mode = moped_exps[0]
@@ -247,47 +342,7 @@ def profiling(test_ret_list):
         comparison[mode_diff_str].append((ratio_r, ratio_p))
         #print "%s\t%s %s" % (mode_diff_str, ratio_r, ratio_p)
 
-    pivot_mode = mar_exps[0]
-    pivot_R = pivot_mode.get_total_R()
-    pivot_P = pivot_mode.get_total_P()
-    for other_mode in mar_exps:
-        other_r = other_mode.get_total_R()
-        other_p = other_mode.get_total_P()
-        ratio_r = round(other_r/pivot_R, 4)
-        ratio_p = round(other_p/pivot_P, 4)
-        mode_diff_str = Experiment.mode_diff_str(pivot_mode, other_mode)
-        if len(mode_diff_str) == 0:
-            mode_diff_str = "original"
-        (o_r, o_p) = comparison[mode_diff_str][0]
-        comparison[mode_diff_str].append((ratio_r, ratio_p))
-        r_diff = abs(o_r-ratio_r)/o_r*100
-        p_diff = abs(o_p-ratio_p)/o_p*100
-        print "%s\t%f %f" % (mode_diff_str, round(r_diff,0), round(p_diff, 0))
-        #print "%s\t%f %f" % (mode_diff_str, ratio_r, ratio_p)
-
-    pivot_mode = face_exps[0]
-    pivot_R = pivot_mode.get_total_R()
-    pivot_P = pivot_mode.get_total_P()
-    for other_mode in face_exps:
-        other_r = other_mode.get_total_R()
-        other_p = other_mode.get_total_P()
-        ratio_r = round(other_r/pivot_R, 4)
-        ratio_p = round(other_p/pivot_P, 4)
-        mode_diff_str = Experiment.mode_diff_str(pivot_mode, other_mode)
-        if len(mode_diff_str) == 0:
-            mode_diff_str = "original"
-        (o_r, o_p) = comparison[mode_diff_str][0]
-        comparison[mode_diff_str].append((ratio_r, ratio_p))
-        r_diff = abs(o_r-ratio_r)/o_r*100
-        p_diff = abs(o_p-ratio_p)/o_p*100
-        #print "%s\t%f %f" % (mode_diff_str, round(r_diff, 0), round(p_diff, 0))
-        #print "%s\t%f %f" % (mode_diff_str, ratio_r, ratio_p)
     '''
-
-
-def get_ratio(in_config, out_configs):
-    pass
-
 
 
 if __name__ == "__main__":

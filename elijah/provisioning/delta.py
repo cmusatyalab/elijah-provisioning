@@ -962,8 +962,9 @@ class DeltaDedup(process_manager.ProcWorker):
                                                             self.in_size,
                                                             self.out_size,
                                                             (self.out_size/float(self.in_size))))
-            LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %\
-                    (self.__class__.__name__, time_start, time_end, total_process_time))
+            LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f\t%f" %\
+                    (self.__class__.__name__, time_start, time_end,
+                     (time_end-time_start), total_process_time))
             LOG.debug("profiling\t%s\tblock-size\t%f\t%f\t%d" % (self.__class__.__name__,
                                                                 float(self.in_size)/self.total_block_count,
                                                                 float(self.out_size)/self.total_block_count,
