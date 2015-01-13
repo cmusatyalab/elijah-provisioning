@@ -155,6 +155,7 @@ class VMOverlayCreationMode(object):
     MAX_THREAD_NUM = 4
 
     PROFILE_DATAPATH = os.path.abspath(os.path.join(Const.HOME_DIR, ".cloudlet/config/mode-profile"))
+    VARYING_PARAMETERS = ['MEMORY_DIFF_ALGORITHM', 'DISK_DIFF_ALGORITHM', 'COMPRESSION_ALGORITHM_TYPE', 'COMPRESSION_ALGORITHM_SPEED']
 
     LIVE_MIGRATION_FINISH_ASAP = 1
     LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE = 2
@@ -173,13 +174,12 @@ class VMOverlayCreationMode(object):
         # number of CPU allocated
         VMOverlayCreationMode.set_num_cores(num_cores)
 
-        self.MEMORY_DIFF_ALGORITHM                  = "xdelta3" # "xdelta3", "bsdiff", "none"
-        self.DISK_DIFF_ALGORITHM                    = "xdelta3" # "xdelta3", "bsdiff", "none"
-
         self.OPTIMIZATION_DEDUP_BASE_DISK            = True
         self.OPTIMIZATION_DEDUP_BASE_MEMORY          = True
         self.OPTIMIZATION_DEDUP_BASE_SELF            = True
 
+        self.MEMORY_DIFF_ALGORITHM                  = "xdelta3" # "xdelta3", "bsdiff", "none"
+        self.DISK_DIFF_ALGORITHM                    = "xdelta3" # "xdelta3", "bsdiff", "none"
         self.COMPRESSION_ALGORITHM_TYPE              = Const.COMPRESSION_LZMA
         self.COMPRESSION_ALGORITHM_SPEED             = 5 # 1 (fastest) ~ 9
 
@@ -188,11 +188,11 @@ class VMOverlayCreationMode(object):
         return pprint.pformat(self.__dict__)
 
     def update_mode(self, new_mode_dict):
-        invalid_keys = ["NUM_PROC_DISK_DIFF", "NUM_PROC_MEMORY_DIFF", "NUM_PROC_COMPRESSION", "NUM_PROC_OPTIMIZATION"]
-        for key in invalid_keys:
+        new_mode = dict()
+        for key in self.VARYING_PARAMETERS:
             if new_mode_dict.get(key, None) is not None:
-                del new_mode_dict[key]
-        self.__dict__.update(new_mode_dict)
+                new_mode[key] = new_mode_dict.get(key)
+        self.__dict__.update(new_mode)
 
     @staticmethod
     def set_num_cores(num_cores):
@@ -238,10 +238,9 @@ class VMOverlayCreationMode(object):
         sorted_key.sort()
         mode_str = list()
         for key in sorted_key:
-            if key in ["NUM_PROC_DISK_DIFF", "NUM_PROC_MEMORY_DIFF", "NUM_PROC_COMPRESSION", "NUM_PROC_OPTIMIZATION"]:
-                continue
-            value = self.__dict__[key]
-            mode_str.append("%s:%s" % (key, value))
+            if key in self.VARYING_PARAMETERS:
+                value = self.__dict__[key]
+                mode_str.append("%s:%s" % (key, value))
         return "|".join(mode_str)
 
     @staticmethod

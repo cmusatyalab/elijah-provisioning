@@ -35,10 +35,9 @@ class MigrationMode(object):
             # ignore numer of process for each stage since this is a maximum
             # number of thread. Also this does not be consider to get P and R
             # since we get per block P and per block R
-            if key in ["NUM_PROC_DISK_DIFF", "NUM_PROC_MEMORY_DIFF", "NUM_PROC_COMPRESSION", "NUM_PROC_OPTIMIZATION"]:
-                continue
-            value = self.mode[key]
-            mode_str.append("%s:%s" % (key, value))
+            if key in VMOverlayCreationMode.VARYING_PARAMETERS:
+                value = self.mode[key]
+                mode_str.append("%s:%s" % (key, value))
         return "|".join(mode_str)
 
     def __repr__(self):
@@ -79,7 +78,10 @@ class MigrationMode(object):
 
     @staticmethod
     def mode_diff(mode1, mode2):
-        set_mode1, set_mode2= set(mode1.keys()), set(mode2.keys())
+        set_mode1, set_mode2 = set(mode1.keys()), set(mode2.keys())
+        set_mode1 = set_mode1.intersection(set(VMOverlayCreationMode.VARYING_PARAMETERS))
+        set_mode2 = set_mode2.intersection(set(VMOverlayCreationMode.VARYING_PARAMETERS))
+
         intersect = set_mode1.intersection(set_mode2)
         changed_keys = [o for o in intersect if mode1[o] != mode2[o]]
         changed_dict = dict()
@@ -92,6 +94,9 @@ class MigrationMode(object):
     @staticmethod
     def mode_diff_str(mode1, mode2):
         set_mode1, set_mode2= set(mode1.keys()), set(mode2.keys())
+        set_mode1 = set_mode1.intersection(set(VMOverlayCreationMode.VARYING_PARAMETERS))
+        set_mode2 = set_mode2.intersection(set(VMOverlayCreationMode.VARYING_PARAMETERS))
+
         intersect = set_mode1.intersection(set_mode2)
         changed_keys = [o for o in intersect if mode1[o] != mode2[o]]
         changed_list = list()
@@ -183,6 +188,18 @@ class ModeProfile(object):
 
         #print "scaling p: %f, r: %f" % (scale_p, scale_r)
         # apply scaling and get expected system out bw for each mode
+        scaled_mode_list, current_block_per_sec = self.list_scaled_modes(cur_mode, scale_p, scale_r, network_bw)
+
+        selected_item = sorted(scaled_mode_list, key=itemgetter(1), reverse=True)[0]
+        selected_mode_obj = selected_item[0]
+        selected_block_per_sec = selected_item[1]
+
+        if selected_block_per_sec <= current_block_per_sec:
+            return None
+        else:
+            return selected_item
+
+    def list_scaled_modes(self, cur_mode, scale_p, scale_r, network_bw):
         scaled_mode_list = list()
         for each_mode in self.overlay_mode_list:
             each_p = each_mode.total_p
@@ -210,63 +227,8 @@ class ModeProfile(object):
                      network_block_per_sec, network_bw))
             scaled_mode_list.append(data)
             #print "(%s) %f %f --> %f %f, %f" % (diff_str, network_bw, system_out_mbps, network_block_per_sec, system_block_per_sec, actual_block_per_sec)
+        return scaled_mode_list, current_block_per_sec
 
-        selected_item = sorted(scaled_mode_list, key=itemgetter(1), reverse=True)[0]
-        selected_mode_obj = selected_item[0]
-        selected_block_per_sec = selected_item[1]
-
-        #import pdb;pdb.set_trace()
-        diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, selected_mode_obj.mode)
-        if selected_block_per_sec <= current_block_per_sec:
-            return None
-        else:
-            return selected_item
-        '''
-        # find candidate
-        candidate_mode_list = list()
-        for margin in [0.1, 0.2]:
-            for item  in scaled_mode_list:
-                (each_mode, scaled_p, scaled_r, new_system_bw) = item
-                if network_bw*(1-margin) < new_system_bw and new_system_bw < network_bw*(1+margin):
-                    candidate_mode_list.append(item)
-            if len(candidate_mode_list) > 0:
-                break
-
-        sorted_candidate = list()
-        desirable_bw_increase = network_bw - system_out_bw
-        if len(candidate_mode_list) == 0:
-            # nothing meets the requirement
-            if len(candidate_mode_list) == 0:
-                if desirable_bw_increase > 0:
-                    # chose the most fastest one
-                    selected_item = sorted(scaled_mode_list, key=itemgetter(3), reverse=True)[0]
-                    return self.MATCHING_BEST_EFFORT, selected_item
-                else:
-                    # choose the slowest one
-                    selected_item = sorted(scaled_mode_list, key=itemgetter(3))[0]
-                    return self.MATCHING_BEST_EFFORT, selected_item
-                    #return selected_item[0], selected_item[3]
-        elif len(candidate_mode_list) == 1:
-            return self.MATCHING_ONE, candidate_mode_list[0]
-        else:
-            if desirable_bw_increase > 0:
-                # increase system speed to use more network BW
-                # choose the one that has the biggest compression ratio (max R)
-                # --> more thoughput, but little lost in compression
-                sorted_candidate = sorted(candidate_mode_list, key=itemgetter(2), reverse=True)
-            else:
-                # decreasing system speed to work with limited network
-                # choose the one that has the shortest speed (minimal P)
-                # --> more compression, but little cpu usage
-                sorted_candidate = sorted(candidate_mode_list, key=itemgetter(1))
-            return self.MATCHING_MULTIPLE, sorted_candidate[0]
-            #return sorted_candidate[0][0], candidate_mode_list[0][3]
-
-        #for item in sorted_candidate:
-        #    (each_mode, scaled_p, scaled_r, new_system_bw) = item
-        #    diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, each_mode.mode)
-        #    print "%s\t%s,%s --> (%s, %s) %s" % (diff_str, network_bw, system_out_bw, scaled_p, scaled_r, new_system_bw)
-        '''
 
     def show_relative_ratio(self, input_mode):
         pivot_mode = self.find_same_mode(self.overlay_mode_list, input_mode)
