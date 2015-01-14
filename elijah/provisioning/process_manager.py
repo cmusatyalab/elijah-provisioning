@@ -218,9 +218,9 @@ class ProcessManager(threading.Thread):
                 compression_first_input_time = worker.monitor_time_first_input_recved.value
 
         # Get total P and total R
-        total_p = MigrationMode.get_total_P(p_dict, total_size_dict_in)
+        total_p = MigrationMode.get_total_P(p_dict)
         total_r = MigrationMode.get_total_R(r_dict, total_size_dict_in)
-        total_p_cur = MigrationMode.get_total_P(p_dict_cur, cur_size_dict_in)
+        total_p_cur = MigrationMode.get_total_P(p_dict_cur)
         total_r_cur = MigrationMode.get_total_R(r_dict_cur, cur_size_dict_in)
         num_cores = VMOverlayCreationMode.get_num_cores()
         system_block_per_sec, system_in_mbps, system_out_mbps = MigrationMode.get_system_throughput(num_cores,

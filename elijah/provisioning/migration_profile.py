@@ -44,29 +44,25 @@ class MigrationMode(object):
         return "%s(%s)" % (self.workload, self.get_mode_id())
 
     @staticmethod
-    def get_total_P(p_dict, indata_size_dict):
+    def get_total_P(p_dict):
         # get total P considering input data
-        memory_in_size = long(indata_size_dict['CreateMemoryDeltalist'])
-        disk_in_size = long(indata_size_dict['CreateDiskDeltalist'])
-        alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
-        total_P_from_each_stage = (p_dict['CreateMemoryDeltalist']*alpha + p_dict['CreateDiskDeltalist']*(1-alpha))\
-            + p_dict['DeltaDedup'] + p_dict['CompressProc']
+        # should not weight using alpha
+        total_P_from_each_stage = p_dict['CreateMemoryDeltalist']+\
+            p_dict['CreateDiskDeltalist'] +\
+            p_dict['DeltaDedup'] +\
+            p_dict['CompressProc']
         return total_P_from_each_stage
 
     @staticmethod
     def get_total_R(r_dict, indata_size_dict):
         # weight using input size
-        memory_in_size = long(indata_size_dict['CreateMemoryDeltalist'])
-        disk_in_size = long(indata_size_dict['CreateDiskDeltalist'])
+        memory_in_size = (indata_size_dict['CreateMemoryDeltalist'])
+        disk_in_size = (indata_size_dict['CreateDiskDeltalist'])
         alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
-        #total_R = (disk_r*disk_memory_ratio+memory_r*memory_disk_ratio)*delta_r*comp_r
-
         total_R_from_each_stage = (r_dict['CreateMemoryDeltalist']*alpha +\
                                    r_dict['CreateDiskDeltalist']*(1-alpha))\
                                 * r_dict['DeltaDedup']\
                                 * r_dict['CompressProc']
-        #print "%f == %f --> %f" % (total_R, total_R_from_each_stage, (total_R-total_R_from_each_stage))
-
         return total_R_from_each_stage
 
     @staticmethod
@@ -136,7 +132,7 @@ class MigrationMode(object):
         exp.block_size_out = json.loads(fd.readline())
         exp.block_size_ratio = json.loads(fd.readline())
         exp.block_time = json.loads(fd.readline())
-        exp.total_p = MigrationMode.get_total_P(exp.block_time, exp.stage_size_in)
+        exp.total_p = MigrationMode.get_total_P(exp.block_time)
         exp.total_r = MigrationMode.get_total_R(exp.block_size_ratio, exp.block_size_in)
         return exp
 
@@ -181,7 +177,7 @@ class ModeProfile(object):
         # get scaling factor between current workload and profiled data
         profiled_mode_total_p = profiled_mode_obj.total_p
         profiled_mode_total_r = profiled_mode_obj.total_r
-        cur_total_p = profiled_mode_obj.get_total_P(cur_p, cur_block_size)
+        cur_total_p = profiled_mode_obj.get_total_P(cur_p)
         cur_total_r = profiled_mode_obj.get_total_R(cur_r, cur_block_size)
         scale_p = cur_total_p/profiled_mode_total_p
         scale_r = cur_total_r/profiled_mode_total_r
@@ -212,9 +208,12 @@ class ModeProfile(object):
 
             # find the bottleneck
             network_block_per_sec = network_bw*1024*1024/(scaled_each_r*BIT_PER_BLOCK)
+            bottleneck = None
             if network_bw < system_out_mbps:
+                bottleneck = "network"
                 actual_block_per_sec = network_block_per_sec
             else:
+                bottleneck = "compute"
                 actual_block_per_sec = system_block_per_sec
             id1 = each_mode.get_mode_id()
             id2 = cur_mode.get_mode_id()
@@ -223,7 +222,7 @@ class ModeProfile(object):
 
             diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, each_mode.mode)
             data = (each_mode, actual_block_per_sec,
-                    (system_block_per_sec, system_in_mbps, system_out_mbps,
+                    (bottleneck, system_block_per_sec, system_in_mbps, system_out_mbps,
                      network_block_per_sec, network_bw))
             scaled_mode_list.append(data)
             #print "(%s) %f %f --> %f %f, %f" % (diff_str, network_bw, system_out_mbps, network_block_per_sec, system_block_per_sec, actual_block_per_sec)
@@ -444,7 +443,7 @@ if __name__ == "__main__":
         item = mode_profile.predict_new_mode(cur_mode, cur_p, cur_r, cur_block_size, network_bw)
         if item is not None:
             (new_mode_obj, actual_block_per_sec, misc) = item
-            (system_block_per_sec, system_in_mbps, system_out_mbps, network_block_per_sec, network_bw) = misc
+            (bottleneck, system_block_per_sec, system_in_mbps, system_out_mbps, network_block_per_sec, network_bw) = misc
             # print result
             diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, new_mode_obj.mode)
             diff = MigrationMode.mode_diff(cur_mode.__dict__, new_mode_obj.mode)

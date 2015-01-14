@@ -293,7 +293,7 @@ def print_bw_block(exps):
         key = "%s,%d,%d" % (each_exp.mode['DISK_DIFF_ALGORITHM'], each_exp.mode['COMPRESSION_ALGORITHM_TYPE'],each_exp.mode['COMPRESSION_ALGORITHM_SPEED'])
         value = (in_data_size, out_data_size, duration, est_duration,
                  8*float(out_data_size)/1024.0/1024/duration,
-                 total_p, total_r)
+                 total_p, total_r, total_p_est, total_r_est)
         item_list = result_dict.get(key, list())
         item_list.append(value)
         result_dict[key] = item_list
@@ -311,7 +311,7 @@ def print_bw_block(exps):
     for (key, value_list) in result_dict.iteritems():
         value_list.sort(key=itemgetter(3))
         value_len = len(value_list)
-        (insize, outsize, duration, est_duration, bw, total_p, total_r) = value_list[value_len/2]
+        (insize, outsize, duration, est_duration, bw, total_p, total_r, total_p_est, total_r_est) = value_list[value_len/2]
         print "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ("\t".join(key.split(",")),
                                                       insize, outsize, duration,
                                                       est_duration,
