@@ -83,8 +83,6 @@ class Experiment(object):
         return changed_str
 
 
-
-
 def parse_each_experiement(lines):
     # get configuration
     config_lines = ""
@@ -109,10 +107,9 @@ def parse_each_experiement(lines):
             continue
         if line.find("profiling") != -1:
             # see only profiling message
-            profile_dic = dict()
             log = line.split("profiling")[1].strip()
             profile_lines.append(log)
-        elif line.find("ime for finishing transferring") != -1:
+        elif line.find("Time for finishing transferring") != -1:
             log = line.split(":")[-1]
             migration_total_time = float(log.strip())
 
@@ -179,12 +176,6 @@ def parsing(inputfile):
         test_ret = parse_each_experiement(each_exp_log)
         test_ret_list.append(test_ret)
     return test_ret_list
-
-
-def profile_each_exp(each_exp_dict):
-    # total execution time from processing time
-
-    pass
 
 
 def _split_experiment(test_ret_list):
@@ -267,14 +258,19 @@ def print_bw(exps):
         print "%s\t%s\t%s\t%s\t%s" % ("\t".join(key.split(",")), value[0], value[1], value[2], value[3])
 
 
-def print_bw_block(exps):
-    # sort by compression algorithm gzip 1, .., gzip9, .., lzma1, .., lzma9
+def sort_experiment_by_diff_compress(exps):
     def compare_comp_algorithm(a):
         d = {"xdelta3":2,
              "bsdiff":3,
              "none":1}
         return (d[a.mode['DISK_DIFF_ALGORITHM']], -a.mode['COMPRESSION_ALGORITHM_TYPE'], a.mode['COMPRESSION_ALGORITHM_SPEED'])
     exps.sort(key=compare_comp_algorithm)
+    return exps
+
+
+def print_bw_block(exps):
+    # sort by compression algorithm gzip 1, .., gzip9, .., lzma1, .., lzma9
+    exps = sort_experiment_by_diff_compress(exps)
     result_dict = OrderedDict()
     for each_exp in exps:
         in_data_size = each_exp.stage_size_in['CreateMemoryDeltalist'] + each_exp.stage_size_in['CreateDiskDeltalist']
@@ -285,7 +281,7 @@ def print_bw_block(exps):
         duration = each_exp.migration_total_time
         est_duration = each_exp.stage_time['CreateMemoryDeltalist'] + each_exp.stage_time['CreateDiskDeltalist']+\
             each_exp.stage_time['DeltaDedup'] + each_exp.stage_time['CompressProc']
-        est_duration += 14 # serial part
+        est_duration += 14# serial part
         total_r = each_exp.get_total_R()
         total_p = each_exp.get_total_P()
         total_r_est = each_exp.estimate_total_R()
@@ -318,37 +314,60 @@ def print_bw_block(exps):
                                                       float(duration)/float(est_duration),
                                                       bw, total_p, total_r)
 
+def print_p_r_over_time(exp):
+    lines = open(inputfile, "r").read().split("\n")
+    adaptation_log_lines = list()
+    for line in lines:
+        # see only DEBUG message
+        if line.find("DEBUG") == -1:
+            continue
+        if line.find("adaptation") != -1:
+            # see only profiling message
+            log = line.split("adaptation")[1].strip()
+            adaptation_log_lines.append(log)
 
-def profiling(test_ret_list):
-    # how change in mode will affect system performance?
-    moped_exps, speech_exps, fluid_exps, face_exps, mar_exps = _split_experiment(test_ret_list)
-    comparison = defaultdict(list)
+    migration_start_time = 0
+    for line in adaptation_log_lines:
+        if line.startswith("start time"):
+            migration_start_time = float(line.split(":")[-1])
+        else:
+            data_point_time, total_p, total_r, total_p_cur, total_r_cur = line.split("\t")
+            time_measured, duration_measured = data_point_time.split(",")
+            print "%s\t%s\t%s\t%s\t%s" % (duration_measured, total_p, total_r, total_p_cur, total_r_cur)
 
-    #print_bw(face_exps)
-    print_bw_block(moped_exps)
-
-    '''
-    pivot_mode = moped_exps[0]
-    pivot_R = pivot_mode.get_total_R()
-    pivot_P = pivot_mode.get_total_P()
-    for other_mode in moped_exps:
-        other_r = other_mode.get_total_R()
-        other_p = other_mode.get_total_P()
-        ratio_r = round(other_r/pivot_R, 4)
-        ratio_p = round(other_p/pivot_P, 4)
-        mode_diff_str = Experiment.mode_diff_str(pivot_mode, other_mode)
-        if len(mode_diff_str) == 0:
-            mode_diff_str = "original"
-        comparison[mode_diff_str].append((ratio_r, ratio_p))
-        #print "%s\t%s %s" % (mode_diff_str, ratio_r, ratio_p)
-
-    '''
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        sys.stderr.write("Need input filename")
+    command_list = ["profiling", "over-time"]
+    if len(sys.argv) != 3:
+        sys.stderr.write("Need command(%s) and input filename\n" % (','.join(command_list)))
         sys.exit(1)
-    inputfile = sys.argv[1]
-    test_ret_list = parsing(inputfile)
-    profiling(test_ret_list)
+    command = sys.argv[1]
+    inputfile = sys.argv[2]
+
+    if command == "profiling":
+        test_ret_list = parsing(inputfile)
+        moped_exps, speech_exps, fluid_exps, face_exps, mar_exps = _split_experiment(test_ret_list)
+        #print_bw(face_exps)
+        print_bw_block(moped_exps)
+    elif command == "over-time":
+        print_p_r_over_time(inputfile)
+    else:
+        pass
+        '''
+        # how change in mode will affect system performance?
+        comparison = defaultdict(list)
+        pivot_mode = moped_exps[0]
+        pivot_R = pivot_mode.get_total_R()
+        pivot_P = pivot_mode.get_total_P()
+        for other_mode in moped_exps:
+            other_r = other_mode.get_total_R()
+            other_p = other_mode.get_total_P()
+            ratio_r = round(other_r/pivot_R, 4)
+            ratio_p = round(other_p/pivot_P, 4)
+            mode_diff_str = Experiment.mode_diff_str(pivot_mode, other_mode)
+            if len(mode_diff_str) == 0:
+                mode_diff_str = "original"
+            comparison[mode_diff_str].append((ratio_r, ratio_p))
+            #print "%s\t%s %s" % (mode_diff_str, ratio_r, ratio_p)
+        '''

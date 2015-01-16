@@ -217,11 +217,19 @@ class ProcessManager(threading.Thread):
             if worker_name == "CompressProc":
                 compression_first_input_time = worker.monitor_time_first_input_recved.value
 
-        # Get total P and total R
-        total_p = MigrationMode.get_total_P(p_dict)
-        total_r = MigrationMode.get_total_R(r_dict, total_size_dict_in)
-        total_p_cur = MigrationMode.get_total_P(p_dict_cur)
-        total_r_cur = MigrationMode.get_total_R(r_dict_cur, cur_size_dict_in)
+        # Get total average P and total R
+        memory_in_size = (total_size_dict_in['CreateMemoryDeltalist'])
+        disk_in_size = (total_size_dict_in['CreateDiskDeltalist'])
+        alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
+        total_p = MigrationMode.get_total_P(p_dict, alpha)
+        total_r = MigrationMode.get_total_R(r_dict, alpha)
+
+        # Get total instant P and total R
+        memory_in_size_cur = (cur_size_dict_in['CreateMemoryDeltalist'])
+        disk_in_size_cur = (cur_size_dict_in['CreateDiskDeltalist'])
+        alpha_cur = float(memory_in_size)/(memory_in_size+disk_in_size)
+        total_p_cur = MigrationMode.get_total_P(p_dict_cur, alpha_cur)
+        total_r_cur = MigrationMode.get_total_R(r_dict_cur, alpha_cur)
         num_cores = VMOverlayCreationMode.get_num_cores()
         system_block_per_sec, system_in_mbps, system_out_mbps = MigrationMode.get_system_throughput(num_cores,
                                                                                                     total_p,
@@ -271,8 +279,7 @@ class ProcessManager(threading.Thread):
         # use accumulated input size even when we use curren p and r value.
         # input size will be used only for getting alpha, accumulated size is
         # good enough
-        return p_dict_cur, r_dict_cur, total_size_dict_in, system_block_per_sec_cur, system_out_mbps_cur, system_out_throughput_measured, system_in_throughput_measured
-        #return p_dict, r_dict, total_size_dict_in, system_block_per_sec, system_out_mbps, system_out_throughput_measured
+        return p_dict, r_dict, p_dict_cur, r_dict_cur, total_p, total_r, total_p_cur, total_r_cur, total_size_dict_in, system_block_per_sec_cur, system_out_mbps_cur, system_out_throughput_measured, system_in_throughput_measured
 
     def get_network_speed(self):
         if self.migration_dest.startswith("network"):
@@ -304,7 +311,6 @@ class ProcessManager(threading.Thread):
         count = 0
         self.cpu_statistics = list()
         while (not self.stop.wait(0.1)):
-            continue
             try:
                 network_bw_mbps = self.get_network_speed()  # mega bit/s
                 system_speed = self.get_system_speed()
@@ -326,25 +332,32 @@ class ProcessManager(threading.Thread):
                     average_cur_system_out = sum(self.cur_system_out_throughput_measured[-10:])/10
 
 
-                p_dict, r_dict, total_size_dict_in, system_block_per_sec, system_out_mbps, system_out_bw_measured, system_in_bw_measured = system_speed
-                msg = "throughput\t%f\tsystem:%f(mbps),%f(block/sec)\tnetwork(mbps):%f\tmeasured:%f,%f\tcur:%f,%f" % (time_current_iter,
-                                                                                                             system_out_mbps,
-                                                                                                             system_block_per_sec,
-                                                                                                             network_bw_mbps,
-                                                                                                             system_in_bw_measured,
-                                                                                                             system_out_bw_measured,
-                                                                                                           average_cur_system_in,
-                                                                                                           average_cur_system_out)
+                p_dict, r_dict, p_dict_cur, r_dict_cur, total_p, total_r, total_p_cur, total_r_cur, total_size_dict_in, system_block_per_sec, system_out_mbps, system_out_bw_measured, system_in_bw_measured = system_speed
+                #msg = "throughput\t%f\tsystem:%f(mbps),%f(block/sec)\tnetwork(mbps):%f\tmeasured:%f,%f\tcur:%f,%f" % (time_current_iter,
+                #                                                                                             system_out_mbps,
+                #                                                                                             system_block_per_sec,
+                #                                                                                             network_bw_mbps,
+                #                                                                                             system_in_bw_measured,
+                #                                                                                             system_out_bw_measured,
+                #                                                                                           average_cur_system_in,
+                msg = "adaptation\t%f,%f\t%f\t%f\t%f\t%f" % (time_current_iter, (time_current_iter-self.time_start), total_p, total_r, total_p_cur, total_r_cur)
                 LOG.debug(msg)
+
+
+
+                continue
+
+
+
 
                 # first predict at 2 seconds and then for every 5 seconds
                 if time_from_start > 2 and (time_current_iter - time_prev_mode_change) > 5:
                     # use current throughput
                     LOG.debug("adaptation\t%f\tUpdate mode to change bw from %f to %f" % (time_from_start, system_out_mbps, network_bw_mbps))
-                    LOG.debug("adaptation\t%f\tcurrect p: %s" % (time_from_start, p_dict))
-                    LOG.debug("adaptation\t%f\tcurrect r: %s" % (time_from_start, r_dict))
+                    LOG.debug("adaptation\t%f\tcurrect p: %s" % (time_from_start, p_dict_cur))
+                    LOG.debug("adaptation\t%f\tcurrect r: %s" % (time_from_start, r_dict_cur))
                     item = self.mode_profile.predict_new_mode(self.overlay_creation_mode,
-                                                              p_dict, r_dict, total_size_dict_in,
+                                                              p_dict_cur, r_dict_cur, total_size_dict_in,
                                                               network_bw_mbps)
                     diff_mode = None
                     if item is not None:
@@ -394,10 +407,6 @@ class ProcessManager(threading.Thread):
                         LOG.debug("adaptation\t%f\tMode change %s" % (time_from_start, diff_str))
                     else:
                         LOG.debug("adaptation\t%f\tcurrent mode is the best" % time_from_start)
-                '''
-                '''
-
-                pass
                 #result = self._get_cpu_usage()
                 #self.cpu_statistics.append((time.time()-time_start, result))
                 #time.sleep(1)

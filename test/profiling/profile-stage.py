@@ -31,9 +31,6 @@ class ProfilingError(Exception):
 
 
 def run_profile(base_path, overlay_path, overlay_mode):
-    LOG.debug("==========================================")
-    LOG.debug(overlay_path)
-
     try:
         synthesis.synthesis(base_path, overlay_path,
                             return_residue="file",
@@ -137,9 +134,9 @@ if __name__ == "__main__":
     speech = "/home/krha/cloudlet/image/overlay/vmhandoff/speech-overlay.zip"
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     workloads = [
-        (windows_base_path, mar),
+        (linux_base_path, moped),
+        #(windows_base_path, mar),
         #(linux_base_path, speech),
-        #(linux_base_path, moped),
         #(windows_base_path, face),
         #(linux_base_path, fluid),
     ]

@@ -1685,6 +1685,9 @@ def synthesis(base_disk, overlay_path, **kwargs):
     if os.path.exists(base_disk) == False:
         msg = "Base disk does not exist at %s" % base_disk
         raise CloudletGenerationError(msg)
+    LOG.debug("==========================================")
+    LOG.debug(overlay_path)
+
 
     disk_only = kwargs.get('disk_only', False)
     zip_container = kwargs.get('zip_container', False)

@@ -44,21 +44,18 @@ class MigrationMode(object):
         return "%s(%s)" % (self.workload, self.get_mode_id())
 
     @staticmethod
-    def get_total_P(p_dict):
+    def get_total_P(p_dict, alpha):
         # get total P considering input data
         # should not weight using alpha
-        total_P_from_each_stage = p_dict['CreateMemoryDeltalist']+\
-            p_dict['CreateDiskDeltalist'] +\
+        total_P_from_each_stage = (p_dict['CreateMemoryDeltalist']*alpha +\
+                                   p_dict['CreateDiskDeltalist']*(1-alpha)) +\
             p_dict['DeltaDedup'] +\
             p_dict['CompressProc']
         return total_P_from_each_stage
 
     @staticmethod
-    def get_total_R(r_dict, indata_size_dict):
+    def get_total_R(r_dict, alpha):
         # weight using input size
-        memory_in_size = (indata_size_dict['CreateMemoryDeltalist'])
-        disk_in_size = (indata_size_dict['CreateDiskDeltalist'])
-        alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
         total_R_from_each_stage = (r_dict['CreateMemoryDeltalist']*alpha +\
                                    r_dict['CreateDiskDeltalist']*(1-alpha))\
                                 * r_dict['DeltaDedup']\
@@ -132,8 +129,12 @@ class MigrationMode(object):
         exp.block_size_out = json.loads(fd.readline())
         exp.block_size_ratio = json.loads(fd.readline())
         exp.block_time = json.loads(fd.readline())
-        exp.total_p = MigrationMode.get_total_P(exp.block_time)
-        exp.total_r = MigrationMode.get_total_R(exp.block_size_ratio, exp.block_size_in)
+
+        memory_in_size = (exp.block_size_in['CreateMemoryDeltalist'])
+        disk_in_size = (exp.block_size_in['CreateDiskDeltalist'])
+        alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
+        exp.total_p = MigrationMode.get_total_P(exp.block_time, alpha)
+        exp.total_r = MigrationMode.get_total_R(exp.block_size_ratio, alpha)
         return exp
 
 
@@ -177,8 +178,12 @@ class ModeProfile(object):
         # get scaling factor between current workload and profiled data
         profiled_mode_total_p = profiled_mode_obj.total_p
         profiled_mode_total_r = profiled_mode_obj.total_r
-        cur_total_p = profiled_mode_obj.get_total_P(cur_p)
-        cur_total_r = profiled_mode_obj.get_total_R(cur_r, cur_block_size)
+
+        memory_in_size = (cur_block_size['CreateMemoryDeltalist'])
+        disk_in_size = (cur_block_size['CreateDiskDeltalist'])
+        alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
+        cur_total_p = profiled_mode_obj.get_total_P(cur_p, alpha)
+        cur_total_r = profiled_mode_obj.get_total_R(cur_r, alpha)
         scale_p = cur_total_p/profiled_mode_total_p
         scale_r = cur_total_r/profiled_mode_total_r
 
