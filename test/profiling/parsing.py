@@ -155,9 +155,7 @@ def parse_each_experiement(lines):
         if profile_type == "block-time":
             duration = round(float(log[-1])*1000, 6)
             exp.block_time[stage_name] = duration
-    return exp
-
-
+    return exp 
 def parsing(inputfile):
     lines = open(inputfile, "r").read().split("\n")
     test_list = list()
@@ -184,6 +182,8 @@ def _split_experiment(test_ret_list):
     fluid_exps = list()
     face_exps = list()
     mar_exps = list()
+    random_exps = list()
+    delta_exps = list()
     for each_exp in test_ret_list:
         if each_exp.workload.find("moped") !=  -1:
             moped_exps.append(each_exp)
@@ -195,6 +195,10 @@ def _split_experiment(test_ret_list):
             mar_exps.append(each_exp)
         elif each_exp.workload.find("speech") !=  -1:
             speech_exps.append(each_exp)
+        elif each_exp.workload.find("random") !=  -1:
+            random_exps.append(each_exp)
+        elif each_exp.workload.find("delta") !=  -1:
+            delta_exps.append(each_exp)
         else:
             msg = "Invalid workload %s" % each_exp['workload']
             print msg
@@ -205,7 +209,7 @@ def _split_experiment(test_ret_list):
     #    print msg
     #    sys.exit(1)
     #    raise ProfilingError(msg)
-    return moped_exps, speech_exps, fluid_exps, face_exps, mar_exps
+    return moped_exps, speech_exps, fluid_exps, face_exps, mar_exps, random_exps, delta_exps
 
 def multikeysort(items, columns):
     comparers = [ ((itemgetter(col[1:].strip()), -1) if col.startswith('-') else (itemgetter(col.strip()), 1)) for col in columns]  
@@ -327,14 +331,29 @@ def print_p_r_over_time(exp):
             adaptation_log_lines.append(log)
 
     migration_start_time = 0
+    iteration_time_list = list()
+    p_and_r_list = list()
     for line in adaptation_log_lines:
         if line.startswith("start time"):
             migration_start_time = float(line.split(":")[-1])
+        elif line.startswith("new iteration"):
+            iter_time, iter_seq_old, iter_seq_new, iter_mem_size = line.split("\t")[1:]
+            iteration_time_list.append((iter_seq_old, iter_time))
         else:
             data_point_time, total_p, total_r, total_p_cur, total_r_cur = line.split("\t")
             time_measured, duration_measured = data_point_time.split(",")
-            print "%s\t%s\t%s\t%s\t%s" % (duration_measured, total_p, total_r, total_p_cur, total_r_cur)
+            p_and_r_list.append((duration_measured, total_p, total_p_cur, total_r, total_r_cur))
 
+    # print result
+    print "iter #\tduration\ttime"
+    for index, (iter_seq_old, iter_time) in enumerate(iteration_time_list):
+        print "%s\t%f\t%s" % (iter_seq_old, (float(iter_time)-float(migration_start_time)), iter_time)
+    print "\n\n"
+
+    print "duration\ttotal_p\ttotal_r\tcur_p\tcur_r"
+    for values in p_and_r_list:
+        (duration_measured, total_p, total_p_cur, total_r, total_r_cur) = values
+        print "%s\t%s\t%s\t%s\t%s" % (duration_measured, total_p, total_p_cur, total_r, total_r_cur)
 
 
 if __name__ == "__main__":
@@ -347,7 +366,7 @@ if __name__ == "__main__":
 
     if command == "profiling":
         test_ret_list = parsing(inputfile)
-        moped_exps, speech_exps, fluid_exps, face_exps, mar_exps = _split_experiment(test_ret_list)
+        moped_exps, speech_exps, fluid_exps, face_exps, mar_exps, random_exps, delta_exps = _split_experiment(test_ret_list)
         #print_bw(face_exps)
         print_bw_block(moped_exps)
     elif command == "over-time":

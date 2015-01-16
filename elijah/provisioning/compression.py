@@ -155,11 +155,11 @@ class CompressProc(process_manager.ProcWorker):
                         self.monitor_total_time_block_cur.value = total_process_time_block_cur/valid_child_proc
                         self.monitor_total_ratio_block_cur.value = total_ratio_block_cur/valid_child_proc
                         #print "[comp] P: %f (%f)\tR: %f (%f)" % (self.monitor_total_time_block.value, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block.value, self.monitor_total_ratio_block_cur.value)
-                    self.monitor_total_input_size.value = total_input_size
-                    self.monitor_total_output_size.value = total_output_size
-                    self.monitor_total_input_size_cur.value = total_input_size_cur
-                    self.monitor_total_output_size_cur.value = total_output_size_cur
-                    #print "[compression] total input size: %d, total_output size: %d" % (self.monitor_total_input_size.value, self.monitor_total_output_size.value)
+                        self.monitor_total_input_size.value = total_input_size
+                        self.monitor_total_output_size.value = total_output_size
+                        self.monitor_total_input_size_cur.value = total_input_size_cur
+                        self.monitor_total_output_size_cur.value = total_output_size_cur
+                        #print "[compression] total input size: %d, total_output size: %d" % (self.monitor_total_input_size.value, self.monitor_total_output_size.value)
             self.finish_processing_input.value = True
 
             # send end meesage to every process
@@ -373,6 +373,10 @@ class CompChildProc(multiprocessing.Process):
             msg = "Empty new compression mode that does not refelected"
             sys.stdout.write(msg)
 
+        # to be deleted
+        import json
+        open("pr-history-comp", "w").write(json.dumps(self.measure_history))
+
     def averaged_value(self, cur_time):
         avg_p = float(0)
         avg_r = float(0)
@@ -383,7 +387,7 @@ class CompChildProc(multiprocessing.Process):
             avg_p += p
             avg_r += r
             counter += 1
-        self.measure_history = self.measure_history[-1*counter:]
+        #self.measure_history = self.measure_history[-1*(counter+1):]
         return avg_p/counter, avg_r/counter
 
 

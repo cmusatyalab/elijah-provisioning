@@ -133,8 +133,10 @@ if __name__ == "__main__":
     moped = "/home/krha/cloudlet/image/overlay/vmhandoff/moped-overlay.zip"
     speech = "/home/krha/cloudlet/image/overlay/vmhandoff/speech-overlay.zip"
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
+    random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
-        (linux_base_path, moped),
+        (linux_base_path, random),
+        #(linux_base_path, moped),
         #(windows_base_path, mar),
         #(linux_base_path, speech),
         #(windows_base_path, face),
@@ -155,8 +157,8 @@ if __name__ == "__main__":
     #mode_list = serial_vs_pipe()
 
     VMOverlayCreationMode.MAX_THREAD_NUM = 1
-    #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
-    VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
+    VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
+    #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
     for (base_path, overlay_path) in workloads:
         for each_mode in mode_list:
             is_url, overlay_url = PackagingUtil.is_zip_contained(overlay_path)

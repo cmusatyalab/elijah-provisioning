@@ -151,7 +151,7 @@ class Options(object):
 class VMOverlayCreationMode(object):
     PIPE_ONE_ELEMENT_SIZE = 4096*100 # 400KB == Max Pipe size is 1MB
     EMULATED_BANDWIDTH_Mbps = 100000 # Mbps
-    MEASURE_AVERAGE_TIME    = 1 # seconds
+    MEASURE_AVERAGE_TIME    = 2 # seconds
     MAX_THREAD_NUM = 4
 
     PROFILE_DATAPATH = os.path.abspath(os.path.join(Const.HOME_DIR, ".cloudlet/config/mode-profile"))
