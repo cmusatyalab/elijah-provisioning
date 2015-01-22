@@ -6,6 +6,7 @@ from pprint import pprint
 from collections import defaultdict
 from collections import OrderedDict
 from operator import itemgetter
+import matplotlib.pyplot as plt
 
 
 stage_names = ["CreateMemoryDeltalist", "CreateDiskDeltalist", "DeltaDedup", "CompressProc"]
@@ -33,14 +34,19 @@ class Experiment(object):
         memory_diff = self.stage_time['CreateDiskDeltalist']
         delta = self.stage_time['DeltaDedup']
         comp = self.stage_time['CompressProc']
-        total_processing_time = memory_diff+disk_diff+delta+comp # should not weight using alpha
+
+        # should not weight using alpha
+        # calculate using p of all stages --> use alpha
+        # calculate using time at all stage --> do not use alpha
+        total_processing_time = memory_diff+disk_diff+delta+comp 
         total_block = self.block['CreateDiskDeltalist'] + self.block['CreateMemoryDeltalist']
         total_p_block = float(total_processing_time) / total_block
         return total_p_block*1000
 
     def estimate_total_P(self):
-        # estimate processing time per block using block processing time of
-        # each stage
+        # estimate processing time per block using block processing time of each stage
+        # calculate using p of all stages --> use alpha
+        # calculate using time at all stage --> do not use alpha
         memory_in_size = self.stage_size_in['CreateMemoryDeltalist']
         disk_in_size = self.stage_size_in['CreateDiskDeltalist']
         alpha = float(memory_in_size)/(memory_in_size+disk_in_size)
@@ -156,6 +162,7 @@ def parse_each_experiement(lines):
             duration = round(float(log[-1])*1000, 6)
             exp.block_time[stage_name] = duration
     return exp 
+
 def parsing(inputfile):
     lines = open(inputfile, "r").read().split("\n")
     test_list = list()
@@ -318,7 +325,22 @@ def print_bw_block(exps):
                                                       float(duration)/float(est_duration),
                                                       bw, total_p, total_r)
 
-def print_p_r_over_time(exp):
+def averaged_value(measure_history, duration):
+    avg_p = float(0)
+    avg_r = float(0)
+    counter = 0
+    (cur_time, cur_p, cur_r) = measure_history[-1]
+    for (measured_time, p, r) in reversed(measure_history):
+        if cur_time - measured_time > duration:
+            break
+        avg_p += p
+        avg_r += r
+        counter += 1
+    #print "%f measure last %d/%d" % (cur_time, counter, len(measure_history))
+    return avg_p/counter, avg_r/counter
+
+
+def print_p_r_over_time(inputfile):
     lines = open(inputfile, "r").read().split("\n")
     adaptation_log_lines = list()
     for line in lines:
@@ -333,6 +355,12 @@ def print_p_r_over_time(exp):
     migration_start_time = 0
     iteration_time_list = list()
     p_and_r_list = list()
+    measure_history = list()
+    time_list = list()
+    p_list = list()
+    p_list_cur = list()
+    r_list = list()
+    r_list_cur = list()
     for line in adaptation_log_lines:
         if line.startswith("start time"):
             migration_start_time = float(line.split(":")[-1])
@@ -343,6 +371,23 @@ def print_p_r_over_time(exp):
             data_point_time, total_p, total_r, total_p_cur, total_r_cur = line.split("\t")
             time_measured, duration_measured = data_point_time.split(",")
             p_and_r_list.append((duration_measured, total_p, total_p_cur, total_r, total_r_cur))
+            measure_history.append((float(duration_measured), float(total_p_cur), float(total_r_cur)))
+            time_list.append(float(time_measured)-float(migration_start_time))
+            p_list.append(float(total_p))
+            p_list_cur.append(float(total_p_cur))
+            r_list.append(float(total_r))
+            r_list_cur.append(float(total_r_cur))
+
+    # averaged p and r over time window
+    p_list_avg1 = list()
+    p_list_avg2 = list()
+    r_list_avg1 = list()
+    r_list_avg2 = list()
+    for index, (duration_measured, total_p_cur, total_r_cur) in enumerate(measure_history):
+        avg_p1, avg_r1 = averaged_value(measure_history[0:index+1], 1)
+        avg_p2, avg_r2 = averaged_value(measure_history[0:index+1], 5)
+        p_list_avg1.append(avg_p1)
+        p_list_avg2.append(avg_p2)
 
     # print result
     print "iter #\tduration\ttime"
@@ -354,6 +399,17 @@ def print_p_r_over_time(exp):
     for values in p_and_r_list:
         (duration_measured, total_p, total_p_cur, total_r, total_r_cur) = values
         print "%s\t%s\t%s\t%s\t%s" % (duration_measured, total_p, total_p_cur, total_r, total_r_cur)
+
+    # plot
+    f, (p_plot, r_plot)= plt.subplots(2, 1, sharex=True)
+    p_plot.set_title("P - " + inputfile)
+    r_plot.set_title("R - " + inputfile)
+    p_plot.set_ylim([0, 1])
+    r_plot.set_ylim([0, 1])
+    p_plot.plot(time_list, p_list, 'r-', time_list, p_list_cur, 'b-')
+    r_plot.plot(time_list, r_list, 'r-', time_list, r_list_cur, 'b-')
+    #plt.show()
+    plt.savefig(inputfile+ '.png')
 
 
 if __name__ == "__main__":

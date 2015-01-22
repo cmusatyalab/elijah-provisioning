@@ -45,8 +45,8 @@ class MigrationMode(object):
 
     @staticmethod
     def get_total_P(p_dict, alpha):
-        # get total P considering input data
-        # should not weight using alpha
+        # calculate using p of all stages --> use alpha
+        # calculate using time at all stage --> do not use alpha
         total_P_from_each_stage = (p_dict['CreateMemoryDeltalist']*alpha +\
                                    p_dict['CreateDiskDeltalist']*(1-alpha)) +\
             p_dict['DeltaDedup'] +\

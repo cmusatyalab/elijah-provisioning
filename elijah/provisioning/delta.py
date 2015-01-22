@@ -815,6 +815,7 @@ class DeltaDedup(process_manager.ProcWorker):
         self.in_size = 0
         self.total_block_count = 0
         self.out_size = 0
+        self.measure_history = list()
 
         try:
             time_start = time.time()
@@ -936,7 +937,9 @@ class DeltaDedup(process_manager.ProcWorker):
                         # zero. So, we just use average value for current value
                         self.monitor_total_time_block_cur.value = self.monitor_total_time_block.value
                         self.monitor_total_ratio_block_cur.value = self.monitor_total_ratio_block.value
-                        #print "[delta] P: %f (%f/%d %f)\tR: %f (%f)" % (self.monitor_total_time_block.value, total_process_time_cur, cur_block_count, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block.value, self.monitor_total_ratio_block_cur.value)
+
+                        cur_wall_time = time.time()
+                        self.measure_history.append((cur_wall_time, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block_cur.value))
             self.is_processing_alive.value = False
             self.finish_processing_input.value = True
             self.monitor_is_alive = False
@@ -970,9 +973,14 @@ class DeltaDedup(process_manager.ProcWorker):
                                                                 self.total_block_count))
             LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
                     (self.__class__.__name__, time_start, time_end, total_process_time/self.total_block_count))
+
         except Exception as e:
             LOG.error(str(e))
             LOG.error("failed at %s" % str(traceback.format_exc()))
+
+        # to be deleted
+        import json
+        open("pr-history-delta", "w").write(json.dumps(self.measure_history))
 
     @staticmethod
     def memory_import_hashdict(meta_path):

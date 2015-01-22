@@ -350,8 +350,9 @@ class CompChildProc(multiprocessing.Process):
 
                 cur_p = 1000.0*time_process_cur_time/child_cur_block_count
                 cur_r = outdata_size_cur/float(indata_size_cur)
-                self.measure_history.append((time_process_end, cur_p, cur_r))
-                cur_p_avg, cur_r_avg = self.averaged_value(time_process_end)
+                cur_wall_time = time.time()
+                self.measure_history.append((cur_wall_time, cur_p, cur_r))
+                cur_p_avg, cur_r_avg = self.averaged_value(cur_wall_time)
                 self.child_process_time_block_cur.value = cur_p_avg
                 self.child_ratio_block_cur.value = cur_r_avg
 
