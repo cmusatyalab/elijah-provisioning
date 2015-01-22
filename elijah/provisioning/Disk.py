@@ -710,8 +710,8 @@ class DiskDiffProc(multiprocessing.Process):
             sys.stdout.write(msg)
 
         # to be deleted
-        import json
-        open("pr-history-disk", "w").write(json.dumps(self.measure_history))
+        #import json
+        #open("pr-history-disk", "w").write(json.dumps(self.measure_history))
 
     def averaged_value(self, cur_time):
         avg_p = float(0)
