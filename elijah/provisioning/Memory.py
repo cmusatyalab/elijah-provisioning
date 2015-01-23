@@ -693,14 +693,14 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
             if valid_child_proc > 0:
                 self.monitor_total_time_block.value = total_process_time/total_block_count
-                self.monitor_total_ratio_block.value = total_input_size/total_output_size
+                self.monitor_total_ratio_block.value = float(total_output_size)/total_input_size
                 self.monitor_total_input_size.value = total_input_size + header_in_size
                 self.monitor_total_output_size.value = total_output_size + header_out_size
                 self.monitor_total_input_size_cur.value = total_input_size_cur
                 self.monitor_total_output_size_cur.value = total_output_size_cur
 
                 cur_p = total_process_time_cur/total_block_count_cur
-                cur_r = total_input_size_cur/total_output_size_cur
+                cur_r = float(total_output_size_cur)/float(total_input_size_cur)
                 cur_wall_time = time.time()
                 self.measure_history.append((cur_wall_time, cur_p, cur_r))
                 avg_cur_p, avg_cur_r = self.averaged_value(self.measure_history, cur_wall_time)
@@ -769,6 +769,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         # to be deleted
         #import json
         #open("pr-history-memory", "w").write(json.dumps(self.measure_history))
+
         return freed_page_counter
 
 

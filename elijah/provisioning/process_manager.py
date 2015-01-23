@@ -231,10 +231,10 @@ class ProcessManager(threading.Thread):
         total_p_cur = MigrationMode.get_total_P(p_dict_cur, alpha_cur)
         total_r_cur = MigrationMode.get_total_R(r_dict_cur, alpha_cur)
         num_cores = VMOverlayCreationMode.get_num_cores()
-        system_block_per_sec, system_in_mbps, system_out_mbps = MigrationMode.get_system_throughput(num_cores,
+        system_block_per_sec, system_in_bw_est, system_out_bw_est = MigrationMode.get_system_throughput(num_cores,
                                                                                                     total_p,
                                                                                                     total_r)
-        system_block_per_sec_cur, system_in_mbps_cur, system_out_mbps_cur = MigrationMode.get_system_throughput(num_cores,
+        system_block_per_sec_cur, system_in_bw_cur_est, system_out_bw_cur_est = MigrationMode.get_system_throughput(num_cores,
                                                                      total_p_cur,
                                                                      total_r_cur)
         #sys.stdout.write("P: %f, %f \tR:%f, %f, BW: %f, %f mbps\t(%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f)\n" % \
@@ -260,26 +260,29 @@ class ProcessManager(threading.Thread):
         #                  ))
 
         # get actual system throughput using in out size
-        comp_in_size = total_size_dict_in['CompressProc']
-        comp_out_size = total_size_dict_out['CompressProc']
-        system_output_size = comp_out_size
+        system_output_size = total_size_dict_out['CompressProc']
         system_in_size = total_size_dict_in['CreateDiskDeltalist'] + total_size_dict_in['CreateMemoryDeltalist']
         cur_time = time.time()
-        system_out_throughput_measured = 8.0*system_output_size/(cur_time-self.time_start)/1024/1024
-        system_in_throughput_measured = 8.0*system_in_size/(cur_time-self.time_start)/1024/1024
+        duration = cur_time - self.prev_measured_time
+        if duration > 1:
+            system_out_bw_instant = 8.0*(system_output_size-self.prev_system_out_size)/duration/1024/1024
+            system_in_bw_instant = 8.0*(system_in_size-self.prev_system_in_size)/duration/1024/1024
+            self.cur_system_out_bw_list.append(system_out_bw_instant)
+            self.cur_system_in_bw_list.append(system_in_bw_instant)
 
-        if cur_time - self.prev_measured_time > 1:
-            self.cur_system_out_throughput_measured.append(8.0*(system_output_size-self.prev_system_out_size)/(cur_time-self.prev_measured_time)/1024/1024)
-            self.cur_system_in_throughput_measured.append(8.0*(system_in_size-self.prev_system_in_size)/(cur_time-self.prev_measured_time)/1024/1024)
             self.prev_system_out_size = system_output_size
             self.prev_system_in_size = system_in_size
             self.prev_measured_time = cur_time
+        #averaging 10 data points (10 seconds)
+        datapoints = -10
+        system_out_bw_actual = float(sum(self.cur_system_out_bw_list[datapoints:]))/len(self.cur_system_out_bw_list[datapoints:])
+        system_in_bw_actual= float(sum(self.cur_system_in_bw_list[datapoints:]))/len(self.cur_system_in_bw_list[datapoints:])
 
-
-        # use accumulated input size even when we use curren p and r value.
-        # input size will be used only for getting alpha, accumulated size is
-        # good enough
-        return p_dict, r_dict, p_dict_cur, r_dict_cur, total_p, total_r, total_p_cur, total_r_cur, total_size_dict_in, system_block_per_sec_cur, system_out_mbps_cur, system_out_throughput_measured, system_in_throughput_measured
+        return p_dict, r_dict, p_dict_cur, r_dict_cur, \
+            total_p, total_r, total_p_cur, total_r_cur, \
+            total_size_dict_in, system_block_per_sec_cur, \
+            system_out_bw_cur_est, system_in_bw_cur_est, \
+            system_out_bw_actual, system_in_bw_actual
 
     def get_network_speed(self):
         if self.migration_dest.startswith("network"):
@@ -301,8 +304,8 @@ class ProcessManager(threading.Thread):
         self.prev_system_out_size = 0
         self.prev_system_in_size = 0
         self.prev_measured_time = self.time_start
-        self.cur_system_in_throughput_measured = list()
-        self.cur_system_out_throughput_measured = list()
+        self.cur_system_in_bw_list = list()
+        self.cur_system_out_bw_list = list()
         LOG.debug("adaptation start time: %f" % self.time_start)
         time_first_measurement = 0
         measured_throughput = 0
@@ -311,7 +314,6 @@ class ProcessManager(threading.Thread):
         count = 0
         self.cpu_statistics = list()
         while (not self.stop.wait(0.1)):
-            continue
             try:
                 network_bw_mbps = self.get_network_speed()  # mega bit/s
                 system_speed = self.get_system_speed()
@@ -325,15 +327,13 @@ class ProcessManager(threading.Thread):
                 if time_first_measurement == 0:
                     time_first_measurement = time.time()
                 time_from_start = time_current_iter-time_first_measurement
-                if len(self.cur_system_in_throughput_measured) < 10:
-                    average_cur_system_in = sum(self.cur_system_in_throughput_measured)/len(self.cur_system_in_throughput_measured)
-                    average_cur_system_out = sum(self.cur_system_out_throughput_measured)/len(self.cur_system_out_throughput_measured)
-                else:
-                    average_cur_system_in = sum(self.cur_system_in_throughput_measured[-10:])/10
-                    average_cur_system_out = sum(self.cur_system_out_throughput_measured[-10:])/10
 
 
-                p_dict, r_dict, p_dict_cur, r_dict_cur, total_p, total_r, total_p_cur, total_r_cur, total_size_dict_in, system_block_per_sec, system_out_mbps, system_out_bw_measured, system_in_bw_measured = system_speed
+                p_dict, r_dict, p_dict_cur, r_dict_cur,\
+                    total_p, total_r, total_p_cur, total_r_cur,\
+                    total_size_dict_in, system_block_per_sec,\
+                    system_out_bw_cur_est, system_in_bw_cur_est,\
+                    system_out_bw_actual, system_in_bw_actual = system_speed
                 #msg = "throughput\t%f\tsystem:%f(mbps),%f(block/sec)\tnetwork(mbps):%f\tmeasured:%f,%f\tcur:%f,%f" % (time_current_iter,
                 #                                                                                             system_out_mbps,
                 #                                                                                             system_block_per_sec,
@@ -341,7 +341,15 @@ class ProcessManager(threading.Thread):
                 #                                                                                             system_in_bw_measured,
                 #                                                                                             system_out_bw_measured,
                 #                                                                                           average_cur_system_in,
-                msg = "adaptation\t%f,%f\t%f\t%f\t%f\t%f" % (time_current_iter, (time_current_iter-self.time_start), total_p, total_r, total_p_cur, total_r_cur)
+                msg = "adaptation\t%f\t%0.2f\t%0.2f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f" % \
+                    (time_current_iter,
+                     (time_current_iter-self.time_start),
+                     network_bw_mbps,
+                     system_out_bw_actual,
+                     system_in_bw_actual,
+                     total_p, total_r,
+                     total_p_cur, total_r_cur)
+
                 LOG.debug(msg)
 
 

@@ -151,8 +151,8 @@ class CompressProc(process_manager.ProcWorker):
                         block_count = proc.child_process_block_total.value
 
                         input_size = proc.child_input_size_total.value
-                        output_size = proc.child_output_size_total.value
                         input_size_cur = proc.child_input_size_cur.value
+                        output_size = proc.child_output_size_total.value
                         output_size_cur = proc.child_output_size_cur.value
 
                         # averaging
@@ -164,20 +164,21 @@ class CompressProc(process_manager.ProcWorker):
                             total_block_count += block_count
 
                             total_input_size += input_size
-                            total_input_size_cur += input_size_cur
                             total_output_size += output_size
+                            total_input_size_cur += input_size_cur
                             total_output_size_cur += output_size_cur
 
                     if valid_child_proc > 0:
                         self.monitor_total_time_block.value = total_process_time/total_block_count
-                        self.monitor_total_ratio_block.value = total_input_size/total_output_size
+                        self.monitor_total_ratio_block.value = float(total_output_size)/total_input_size
                         self.monitor_total_input_size.value = total_input_size
                         self.monitor_total_output_size.value = total_output_size
                         self.monitor_total_input_size_cur.value = total_input_size_cur
                         self.monitor_total_output_size_cur.value = total_output_size_cur
 
                         cur_p = total_process_time_cur/total_block_count_cur
-                        cur_r = total_input_size_cur/total_output_size_cur
+                        cur_r = float(total_output_size_cur)/float(total_input_size_cur)
+
                         cur_wall_time = time.time()
                         self.measure_history.append((cur_wall_time, cur_p, cur_r))
                         avg_cur_p, avg_cur_r = self.averaged_value(self.measure_history, cur_wall_time)
@@ -185,6 +186,10 @@ class CompressProc(process_manager.ProcWorker):
                         self.monitor_total_ratio_block_cur.value = avg_cur_r
 
             self.finish_processing_input.value = True
+
+            # to be deleted
+            #import json
+            #open("pr-history-comp", "w").write(json.dumps(self.measure_history))
 
             # send end meesage to every process
             for index in self.proc_list:
@@ -249,7 +254,6 @@ class CompressProc(process_manager.ProcWorker):
             sys.stderr.write(traceback.format_exc())
 
 
-
 class CompChildProc(multiprocessing.Process):
     def __init__(self, command_queue, task_queue, mode_queue,
                  output_queue, comp_type, comp_level):
@@ -259,7 +263,6 @@ class CompChildProc(multiprocessing.Process):
         self.output_queue = output_queue
         self.comp_type = comp_type
         self.comp_level = comp_level
-        self.measure_history = list()
 
         # shared variables between processes
         self.child_process_time_cur = multiprocessing.RawValue(ctypes.c_double, 0)
@@ -382,23 +385,6 @@ class CompChildProc(multiprocessing.Process):
             self.mode_queue.get_nowait()
             msg = "Empty new compression mode that does not refelected"
             sys.stdout.write(msg)
-
-        # to be deleted
-        #import json
-        #open("pr-history-comp", "w").write(json.dumps(self.measure_history))
-
-    def averaged_value(self, cur_time):
-        avg_p = float(0)
-        avg_r = float(0)
-        counter = 0
-        for (measured_time, p, r) in reversed(self.measure_history):
-            if cur_time - measured_time > VMOverlayCreationMode.MEASURE_AVERAGE_TIME:
-                break
-            avg_p += p
-            avg_r += r
-            counter += 1
-        #self.measure_history = self.measure_history[-1*(counter+1):]
-        return avg_p/counter, avg_r/counter
 
 
 class DecompProc(multiprocessing.Process):

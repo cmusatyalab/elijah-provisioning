@@ -735,8 +735,8 @@ def create_residue(base_disk, base_hashvalue,
         #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
 
         # multi-processing
-        NUM_CPU_CORES = 4   # set CPU affinity
-        VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
+        NUM_CPU_CORES = 1   # set CPU affinity
+        VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
 
         overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_BZIP2
@@ -824,7 +824,6 @@ def create_residue(base_disk, base_hashvalue,
     time_dedup = time.time()
     if overlay_mode.PROCESS_PIPELINED == False:
         _waiting_to_finish(process_controller, "CompressProc")
-
 
     time_packaging_start = time.time()
     if migration_addr.startswith("network"):
