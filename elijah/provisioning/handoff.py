@@ -735,7 +735,7 @@ def create_residue(base_disk, base_hashvalue,
         #overlay_mode = VMOverlayCreationMode.get_serial_single_process()
 
         # multi-processing
-        NUM_CPU_CORES = 1   # set CPU affinity
+        NUM_CPU_CORES = 4   # set CPU affinity
         VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
 

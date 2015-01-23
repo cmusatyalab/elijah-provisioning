@@ -135,8 +135,8 @@ if __name__ == "__main__":
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
-        (linux_base_path, random),
-        #(linux_base_path, moped),
+        (linux_base_path, moped),
+        #(linux_base_path, random),
         #(windows_base_path, mar),
         #(linux_base_path, speech),
         #(windows_base_path, face),

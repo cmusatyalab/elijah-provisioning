@@ -328,10 +328,26 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             if proc.is_alive() == True:
                 m_queue.put(("new_mode", new_mode))
 
+    @staticmethod
+    def averaged_value(measure_hist, cur_time):
+        avg_p = float(0)
+        avg_r = float(0)
+        counter = 0
+        for (measured_time, p, r) in reversed(measure_hist):
+            if cur_time - measured_time > VMOverlayCreationMode.MEASURE_AVERAGE_TIME:
+                break
+            avg_p += p
+            avg_r += r
+            counter += 1
+        #self.measure_history = self.measure_history[-1*(counter+1):]
+        #LOG.debug("%f measure last %d/%d" % (time.time(), counter, len(self.measure_history)))
+        return avg_p/counter, avg_r/counter
+
     def create_disk_deltalist(self):
         time_start = time.time()
         self.total_block = 0
         self.total_time = float(0)
+        self.measure_history = list()
         is_first_recv = False
         time_first_recv = 0
         time_process_start = 0
@@ -409,45 +425,52 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                         task_queue.put(modified_chunk_list)
                         modified_chunk_list = []
 
-                        total_process_time_block = 0
-                        total_ratio_block = 0
-                        total_process_time_block_cur = 0
-                        total_ratio_block_cur = 0
+                        total_process_time_cur = 0
+                        total_process_time = 0
+                        total_block_count_cur = 0
+                        total_block_count = 0
                         total_input_size = 0
-                        total_output_size = 0
                         total_input_size_cur = 0
+                        total_output_size = 0
                         total_output_size_cur = 0
                         valid_child_proc = 0
                         for (proc, c_queue, mode_queue) in self.proc_list:
-                            process_time_block = proc.child_process_time_block.value
-                            ratio_block = proc.child_ratio_block.value
-                            process_time_block_cur = proc.child_process_time_block_cur.value
-                            ratio_block_cur = proc.child_ratio_block_cur.value
-                            input_size = proc.child_input_size.value
-                            output_size = proc.child_output_size.value
+                            process_time_cur = proc.child_process_time_cur.value
+                            process_time = proc.child_process_time_total.value
+                            block_count_cur = proc.child_process_block_cur.value
+                            block_count = proc.child_process_block_total.value
+
+                            input_size = proc.child_input_size_total.value
+                            output_size = proc.child_output_size_total.value
                             input_size_cur = proc.child_input_size_cur.value
                             output_size_cur = proc.child_output_size_cur.value
-                            if (process_time_block > 0) and (ratio_block > 0):
+                            if (block_count_cur> 0):
                                 valid_child_proc += 1
-                                total_process_time_block += process_time_block
-                                total_ratio_block += ratio_block
-                                total_process_time_block_cur += process_time_block_cur
-                                total_ratio_block_cur += ratio_block_cur
+                                total_process_time_cur += process_time_cur
+                                total_process_time += process_time
+                                total_block_count_cur += block_count_cur
+                                total_block_count += block_count
+
                                 total_input_size += input_size
-                                total_output_size += output_size
                                 total_input_size_cur += input_size_cur
+                                total_output_size += output_size
                                 total_output_size_cur += output_size_cur
+
                         if valid_child_proc > 0:
-                            self.monitor_total_time_block.value = total_process_time_block/valid_child_proc
-                            self.monitor_total_ratio_block.value = total_ratio_block/valid_child_proc
-                            self.monitor_total_time_block_cur.value = total_process_time_block_cur/valid_child_proc
-                            self.monitor_total_ratio_block_cur.value = total_ratio_block_cur/valid_child_proc
-                            #print "[disk] P: %f (%f)\tR: %f (%f)" % (self.monitor_total_time_block.value, self.monitor_total_time_block_cur.value, self.monitor_total_ratio_block.value, self.monitor_total_ratio_block_cur.value)
+                            self.monitor_total_time_block.value = total_process_time/total_block_count
+                            self.monitor_total_ratio_block.value = total_input_size/total_output_size
                             self.monitor_total_input_size.value = total_input_size
                             self.monitor_total_output_size.value = total_output_size
                             self.monitor_total_input_size_cur.value = total_input_size_cur
                             self.monitor_total_output_size_cur.value = total_output_size_cur
-                            #print "[disk] total input size: %d, total_output size: %d" % (self.monitor_total_input_size.value, self.monitor_total_output_size.value)
+
+                            cur_p = total_process_time_cur/total_block_count_cur
+                            cur_r = total_input_size_cur/total_output_size_cur
+                            cur_wall_time = time.time()
+                            self.measure_history.append((cur_wall_time, cur_p, cur_r))
+                            avg_cur_p, avg_cur_r = self.averaged_value(self.measure_history, cur_wall_time)
+                            self.monitor_total_time_block_cur.value = avg_cur_p
+                            self.monitor_total_ratio_block_cur.value = avg_cur_r
 
             self.finish_processing_input.value = True
 
@@ -580,17 +603,17 @@ class DiskDiffProc(multiprocessing.Process):
         self.basedisk_path = basedisk_path
         self.modified_disk = modified_disk
         self.chunk_size = chunk_size
-        self.measure_history = list()
 
         # shared variables between processes
-        self.child_process_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
-        self.child_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
-        self.child_process_time_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
-        self.child_ratio_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
-        self.child_input_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
-        self.child_output_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
+        self.child_process_time_cur = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_process_time_total = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_process_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
+        self.child_process_block_total = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_input_size_cur = multiprocessing.RawValue(ctypes.c_ulong, 0)
+        self.child_input_size_total = multiprocessing.RawValue(ctypes.c_ulong, 0)
         self.child_output_size_cur = multiprocessing.RawValue(ctypes.c_ulong, 0)
+        self.child_output_size_total = multiprocessing.RawValue(ctypes.c_ulong, 0)
+
 
         super(DiskDiffProc, self).__init__(target=self.process_diff)
 
@@ -681,28 +704,18 @@ class DiskDiffProc(multiprocessing.Process):
                 time_process_total_time += time_process_cur_time
                 indata_size += indata_size_cur
                 outdata_size += outdata_size_cur
-                self.child_input_size.value = indata_size
-                self.child_output_size.value = outdata_size
                 self.child_input_size_cur.value = indata_size_cur
+                self.child_input_size_total.value = indata_size
                 self.child_output_size_cur.value = outdata_size_cur
+                self.child_output_size_total.value = outdata_size
                 if child_cur_block_count > 0:
-                    self.child_process_time_block.value = 1000.0*time_process_total_time/child_total_block
-                    self.child_ratio_block.value = outdata_size/float(indata_size)
-
-                    cur_p = 1000.0*time_process_cur_time/child_cur_block_count
-                    cur_r = outdata_size_cur/float(indata_size_cur)
-                    cur_wall_time = time.time()
-                    self.measure_history.append((cur_wall_time, cur_p, cur_r))
-                    cur_p_avg, cur_r_avg = self.averaged_value(cur_wall_time)
-                    self.child_process_time_block_cur.value = cur_p_avg
-                    self.child_ratio_block_cur.value = cur_r_avg
+                    self.child_process_time_cur.value = 1000.0*time_process_cur_time
+                    self.child_process_time_total.value = 1000.0*time_process_total_time
+                    self.child_process_block_cur.value = child_cur_block_count
+                    self.child_process_block_total.value = child_total_block
 
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Disk][Child] Child finished. process %d jobs (%f)" % (child_total_block, time_process_total_time))
-        self.child_process_time_block.value = 0
-        self.child_ratio_block.value = 0
-        self.child_process_time_block_cur.value = 0
-        self.child_ratio_block_cur.value = 0
         self.command_queue.put((indata_size, outdata_size, child_total_block, time_process_total_time))
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()
@@ -712,19 +725,6 @@ class DiskDiffProc(multiprocessing.Process):
         # to be deleted
         #import json
         #open("pr-history-disk", "w").write(json.dumps(self.measure_history))
-
-    def averaged_value(self, cur_time):
-        avg_p = float(0)
-        avg_r = float(0)
-        counter = 0
-        for (measured_time, p, r) in reversed(self.measure_history):
-            if cur_time - measured_time > VMOverlayCreationMode.MEASURE_AVERAGE_TIME:
-                break
-            avg_p += p
-            avg_r += r
-            counter += 1
-        #self.measure_history = self.measure_history[-1*(counter+1):]
-        return avg_p/counter, avg_r/counter
 
 
 if __name__ == "__main__":
