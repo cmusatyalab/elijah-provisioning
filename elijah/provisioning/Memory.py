@@ -692,8 +692,10 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     total_output_size_cur += output_size_cur
 
             if valid_child_proc > 0:
-                self.monitor_total_time_block.value = total_process_time/total_block_count
-                self.monitor_total_ratio_block.value = float(total_output_size)/total_input_size
+                if total_block_count is not 0:
+                    self.monitor_total_time_block.value = total_process_time/total_block_count
+                if total_input_size is not 0:
+                    self.monitor_total_ratio_block.value = float(total_output_size)/total_input_size
                 self.monitor_total_input_size.value = total_input_size + header_in_size
                 self.monitor_total_output_size.value = total_output_size + header_out_size
                 self.monitor_total_input_size_cur.value = total_input_size_cur
@@ -1066,11 +1068,12 @@ class MemoryDiffProc(multiprocessing.Process):
                 time_process_total_time += time_process_cur_time
                 indata_size += indata_size_cur
                 outdata_size += outdata_size_cur
-                self.child_input_size_cur.value = indata_size_cur
-                self.child_input_size_total.value = indata_size
-                self.child_output_size_cur.value = outdata_size_cur
-                self.child_output_size_total.value = outdata_size
                 if child_cur_block_count > 0:
+                    self.child_input_size_cur.value = indata_size_cur
+                    self.child_input_size_total.value = indata_size
+                    self.child_output_size_cur.value = outdata_size_cur
+                    self.child_output_size_total.value = outdata_size
+
                     self.child_process_time_cur.value = 1000.0*time_process_cur_time
                     self.child_process_time_total.value = 1000.0*time_process_total_time
                     self.child_process_block_cur.value = child_cur_block_count

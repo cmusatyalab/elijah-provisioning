@@ -343,6 +343,8 @@ def averaged_value(measure_history, duration):
 def print_p_r_over_time(inputfile):
     lines = open(inputfile, "r").read().split("\n")
     adaptation_log_lines = list()
+    mode_test_log_lines = list()
+    mode_change_log_lines = list()
     for line in lines:
         # see only DEBUG message
         if line.find("DEBUG") == -1:
@@ -351,6 +353,12 @@ def print_p_r_over_time(inputfile):
             # see only profiling message
             log = line.split("adaptation")[1].strip()
             adaptation_log_lines.append(log)
+        if line.find("mode-change-test") != -1:
+            log = line.split("mode-change-test")[1].strip()
+            mode_test_log_lines.append(log)
+        if line.find("mode-change") != -1 and line.find("mode-change-test") == -1:
+            log = line.split("mode-change")[1].strip()
+            mode_change_log_lines.append(log)
 
     migration_start_time = 0
     iteration_time_list = list()
@@ -361,6 +369,9 @@ def print_p_r_over_time(inputfile):
     p_list_cur = list()
     r_list = list()
     r_list_cur = list()
+    system_in_bw_list = list()
+    system_out_bw_list = list()
+    system_out_bw_potential_list = list()
     for line in adaptation_log_lines:
         if line.startswith("start time"):
             migration_start_time = float(line.split(":")[-1])
@@ -368,15 +379,24 @@ def print_p_r_over_time(inputfile):
             iter_time, iter_seq_old, iter_seq_new, iter_mem_size = line.split("\t")[1:]
             iteration_time_list.append((iter_seq_old, iter_time))
         else:
-            data_point_time, total_p, total_r, total_p_cur, total_r_cur = line.split("\t")
-            time_measured, duration_measured = data_point_time.split(",")
+            (time_measured, duration_measured, network_bw_mbps,\
+             system_out_bw_actual, system_in_bw_actual,\
+             system_out_bw_cur_est, system_in_bw_cur_est,\
+             total_p, total_r,\
+             total_p_cur, total_r_cur) = line.split("\t")
             p_and_r_list.append((duration_measured, total_p, total_p_cur, total_r, total_r_cur))
             measure_history.append((float(duration_measured), float(total_p_cur), float(total_r_cur)))
-            time_list.append(float(time_measured)-float(migration_start_time))
+
+            # data for plot
+            #time_list.append(float(time_measured)-float(migration_start_time))
+            time_list.append(duration_measured)
             p_list.append(float(total_p))
             p_list_cur.append(float(total_p_cur))
             r_list.append(float(total_r))
             r_list_cur.append(float(total_r_cur))
+            system_in_bw_list.append(float(system_in_bw_actual))
+            system_out_bw_potential_list.append(float(system_out_bw_cur_est))
+            system_out_bw_list.append(float(system_out_bw_actual))
 
     # averaged p and r over time window
     p_list_avg1 = list()
@@ -401,15 +421,32 @@ def print_p_r_over_time(inputfile):
         print "%s\t%s\t%s\t%s\t%s" % (duration_measured, total_p, total_p_cur, total_r, total_r_cur)
 
     # plot
-    f, (p_plot, r_plot)= plt.subplots(2, 1, sharex=True)
+    f, (p_plot, r_plot, bw_plot)= plt.subplots(3, 1, sharex=True)
     p_plot.set_title("P - " + inputfile)
     r_plot.set_title("R - " + inputfile)
+    bw_plot.set_title("BW - " + inputfile)
+
     p_plot.set_ylim([0, 1])
     r_plot.set_ylim([0, 1])
     p_plot.plot(time_list, p_list, 'r-', time_list, p_list_cur, 'b-')
     r_plot.plot(time_list, r_list, 'r-', time_list, r_list_cur, 'b-')
+    bw_plot.plot(time_list, system_in_bw_list, 'r-', label="System in BW")
+    bw_plot.plot(time_list, system_out_bw_list, 'b-', label="System out BW")
+    bw_plot.plot(time_list, system_out_bw_potential_list, 'b--', label="System out BW potential")
+    #bw_plot.legend(shadow=True, bbox_to_anchor=(0., 1.02, 1., .102), loc=3)
+    bw_plot.legend(shadow=True, loc="best", prop={'size':6})
     #plt.show()
-    plt.savefig(inputfile+ '.png')
+    cur_xlim = f.gca().get_xlim()[1]
+    p_plot.set_xlim([0, cur_xlim])
+
+    # plot mode change if it exists
+    for each_mode_change in mode_change_log_lines:
+        if each_mode_change.lower().find("current mode is the best") != -1:
+            continue
+        mode_change_time = float(each_mode_change.split("\t")[1])
+        bw_plot.axvline(x=mode_change_time, linewidth=2, color='k')
+
+    plt.savefig(inputfile+ '.pdf')
 
 
 if __name__ == "__main__":

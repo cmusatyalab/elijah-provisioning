@@ -539,8 +539,7 @@ class StreamSynthesisFile(multiprocessing.Process):
                 emulated_time = (processed_size*8) / (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
                 if emulated_time > processed_time:
                     sleep_time = (emulated_time-processed_time)
-                    LOG.debug("Emulating BW of %d Mbps, so wait %f s" %\
-                            (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps, sleep_time))
+                    #LOG.debug("Emulating BW of %d Mbps, so wait %f s" %\ (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps, sleep_time))
                     time.sleep(sleep_time)
 
 
@@ -856,7 +855,8 @@ def create_residue(base_disk, base_hashvalue,
                                                               time_network_end,
                                                               (time_network_end-time_network_start)))
 
-        process_controller.terminate()
+        cpu_stat = process_controller.cpu_statistics
+        process_manager.kill_instance()
 
         # 7. terminting
         if resumed_vm.monitor is not None:
@@ -919,9 +919,9 @@ def create_residue(base_disk, base_hashvalue,
                                                                     (time_packaging_end-time_packaging_start)))
 
         # 7. terminting
-        process_controller.terminate()
         cpu_stat = process_controller.cpu_statistics
         #open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
+        process_manager.kill_instance()
 
         memory_read_proc.finish()   # deallocate resources for snapshotting
         # 7. terminting
