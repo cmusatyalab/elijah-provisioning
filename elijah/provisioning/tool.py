@@ -32,11 +32,15 @@ import struct
 from lzma import LZMACompressor
 from lzma import LZMADecompressor
 
-import msgpack 
+import pyximport; pyximport.install()
+from cython_xor import cython_xor
+
+import msgpack
 from Configuration import Const
 import log as logging
 
 LOG = logging.getLogger(__name__)
+
 
 
 #global

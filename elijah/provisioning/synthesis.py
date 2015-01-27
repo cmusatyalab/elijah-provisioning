@@ -1764,7 +1764,8 @@ def synthesis(base_disk, overlay_path, **kwargs):
                 LOG.info("[RESULT] Residue")
                 LOG.info("[RESULT]   Metafile : %s" % \
                         (os.path.abspath(residue_overlay)))
-            if (residue_overlay is not None) and os.path.exists(residue_overlay) == True:
+            if (residue_overlay is not None) and os.path.exists(residue_overlay) == True\
+                    and is_profiling_test:
                 os.remove(residue_overlay)
         except CloudletGenerationError, e:
             LOG.error("Cannot create residue : %s" % (str(e)))

@@ -155,6 +155,18 @@ class PreloadResidueData(threading.Thread):
                 else:
                     raise DeltaError("Delta type should be either disk or memory")
                 recover_data = tool.merge_data_bsdiff(base_data, patch_data)
+            elif delta_item.ref_id == DeltaItem.REF_XOR:
+                patch_data = delta_item.data
+                patch_original_size = delta_item.offset_len
+                if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
+                        delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
+                    base_data = self.raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
+                elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
+                    delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+                    base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
+                else:
+                    raise DeltaError("Delta type should be either disk or memory")
+                recover_data = tool.cython_xor(base_data, patch_data)
             else:
                 msg ="Cannot recover: invalid referce id %d" % delta_item.ref_id
                 raise MemoryError(msg)
@@ -402,10 +414,15 @@ class QmpThread(threading.Thread):
 
     def control_migration(self):
         self.qmp.connect()
-        counter_check_comp_size = 0
         ret = self.qmp.qmp_negotiate()
         if not ret:
             raise CloudletGenerationError("failed to connect to qmp channel")
+        ret = self.qmp.randomize_raw_live()  # randomize page output order
+        if not ret:
+            raise CloudletGenerationError("failed to randomize memory order")
+        LOG.debug("randomization\tmemory randomization success")
+        counter_check_comp_size = 0
+
         time.sleep(5)
 
         if VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
@@ -740,8 +757,8 @@ def create_residue(base_disk, base_hashvalue,
 
         overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_BZIP2
         overlay_mode.COMPRESSION_ALGORITHM_SPEED = 5
-        #overlay_mode.MEMORY_DIFF_ALGORITHM = "none"
-        #overlay_mode.DISK_DIFF_ALGORITHM = "none"
+        overlay_mode.MEMORY_DIFF_ALGORITHM = "xor"
+        overlay_mode.DISK_DIFF_ALGORITHM = "xor"
 
     process_controller.set_mode(overlay_mode, migration_addr)
     LOG.info("* LIVE MIGRATION STRATEGY: %d" % VMOverlayCreationMode.LIVE_MIGRATION_STOP)

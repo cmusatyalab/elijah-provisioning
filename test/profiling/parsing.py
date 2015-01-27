@@ -233,8 +233,9 @@ def multikeysort(items, columns):
 def print_bw(exps):
     # sort by compression algorithm gzip 1, .., gzip9, .., lzma1, .., lzma9
     def compare_comp_algorithm(a):
-        d = {"xdelta3":2,
-             "bsdiff":3,
+        d = {"xdelta3":3,
+             "bsdiff":4,
+             "xor":2,
              "none":1}
         return (d[a.mode['DISK_DIFF_ALGORITHM']], -a.mode['COMPRESSION_ALGORITHM_TYPE'], a.mode['COMPRESSION_ALGORITHM_SPEED'])
     exps.sort(key=compare_comp_algorithm)
@@ -271,8 +272,9 @@ def print_bw(exps):
 
 def sort_experiment_by_diff_compress(exps):
     def compare_comp_algorithm(a):
-        d = {"xdelta3":2,
-             "bsdiff":3,
+        d = {"xdelta3":3,
+             "bsdiff":4,
+             "xor":2,
              "none":1}
         return (d[a.mode['DISK_DIFF_ALGORITHM']], -a.mode['COMPRESSION_ALGORITHM_TYPE'], a.mode['COMPRESSION_ALGORITHM_SPEED'])
     exps.sort(key=compare_comp_algorithm)

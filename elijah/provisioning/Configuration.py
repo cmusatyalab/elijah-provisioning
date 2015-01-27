@@ -178,8 +178,8 @@ class VMOverlayCreationMode(object):
         self.OPTIMIZATION_DEDUP_BASE_MEMORY          = True
         self.OPTIMIZATION_DEDUP_BASE_SELF            = True
 
-        self.MEMORY_DIFF_ALGORITHM                  = "xdelta3" # "xdelta3", "bsdiff", "none"
-        self.DISK_DIFF_ALGORITHM                    = "xdelta3" # "xdelta3", "bsdiff", "none"
+        self.MEMORY_DIFF_ALGORITHM                  = "xdelta3" # "xdelta3", "bsdiff", "xor", "none"
+        self.DISK_DIFF_ALGORITHM                    = "xdelta3" # "xdelta3", "bsdiff", "xor", "none"
         self.COMPRESSION_ALGORITHM_TYPE              = Const.COMPRESSION_LZMA
         self.COMPRESSION_ALGORITHM_SPEED             = 5 # 1 (fastest) ~ 9
 

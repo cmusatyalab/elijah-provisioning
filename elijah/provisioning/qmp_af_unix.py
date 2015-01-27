@@ -72,6 +72,25 @@ class QmpAfUnix:
             print "---"
             #sys.stderr.write("failed at %s" % str(traceback.format_exc()))
 
+    # returns True on success, False otherwise
+    def randomize_raw_live(self):
+        json_cmd = json.dumps({"execute":"randomize-raw-live"})
+        self.sock.sendall(json_cmd)
+        response = json.loads(self.sock.recv(1024))
+        if "return" in response:
+            return True
+        else:
+            return False
+
+    # returns True on success, False otherwise
+    def unrandomize_raw_live(self):
+        json_cmd = json.dumps({"execute":"unrandomize-raw-live"})
+        self.sock.sendall(json_cmd)
+        response = json.loads(self.sock.recv(1024))
+        if "return" in response:
+            return True
+        else:
+            return False
 
     def stop_raw_live_once(self):
         self.connect()
@@ -85,6 +104,12 @@ class QmpAfUnix:
     def iterate_raw_live_once(self):
         self.connect()
         ret = self.qmp_negotiate()
+        ret = self.randomize_raw_live()  # randomize page output order
+        if ret:
+            print "Randomized page output order"
+        else:
+            print "Failed to randomize page output order"
+#       self.unrandomize_raw_live()  # make page output order sequential
         time.sleep(20)
         if ret:
             print "iterating"

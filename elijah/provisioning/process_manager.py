@@ -321,6 +321,7 @@ class ProcessManager(threading.Thread):
         count = 0
         self.cpu_statistics = list()
         while (not self.stop.wait(0.1)):
+            continue
             try:
                 network_bw = self.get_network_speed()  # mega bit/s
                 system_speed = self.get_system_speed()

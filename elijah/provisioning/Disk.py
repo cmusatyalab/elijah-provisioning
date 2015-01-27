@@ -681,12 +681,16 @@ class DiskDiffProc(multiprocessing.Process):
                             diff_type = DeltaItem.REF_BSDIFF
                             if len(diff_data) > chunk_data_len:
                                 raise IOError("bsdiff patch is bigger than origianl")
+                        elif self.diff_algorithm == "xor":
+                            diff_data = tool.cython_xor(source_data, data)
+                            diff_type = DeltaItem.REF_XOR
+                            if len(diff_data) > chunk_data_len:
+                                raise IOError("xorpatch is bigger than origianl")
                         elif self.diff_algorithm == "none":
                             diff_data = data
                             diff_type = DeltaItem.REF_RAW
                         else:
-                            diff_data = data
-                            diff_type = DeltaItem.REF_RAW
+                            raise DiskError("%s algorithm is not supported" % self.diff_algorithm)
                     except IOError as e:
                         diff_data = data
                         diff_type = DeltaItem.REF_RAW
