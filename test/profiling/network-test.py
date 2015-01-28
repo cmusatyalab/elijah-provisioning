@@ -61,7 +61,7 @@ if __name__ == "__main__":
     VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
     #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
     #bandwidth = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 50]
-    bandwidth = [50]
+    bandwidth = [20]
     bandwidth.reverse()
     for (base_path, overlay_path) in workloads:
         for network_bw in bandwidth:
@@ -69,8 +69,8 @@ if __name__ == "__main__":
             overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=1)
             overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP
             overlay_mode.COMPRESSION_ALGORITHM_SPEED = 5
-            overlay_mode.MEMORY_DIFF_ALGORITHM = "xor"
-            overlay_mode.DISK_DIFF_ALGORITHM = "xor"
+            overlay_mode.MEMORY_DIFF_ALGORITHM = "xdelta3"
+            overlay_mode.DISK_DIFF_ALGORITHM = "xdelta3"
 
             VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps = network_bw
             LOG.debug("network-test\t%s (Mbps)" % VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps)

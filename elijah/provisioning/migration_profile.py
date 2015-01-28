@@ -8,6 +8,12 @@ from pprint import pprint
 from collections import defaultdict
 from Configuration import VMOverlayCreationMode
 from operator import itemgetter, attrgetter, methodcaller
+import log as logging
+
+
+LOG = logging.getLogger(__name__)
+_process_controller = None
+
 
 stage_names = ["CreateMemoryDeltalist", "CreateDiskDeltalist", "DeltaDedup", "CompressProc"]
 BIT_PER_BLOCK = (4096+11)*8
@@ -187,7 +193,8 @@ class ModeProfile(object):
         scale_p = cur_total_p/profiled_mode_total_p
         scale_r = cur_total_r/profiled_mode_total_r
 
-        #print "scaling p: %f, r: %f" % (scale_p, scale_r)
+        #LOG.debug("mode-predict\tcur_p:%f\tcur_r:%f\tprofile_p:%f\tprofile_r:%f\tscaling_p:%f\tscaling_r:%f" % \
+        #          (cur_total_p, cur_total_r, profiled_mode_total_p, profiled_mode_total_r, scale_p, scale_r))
         # apply scaling and get expected system out bw for each mode
         scaled_mode_list, current_block_per_sec = self.list_scaled_modes(cur_mode, scale_p, scale_r, network_bw)
 
@@ -230,7 +237,13 @@ class ModeProfile(object):
                     (bottleneck, system_block_per_sec, system_in_mbps, system_out_mbps,
                      network_block_per_sec, network_bw))
             scaled_mode_list.append(data)
-            #print "(%s) %f %f --> %f %f, %f" % (diff_str, network_bw, system_out_mbps, network_block_per_sec, system_block_per_sec, actual_block_per_sec)
+            #LOG.debug("mode-predict\t(%s) %f %f %s --> %f %f, %f" % (diff_str,
+            #                                                         network_bw,
+            #                                                         bottleneck,
+            #                                                         system_out_mbps,
+            #                                                         network_block_per_sec,
+            #                                                         system_block_per_sec,
+            #                                                         actual_block_per_sec))
         return scaled_mode_list, current_block_per_sec
 
 
