@@ -45,11 +45,11 @@ if __name__ == "__main__":
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
         (linux_base_path, moped),
-        (linux_base_path, speech),
-        (windows_base_path, mar),
-        (windows_base_path, face),
-        (linux_base_path, random),
-        (linux_base_path, fluid),
+        #(linux_base_path, speech),
+        #(windows_base_path, mar),
+        #(windows_base_path, face),
+        #(linux_base_path, random),
+        #(linux_base_path, fluid),
     ]
     for (base_path, overlay_path) in workloads:
         if os.path.exists(base_path) == False:
@@ -60,16 +60,17 @@ if __name__ == "__main__":
     VMOverlayCreationMode.MAX_THREAD_NUM = 1
     VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
     #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
-    bandwidth = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 50]
+    #bandwidth = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 50]
+    bandwidth = [50]
     bandwidth.reverse()
     for (base_path, overlay_path) in workloads:
         for network_bw in bandwidth:
             # generate mode
             overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=1)
-            overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_BZIP2
+            overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP
             overlay_mode.COMPRESSION_ALGORITHM_SPEED = 5
-            overlay_mode.MEMORY_DIFF_ALGORITHM = "xdelta3"
-            overlay_mode.DISK_DIFF_ALGORITHM = "xdelta3"
+            overlay_mode.MEMORY_DIFF_ALGORITHM = "xor"
+            overlay_mode.DISK_DIFF_ALGORITHM = "xor"
 
             VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps = network_bw
             LOG.debug("network-test\t%s (Mbps)" % VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps)

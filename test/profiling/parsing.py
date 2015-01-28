@@ -390,8 +390,8 @@ def print_p_r_over_time(inputfile):
             measure_history.append((float(duration_measured), float(total_p_cur), float(total_r_cur)))
 
             # data for plot
-            #time_list.append(float(time_measured)-float(migration_start_time))
-            time_list.append(duration_measured)
+            time_list.append(float(time_measured)-float(migration_start_time))
+            #time_list.append(duration_measured)
             p_list.append(float(total_p))
             p_list_cur.append(float(total_p_cur))
             r_list.append(float(total_r))
@@ -448,7 +448,7 @@ def print_p_r_over_time(inputfile):
         mode_change_time = float(each_mode_change.split("\t")[1])
         bw_plot.axvline(x=mode_change_time, linewidth=2, color='k')
 
-    plt.savefig(inputfile+ '.pdf')
+    plt.savefig(inputfile+ '.png')
 
 
 if __name__ == "__main__":
