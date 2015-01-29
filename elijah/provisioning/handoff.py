@@ -100,7 +100,7 @@ class PreloadResidueData(threading.Thread):
 
         for delta_item in deltalist:
             if type(delta_item) != DeltaItem:
-                raise CloudletGenerationError("Failed to reconstruct deltalist")
+                raise HandoffError("Failed to reconstruct deltalist")
 
             #LOG.info("recovering %ld/%ld" % (index, len(delta_list)))
             if (delta_item.ref_id == DeltaItem.REF_RAW):
@@ -141,7 +141,7 @@ class PreloadResidueData(threading.Thread):
                     base_data = raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
                 else:
                     msg = "Delta should be either disk or memory"
-                    raise CloudletGenerationError(msg)
+                    raise HandoffError(msg)
                 recover_data = tool.merge_data(base_data, patch_data, len(base_data)*5)
             elif delta_item.ref_id == DeltaItem.REF_BSDIFF:
                 patch_data = delta_item.data
@@ -175,7 +175,7 @@ class PreloadResidueData(threading.Thread):
                 msg = "Recovered Size Error: %d, ref_id: %s, %ld %ld" % \
                         (len(recover_data), delta_item.ref_id, \
                         delta_item.data_len, delta_item.offset)
-                raise CloudletGenerationError(msg)
+                raise HandoffError(msg)
 
             # recover
             #delta_item.ref_id = DeltaItem.REF_RAW
@@ -227,12 +227,15 @@ class VMMonitor(object):
             2) used/freed disk block list
             3) freed memory page
         '''
-        # puase the VM if it's not yet
-        if self.machine is not None:
-            vm_state, reason = self.machine.state(0)
-            if vm_state != libvirt.VIR_DOMAIN_PAUSED:
-                self.machine.suspend()
+        time1 = time.time()
+        # do not pause VM since we're doing semi-live migration
+        # this will be done by qmp
+        #if self.machine is not None:
+        #    vm_state, reason = self.machine.state(0)
+        #    if vm_state != libvirt.VIR_DOMAIN_PAUSED:
+        #        self.machine.suspend()
 
+        time2 = time.time()
         # 2. get dma & discard information
         if self.options.TRIM_SUPPORT:
             dma_dict, trim_dict = Disk.parse_qemu_log(self.qemu_logfile, Const.CHUNK_SIZE)
@@ -243,6 +246,7 @@ class VMMonitor(object):
         free_memory_dict = dict()
         time_parse_trim_log = time.time()
 
+        time3 = time.time()
         # 3. get used sector information from x-ray
         used_blocks_dict = None
         if self.options.XRAY_SUPPORT:
@@ -255,6 +259,7 @@ class VMMonitor(object):
         info_dict[_MonitoringInfo.MEMORY_FREE_BLOCKS] = free_memory_dict
 
         modified_chunk_queue = self.fuse_stream_monitor.get_modified_chunk_queue()
+        time4 = time.time()
         # mark the modifid disk area in the original VM overlay as modified area
         if self.original_deltalist is not None:
             for o_delta_item in self.original_deltalist:
@@ -262,6 +267,9 @@ class VMMonitor(object):
                     modified_index = o_delta_item.offset / Const.CHUNK_SIZE
                     modified_chunk_queue.put((modified_index, 1.0))
         info_dict[_MonitoringInfo.DISK_MODIFIED_BLOCKS] = modified_chunk_queue
+        time5 = time.time()
+
+        LOG.debug("consumed time %f, %f, %f, %f" % ((time5-time4), (time4-time3), (time3-time2), (time2-time1)))
 
         self.monitoring_info = _MonitoringInfo(info_dict)
         return self.monitoring_info
@@ -416,11 +424,11 @@ class QmpThread(threading.Thread):
         self.qmp.connect()
         ret = self.qmp.qmp_negotiate()
         if not ret:
-            raise CloudletGenerationError("failed to connect to qmp channel")
-        ret = self.qmp.randomize_raw_live()  # randomize page output order
-        if not ret:
-            raise CloudletGenerationError("failed to randomize memory order")
-        LOG.debug("randomization\tmemory randomization success")
+            raise HandoffError("failed to connect to qmp channel")
+        #ret = self.qmp.randomize_raw_live()  # randomize page output order
+        #if not ret:
+        #    raise HandoffError("failed to randomize memory order")
+        #LOG.debug("randomization\tmemory randomization success")
         counter_check_comp_size = 0
 
         time.sleep(5)
@@ -657,7 +665,7 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
     fuse_stream_monitor = kwargs.get('fuse_stream_monitor', None)
     ret = machine.migrateSetMaxSpeed(1000000, 0)   # 1000 Gbps, unlimited
     if ret != 0:
-        raise CloudletGenerationError("Cannot set migration speed : %s", machine.name())
+        raise HandoffError("Cannot set migration speed : %s", machine.name())
 
     # Stop monitoring for memory access (snapshot will create a lot of access)
     fuse_stream_monitor.del_path(cloudletfs.StreamMonitor.MEMORY_ACCESS)
@@ -695,12 +703,12 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
         # we intentionally ignore seek error from libvirt since we have cause
         # that by using named pipe
         if str(e).startswith('unable to seek') == False:
-            raise CloudletGenerationError("libvirt memory save : " + str(e))
+            raise HandoffError("libvirt memory save : " + str(e))
     finally:
         pass
 
     if ret != 0:
-        raise CloudletGenerationError("libvirt: Cannot save memory state")
+        raise HandoffError("libvirt: Cannot save memory state")
 
     return memory_read_proc
 
@@ -709,7 +717,7 @@ def _waiting_to_finish(process_controller, worker_name):
     while True:
         worker_info = process_controller.process_infos.get(worker_name, None)
         if worker_info == None:
-            raise CloudletGenerationError("Failed to access %s worker" % worker_name)
+            raise HandoffError("Failed to access %s worker" % worker_name)
         if worker_info['is_processing_alive'].value == False:
             break
         else:
@@ -757,8 +765,8 @@ def create_residue(base_disk, base_hashvalue,
 
         overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_BZIP2
         overlay_mode.COMPRESSION_ALGORITHM_SPEED = 5
-        overlay_mode.MEMORY_DIFF_ALGORITHM = "xor"
-        overlay_mode.DISK_DIFF_ALGORITHM = "xor"
+        overlay_mode.MEMORY_DIFF_ALGORITHM = "xdelta3"
+        overlay_mode.DISK_DIFF_ALGORITHM = "xdelta3"
 
     process_controller.set_mode(overlay_mode, migration_addr)
     LOG.info("* LIVE MIGRATION STRATEGY: %d" % VMOverlayCreationMode.LIVE_MIGRATION_STOP)
@@ -785,11 +793,12 @@ def create_residue(base_disk, base_hashvalue,
                            qemu_logfile,
                            original_deltalist=original_deltalist)
     monitoring_info = vm_monitor.get_monitoring_info()
-
     time_ss = time.time()
     LOG.debug("[time] serialized step (%f ~ %f): %f" % (time_start,
-                                                           time_ss,
-                                                           (time_ss-time_start)))
+                                                        time_ss,
+                                                        (time_ss-time_start)))
+    if (time_ss-time_start) > 5:
+        raise HandoffError("Time for serialized step takes too long. Check get_monitoring_info()")
 
     qmp_thread = QmpThread(resumed_vm.qmp_channel, memory_snapshot_queue,
                            compdata_queue, overlay_mode, resumed_vm.monitor)
@@ -804,7 +813,7 @@ def create_residue(base_disk, base_hashvalue,
         if overlay_mode.LIVE_MIGRATION_STOP is not VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
             msg = "Use ASAP VM stop for pipelined approach for serialized processing.\n"
             msg += "Otherwise it won't fininsh at the memory dumping stage"
-            raise CloudletGenerationError(msg)
+            raise HandoffError(msg)
         time.sleep(5)
         qmp_thread.start()
         _waiting_to_finish(process_controller, "MemoryReadProcess")

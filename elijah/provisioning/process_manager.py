@@ -200,18 +200,18 @@ class ProcessManager(threading.Thread):
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
             if worker == None:
-                #print "%s is not available"
+                #LOG.debug("%f\t%s is not available" % (time.time(), worker_name))
                 return None
             worker_info = self.process_infos[worker_name]
             if worker_info['finish_processing_input'].value == True:
-                #print "%s is finished" % worker_name
+                #LOG.debug("%f\t%s is finished" % (time.time(), worker_name))
                 return None
             time_block = worker.monitor_total_time_block.value
             ratio_block = worker.monitor_total_ratio_block.value
             time_block_cur = worker.monitor_total_time_block_cur.value
             ratio_block_cur = worker.monitor_total_ratio_block_cur.value
             if time_block <= 0 or ratio_block <=0:
-                #print "%s has wront data" % worker_name
+                #LOG.debug("%s has wrong data" % worker_name)
                 return None
             p_dict[worker_name] = time_block
             r_dict[worker_name] = ratio_block
@@ -271,7 +271,7 @@ class ProcessManager(threading.Thread):
         system_in_size = total_size_dict_in['CreateDiskDeltalist'] + total_size_dict_in['CreateMemoryDeltalist']
         cur_time = time.time()
         duration = cur_time - self.prev_measured_time
-        if duration > 1:
+        if duration >= 1:
             system_out_bw_instant = 8.0*(system_output_size-self.prev_system_out_size)/duration/1024/1024
             system_in_bw_instant = 8.0*(system_in_size-self.prev_system_in_size)/duration/1024/1024
             self.cur_system_out_bw_list.append(system_out_bw_instant)
@@ -318,7 +318,6 @@ class ProcessManager(threading.Thread):
         measured_throughput = 0
         mode_change_history = list()
         time_prev_mode_change = self.time_start
-        count = 0
         self.cpu_statistics = list()
         while (not self.stop.wait(0.1)):
             try:
@@ -326,10 +325,10 @@ class ProcessManager(threading.Thread):
                 system_speed = self.get_system_speed()
                 time_current_iter = time.time()
                 if system_speed == None:
-                    #sys.stdout.write("system speed is not measured\n")
+                    #LOG.debug("system speed is not measured")
                     continue
                 if network_bw == None:
-                    #sys.stdout.write("network speed is not measured\n")
+                    #LOG.debug("network speed is not measured")
                     continue
                 if time_first_measurement == 0:
                     time_first_measurement = time.time()
@@ -446,7 +445,6 @@ class ProcessManager(threading.Thread):
                 sys.stdout.write("[manager] Exception")
                 sys.stderr.write(traceback.format_exc())
                 sys.stderr.write("%s\n" % str(e))
-            count += 1
 
     def register(self, worker):
         worker_name = getattr(worker, "worker_name", "NoName")

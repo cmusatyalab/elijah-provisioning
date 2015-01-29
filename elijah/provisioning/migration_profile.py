@@ -195,7 +195,6 @@ class ModeProfile(object):
 
         #LOG.debug("mode-predict\tcur_p:%f\tcur_r:%f\tprofile_p:%f\tprofile_r:%f\tscaling_p:%f\tscaling_r:%f" % \
         #          (cur_total_p, cur_total_r, profiled_mode_total_p, profiled_mode_total_r, scale_p, scale_r))
-        # apply scaling and get expected system out bw for each mode
         scaled_mode_list, current_block_per_sec = self.list_scaled_modes(cur_mode, scale_p, scale_r, network_bw)
 
         selected_item = sorted(scaled_mode_list, key=itemgetter(1), reverse=True)[0]
@@ -239,8 +238,8 @@ class ModeProfile(object):
             scaled_mode_list.append(data)
             #LOG.debug("mode-predict\t(%s) %f %f %s --> %f %f, %f" % (diff_str,
             #                                                         network_bw,
-            #                                                         bottleneck,
             #                                                         system_out_mbps,
+            #                                                         bottleneck,
             #                                                         network_block_per_sec,
             #                                                         system_block_per_sec,
             #                                                         actual_block_per_sec))

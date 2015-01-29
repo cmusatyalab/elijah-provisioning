@@ -7,6 +7,8 @@ from collections import defaultdict
 from collections import OrderedDict
 from operator import itemgetter
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
+import matplotlib
 
 
 stage_names = ["CreateMemoryDeltalist", "CreateDiskDeltalist", "DeltaDedup", "CompressProc"]
@@ -416,39 +418,53 @@ def print_p_r_over_time(inputfile):
     for index, (iter_seq_old, iter_time) in enumerate(iteration_time_list):
         print "%s\t%f\t%s" % (iter_seq_old, (float(iter_time)-float(migration_start_time)), iter_time)
     print "\n\n"
-
     print "duration\ttotal_p\ttotal_r\tcur_p\tcur_r"
     for values in p_and_r_list:
         (duration_measured, total_p, total_p_cur, total_r, total_r_cur) = values
         print "%s\t%s\t%s\t%s\t%s" % (duration_measured, total_p, total_p_cur, total_r, total_r_cur)
 
-    # plot
-    f, (p_plot, r_plot, bw_plot)= plt.subplots(3, 1, sharex=True)
+
+    # figure plot
+    fig, ax = plt.subplots()
+    font = {'family' : 'sans-serif',
+            'weight' : 'normal',
+            'size'   : 22}
+    matplotlib.rc('font', **font)
+
+    # plot p and r
+    f1, (p_plot, r_plot)= plt.subplots(2, 1, sharex=True)
     p_plot.set_title("P - " + inputfile)
     r_plot.set_title("R - " + inputfile)
-    bw_plot.set_title("BW - " + inputfile)
 
-    p_plot.set_ylim([0, 1])
+    (y_min, y_max) = p_plot.get_ylim()
+    p_plot.set_ylim([0, max(1, y_max)])
     r_plot.set_ylim([0, 1])
     p_plot.plot(time_list, p_list, 'r-', time_list, p_list_cur, 'b-')
     r_plot.plot(time_list, r_list, 'r-', time_list, r_list_cur, 'b-')
+    cur_xlim = f1.gca().get_xlim()[1]
+    p_plot.set_xlim([0, cur_xlim])
+    plt.savefig(inputfile + "-pr" + '.png')
+
+
+    # plot performance
+    f2, (bw_plot)= plt.subplots(1, 1, sharex=True)
+    f2.set_size_inches(12,4)
+    bw_plot.set_title("BW - " + inputfile)
     bw_plot.plot(time_list, system_in_bw_list, 'r-', label="System in BW")
     bw_plot.plot(time_list, system_out_bw_list, 'b-', label="System out BW")
     bw_plot.plot(time_list, system_out_bw_potential_list, 'b--', label="System out BW potential")
+    bw_plot.set_xlim([0, cur_xlim])
     #bw_plot.legend(shadow=True, bbox_to_anchor=(0., 1.02, 1., .102), loc=3)
     bw_plot.legend(shadow=True, loc="best", prop={'size':6})
-    #plt.show()
-    cur_xlim = f.gca().get_xlim()[1]
-    p_plot.set_xlim([0, cur_xlim])
-
     # plot mode change if it exists
     for each_mode_change in mode_change_log_lines:
         if each_mode_change.lower().find("current mode is the best") != -1:
             continue
-        mode_change_time = float(each_mode_change.split("\t")[1])
+        mode_change_time = float(each_mode_change.split("\t")[0]) - migration_start_time
+        #mode_change_time = float(each_mode_change.split("\t")[1])
         bw_plot.axvline(x=mode_change_time, linewidth=2, color='k')
 
-    plt.savefig(inputfile+ '.png')
+    plt.savefig(inputfile + "-bw" + '.png')
 
 
 if __name__ == "__main__":
