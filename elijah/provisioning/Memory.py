@@ -705,13 +705,14 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 self.monitor_total_input_size_cur.value = total_input_size_cur
                 self.monitor_total_output_size_cur.value = total_output_size_cur
 
-                cur_p = total_process_time_cur/total_block_count_cur
+                cur_p = float(total_process_time_cur)/total_block_count_cur
                 cur_r = float(total_output_size_cur)/float(total_input_size_cur)
                 cur_wall_time = time.time()
                 self.measure_history.append((cur_wall_time, cur_p, cur_r))
                 avg_cur_p, avg_cur_r = self.averaged_value(self.measure_history, cur_wall_time)
                 self.monitor_total_time_block_cur.value = avg_cur_p
                 self.monitor_total_ratio_block_cur.value = avg_cur_r
+                LOG.debug("%f\t%f\t%f\t%f\t" % (cur_p, avg_cur_p, total_process_time_cur, total_block_count_cur))
 
         # send last memory page
         # libvirt randomly add string starting with 'LibvirtQemudSave'

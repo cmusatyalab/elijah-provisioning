@@ -405,7 +405,9 @@ class LibvirtThread(threading.Thread):
         threading.Thread.__init__(self, target=self.save_mem)
 
     def save_mem(self):
+        LOG.debug("%f\taaaaaaaaaaaaaa before start saving command" % (time.time()))
         self.machine.save(self.outputpath)
+        LOG.debug("%f\taaaaaaaaaaaaaa after start saving command" % (time.time()))
 
 
 class QmpThread(threading.Thread):
@@ -418,9 +420,10 @@ class QmpThread(threading.Thread):
         self.qmp = qmp_af_unix.QmpAfUnix(self.qmp_path)
         self.fuse_stream_monitor = fuse_stream_monitor
         self.migration_stop_time = 0
+        self.done_configuration = False
         threading.Thread.__init__(self, target=self.control_migration)
 
-    def control_migration(self):
+    def config_migration(self):
         self.qmp.connect()
         ret = self.qmp.qmp_negotiate()
         if not ret:
@@ -428,9 +431,14 @@ class QmpThread(threading.Thread):
         #ret = self.qmp.randomize_raw_live()  # randomize page output order
         #if not ret:
         #    raise HandoffError("failed to randomize memory order")
-        #LOG.debug("randomization\tmemory randomization success")
-        counter_check_comp_size = 0
+        #LOG.debug("%f\trandomization\tmemory randomization success" % (time.time()))
+        self.done_configuration = True
 
+    def control_migration(self):
+        if self.done_configuration is False:
+            self.config_migration()
+
+        counter_check_comp_size = 0
         time.sleep(5)
 
         if VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
@@ -803,6 +811,7 @@ def create_residue(base_disk, base_hashvalue,
     qmp_thread = QmpThread(resumed_vm.qmp_channel, memory_snapshot_queue,
                            compdata_queue, overlay_mode, resumed_vm.monitor)
     qmp_thread.daemon = True
+    qmp_thread.config_migration()
 
     memory_read_proc = save_mem_snapshot(resumed_vm.conn,
                                          resumed_vm.machine,

@@ -244,6 +244,8 @@ class ProcessManager(threading.Thread):
         system_block_per_sec_cur, system_in_bw_cur_est, system_out_bw_cur_est = MigrationMode.get_system_throughput(num_cores,
                                                                      total_p_cur,
                                                                      total_r_cur)
+        #LOG.debug("p tot\t%s\t%f --> %f" % (str(p_dict), alpha, total_p))
+        #LOG.debug("p cur\t%s\t%f --> %f" % (str(p_dict_cur), alpha, total_p_cur))
         #sys.stdout.write("P: %f, %f \tR:%f, %f, BW: %f, %f mbps\t(%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f)\n" % \
         #                 (total_p, total_p_cur,
         #                  total_r, total_r_cur,
