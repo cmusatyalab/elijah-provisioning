@@ -362,6 +362,8 @@ class ProcessManager(threading.Thread):
 
                 LOG.debug(msg)
 
+                continue
+
                 # first predict at 2 seconds and then for every 5 seconds
                 if time_from_start > 5 and (time_current_iter - time_prev_mode_change) > 5:
                     # use current throughput

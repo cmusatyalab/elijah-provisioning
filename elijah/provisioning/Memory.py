@@ -570,13 +570,12 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
         # measurement
         self.measure_history = list()
+        self.measure_history_cur = list()
         self.total_block = 0
         self.total_time = float(0)
         self.iteration_datasize_list = list()
         self.iteration_size = 0
         self.iteration_seq = 0
-
-        time_process_start = 0
 
         # Due to the header of each memory page, memory chunk size is not 4KB +
         # 8 bytes. Also, we need to follow this format for libvirt header.
@@ -644,7 +643,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                         time_first_recv = time.time()
 
                     recved_data_size = len(recved_data)
-                    time_process_start = time.time()
                     if recved_data == Const.QUEUE_SUCCESS_MESSAGE:
                         # End of the stream
                         is_end_of_stream = True
@@ -663,56 +661,56 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 memory_page_list = memory_page_list[-1:]
                 self.task_queue.put(tasks)
 
-            total_process_time_cur = 0
             total_process_time = 0
-            total_block_count_cur = 0
             total_block_count = 0
             total_input_size = 0
-            total_input_size_cur = 0
             total_output_size = 0
-            total_output_size_cur = 0
-            valid_child_proc = 0
             for (proc, c_queue, mode_queue) in self.proc_list:
-                process_time_cur = proc.child_process_time_cur.value
                 process_time = proc.child_process_time_total.value
-                block_count_cur = proc.child_process_block_cur.value
                 block_count = proc.child_process_block_total.value
-
                 input_size = proc.child_input_size_total.value
                 output_size = proc.child_output_size_total.value
-                input_size_cur = proc.child_input_size_cur.value
-                output_size_cur = proc.child_output_size_cur.value
-                # averaging
-                if (block_count_cur> 0):
-                    valid_child_proc += 1
-                    total_process_time_cur += process_time_cur
-                    total_process_time += process_time
-                    total_block_count_cur += block_count_cur
-                    total_block_count += block_count
 
-                    total_input_size += input_size
-                    total_input_size_cur += input_size_cur
-                    total_output_size += output_size
-                    total_output_size_cur += output_size_cur
+                total_process_time += process_time
+                total_block_count += block_count
+                total_input_size += input_size
+                total_output_size += output_size
 
-            if valid_child_proc > 0:
-                if total_block_count is not 0:
-                    self.monitor_total_time_block.value = total_process_time/total_block_count
-                if total_input_size is not 0:
-                    self.monitor_total_ratio_block.value = float(total_output_size)/total_input_size
-                self.monitor_total_input_size.value = total_input_size + header_in_size
-                self.monitor_total_output_size.value = total_output_size + header_out_size
-                self.monitor_total_input_size_cur.value = total_input_size_cur
-                self.monitor_total_output_size_cur.value = total_output_size_cur
-
-                cur_p = float(total_process_time_cur)/total_block_count_cur
-                cur_r = float(total_output_size_cur)/float(total_input_size_cur)
+            # record only when there's an update
+            prev_measure_values = (0, 0, 0, 0, 0)
+            if len(self.measure_history) >= 1:
+                prev_measure_values = self.measure_history[-1]
+            prev_m_time, prev_process_time, prev_block_count, prev_insize, prev_outsize = prev_measure_values
+            if prev_process_time < total_process_time:
+                monitor_p = total_process_time/total_block_count
+                monitor_r = float(total_output_size)/total_input_size
+                monitor_insize = total_input_size + header_in_size
+                monitor_outsize = total_output_size + header_out_size
+                self.monitor_total_time_block.value = monitor_p
+                self.monitor_total_ratio_block.value = monitor_r
+                self.monitor_total_input_size.value = monitor_insize
+                self.monitor_total_output_size.value = monitor_outsize
                 cur_wall_time = time.time()
-                self.measure_history.append((cur_wall_time, cur_p, cur_r))
-                avg_cur_p, avg_cur_r = self.averaged_value(self.measure_history, cur_wall_time)
+                self.measure_history.append((cur_wall_time, total_process_time, total_block_count, monitor_insize, monitor_outsize))
+
+                # get cur value compared to prev value
+                cur_process_time = total_process_time - prev_process_time
+                cur_block_count = total_block_count - prev_block_count
+                cur_insize = monitor_insize - prev_insize
+                cur_outsize = monitor_outsize - prev_outsize
+                cur_p = cur_process_time/cur_block_count
+                cur_r = float(cur_outsize)/cur_insize
+                self.measure_history_cur.append((cur_wall_time, cur_p, cur_r))
+                avg_cur_p, avg_cur_r = self.averaged_value(self.measure_history_cur, cur_wall_time)
+
                 self.monitor_total_time_block_cur.value = avg_cur_p
                 self.monitor_total_ratio_block_cur.value = avg_cur_r
-                LOG.debug("%f\t%f\t%f\t%f\t" % (cur_p, avg_cur_p, total_process_time_cur, total_block_count_cur))
+                self.monitor_total_input_size_cur.value = cur_insize
+                self.monitor_total_output_size_cur.value = cur_outsize
+                #LOG.debug("%f\t%f\tprocess:%s, %s, %s\tcur_block:%s, %s, %s\t" % \
+                #          (cur_p, avg_cur_p,
+                #           total_process_time, prev_process_time, cur_process_time,
+                #           total_block_count, prev_block_count, cur_block_count))
 
         # send last memory page
         # libvirt randomly add string starting with 'LibvirtQemudSave'
@@ -775,7 +773,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
 
         # to be deleted
         #import json
-        #open("pr-history-memory", "w").write(json.dumps(self.measure_history))
+        #open("pr-history-memory", "w").write(json.dumps(self.measure_history_cur))
 
         return freed_page_counter
 
@@ -941,13 +939,9 @@ class MemoryDiffProc(multiprocessing.Process):
         self.apply_free_memory = apply_free_memory
 
         # shared variables between processes
-        self.child_process_time_cur = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_process_time_total = multiprocessing.RawValue(ctypes.c_double, 0)
-        self.child_process_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_process_block_total = multiprocessing.RawValue(ctypes.c_double, 0)
-        self.child_input_size_cur = multiprocessing.RawValue(ctypes.c_ulong, 0)
         self.child_input_size_total = multiprocessing.RawValue(ctypes.c_ulong, 0)
-        self.child_output_size_cur = multiprocessing.RawValue(ctypes.c_ulong, 0)
         self.child_output_size_total = multiprocessing.RawValue(ctypes.c_ulong, 0)
 
         super(MemoryDiffProc, self).__init__(target=self.process_diff)
@@ -1081,15 +1075,12 @@ class MemoryDiffProc(multiprocessing.Process):
                 indata_size += indata_size_cur
                 outdata_size += outdata_size_cur
                 if child_cur_block_count > 0:
-                    self.child_input_size_cur.value = indata_size_cur
                     self.child_input_size_total.value = indata_size
-                    self.child_output_size_cur.value = outdata_size_cur
                     self.child_output_size_total.value = outdata_size
 
-                    self.child_process_time_cur.value = 1000.0*time_process_cur_time
                     self.child_process_time_total.value = 1000.0*time_process_total_time
-                    self.child_process_block_cur.value = child_cur_block_count
                     self.child_process_block_total.value = child_total_block
+                    #LOG.debug("child process time: %s %s" % (time_process_total_time, child_total_block))
 
                 if len(deltaitem_list) > 0:
                     self.deltalist_queue.put(deltaitem_list)

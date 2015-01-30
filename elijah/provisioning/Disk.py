@@ -348,6 +348,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         self.total_block = 0
         self.total_time = float(0)
         self.measure_history = list()
+        self.measure_history_cur = list()
         is_first_recv = False
         time_first_recv = 0
         time_process_start = 0
@@ -425,52 +426,56 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                         task_queue.put(modified_chunk_list)
                         modified_chunk_list = []
 
-                        total_process_time_cur = 0
                         total_process_time = 0
-                        total_block_count_cur = 0
                         total_block_count = 0
                         total_input_size = 0
-                        total_input_size_cur = 0
                         total_output_size = 0
-                        total_output_size_cur = 0
-                        valid_child_proc = 0
                         for (proc, c_queue, mode_queue) in self.proc_list:
-                            process_time_cur = proc.child_process_time_cur.value
                             process_time = proc.child_process_time_total.value
-                            block_count_cur = proc.child_process_block_cur.value
                             block_count = proc.child_process_block_total.value
-
                             input_size = proc.child_input_size_total.value
                             output_size = proc.child_output_size_total.value
-                            input_size_cur = proc.child_input_size_cur.value
-                            output_size_cur = proc.child_output_size_cur.value
-                            if (block_count_cur> 0):
-                                valid_child_proc += 1
-                                total_process_time_cur += process_time_cur
-                                total_process_time += process_time
-                                total_block_count_cur += block_count_cur
-                                total_block_count += block_count
 
-                                total_input_size += input_size
-                                total_input_size_cur += input_size_cur
-                                total_output_size += output_size
-                                total_output_size_cur += output_size_cur
+                            total_process_time += process_time
+                            total_block_count += block_count
+                            total_input_size += input_size
+                            total_output_size += output_size
 
-                        if valid_child_proc > 0:
-                            self.monitor_total_time_block.value = total_process_time/total_block_count
-                            self.monitor_total_ratio_block.value = float(total_output_size)/total_input_size
-                            self.monitor_total_input_size.value = total_input_size
-                            self.monitor_total_output_size.value = total_output_size
-                            self.monitor_total_input_size_cur.value = total_input_size_cur
-                            self.monitor_total_output_size_cur.value = total_output_size_cur
-
-                            cur_p = total_process_time_cur/total_block_count_cur
-                            cur_r = float(total_output_size_cur)/float(total_input_size_cur)
+                        # record only when there's an update
+                        prev_measure_values = (0, 0, 0, 0, 0)
+                        if len(self.measure_history) >= 1:
+                            prev_measure_values = self.measure_history[-1]
+                        prev_m_time, prev_process_time, prev_block_count, prev_insize, prev_outsize = prev_measure_values
+                        if prev_process_time < total_process_time:
+                            monitor_p = total_process_time/total_block_count
+                            monitor_r = float(total_output_size)/total_input_size
+                            monitor_insize = total_input_size
+                            monitor_outsize = total_output_size
+                            self.monitor_total_time_block.value = monitor_p
+                            self.monitor_total_ratio_block.value = monitor_r
+                            self.monitor_total_input_size.value = monitor_insize
+                            self.monitor_total_output_size.value = monitor_outsize
                             cur_wall_time = time.time()
-                            self.measure_history.append((cur_wall_time, cur_p, cur_r))
-                            avg_cur_p, avg_cur_r = self.averaged_value(self.measure_history, cur_wall_time)
+                            self.measure_history.append((cur_wall_time, total_process_time, total_block_count, monitor_insize, monitor_outsize))
+
+                            # get cur value compared to prev value
+                            cur_process_time = total_process_time - prev_process_time
+                            cur_block_count = total_block_count - prev_block_count
+                            cur_insize = monitor_insize - prev_insize
+                            cur_outsize = monitor_outsize - prev_outsize
+                            cur_p = cur_process_time/cur_block_count
+                            cur_r = float(cur_outsize)/cur_insize
+                            self.measure_history_cur.append((cur_wall_time, cur_p, cur_r))
+                            avg_cur_p, avg_cur_r = self.averaged_value(self.measure_history_cur, cur_wall_time)
+
                             self.monitor_total_time_block_cur.value = avg_cur_p
                             self.monitor_total_ratio_block_cur.value = avg_cur_r
+                            self.monitor_total_input_size_cur.value = cur_insize
+                            self.monitor_total_output_size_cur.value = cur_outsize
+                            #LOG.debug("%f\t%f\ttotal:%s, %s, %s, %s\tcur_block:%s, %s\t" % \
+                            #          (cur_r, avg_cur_r,
+                            #           monitor_insize, monitor_outsize, prev_insize, prev_outsize,
+                            #           cur_insize, cur_outsize))
 
             self.finish_processing_input.value = True
 
@@ -558,7 +563,7 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
 
         # to be deleted
         #import json
-        #open("pr-history-disk", "w").write(json.dumps(self.measure_history))
+        #open("pr-history-disk", "w").write(json.dumps(self.measure_history_cur))
 
 
 def recover_disk(base_disk, base_mem, overlay_mem, overlay_disk, recover_path, chunk_size):
@@ -609,15 +614,10 @@ class DiskDiffProc(multiprocessing.Process):
         self.chunk_size = chunk_size
 
         # shared variables between processes
-        self.child_process_time_cur = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_process_time_total = multiprocessing.RawValue(ctypes.c_double, 0)
-        self.child_process_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
         self.child_process_block_total = multiprocessing.RawValue(ctypes.c_double, 0)
-        self.child_input_size_cur = multiprocessing.RawValue(ctypes.c_ulong, 0)
         self.child_input_size_total = multiprocessing.RawValue(ctypes.c_ulong, 0)
-        self.child_output_size_cur = multiprocessing.RawValue(ctypes.c_ulong, 0)
         self.child_output_size_total = multiprocessing.RawValue(ctypes.c_ulong, 0)
-
 
         super(DiskDiffProc, self).__init__(target=self.process_diff)
 
@@ -713,15 +713,11 @@ class DiskDiffProc(multiprocessing.Process):
                 indata_size += indata_size_cur
                 outdata_size += outdata_size_cur
                 if child_cur_block_count > 0:
-                    self.child_input_size_cur.value = indata_size_cur
                     self.child_input_size_total.value = indata_size
-                    self.child_output_size_cur.value = outdata_size_cur
                     self.child_output_size_total.value = outdata_size
-
-                    self.child_process_time_cur.value = 1000.0*time_process_cur_time
                     self.child_process_time_total.value = 1000.0*time_process_total_time
-                    self.child_process_block_cur.value = child_cur_block_count
                     self.child_process_block_total.value = child_total_block
+                    #LOG.debug("instance compress ratio: %s %s %f" % (indata_size_cur, outdata_size_cur, (indata_size_cur-outdata_size_cur)))
 
                 self.deltalist_queue.put(deltaitem_list)
         LOG.debug("[Disk][Child] Child finished. process %d jobs (%f)" % (child_total_block, time_process_total_time))

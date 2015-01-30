@@ -418,7 +418,7 @@ def print_p_r_over_time(inputfile):
     for index, (iter_seq_old, iter_time) in enumerate(iteration_time_list):
         print "%s\t%f\t%s" % (iter_seq_old, (float(iter_time)-float(migration_start_time)), iter_time)
     print "\n\n"
-    print "duration\ttotal_p\ttotal_r\tcur_p\tcur_r"
+    print "duration\ttotal_p\tcur_p\ttotal_r\tcur_r"
     for values in p_and_r_list:
         (duration_measured, total_p, total_p_cur, total_r, total_r_cur) = values
         print "%s\t%s\t%s\t%s\t%s" % (duration_measured, total_p, total_p_cur, total_r, total_r_cur)
@@ -435,14 +435,13 @@ def print_p_r_over_time(inputfile):
     f1, (p_plot, r_plot)= plt.subplots(2, 1, sharex=True)
     p_plot.set_title("P - " + inputfile)
     r_plot.set_title("R - " + inputfile)
-
-    (y_min, y_max) = p_plot.get_ylim()
-    p_plot.set_ylim([0, max(1, y_max)])
-    r_plot.set_ylim([0, 1])
     p_plot.plot(time_list, p_list, 'r-', time_list, p_list_cur, 'b-')
     r_plot.plot(time_list, r_list, 'r-', time_list, r_list_cur, 'b-')
     cur_xlim = f1.gca().get_xlim()[1]
     p_plot.set_xlim([0, cur_xlim])
+    (y_min, y_max) = p_plot.get_ylim()
+    p_plot.set_ylim([0, max(1, y_max)])
+    r_plot.set_ylim([0, 1])
     plt.savefig(inputfile + "-pr" + '.png')
 
 
