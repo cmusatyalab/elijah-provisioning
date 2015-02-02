@@ -296,9 +296,8 @@ class CompChildProc(multiprocessing.Process):
                     new_mode = value
                     new_comp_type = new_mode.get("comp_type", None)
                     new_comp_level = new_mode.get("comp_level", None)
-                    sys.stdout.write("Change Compression mode: from (%s, %s) to (%s, %s)\n" %
-                                    (self.comp_type, self.comp_level,
-                                    new_comp_type, new_comp_level))
+                    LOG.debug("change-mode\t%fcomp\t(%s,%s) -> (%s,%s)" %\
+                              (time.time(), self.comp_type, self.comp_level, new_comp_type, new_comp_level))
                     if new_comp_type is not None:
                         self.comp_type = new_comp_type
                     if new_comp_level is not None:
@@ -478,6 +477,7 @@ class DecompChildProc(multiprocessing.Process):
                     decomp_data = zlib.decompress(comp_data, zlib.MAX_WBITS|16)
                 else:
                     raise CompressionError("Not valid compression option")
+                LOG.debug("%f\tdecompress one blob" % (time.time()))
                 self.output_queue.put(decomp_data)
         #sys.stdout.write("[decomp][Child] child finished. send command queue msg\n")
         self.command_queue.put("Compressed processed everything")

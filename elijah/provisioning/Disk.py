@@ -642,9 +642,9 @@ class DiskDiffProc(multiprocessing.Process):
                 if command == "new_mode":
                     new_mode = value
                     new_diff_algorithm = new_mode.get("diff_algorithm", None)
-                    sys.stdout.write("Change diff algorithm for disk from (%s) to (%s)\n" %
-                                    (self.diff_algorithm, new_diff_algorithm))
                     if new_diff_algorithm is not None:
+                        LOG.debug("change-mode\t%fdisk\t%s -> %s" %\
+                                  (time.time(), self.diff_algorithm, new_diff_algorithm))
                         self.diff_algorithm = new_diff_algorithm
                 elif command == "new_num_cores":
                     new_num_cores = value

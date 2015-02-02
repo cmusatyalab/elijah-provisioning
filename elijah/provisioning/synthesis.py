@@ -1725,7 +1725,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
     # no-pipelining
     delta_proc.start()
     fuse_thread.start()
-    delta_proc.join()
+    #delta_proc.join()
     fuse_thread.join()
 
     synthesized_VM.resume()

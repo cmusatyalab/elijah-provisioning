@@ -64,23 +64,53 @@ class NetworkMeasurementThread(threading.Thread):
         self.vm_resume_time_at_dest = vm_resume_time_at_dest
         threading.Thread.__init__(self, target=self.receiving)
 
+    @staticmethod
+    def time_average(measure_history, start_time, cur_time):
+        sum_value = float(0)
+        counter = 0
+        for (measured_time, value) in reversed(measure_history):
+            # average only last 2s from current and after 3 seconds since start
+            #if (cur_time - measured_time) > 2 or (measured_time - start_time) < 3:
+            if (measured_time - start_time) < 3:
+                break
+            if counter > 5:
+                break
+            sum_value += value
+            counter += 1
+        if len(measure_history) > 2:
+            #LOG.debug("bandwidth\t%f\t%f\t%0.4f --> %0.4f\t%d/%d" % (cur_time,
+            #                                                         start_time,
+            #                                                         measure_history[-2][-1],
+            #                                                         measure_history[-1][-1],
+            #                                                         counter,
+            #                                                         len(measure_history)))
+            pass
+        if counter == 0:
+            return measure_history[-1][1]
+        return sum_value/counter
+
+
     def receiving(self):
         ack_time_list = list()
         measured_bw_list = list()
         ack_size = 8
+        time_start = 0
+        measured_bw_list = list()
         while True:
             ack_data = self.sock.recv(ack_size)
             ack = struct.unpack("!Q", ack_data)[0]
             time_recv_prev = time.time()
-            averaged_bw_list = list()
             if (ack == 0x01):
                 # start receiving acks of new blob
+                measure_bw_blob = list()
                 while True:
                     ack_data = self.sock.recv(ack_size)
-                    ack_recved_data = struct.unpack("!Q", ack_data)[0] 
+                    ack_recved_data = struct.unpack("!Q", ack_data)[0]
                     if ack_recved_data == 0x02:
                         break
-                    time_recv_cur = time.time() 
+                    if time_start == 0:
+                        time_start = time.time()
+                    time_recv_cur = time.time()
                     receive_duration = time_recv_cur - time_recv_prev
                     bw_mbps = 8*ack_recved_data/receive_duration/1024.0/1024
                     #print "ack: %f, %f, %f, %ld, %f mbps" % (
@@ -90,17 +120,28 @@ class NetworkMeasurementThread(threading.Thread):
                     #    ack_recved_data,
                     #    bw_mbps)
                     time_recv_prev = time_recv_cur
-                    averaged_bw_list.append(bw_mbps)
-                if len(averaged_bw_list) > 0:
-                    averaged_bw = sum(averaged_bw_list)/len(averaged_bw_list)
-                    #print "average bw: %f" % averaged_bw
 
-                self.monitor_network_bw.value = averaged_bw
+                    # filter out error bw
+                    if len(measured_bw_list) > 0:
+                        prev_bw = measured_bw_list[-1][-1]
+                        #LOG.debug("bandwidth\t%f\tvalue change: %f --> %f" % (time_recv_cur, prev_bw, bw_mbps))
+                        # assume error for one-order of magnitude changes
+                        if bw_mbps > prev_bw*10 or bw_mbps < prev_bw*0.1 or\
+                                bw_mbps > 1024:
+                            #LOG.debug("bandwidth\t%f\tfiltered value: %f --> %f" % (time_recv_cur, prev_bw, bw_mbps))
+                            bw_mbps = prev_bw
+                    measure_bw_blob.append(bw_mbps)
+                if len(measure_bw_blob) > 0:
+                    median_bw = measure_bw_blob[len(measure_bw_blob)/2]
+                    measured_bw_list.append((time_recv_cur, median_bw))
+                self.monitor_network_bw.value = self.time_average(measured_bw_list,
+                                                                  time_start,
+                                                                  time_recv_cur)
             elif (ack == 0x10):
                 data = self.sock.recv(8)
                 vm_resume_time = struct.unpack("!d", data)[0]
                 self.vm_resume_time_at_dest.value = float(vm_resume_time)
-                print "migration resume time: %f" % vm_resume_time
+                print "migration resume time: %f" % (vm_resume_time)
                 break
             else:
                 print "error"

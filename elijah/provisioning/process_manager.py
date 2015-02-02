@@ -185,7 +185,7 @@ class ProcessManager(threading.Thread):
         return result
 
     @staticmethod
-    def averaged_value(measure_hist, cur_time, avg_time=VMOverlayCreationMode.MEASURE_AVERAGE_TIME):
+    def _averaged_value(measure_hist, cur_time, avg_time=VMOverlayCreationMode.MEASURE_AVERAGE_TIME):
         avg_value = float(0)
         counter = 0
         for (measured_time, value) in reversed(measure_hist):
@@ -302,8 +302,8 @@ class ProcessManager(threading.Thread):
 
             self.cur_system_in_bw_list.append((cur_time, system_in_bw_instant))
             self.cur_system_out_bw_list.append((cur_time, system_out_bw_instant))
-            #system_in_bw_actual = self.averaged_value(self.cur_system_in_bw_list, cur_time, 1)
-            #system_out_bw_actual = self.averaged_value(self.cur_system_out_bw_list, cur_time, 1)
+            #system_in_bw_actual = self._averaged_value(self.cur_system_in_bw_list, cur_time, 1)
+            #system_out_bw_actual = self._averaged_value(self.cur_system_out_bw_list, cur_time, 1)
             system_in_bw_actual = system_in_bw_instant
             system_out_bw_actual = system_out_bw_instant
 
@@ -313,18 +313,31 @@ class ProcessManager(threading.Thread):
             system_out_bw_cur_est, system_in_bw_cur_est, \
             system_out_bw_actual, system_in_bw_actual
 
-    def get_network_speed(self):
-        if self.migration_dest.startswith("network"):
-            worker = self.process_list.get("StreamSynthesisClient", None)
+    def get_migration_iteration_count(self):
+            worker = self.process_list.get("CreateMemoryDeltalist", None)
             if worker == None:
                 return None
-            worker_info = self.process_infos["StreamSynthesisClient"]
-            if worker_info['is_processing_alive'].value == False:
-                return None
-            network_bw = worker.monitor_network_bw.value
-            if network_bw <= 0:
-                return None
-            return network_bw # mbps
+            iteration_num = worker.monitor_current_iteration.value
+            return iteration_num
+
+    def get_network_speed(self):
+        if self.migration_dest.startswith("network"):
+            # only used for experiement. 
+            # If it's bigger than 0, adaptation use this value to transmit over the network
+            if VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH > 0:
+                #LOG.debug("returning from STATIC network bw: %d Mbps" % (VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH))
+                return VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH
+            else:
+                worker = self.process_list.get("StreamSynthesisClient", None)
+                if worker == None:
+                    return None
+                worker_info = self.process_infos["StreamSynthesisClient"]
+                if worker_info['is_processing_alive'].value == False:
+                    return None
+                network_bw = worker.monitor_network_bw.value
+                if network_bw <= 0:
+                    return None
+                return network_bw # mbps
         else:
             return VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps
 
@@ -387,7 +400,7 @@ class ProcessManager(threading.Thread):
                 # first predict at 2 seconds and then for every 5 seconds
                 if time_from_start > 5 and (time_current_iter - time_prev_mode_change) > 5:
                     # use current throughput
-                    LOG.debug("mode-change-test\t%f\t%0.2f\t%f\t%f" % \
+                    LOG.debug("mode-test\t%f\t%0.2f\t%f\t%f" % \
                               (time_current_iter,
                                time_from_start,
                                system_out_bw_actual,

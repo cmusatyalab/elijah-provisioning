@@ -618,6 +618,7 @@ class Recovered_delta(multiprocessing.Process):
 
         self.out_pipe.write(str(Recovered_delta.END_OF_PIPE) + "\n")
         self.out_pipe.close()
+        # fix this
         self.recover_mem_fd.close()
         self.recover_mem_fd = None
         self.recover_disk_fd.close()

@@ -97,6 +97,7 @@ def parse_each_experiement(lines):
     is_start_config_line = False
     workload = lines[0].split(" ")[-1]
     migration_total_time = 0
+    migration_downtime = 0
     for line in lines[1:]:
         if line.find("* Overlay creation mode start") != -1:
             is_start_config_line = True
@@ -120,12 +121,19 @@ def parse_each_experiement(lines):
         elif line.find("Time for finishing transferring") != -1:
             log = line.split(":")[-1]
             migration_total_time = float(log.strip())
+        elif line.find("Finish migration") != -1:
+            log = line.split(":")[-1]
+            migration_total_time = float(log.strip())
+        elif line.find("migration downtime") != -1:
+            log = line.split(":")[-1]
+            migration_downtime = float(log.strip())
 
     # process filtered log data
     exp = Experiment()
     workload = lines[0].split(" ")[-1]
     setattr(exp, 'workload', os.path.basename(workload))
     setattr(exp, 'migration_total_time', migration_total_time)
+    setattr(exp, 'migration_downtime', migration_downtime)
     setattr(exp, 'mode', config_dict)
     setattr(exp, 'stage_size_in', dict.fromkeys(stage_names, 0))
     setattr(exp, 'stage_size_out', dict.fromkeys(stage_names, 0))
@@ -387,7 +395,7 @@ def print_p_r_over_time(inputfile):
     p_list_cur = list()
     r_list = list()
     r_list_cur = list()
-    network_bw = 0.0
+    network_bw_list = list()
     system_in_bw_list = list()
     system_out_bw_list = list()
     system_out_bw_potential_list = list()
@@ -405,7 +413,7 @@ def print_p_r_over_time(inputfile):
              total_p_cur, total_r_cur) = line.split("\t")
             p_and_r_list.append((duration_measured, total_p, total_p_cur, total_r, total_r_cur))
             measure_history.append((float(duration_measured), float(total_p_cur), float(total_r_cur)))
-            network_bw = network_bw_mbps
+            network_bw_list.append(network_bw_mbps)
 
             # data for plot
             duration = float(time_measured)-float(migration_start_time)
@@ -474,11 +482,12 @@ def print_p_r_over_time(inputfile):
     f2.set_size_inches(12,5)
     bw_plot.set_ylabel("Throughput (MBps)")
     bw_plot.set_xlabel("Time (s)")
-    bw_plot.set_title("BW - " + inputfile)
+    bw_plot.set_title("Trace - " + inputfile)
     LINE_WIDTH = 3
-    bw_plot.plot(time_list, system_in_bw_list, 'r-', label="Input throughput", linewidth=LINE_WIDTH)
-    bw_plot.plot(time_list, system_out_bw_list, 'b-', label="Output throughput", linewidth=LINE_WIDTH)
+    bw_plot.plot(time_list, system_in_bw_list, 'r-o', label="input throughput", linewidth=LINE_WIDTH)
+    bw_plot.plot(time_list, system_out_bw_list, 'b-+', label="Output throughput", linewidth=LINE_WIDTH)
     bw_plot.plot(time_list, system_out_bw_potential_list, 'b--', label="Potential output throughput", linewidth=LINE_WIDTH)
+    bw_plot.plot(time_list, network_bw_list, 'g-', label="Network throughput", linewidth=LINE_WIDTH-1)
     bw_plot.set_xlim([0, cur_xlim])
     #bw_plot.legend(shadow=True, bbox_to_anchor=(0., 1.02, 1., .102), loc=3)
     bw_plot.legend(shadow=True, loc="best", prop={'size':18})
@@ -489,16 +498,16 @@ def print_p_r_over_time(inputfile):
             continue
         mode_change_time = float(each_mode_change.split("\t")[0]) - migration_start_time
         #mode_change_time = float(each_mode_change.split("\t")[1])
-        bw_plot.axvline(x=mode_change_time, linewidth=2, color='k')
+        bw_plot.axvline(x=mode_change_time, linewidth=2, color='k', linestyle='-.')
     f2.gca().grid(True)
-    bw_plot.axhline(y=network_bw, linewidth=1, color='g', linestyle='--')
+    #bw_plot.axhline(y=network_bw, linewidth=1, color='g', linestyle='--')
     plt.gcf().subplots_adjust(bottom=0.15)
     #plt.gcf().subplots_adjust(left=0.01)
     plt.savefig(inputfile + "-bw" + '.png')
 
 
 if __name__ == "__main__":
-    command_list = ["profiling", "over-time"]
+    command_list = ["profiling", "over-time", "summary"]
     if len(sys.argv) != 3:
         sys.stderr.write("Need command(%s) and input filename\n" % (','.join(command_list)))
         sys.exit(1)
@@ -512,6 +521,24 @@ if __name__ == "__main__":
         print_bw_block(moped_exps)
     elif command == "over-time":
         print_p_r_over_time(inputfile)
+    elif command == "summary":
+        exp_list = parsing(inputfile)
+        exp = exp_list[0]
+        workload = exp.workload
+        in_size = exp.stage_size_in['CreateMemoryDeltalist'] + exp.stage_size_in['CreateDiskDeltalist']
+        out_size = exp.stage_size_in['CompressProc']
+        handoff_time = exp.migration_total_time
+        migration_downtime = exp.migration_downtime
+        total_ratio = (float(out_size)/in_size)
+        total_cpu_time = sum(exp.stage_time.values())
+        system_in_bw = 8*float(in_size)/handoff_time/1024.0/1024.0
+        system_out_bw = 8*float(out_size)/handoff_time/1024.0/1024.0
+        print "workload: %s (%s)" % (inputfile, workload)
+        print "total\tdown\tcpu\tin-size\tout\tin-bw\tout-bw"
+        print "%4.2f\t%4.2f\t%4.2f\t%6.2f\t%6.2f\t%6.2f\t%6.2f" % (handoff_time, migration_downtime, total_cpu_time, in_size/1024.0/1024, out_size/1024.0/1024, system_in_bw, system_out_bw)
+
+
+
     else:
         pass
         '''

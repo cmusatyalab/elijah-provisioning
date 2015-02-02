@@ -19,7 +19,6 @@
 #
 
 import os
-import affinity
 
 
 class ConfigurationError(Exception):
@@ -151,6 +150,7 @@ class Options(object):
 class VMOverlayCreationMode(object):
     PIPE_ONE_ELEMENT_SIZE = 4096*100 # 400KB == Max Pipe size is 1MB
     EMULATED_BANDWIDTH_Mbps = 100000 # Mbps
+    USE_STATIC_NETWORK_BANDWIDTH = -1 # only used for experiement. If it's bigger than 0, adaptation use this value to transmit over the network
     MEASURE_AVERAGE_TIME    = 2 # seconds
     MAX_THREAD_NUM = 4
 
@@ -159,6 +159,8 @@ class VMOverlayCreationMode(object):
 
     LIVE_MIGRATION_FINISH_ASAP = 1
     LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE = 2
+    LIVE_MIGRATION_FINISH_AT_2ND_ITERATION  = 3
+    LIVE_MIGRATION_FINISH_AT_3RD_ITERATION  = 4
     LIVE_MIGRATION_STOP = LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
 
     def __init__(self, num_cores=4):
@@ -196,6 +198,7 @@ class VMOverlayCreationMode(object):
 
     @staticmethod
     def set_num_cores(num_cores):
+        import affinity
         # assuming 8 cores
         affinity_mask = 0x01
         if num_cores == 1:
@@ -218,6 +221,7 @@ class VMOverlayCreationMode(object):
 
     @staticmethod
     def get_num_cores():
+        import affinity
         num_cores = 0
         affinity_mask = affinity.get_process_affinity_mask(os.getpid())
         if affinity_mask == 0x02:     # cpu 1
@@ -231,6 +235,22 @@ class VMOverlayCreationMode(object):
         else:
             raise Exception("Do not allocate more than 4 cores at this experiement")
         return num_cores
+
+    @staticmethod
+    def get_cpu_core_index():
+        import affinity
+        num_cores = 0
+        affinity_mask = affinity.get_process_affinity_mask(os.getpid())
+        if affinity_mask == 0x02:     # cpu 1
+            return [1]
+        elif affinity_mask == 0x06:    # cpu 1,2
+            return [1,2]
+        elif affinity_mask == 0x0e:    # cpu 1,2,3
+            return [1,2,3]
+        elif affinity_mask == 0x1e: # cpu 1,2,3,4
+            return [1,2,3,4]
+        else:
+            raise Exception("Do not allocate more than 4 cores at this experiement")
 
 
     def get_mode_id(self):

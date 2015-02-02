@@ -70,7 +70,7 @@ class MigrationMode(object):
 
     @staticmethod
     def get_system_throughput(num_cores, total_p, total_r):
-        system_block_per_sec = (1/total_p*1000) * num_cores
+        system_block_per_sec = (1/total_p*1000) * num_cores*0.7
         system_in_mbps = system_block_per_sec*BIT_PER_BLOCK/1024.0/1024
         system_out_mbps = system_in_mbps * total_r# mbps
         return system_block_per_sec, system_in_mbps, system_out_mbps

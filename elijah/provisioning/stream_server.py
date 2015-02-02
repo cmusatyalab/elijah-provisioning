@@ -58,8 +58,6 @@ from delta import DeltaItem
 LOG = logging.getLogger(__name__)
 session_resources = dict()   # dict[session_id] = obj(SessionResource)
 
-PERIODIC_ACK_BYTES = 200 * 1024 # every 100 KB
-
 
 class StreamSynthesisError(Exception):
     pass
@@ -150,6 +148,7 @@ class RecoverDeltaProc(multiprocessing.Process):
 
             overlay_chunk_ids = list()
             # recv_data is a single blob so that it contains whole DeltaItem
+            LOG.debug("%f\trecover one blob" % (time.time()))
             delta_item_list = RecoverDeltaProc.from_buffer(recv_data)
             for delta_item in delta_item_list:
                 ret = self.recover_item(delta_item)
@@ -580,7 +579,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 if blob_size == None:
                     raise StreamSynthesisError("Failed to receive blob")
                 if blob_size == 0:
-                    print "end of stream"
+                    LOG.debug("%f\tend of stream" % (time.time()))
                     break
                 blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
                 blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
@@ -589,7 +588,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 # send ack right before getting the blob
                 ack_data = struct.pack("!Q", 0x01)
                 self.request.send(ack_data)
-                compressed_blob = self._recv_all(blob_size, ack_size=100*1024) # send ack for every 100KB
+                compressed_blob = self._recv_all(blob_size, ack_size=200*1024)
                 # send ack right after getting the blob
                 ack_data = struct.pack("!Q", 0x02)
                 self.request.send(ack_data)
@@ -599,16 +598,15 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 disk_chunk_set = set(["%ld:1" % item for item in blob_disk_chunk])
                 memory_chunk_all.update(memory_chunk_set)
                 disk_chunk_all.update(disk_chunk_set)
-                sys.stdout.write("process one blob\n")
+                LOG.debug("%f\treceive one blob" % (time.time()))
                 recv_blob_counter += 1
-
         except Exception, e:
             sys.stderr.write("%sn" % str(e))
             sys.stderr.write("failed at %sn" % str(traceback.format_exc()))
 
         network_out_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
         delta_proc.join()
-        print "deltaproc join"
+        LOG.debug("%f\tdeltaproc join" % (time.time()))
 
         # We told to FUSE that we have everything ready, so we need to wait
         # until delta_proc fininshes. we cannot start VM before delta_proc

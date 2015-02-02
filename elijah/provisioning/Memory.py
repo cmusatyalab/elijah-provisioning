@@ -432,6 +432,8 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         self.num_proc = VMOverlayCreationMode.MAX_THREAD_NUM
         self.diff_algorithm = overlay_mode.MEMORY_DIFF_ALGORITHM
 
+        self.monitor_current_iteration = multiprocessing.RawValue(ctypes.c_ulong, 0)
+
         super(CreateMemoryDeltalist, self).__init__(target=self.create_memory_deltalist)
 
     def create_memory_deltalist(self):
@@ -538,10 +540,12 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 blob_offset, = struct.unpack(Memory.CHUNK_HEADER_FMT, header)
                 iter_seq = (blob_offset & Memory.ITER_SEQ_MASK) >> Memory.ITER_SEQ_SHIFT
                 if iter_seq != self.iteration_seq:
-                    msg = "adaptation\tnew iteration\t%f\t%d\t%d\t%d" % (time.time(), self.iteration_seq, iter_seq, self.iteration_size)
+                    msg = "adaptation\tqemu_control\tstart iteration\t%f\t%d\t%d\t%d" % \
+                        (time.time(), self.iteration_seq, iter_seq, self.iteration_size)
                     self.iteration_seq = iter_seq
                     LOG.debug(msg)
                     self.iteration_size = 0
+                    self.monitor_current_iteration.value = iter_seq
             ret_chunks.append(chunked_data)
             self.iteration_size += chunked_data_size
         return ret_chunks
@@ -681,11 +685,12 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             if len(self.measure_history) >= 1:
                 prev_measure_values = self.measure_history[-1]
             prev_m_time, prev_process_time, prev_block_count, prev_insize, prev_outsize = prev_measure_values
-            if prev_process_time < total_process_time:
+            monitor_insize = total_input_size + header_in_size
+            monitor_outsize = total_output_size + header_out_size
+            if (prev_process_time < total_process_time) and (prev_block_count < total_block_count)\
+                    and (monitor_insize > prev_insize) and (monitor_outsize > prev_outsize):
                 monitor_p = total_process_time/total_block_count
                 monitor_r = float(total_output_size)/total_input_size
-                monitor_insize = total_input_size + header_in_size
-                monitor_outsize = total_output_size + header_out_size
                 self.monitor_total_time_block.value = monitor_p
                 self.monitor_total_ratio_block.value = monitor_r
                 self.monitor_total_input_size.value = monitor_insize
@@ -969,9 +974,9 @@ class MemoryDiffProc(multiprocessing.Process):
                 if command == "new_mode":
                     new_mode = value
                     new_diff_algorithm = new_mode.get("diff_algorithm", None)
-                    sys.stdout.write("Change diff algorithm for memory from (%s) to (%s)\n" %
-                                    (self.diff_algorithm, new_diff_algorithm))
                     if new_diff_algorithm is not None:
+                        LOG.debug("change-mode\t%fmemory\t%s -> %s" %\
+                                (time.time(), self.diff_algorithm, new_diff_algorithm))
                         self.diff_algorithm = new_diff_algorithm
                 elif command == "new_num_cores":
                     new_num_cores = value

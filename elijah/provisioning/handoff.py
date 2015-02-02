@@ -28,6 +28,7 @@ import hashlib
 import libvirt
 import shutil
 import traceback
+import psutil
 import struct
 import msgpack
 from tempfile import NamedTemporaryFile
@@ -244,8 +245,6 @@ class VMMonitor(object):
         else:
             trim_dict = dict()
         free_memory_dict = dict()
-        time_parse_trim_log = time.time()
-
         time3 = time.time()
         # 3. get used sector information from x-ray
         used_blocks_dict = None
@@ -409,8 +408,10 @@ class LibvirtThread(threading.Thread):
 
 
 class QmpThread(threading.Thread):
-    def __init__(self, qmp_path, memory_snapshot_queue, compdata_queue, overlay_mode, fuse_stream_monitor):
+    def __init__(self, qmp_path, process_controller, memory_snapshot_queue,
+                 compdata_queue, overlay_mode, fuse_stream_monitor):
         self.qmp_path = qmp_path
+        self.process_controller = process_controller
         self.memory_snapshot_queue = memory_snapshot_queue
         self.compdata_queue = compdata_queue
         self.overlay_mode = overlay_mode
@@ -433,7 +434,7 @@ class QmpThread(threading.Thread):
         self.done_configuration = True
 
     def control_migration(self):
-        LOG.debug("%f\tqemu_control\tstart_thread" % time.time())
+        LOG.debug("qemu_control\t%f\tstart_thread" % time.time())
         if self.done_configuration is False:
             self.config_migration()
 
@@ -442,38 +443,97 @@ class QmpThread(threading.Thread):
 
         if VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
             self.migration_stop_time = self._stop_migration()
-        elif VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE:
-            iteration_issue_time_list = list()
-            sleep_between_iteration = 2
-            while(not self.stop.wait(0.1)):
-                unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
-                    VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
-                if unprocessed_memory_snapshot_size < 1024*1024*100: # 10 MB
-                    LOG.debug("qemu_control\titerate_raw_live")
-                    ret = self.qmp.iterate_raw_live()
-                    iteration_issue_time_list.append(time.time())
-                    time.sleep(sleep_between_iteration)
-
-                if len(iteration_issue_time_list) < 2:
+        elif VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_AT_2ND_ITERATION:
+            LOG.debug("qemu_control\tLIVE_MIGRATION_FINISH_AT_2ND_ITERATION")
+            iteration_issued = dict()
+            while(not self.stop.wait(1)):
+                iter_num = self.process_controller.get_migration_iteration_count()
+                if iter_num == None:
                     continue
 
+                unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
+                    VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
+                LOG.debug("qemu_control\tdata left: %s" % (unprocessed_memory_snapshot_size))
+                if unprocessed_memory_snapshot_size < 1024*1024*50: # 100 MB
+                    is_iter_requested = iteration_issued.get(iter_num, False)
+                    LOG.debug("qemu_control\titeration num: %s\t%s\t" % (iter_num, is_iter_requested))
+                    if is_iter_requested == False:
+                        if iter_num == 5:
+                            if self.compdata_queue.qsize() == 0:
+                                # stop after transmitting everything
+                                self.migration_stop_time = self._stop_migration()
+                                LOG.debug("qemu_control\trequest stop iteration at %d(%s)\t" % (iter_num, self.compdata_queue.qsize()))
+                                iteration_issued[iter_num] = True
+                                break
+                            else:
+                                LOG.debug("qemu_control\twait before stop until transfer everything")
+                        else:
+                            LOG.debug("qemu_control\t%f\trequest new iteration %d\t" % \
+                                      (time.time(), iter_num+1))
+                            ret = self.qmp.iterate_raw_live()
+                            if True:
+                                iteration_issued[iter_num] = True
+                                time.sleep(2)
+                            else:
+                                LOG.debug("qemu_control\t%f\tfailed to issue new iteration %d" %\
+                                          (time.time(), iter_num+1))
+
+        elif VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_AT_3RD_ITERATION:
+            pass
+        elif VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE:
+            iteration_issued = dict()
+            iteration_issue_time_list = list()
+            sleep_between_iteration = 2
+            loopping_period = 0.1
+            while(not self.stop.wait(loopping_period)):
+                iter_num = self.process_controller.get_migration_iteration_count()
+                unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
+                    VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
+
+                # issue new iteration
+                is_new_request_issued = False
+                if unprocessed_memory_snapshot_size < 1024*1024*10: # 10 MB
+                    LOG.debug("qemu_control\t%f\tready to request new iteration %d" % (time.time(), (iter_num+1)))
+                    is_iter_requested = iteration_issued.get(iter_num, False)
+                    if is_iter_requested is False:
+                        # request new iteration
+                        LOG.debug("qemu_control\t%f\trequest new iteration %d\t" % \
+                                  (time.time(), iter_num+1))
+                        ret = self.qmp.iterate_raw_live()
+                        iteration_issued[iter_num] = True
+                        iteration_issue_time_list.append(time.time())
+                        time.sleep(sleep_between_iteration)
+                        is_new_request_issued = True
+                    else:
+                        # already requested, but no more data to process
+                        iteration_issue_time_list.append(time.time())
+                        LOG.debug("qemu_control\t%f\trepeat new iteration %d\t" % \
+                                  (time.time(), iter_num+1))
+                        is_new_request_issued = True
+
+                if is_new_request_issued == False or (len(iteration_issue_time_list) < 2):
+                    continue
+
+                # check end condition
                 lastest_time_diff = iteration_issue_time_list[-1] - iteration_issue_time_list[-2]
-                LOG.debug("qemu_control\tin_data_size:%d\ttime_between_iter:%f" % \
-                          (unprocessed_memory_snapshot_size, lastest_time_diff))
-                if lastest_time_diff < sleep_between_iteration*1.5:
+                threshold = (loopping_period + sleep_between_iteration)*1.5
+                LOG.debug("qemu_control\t%f\tin_data_size:%d\ttime_between_iter:%f (<%f)" % \
+                          (time.time(), unprocessed_memory_snapshot_size,
+                           lastest_time_diff, threshold))
+                if lastest_time_diff < threshold:
                     counter_check_comp_size += 1
-                    LOG.debug("qemu_control\toutput_queue_size:%d\titer_count:%d" %\
-                              (self.compdata_queue.qsize(), len(iteration_issue_time_list)))
+                    LOG.debug("qemu_control\t%f\toutput_queue_size:%d\titer_count:%d" %\
+                              (time.time(),
+                               self.compdata_queue.qsize(), len(iteration_issue_time_list)))
                     if self.compdata_queue.qsize() == 0:
                         # stop after transmitting everything
                         self.migration_stop_time = self._stop_migration()
                         break
-                    if len(iteration_issue_time_list) > 5:
+                    if len(iteration_issue_time_list) >= 5:
                         self.migration_stop_time = self._stop_migration()
                         break
 
         self.qmp.disconnect()
-
 
     def _stop_migration(self):
         LOG.debug("qemu_control\tsent stop_raw_live signal at %f" % time.time())
@@ -751,6 +811,49 @@ def _generate_overlaymeta(overlay_metapath, overlay_info, base_hashvalue,
     return overlay_metapath
 
 
+class CPUMonitor(threading.Thread):
+    def __init__(self):
+        self.cpu_percent_list = list()
+        self.stop = threading.Event()
+        threading.Thread.__init__(self, target=self.monitor_cpu)
+
+    def getCPUUsage(self):
+        return self.core_cpus
+
+    def monitor_cpu(self):
+        while(not self.stop.wait(1)):
+            cpu_usage = psutil.cpu_percent(interval=0, percpu=True)
+            cur_time = time.time()
+            self.cpu_percent_list.append((cur_time, cpu_usage))
+            #LOG.debug("cpu_usage\t%f\t%s" % (cur_time, str(cpu_usage)))
+
+    def average_cpu_time(self, start_time, end_time, assigned_core_list):
+        core_cpus = {}.fromkeys(range(8), 0)
+        count_datapoint = 0
+
+        # sum across datapoints
+        for (measured_time, cpu_percent) in self.cpu_percent_list:
+            if measured_time < start_time:
+                #LOG.debug("cpu_usage\tbefore start processing: %s" % cpu_percent)
+                continue
+            if measured_time > end_time:
+                #LOG.debug("cpu_usage\tafter finish processing: %s" % cpu_percent)
+                continue
+            for index, each_core in enumerate(cpu_percent):
+                core_cpus[index] += each_core
+            count_datapoint += 1
+        for index in core_cpus:
+            core_cpus[index] = core_cpus[index]/count_datapoint
+        LOG.debug("cpu_usage\t%f\t%s" % (time.time(), str(core_cpus)))
+
+        avg_cpu_percent = 0.0
+        for core_index in assigned_core_list:
+            avg_cpu_percent += core_cpus[core_index]
+        return avg_cpu_percent/len(assigned_core_list)
+
+    def terminate(self):
+        self.stop.set()
+
 
 def create_residue(base_disk, base_hashvalue,
                    basedisk_hashdict, basemem_hashdict,
@@ -760,6 +863,18 @@ def create_residue(base_disk, base_hashvalue,
     '''Get residue
     return overlay_metafile, overlay_files
     '''
+
+    # set affinity of VM not to disturb the migration
+    core_index = VMOverlayCreationMode.get_cpu_core_index()
+    assigned_core_list = VMOverlayCreationMode.get_cpu_core_index()
+    excluded_core_list = list(set(range(0,8)) - set(assigned_core_list))
+    for proc in psutil.process_iter():
+        if proc.name.lower().startswith("cloudlet_"):
+            proc.set_cpu_affinity(excluded_core_list)
+            LOG.debug("affinity\tset affinity of %s to %s" % (proc.name, excluded_core_list))
+
+
+    cpu_stat_start = psutil.cpu_times(percpu = True)
     time_start = time.time()
     process_controller = process_manager.get_instance()
     if overlay_mode == None:
@@ -791,6 +906,10 @@ def create_residue(base_disk, base_hashvalue,
             Const.get_basepath(base_disk, check_exist=True)
     qemu_logfile = resumed_vm.qemu_logfile
 
+    # start CPU Monitor
+    cpu_monitor = CPUMonitor()
+    cpu_monitor.start()
+
     memory_snapshot_queue = multiprocessing.Queue(overlay_mode.QUEUE_SIZE_MEMORY_SNAPSHOT)
     residue_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_OPTIMIZATION)
     compdata_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_COMPRESSION)
@@ -809,8 +928,9 @@ def create_residue(base_disk, base_hashvalue,
     if (time_ss-time_start) > 5:
         raise HandoffError("Time for serialized step takes too long. Check get_monitoring_info()")
 
-    qmp_thread = QmpThread(resumed_vm.qmp_channel, memory_snapshot_queue,
-                           compdata_queue, overlay_mode, resumed_vm.monitor)
+    qmp_thread = QmpThread(resumed_vm.qmp_channel, process_controller,
+                           memory_snapshot_queue, compdata_queue,
+                           overlay_mode, resumed_vm.monitor)
     qmp_thread.daemon = True
     qmp_thread.config_migration()
 
@@ -886,11 +1006,11 @@ def create_residue(base_disk, base_hashvalue,
         client = StreamSynthesisClient(migration_dest_ip, metadata, compdata_queue)
         client.start()
         client.join()
+        cpu_stat_end = psutil.cpu_times(percpu=True)
         time_network_end = time.time()
         LOG.debug("[time] Network transmission (%f~%f):%f" % (time_network_start,
                                                               time_network_end,
                                                               (time_network_end-time_network_start)))
-
         cpu_stat = process_controller.cpu_statistics
         process_manager.kill_instance()
 
@@ -912,6 +1032,27 @@ def create_residue(base_disk, base_hashvalue,
                                                                 (time_finish_transmission-time_start)))
         LOG.debug("[time] Start ~ Finish migration (%f ~ %f): %f" % (time_start, vm_resume_time_at_dest,
                                                                 (vm_resume_time_at_dest-time_start)))
+        # measure CPU usage
+        cpu_monitor.terminate()
+        cpu_monitor.join()
+        avg_cpu_usage = cpu_monitor.average_cpu_time(time_start, time_finish_transmission, assigned_core_list)
+        LOG.debug("cpu_usage\t%f\taverage\t%s" % (time.time(), avg_cpu_usage))
+
+        # measrue CPU time
+        cpu_user_time = 0.0
+        cpu_sys_time = 0.0
+        cpu_idle_time = 0.0
+        for core_index in assigned_core_list:
+            cpu_time_start = cpu_stat_start[core_index]
+            cpu_time_end = cpu_stat_end[core_index]
+            cpu_user_time += (cpu_time_end[0] - cpu_time_start[0])
+            cpu_sys_time += (cpu_time_end[2] - cpu_time_start[2])
+            cpu_idle_time += (cpu_time_end[3] - cpu_time_start[3])
+        cpu_total_time = cpu_user_time+cpu_sys_time
+        LOG.debug("cpu_usage\t%f\tostime\t%s\t%f\t%f %%(not accurate)" %\
+                  (time.time(), assigned_core_list,
+                   cpu_total_time, 100.0*cpu_total_time/(cpu_total_time+cpu_idle_time)))
+
         return None
     elif migration_addr.startswith("file"):
         temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")
@@ -932,10 +1073,11 @@ def create_residue(base_disk, base_hashvalue,
             qmp_thread.start()
         # wait to finish creating files
         synthesis_file.join()
-        time_end_transfer = time.time()
         LOG.debug("[time] Time for finishing transferring (%f ~ %f): %f" % (time_start,
                                                                             time_end_transfer,
                                                                             (time_end_transfer-time_start)))
+        time_end_transfer = time.time()
+
         overlay_info, overlay_files = synthesis_file.get_overlay_info()
 
         overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
@@ -955,8 +1097,9 @@ def create_residue(base_disk, base_hashvalue,
                                                                     (time_packaging_end-time_packaging_start)))
 
         # 7. terminting
+        qmp_thread.join()
         cpu_stat = process_controller.cpu_statistics
-        #open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
+        open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
         process_manager.kill_instance()
 
         memory_read_proc.finish()   # deallocate resources for snapshotting
@@ -973,5 +1116,10 @@ def create_residue(base_disk, base_hashvalue,
 
         LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
                                                                 (time_end-time_start)))
+        cpu_monitor.terminate()
+        cpu_monitor.join()
+        assigned_core_list = VMOverlayCreationMode.get_cpu_core_index()
+        avg_cpu_usage = cpu_monitor.average_cpu_time(time_start, time_finish_transmission, assigned_core_list)
+        LOG.debug("cpu_usage\t%f\taverage\t%s" % (time.time(), avg_cpu_usage))
         return overlay_zipfile
 
