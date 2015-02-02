@@ -46,7 +46,7 @@ def profiling_workload():
     NUM_CPU_CORES = 1
     mode_list = list()
     for repeat in xrange(3):
-        for diff in ("xor", "xdelta3"):    #("xdelta3", "bsdiff", "none"):
+        for diff in ("xor", "xdelta3", "bsdiff", "none"):
             for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
                 for comp_level in [1, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
                     overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
@@ -136,8 +136,8 @@ if __name__ == "__main__":
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     delta = "/home/krha/cloudlet/image/overlay/vmhandoff/workload-delta.zip"
     workloads = [
-        (linux_base_path, delta),
-        #(linux_base_path, moped),
+        #(linux_base_path, delta),
+        (linux_base_path, moped),
         #(linux_base_path, random),
         #(windows_base_path, mar),
         #(linux_base_path, speech),

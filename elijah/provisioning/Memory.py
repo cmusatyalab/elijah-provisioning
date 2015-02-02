@@ -947,7 +947,7 @@ class MemoryDiffProc(multiprocessing.Process):
         super(MemoryDiffProc, self).__init__(target=self.process_diff)
 
     def process_diff(self):
-        self.memory_offset_list = list()
+        #self.memory_offset_list = list()
         self.raw_file = open(self.basemem_path, "rb")
         self.raw_mmap = mmap.mmap(self.raw_file.fileno(), 0, prot=mmap.PROT_READ)
         self.raw_filesize = os.path.getsize(self.basemem_path)
@@ -1000,7 +1000,7 @@ class MemoryDiffProc(multiprocessing.Process):
                     iter_seq = (ram_offset & Memory.ITER_SEQ_MASK) >> Memory.ITER_SEQ_SHIFT
                     ram_offset = (ram_offset & Memory.CHUNK_POS_MASK) + self.libvirt_header_offset
                     #print "%d, %ld" % (iter_seq, ram_offset)
-                    self.memory_offset_list.append((iter_seq, ram_offset))
+                    #self.memory_offset_list.append((iter_seq, ram_offset))
 
                     # get data
                     data = data[Memory.CHUNK_HEADER_SIZE:]
@@ -1094,8 +1094,8 @@ class MemoryDiffProc(multiprocessing.Process):
             sys.stdout.write(msg)
 
         # to be deleted
-        import json
-        open("memory-access-order", "w").write(json.dumps(self.memory_offset_list))
+        #import json
+        #open("memory-access-order", "w").write(json.dumps(self.memory_offset_list))
 
     def get_raw_data(self, offset, length):
         # retrieve page data from raw memory

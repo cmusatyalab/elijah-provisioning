@@ -184,6 +184,19 @@ class ProcessManager(threading.Thread):
         sys.stdout.write("\n")
         return result
 
+    @staticmethod
+    def averaged_value(measure_hist, cur_time, avg_time=VMOverlayCreationMode.MEASURE_AVERAGE_TIME):
+        avg_value = float(0)
+        counter = 0
+        for (measured_time, value) in reversed(measure_hist):
+            if cur_time - measured_time > avg_time:
+                break
+            avg_value += value
+            counter += 1
+        #LOG.debug("coutning for avg : %d" % counter)
+        return float(avg_value)/counter
+
+
     def get_system_speed(self):
         worker_names = ["DeltaDedup", "CreateMemoryDeltalist",
                         "CreateDiskDeltalist", "CompressProc"]
@@ -273,19 +286,26 @@ class ProcessManager(threading.Thread):
         system_in_size = total_size_dict_in['CreateDiskDeltalist'] + total_size_dict_in['CreateMemoryDeltalist']
         cur_time = time.time()
         duration = cur_time - self.prev_measured_time
-        if duration >= 1:
-            system_out_bw_instant = 8.0*(system_output_size-self.prev_system_out_size)/duration/1024/1024
+        system_in_bw_actual = self.prev_system_in_bw
+        system_out_bw_actual = self.prev_system_out_bw
+        if (system_in_size > self.prev_system_in_size) and\
+                (system_output_size > self.prev_system_out_size):
             system_in_bw_instant = 8.0*(system_in_size-self.prev_system_in_size)/duration/1024/1024
-            self.cur_system_out_bw_list.append(system_out_bw_instant)
-            self.cur_system_in_bw_list.append(system_in_bw_instant)
+            system_out_bw_instant = 8.0*(system_output_size-self.prev_system_out_size)/duration/1024/1024
+            #LOG.debug("compress size: %s %s %s %s" % (system_out_bw_instant, system_output_size, self.prev_system_out_size, duration))
 
             self.prev_system_out_size = system_output_size
             self.prev_system_in_size = system_in_size
             self.prev_measured_time = cur_time
-        #averaging 5 data points (5 seconds)
-        datapoints = -5
-        system_out_bw_actual = float(sum(self.cur_system_out_bw_list[datapoints:]))/len(self.cur_system_out_bw_list[datapoints:])
-        system_in_bw_actual= float(sum(self.cur_system_in_bw_list[datapoints:]))/len(self.cur_system_in_bw_list[datapoints:])
+            self.prev_system_out_bw = system_out_bw_instant
+            self.prev_system_in_bw = system_in_bw_instant
+
+            self.cur_system_in_bw_list.append((cur_time, system_in_bw_instant))
+            self.cur_system_out_bw_list.append((cur_time, system_out_bw_instant))
+            #system_in_bw_actual = self.averaged_value(self.cur_system_in_bw_list, cur_time, 1)
+            #system_out_bw_actual = self.averaged_value(self.cur_system_out_bw_list, cur_time, 1)
+            system_in_bw_actual = system_in_bw_instant
+            system_out_bw_actual = system_out_bw_instant
 
         return p_dict, r_dict, p_dict_cur, r_dict_cur, \
             total_p, total_r, total_p_cur, total_r_cur, \
@@ -312,6 +332,8 @@ class ProcessManager(threading.Thread):
         self.time_start = time.time()
         self.prev_system_out_size = 0
         self.prev_system_in_size = 0
+        self.prev_system_out_bw = 0
+        self.prev_system_in_bw = 0
         self.prev_measured_time = self.time_start
         self.cur_system_in_bw_list = list()
         self.cur_system_out_bw_list = list()
@@ -361,8 +383,6 @@ class ProcessManager(threading.Thread):
                      total_p_cur, total_r_cur)
 
                 LOG.debug(msg)
-
-                continue
 
                 # first predict at 2 seconds and then for every 5 seconds
                 if time_from_start > 5 and (time_current_iter - time_prev_mode_change) > 5:
@@ -446,9 +466,10 @@ class ProcessManager(threading.Thread):
                 #result = self._get_queue_length()
                 #time.sleep(0.1)
             except Exception as e:
-                sys.stdout.write("[manager] Exception")
+                sys.stdout.write("[manager] Exception\n")
                 sys.stderr.write(traceback.format_exc())
                 sys.stderr.write("%s\n" % str(e))
+                sys.stdout.write("[manager] Exception\n")
 
     def register(self, worker):
         worker_name = getattr(worker, "worker_name", "NoName")

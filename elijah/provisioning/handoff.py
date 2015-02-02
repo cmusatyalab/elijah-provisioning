@@ -405,9 +405,7 @@ class LibvirtThread(threading.Thread):
         threading.Thread.__init__(self, target=self.save_mem)
 
     def save_mem(self):
-        LOG.debug("%f\taaaaaaaaaaaaaa before start saving command" % (time.time()))
         self.machine.save(self.outputpath)
-        LOG.debug("%f\taaaaaaaaaaaaaa after start saving command" % (time.time()))
 
 
 class QmpThread(threading.Thread):
@@ -428,13 +426,14 @@ class QmpThread(threading.Thread):
         ret = self.qmp.qmp_negotiate()
         if not ret:
             raise HandoffError("failed to connect to qmp channel")
-        #ret = self.qmp.randomize_raw_live()  # randomize page output order
-        #if not ret:
-        #    raise HandoffError("failed to randomize memory order")
-        #LOG.debug("%f\trandomization\tmemory randomization success" % (time.time()))
+        ret = self.qmp.randomize_raw_live()  # randomize page output order
+        if not ret:
+            raise HandoffError("failed to randomize memory order")
+        LOG.debug("%f\trandomization\tmemory randomization success" % (time.time()))
         self.done_configuration = True
 
     def control_migration(self):
+        LOG.debug("%f\tqemu_control\tstart_thread" % time.time())
         if self.done_configuration is False:
             self.config_migration()
 
@@ -449,9 +448,8 @@ class QmpThread(threading.Thread):
             while(not self.stop.wait(0.1)):
                 unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
                     VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
-                #LOG.debug("[live] %d" % unprocessed_memory_snapshot_size)
-                if unprocessed_memory_snapshot_size < 1024*1024*10: # 10 MB
-                    LOG.debug("[live][qmp] iterate_raw_live")
+                if unprocessed_memory_snapshot_size < 1024*1024*100: # 10 MB
+                    LOG.debug("qemu_control\titerate_raw_live")
                     ret = self.qmp.iterate_raw_live()
                     iteration_issue_time_list.append(time.time())
                     time.sleep(sleep_between_iteration)
@@ -459,9 +457,13 @@ class QmpThread(threading.Thread):
                 if len(iteration_issue_time_list) < 2:
                     continue
 
-                latest_time_diff = iteration_issue_time_list[-1] - iteration_issue_time_list[-2]
-                if latest_time_diff < sleep_between_iteration*1.4:
+                lastest_time_diff = iteration_issue_time_list[-1] - iteration_issue_time_list[-2]
+                LOG.debug("qemu_control\tin_data_size:%d\ttime_between_iter:%f" % \
+                          (unprocessed_memory_snapshot_size, lastest_time_diff))
+                if lastest_time_diff < sleep_between_iteration*1.5:
                     counter_check_comp_size += 1
+                    LOG.debug("qemu_control\toutput_queue_size:%d\titer_count:%d" %\
+                              (self.compdata_queue.qsize(), len(iteration_issue_time_list)))
                     if self.compdata_queue.qsize() == 0:
                         # stop after transmitting everything
                         self.migration_stop_time = self._stop_migration()
@@ -474,10 +476,9 @@ class QmpThread(threading.Thread):
 
 
     def _stop_migration(self):
-        #self._waiting(self.timeout)
-        LOG.debug("[live] sent stop_raw_live signal at %f" % time.time())
+        LOG.debug("qemu_control\tsent stop_raw_live signal at %f" % time.time())
         stop_time = self.qmp.stop_raw_live()
-        LOG.debug("[live] stop migration at %f" % stop_time)
+        LOG.debug("qemu_control\tstop migration at %f" % stop_time)
         self.fuse_stream_monitor.terminate()
         return stop_time
 
@@ -771,10 +772,10 @@ def create_residue(base_disk, base_hashvalue,
         VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
 
-        overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_BZIP2
-        overlay_mode.COMPRESSION_ALGORITHM_SPEED = 5
-        overlay_mode.MEMORY_DIFF_ALGORITHM = "xdelta3"
-        overlay_mode.DISK_DIFF_ALGORITHM = "xdelta3"
+        overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP
+        overlay_mode.COMPRESSION_ALGORITHM_SPEED = 1
+        overlay_mode.MEMORY_DIFF_ALGORITHM = "none"
+        overlay_mode.DISK_DIFF_ALGORITHM = "none"
 
     process_controller.set_mode(overlay_mode, migration_addr)
     LOG.info("* LIVE MIGRATION STRATEGY: %d" % VMOverlayCreationMode.LIVE_MIGRATION_STOP)

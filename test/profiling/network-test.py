@@ -44,9 +44,9 @@ if __name__ == "__main__":
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
-        (windows_base_path, mar),
-        #(linux_base_path, moped),
+        (linux_base_path, moped),
         #(linux_base_path, speech),
+        #(windows_base_path, mar),
         #(windows_base_path, face),
         #(linux_base_path, random),
         #(linux_base_path, fluid),
@@ -58,23 +58,24 @@ if __name__ == "__main__":
             raise ProfilingError("Invalid path to %s" % overlay_path)
 
     VMOverlayCreationMode.MAX_THREAD_NUM = 1
-    VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
     #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
-    #bandwidth = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 50]
-    bandwidth = [20]
+    bandwidth = [1, 5, 10, 20, 30, 40, 50, 50]
+    #bandwidth = [20]
     bandwidth.reverse()
     for (base_path, overlay_path) in workloads:
         for network_bw in bandwidth:
-            # generate mode
-            overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=1)
-            overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP
-            overlay_mode.COMPRESSION_ALGORITHM_SPEED = 5
-            overlay_mode.MEMORY_DIFF_ALGORITHM = "xdelta3"
-            overlay_mode.DISK_DIFF_ALGORITHM = "xdelta3"
+            for stop_condition in [VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP]:
+                # generate mode
+                VMOverlayCreationMode.LIVE_MIGRATION_STOP = stop_condition
+                overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=1)
+                overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_BZIP2
+                overlay_mode.COMPRESSION_ALGORITHM_SPEED = 5
+                overlay_mode.MEMORY_DIFF_ALGORITHM = "xdelta3"
+                overlay_mode.DISK_DIFF_ALGORITHM = "xdelta3"
 
-            VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps = network_bw
-            LOG.debug("network-test\t%s (Mbps)" % VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps)
-            is_url, overlay_url = PackagingUtil.is_zip_contained(overlay_path)
-            run_profile(base_path, overlay_url, overlay_mode)
-            time.sleep(10)
+                VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps = network_bw
+                LOG.debug("network-test\t%s (Mbps)" % VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps)
+                is_url, overlay_url = PackagingUtil.is_zip_contained(overlay_path)
+                run_profile(base_path, overlay_url, overlay_mode)
+                time.sleep(10)
 

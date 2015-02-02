@@ -329,7 +329,7 @@ def print_bw_block(exps):
                                                       float(duration)/float(est_duration),
                                                       bw, total_p, total_r)
 
-def averaged_value(measure_history, duration):
+def averaged_pr(measure_history, duration):
     avg_p = float(0)
     avg_r = float(0)
     counter = 0
@@ -342,6 +342,18 @@ def averaged_value(measure_history, duration):
         counter += 1
     #print "%f measure last %d/%d" % (cur_time, counter, len(measure_history))
     return avg_p/counter, avg_r/counter
+
+
+def averaged_value(measure_hist, cur_time, avg_time=1):
+    avg_value = float(0)
+    counter = 0
+    for (measured_time, value) in reversed(measure_hist):
+        if cur_time - measured_time > avg_time:
+            break
+        avg_value += float(value)
+        counter += 1
+    #LOG.debug("coutning for avg : %d" % counter)
+    return float(avg_value)/counter
 
 
 def print_p_r_over_time(inputfile):
@@ -365,6 +377,8 @@ def print_p_r_over_time(inputfile):
             mode_change_log_lines.append(log)
 
     migration_start_time = 0
+    system_in_hist = list()
+    system_out_hist = list()
     iteration_time_list = list()
     p_and_r_list = list()
     measure_history = list()
@@ -373,6 +387,7 @@ def print_p_r_over_time(inputfile):
     p_list_cur = list()
     r_list = list()
     r_list_cur = list()
+    network_bw = 0.0
     system_in_bw_list = list()
     system_out_bw_list = list()
     system_out_bw_potential_list = list()
@@ -390,17 +405,26 @@ def print_p_r_over_time(inputfile):
              total_p_cur, total_r_cur) = line.split("\t")
             p_and_r_list.append((duration_measured, total_p, total_p_cur, total_r, total_r_cur))
             measure_history.append((float(duration_measured), float(total_p_cur), float(total_r_cur)))
+            network_bw = network_bw_mbps
 
             # data for plot
-            time_list.append(float(time_measured)-float(migration_start_time))
+            duration = float(time_measured)-float(migration_start_time)
+            time_list.append(duration)
             #time_list.append(duration_measured)
             p_list.append(float(total_p))
             p_list_cur.append(float(total_p_cur))
             r_list.append(float(total_r))
             r_list_cur.append(float(total_r_cur))
-            system_in_bw_list.append(float(system_in_bw_actual))
             system_out_bw_potential_list.append(float(system_out_bw_cur_est))
-            system_out_bw_list.append(float(system_out_bw_actual))
+
+            system_in_hist.append((float(time_measured), system_in_bw_actual))
+            system_out_hist.append((float(time_measured), system_out_bw_actual))
+            system_in_actual_avg = averaged_value(system_in_hist, float(time_measured), avg_time=2)
+            system_out_actual_avg = averaged_value(system_out_hist, float(time_measured), avg_time=2)
+            #system_in_actual_avg = system_in_bw_actual
+            #system_out_actual_avg = system_out_bw_actual
+            system_in_bw_list.append(system_in_actual_avg)
+            system_out_bw_list.append(system_out_actual_avg)
 
     # averaged p and r over time window
     p_list_avg1 = list()
@@ -408,8 +432,8 @@ def print_p_r_over_time(inputfile):
     r_list_avg1 = list()
     r_list_avg2 = list()
     for index, (duration_measured, total_p_cur, total_r_cur) in enumerate(measure_history):
-        avg_p1, avg_r1 = averaged_value(measure_history[0:index+1], 1)
-        avg_p2, avg_r2 = averaged_value(measure_history[0:index+1], 5)
+        avg_p1, avg_r1 = averaged_pr(measure_history[0:index+1], 1)
+        avg_p2, avg_r2 = averaged_pr(measure_history[0:index+1], 5)
         p_list_avg1.append(avg_p1)
         p_list_avg2.append(avg_p2)
 
@@ -426,7 +450,7 @@ def print_p_r_over_time(inputfile):
 
     # figure plot
     fig, ax = plt.subplots()
-    font = {'family' : 'sans-serif',
+    font = {'family' : 'Times New Roman',
             'weight' : 'normal',
             'size'   : 22}
     matplotlib.rc('font', **font)
@@ -447,14 +471,18 @@ def print_p_r_over_time(inputfile):
 
     # plot performance
     f2, (bw_plot)= plt.subplots(1, 1, sharex=True)
-    f2.set_size_inches(12,4)
+    f2.set_size_inches(12,5)
+    bw_plot.set_ylabel("Throughput (MBps)")
+    bw_plot.set_xlabel("Time (s)")
     bw_plot.set_title("BW - " + inputfile)
-    bw_plot.plot(time_list, system_in_bw_list, 'r-', label="System in BW")
-    bw_plot.plot(time_list, system_out_bw_list, 'b-', label="System out BW")
-    bw_plot.plot(time_list, system_out_bw_potential_list, 'b--', label="System out BW potential")
+    LINE_WIDTH = 3
+    bw_plot.plot(time_list, system_in_bw_list, 'r-', label="Input throughput", linewidth=LINE_WIDTH)
+    bw_plot.plot(time_list, system_out_bw_list, 'b-', label="Output throughput", linewidth=LINE_WIDTH)
+    bw_plot.plot(time_list, system_out_bw_potential_list, 'b--', label="Potential output throughput", linewidth=LINE_WIDTH)
     bw_plot.set_xlim([0, cur_xlim])
     #bw_plot.legend(shadow=True, bbox_to_anchor=(0., 1.02, 1., .102), loc=3)
-    bw_plot.legend(shadow=True, loc="best", prop={'size':6})
+    bw_plot.legend(shadow=True, loc="best", prop={'size':18})
+
     # plot mode change if it exists
     for each_mode_change in mode_change_log_lines:
         if each_mode_change.lower().find("current mode is the best") != -1:
@@ -462,7 +490,10 @@ def print_p_r_over_time(inputfile):
         mode_change_time = float(each_mode_change.split("\t")[0]) - migration_start_time
         #mode_change_time = float(each_mode_change.split("\t")[1])
         bw_plot.axvline(x=mode_change_time, linewidth=2, color='k')
-
+    f2.gca().grid(True)
+    bw_plot.axhline(y=network_bw, linewidth=1, color='g', linestyle='--')
+    plt.gcf().subplots_adjust(bottom=0.15)
+    #plt.gcf().subplots_adjust(left=0.01)
     plt.savefig(inputfile + "-bw" + '.png')
 
 
