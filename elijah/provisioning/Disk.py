@@ -446,11 +446,13 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
                         if len(self.measure_history) >= 1:
                             prev_measure_values = self.measure_history[-1]
                         prev_m_time, prev_process_time, prev_block_count, prev_insize, prev_outsize = prev_measure_values
-                        if prev_process_time < total_process_time:
+                        monitor_insize = total_input_size
+                        monitor_outsize = total_output_size
+                        if prev_process_time < total_process_time and (prev_block_count < total_block_count)\
+                                and (monitor_insize > prev_insize) and (monitor_outsize > prev_outsize):
+
                             monitor_p = total_process_time/total_block_count
                             monitor_r = float(total_output_size)/total_input_size
-                            monitor_insize = total_input_size
-                            monitor_outsize = total_output_size
                             self.monitor_total_time_block.value = monitor_p
                             self.monitor_total_ratio_block.value = monitor_r
                             self.monitor_total_input_size.value = monitor_insize

@@ -45,7 +45,7 @@ if __name__ == "__main__":
             print "do not change"
     elif command == "list-all":
         mode_profile = ModeProfile.load_from_file(inputfile)
-        cur_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=2)
+        cur_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=1)
         cur_mode.MEMORY_DIFF_ALGORITHM = "xdelta3"
         cur_mode.DISK_DIFF_ALGORITHM = "xdelta3"
         cur_mode.COMPRESSION_ALGORITHM_TYPE = 2
@@ -56,7 +56,7 @@ if __name__ == "__main__":
         scale_r = 1
         print "conf\t\t\t\tbottleneck by\tsystem BW\tnetwork BW\tblock processing/s"
         selected_mode_list = list()
-        for network_bw in xrange(1, 50, 1):
+        for network_bw in xrange(1, 200, 5):
             scaled_mode_list, current_block_per_sec = mode_profile.list_scaled_modes(cur_mode, scale_p, scale_r, network_bw)
             scaled_mode_list.sort(key=lambda item: item[1], reverse=True)
             selected_item = scaled_mode_list[0]
@@ -72,6 +72,8 @@ if __name__ == "__main__":
                 diff = MigrationMode.mode_diff(cur_mode.__dict__, new_mode_obj.mode)
                 print "%s|%s|%0.2f|%0.2f|%0.2f" % (diff_str, bottleneck, system_out_mbps, network_bw, actual_block_per_sec)
                 selected_mode_list.append(new_mode_obj.mode)
+            if network_bw == 31:
+                print "\n\n"
     elif command == "compare":
         another_inputfile = sys.argv[3]
         mode_profile1 = ModeProfile.load_from_file(inputfile)
