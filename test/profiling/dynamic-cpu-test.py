@@ -4,6 +4,7 @@ import os
 import sys
 sys.path.insert(0, "../../")
 
+import psutil
 import subprocess
 import traceback
 from datetime import datetime
@@ -19,8 +20,47 @@ LOG = logging.getLogger(__name__)
 from elijah.provisioning.Configuration import VMOverlayCreationMode
 from elijah.provisioning import synthesis as synthesis
 from elijah.provisioning.package import PackagingUtil
+from elijah.provisioning.handoff import _handoff_start_time
 
 
+class CPUCoreControl(threading.Thread):
+    def __init__(self):
+        self.stop = threading.Event()
+        # [(time1, [cores]), (time2, [cores]), ...]
+        self.network_bw_changes = [(20.0, [1,2]),
+                                   (40.0, [1])]
+        threading.Thread.__init__(self, target=self.core_change)
+
+    def core_change(self):
+        global _handoff_start_time
+
+        (activate_time, core_list) = self.network_bw_changes.pop(0)
+        while(not self.stop.wait(1)):
+            duration = time.time() - _handoff_start_time[0]
+            LOG.info("control_core\t%f\t%f\t%s" % (activate_time, duration, core_list))
+            if activate_time <= duration:
+                # change network BW
+                current_cores = VMOverlayCreationMode.get_num_cores()
+                cur_proc = psutil.Process(os.getpid())
+                cur_proc.set_cpu_affinity(core_list)
+                LOG.info("control_core\t%f\t%s\t%s --> %s" % (duration, cur_proc.name, current_cores, core_list))
+                children_proc_list = cur_proc.get_children()
+                for each_child_proc in children_proc_list:
+                    LOG.info("control_core\t%f\t%s\t%s --> %s" % (duration, cur_proc.name, current_cores, core_list))
+                    each_child_proc.set_cpu_affinity(core_list)
+
+                VMOverlayCreationMode.set_num_cores(len(core_list))
+                try:
+                    (activate_time, core_list) = self.network_bw_changes.pop(0)
+                except IndexError as e:
+                    LOG.info("control_core\tno more data")
+                    break
+            else:
+                continue
+        LOG.info("control_network\tfinish bw control thread")
+
+    def terminate(self):
+        self.stop.set()
 
 def run_file(base_path, overlay_path, overlay_mode):
     try:
@@ -71,33 +111,33 @@ if __name__ == "__main__":
             raise ProfilingError("Invalid path to %s" % overlay_path)
 
     num_core = 1
-    #bandwidth = [5, 10, 15, 20, 25, 30, 35, 40, 40]
-    bandwidth = [10]
-    bandwidth.reverse()
-    #num_cores_list = [1,1,2,3,4]; network_bw = 15
-
+    bandwidth = [15]
     for (base_path, overlay_path) in workloads:
         for network_bw in bandwidth:
-        #for num_core in num_cores_list:
             # confiure network using TC
             cmd = "sudo %s restart %d" % (os.path.abspath("./traffic_shaping"), network_bw)
             LOG.debug(cmd)
             LOG.debug(subprocess.check_output(cmd.split(" ")))
             VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH = network_bw
 
+            # start controlling number of cores
+            cpu_control = CPUCoreControl()
+            cpu_control.start()
+
             # generate mode
-            NUM_CORES = num_core
             VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
-            overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CORES)
-            overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP
-            overlay_mode.COMPRESSION_ALGORITHM_SPEED = 1
+            overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=4)
+            overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_LZMA
+            overlay_mode.COMPRESSION_ALGORITHM_SPEED = 5
             overlay_mode.MEMORY_DIFF_ALGORITHM = "none"
             overlay_mode.DISK_DIFF_ALGORITHM = "none"
 
-            LOG.debug("network-test\t%s-%s (Mbps)" % (VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH, num_core))
+            overlay_mode.set_num_cores(num_core)
+            LOG.debug("network-test\t%s-varying (Mbps)" % (num_core))
             is_url, overlay_url = PackagingUtil.is_zip_contained(overlay_path)
-            #run_file(base_path, overlay_url, overlay_mode)
             run_network(base_path, overlay_url, overlay_mode)
 
+            cpu_control.terminate()
+            cpu_control.join()
             time.sleep(30)
 

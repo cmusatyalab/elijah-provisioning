@@ -57,6 +57,11 @@ import log as logging
 
 LOG = logging.getLogger(__name__)
 
+# This is only for experiemental purpose.
+# It is used to measure the time for changing network BW or CPU cores at the
+# right time.
+_handoff_start_time = [sys.maxint]
+
 class HandoffError(Exception):
     pass
 
@@ -860,6 +865,7 @@ def create_residue(base_disk, base_hashvalue,
                    resumed_vm, options, original_deltalist,
                    migration_addr,
                    overlay_mode=None):
+    global _handoff_start_time
     '''Get residue
     return overlay_metafile, overlay_files
     '''
@@ -876,6 +882,8 @@ def create_residue(base_disk, base_hashvalue,
 
     cpu_stat_start = psutil.cpu_times(percpu = True)
     time_start = time.time()
+    _handoff_start_time[0] = time_start
+    LOG.info("control_network\tupdate start time: %f" % _handoff_start_time[0])
     process_controller = process_manager.get_instance()
     if overlay_mode == None:
         # serial mode for testing

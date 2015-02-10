@@ -19,8 +19,42 @@ LOG = logging.getLogger(__name__)
 from elijah.provisioning.Configuration import VMOverlayCreationMode
 from elijah.provisioning import synthesis as synthesis
 from elijah.provisioning.package import PackagingUtil
+from elijah.provisioning.handoff import _handoff_start_time
 
 
+class NetworkBWcontrol(threading.Thread):
+    def __init__(self):
+        self.stop = threading.Event()
+        # [(time1, BW1), (time2, BW2), ...]
+        self.network_bw_changes = [(0.0, 10),
+                                   (50.0, 30),
+                                   (100.0, 10)]
+        threading.Thread.__init__(self, target=self.bw_change)
+
+    def bw_change(self):
+        global _handoff_start_time
+
+        (activate_time, network_bw) = self.network_bw_changes.pop(0)
+        while(not self.stop.wait(1)):
+            duration = time.time() - _handoff_start_time[0]
+            #LOG.info("control_network\t%f\t%f\t%f" % (activate_time, duration, network_bw))
+            if activate_time <= duration:
+                # change network BW
+                cmd = "sudo %s restart %d" % (os.path.abspath("./traffic_shaping"), network_bw)
+                LOG.info("control_network\t%f\t%s" % (duration, cmd))
+                LOG.info("control_network\t%f\t%s" % (duration, subprocess.check_output(cmd.split(" "))))
+                VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH = network_bw
+                try:
+                    (activate_time, network_bw) = self.network_bw_changes.pop(0)
+                except IndexError as e:
+                    LOG.info("control_network\tno more data")
+                    break
+            else:
+                continue
+        LOG.info("control_network\tfinish bw control thread")
+
+    def terminate(self):
+        self.stop.set()
 
 def run_file(base_path, overlay_path, overlay_mode):
     try:
@@ -57,9 +91,9 @@ if __name__ == "__main__":
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
-        #(windows_base_path, mar),
+        (windows_base_path, mar),
         #(windows_base_path, face),
-        (linux_base_path, moped),
+        #(linux_base_path, moped),
         #(linux_base_path, speech),
         #(linux_base_path, random),
         #(linux_base_path, fluid),
@@ -70,20 +104,12 @@ if __name__ == "__main__":
         if os.path.exists(overlay_path) == False:
             raise ProfilingError("Invalid path to %s" % overlay_path)
 
-    num_core = 1
-    #bandwidth = [5, 10, 15, 20, 25, 30, 35, 40, 40]
-    bandwidth = [10]
-    bandwidth.reverse()
-    #num_cores_list = [1,1,2,3,4]; network_bw = 15
-
+    num_cores_list = [1]
     for (base_path, overlay_path) in workloads:
-        for network_bw in bandwidth:
-        #for num_core in num_cores_list:
-            # confiure network using TC
-            cmd = "sudo %s restart %d" % (os.path.abspath("./traffic_shaping"), network_bw)
-            LOG.debug(cmd)
-            LOG.debug(subprocess.check_output(cmd.split(" ")))
-            VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH = network_bw
+        for num_core in num_cores_list:
+            # start BW control
+            bw_control = NetworkBWcontrol()
+            bw_control.start()
 
             # generate mode
             NUM_CORES = num_core
@@ -94,10 +120,12 @@ if __name__ == "__main__":
             overlay_mode.MEMORY_DIFF_ALGORITHM = "none"
             overlay_mode.DISK_DIFF_ALGORITHM = "none"
 
-            LOG.debug("network-test\t%s-%s (Mbps)" % (VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH, num_core))
+            LOG.debug("network-test\tvarying-%s (Mbps)" % (num_core))
             is_url, overlay_url = PackagingUtil.is_zip_contained(overlay_path)
             #run_file(base_path, overlay_url, overlay_mode)
             run_network(base_path, overlay_url, overlay_mode)
 
+            bw_control.terminate()
+            bw_control.join()
             time.sleep(30)
 

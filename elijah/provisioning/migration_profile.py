@@ -4,6 +4,8 @@ import os
 import ast
 import json
 import math
+from collections import defaultdict
+from collections import OrderedDict
 from pprint import pprint
 from collections import defaultdict
 from Configuration import VMOverlayCreationMode
@@ -70,6 +72,7 @@ class MigrationMode(object):
 
     @staticmethod
     def get_system_throughput(num_cores, total_p, total_r):
+        #LOG.debug("num_core\t%d" % num_cores)
         system_block_per_sec = (1/total_p*1000) * num_cores*0.7
         system_in_mbps = system_block_per_sec*BIT_PER_BLOCK/1024.0/1024
         system_out_mbps = system_in_mbps * total_r# mbps
@@ -197,9 +200,23 @@ class ModeProfile(object):
         #          (cur_total_p, cur_total_r, profiled_mode_total_p, profiled_mode_total_r, scale_p, scale_r))
         scaled_mode_list, current_block_per_sec = self.list_scaled_modes(cur_mode, scale_p, scale_r, network_bw)
 
-        selected_item = sorted(scaled_mode_list, key=itemgetter(1), reverse=True)[0]
+        sorted_mode_list = sorted(scaled_mode_list, key=itemgetter(1), reverse=True)
+        selected_item = sorted_mode_list[0]
         selected_mode_obj = selected_item[0]
         selected_block_per_sec = selected_item[1]
+
+        #for sorted_item in sorted_mode_list:
+        #    (each_mode, actual_block_per_sec,\
+        #    (bottleneck, system_block_per_sec, system_in_mbps, system_out_mbps,\
+        #    network_block_per_sec, network_bw)) = sorted_item
+        #    diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, each_mode.mode)
+        #    LOG.debug("mode-predict\t(%s) %f %f %s --> %f %f, %f" % (each_mode.mode,
+        #                                                             network_bw,
+        #                                                             system_out_mbps,
+        #                                                             bottleneck,
+        #                                                             network_block_per_sec,
+        #                                                             system_block_per_sec,
+        #                                                             actual_block_per_sec))
 
         if selected_block_per_sec <= current_block_per_sec:
             return None
@@ -231,12 +248,11 @@ class ModeProfile(object):
             if id1 == id2:
                 current_block_per_sec = actual_block_per_sec
 
-            diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, each_mode.mode)
             data = (each_mode, actual_block_per_sec,
                     (bottleneck, system_block_per_sec, system_in_mbps, system_out_mbps,
                      network_block_per_sec, network_bw))
             scaled_mode_list.append(data)
-            #LOG.debug("mode-predict\t(%s) %f %f %s --> %f %f, %f" % (diff_str,
+            #LOG.debug("mode-predict\t(%s) %f %f %s --> %f %f, %f" % (each_mode.mode,
             #                                                         network_bw,
             #                                                         system_out_mbps,
             #                                                         bottleneck,
@@ -301,21 +317,30 @@ def parse_each_experiement(lines):
 
     # filter out only profiling log
     profile_lines = list()
+    migration_total_time = 0
+    migration_downtime = 0
     for line in lines:
         # see only DEBUG message
         if line.find("DEBUG") == -1:
             continue
-        if line.find("profiling") == -1:
-            continue
-
-        # see only profiling message
-        profile_dic = dict()
-        log = line.split("profiling")[1].strip()
-        profile_lines.append(log)
+        if line.find("profiling") != -1:
+            log = line.split("profiling")[1].strip()
+            profile_lines.append(log)
+        elif line.find("Time for finishing transferring") != -1:
+            log = line.split(":")[-1]
+            migration_total_time = float(log.strip())
+        elif line.find("Finish migration") != -1:
+            log = line.split(":")[-1]
+            migration_total_time = float(log.strip())
+        elif line.find("migration downtime") != -1:
+            log = line.split(":")[-1]
+            migration_downtime = float(log.strip())
 
     # process filtered log data
     exp = MigrationMode()
     setattr(exp, 'workload', os.path.basename(workload))
+    setattr(exp, 'migration_total_time', migration_total_time)
+    setattr(exp, 'migration_downtime', migration_downtime)
     setattr(exp, 'mode', config_dict)
     setattr(exp, 'stage_size_in', dict.fromkeys(stage_names, 0))
     setattr(exp, 'stage_size_out', dict.fromkeys(stage_names, 0))
@@ -411,6 +436,51 @@ def _split_experiment(test_ret_list):
     return moped_exps, fluid_exps, face_exps, mar_exps, speech_exps
 
 
+def select_mediam_exp(exps):
+    # sort by compression algorithm gzip 1, .., gzip9, .., lzma1, .., lzma9
+    def compare_comp_algorithm(a):
+        d = {"xdelta3":3,
+             "bsdiff":4,
+             "xor":2,
+             "none":1}
+        return (d[a.mode['DISK_DIFF_ALGORITHM']], -a.mode['COMPRESSION_ALGORITHM_TYPE'], a.mode['COMPRESSION_ALGORITHM_SPEED'])
+    selected_exp_list = list()
+    exps.sort(key=compare_comp_algorithm)
+    result_dict = OrderedDict()
+    for each_exp in exps:
+        in_data_size = each_exp.stage_size_in['CreateMemoryDeltalist'] + each_exp.stage_size_in['CreateDiskDeltalist']
+        in_data_disk = each_exp.stage_size_in['CreateDiskDeltalist']
+        in_data_mem = each_exp.stage_size_in['CreateMemoryDeltalist']
+        alpha = float(in_data_mem)/in_data_size
+        total_p = MigrationMode.get_total_P(each_exp.block_time, alpha)
+        total_r = MigrationMode.get_total_R(each_exp.block_size_ratio, alpha)
+        out_data_size = each_exp.stage_size_out['CompressProc']
+        duration = each_exp.migration_total_time
+        est_duration1 = each_exp.stage_time['CreateMemoryDeltalist'] + each_exp.stage_time['CreateDiskDeltalist']+\
+            each_exp.stage_time['DeltaDedup'] + each_exp.stage_time['CompressProc']
+        key = "%s,%d,%d" % (each_exp.mode['DISK_DIFF_ALGORITHM'], each_exp.mode['COMPRESSION_ALGORITHM_TYPE'],each_exp.mode['COMPRESSION_ALGORITHM_SPEED'])
+        value = (in_data_size, out_data_size, duration, 8*float(out_data_size)/1024.0/1024/duration, total_p, total_r, each_exp)
+        item_list = result_dict.get(key, list())
+        item_list.append(value)
+        result_dict[key] = item_list
+
+        #print "%s,%d,%d\t%ld\t%ld\t%f,%f,%f\t%f" %\
+        #    (each_exp.mode['DISK_DIFF_ALGORITHM'],\
+        #    each_exp.mode['COMPRESSION_ALGORITHM_TYPE'],\
+        #     each_exp.mode['COMPRESSION_ALGORITHM_SPEED'],\
+        #     in_data_size, out_data_size, duration, est_duration1, float(duration)/est_duration1,
+        #     8*float(out_data_size)/1024.0/1024/duration) 
+
+    # chose the median throughput value
+    for (key, value_list) in result_dict.iteritems():
+        value_list.sort(key=itemgetter(3))
+        value_len = len(value_list)
+        value = value_list[value_len/2]
+        print "%s\t%s\t%s\t%s\t%s\t%s\t%s" % ("\t".join(key.split(",")), value[0], value[1], value[2], value[3], value[4], value[5])
+        selected_exp = value[-1]
+        selected_exp_list.append(selected_exp)
+    return selected_exp_list
+
 
 def profiling(test_ret_list):
     # how change in mode will affect system performance?
@@ -418,7 +488,8 @@ def profiling(test_ret_list):
     comp_list = list()
     filename = "profile.json"
     if moped_exps:
-        ModeProfile.save_to_file(filename, moped_exps)
+        selected_exp_list = select_mediam_exp(moped_exps)
+        ModeProfile.save_to_file(filename, selected_exp_list)
         print "saved at %s" % filename
     if face_exps:
         ModeProfile.save_to_file(filename, face_exps)
