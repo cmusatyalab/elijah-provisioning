@@ -71,8 +71,8 @@ if __name__ == "__main__":
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
         #(windows_base_path, mar),
-        #(windows_base_path, face),
-        (linux_base_path, moped),
+        (windows_base_path, face),
+        #(linux_base_path, moped),
         #(linux_base_path, speech),
         #(linux_base_path, random),
         #(linux_base_path, fluid),
@@ -84,23 +84,23 @@ if __name__ == "__main__":
             raise ProfilingError("Invalid path to %s" % overlay_path)
 
     num_core = 1
-    network_bw = 10
     mode_list = profiling_workload(num_core)
 
-    # confiure network using TC
-    cmd = "sudo %s restart %d" % (os.path.abspath("./traffic_shaping"), network_bw)
-    LOG.debug(cmd)
-    LOG.debug(subprocess.check_output(cmd.split(" ")))
-
-    VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH = network_bw
     VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
     for (base_path, overlay_path) in workloads:
-        for each_mode in mode_list:
-            # generate mode
-            LOG.debug("network-test\t%s-%s (Mbps)" % (VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH, num_core))
-            is_url, overlay_url = PackagingUtil.is_zip_contained(overlay_path)
-            #run_file(base_path, overlay_url, overlay_mode)
-            run_network(base_path, overlay_url, each_mode)
+        for network_bw in [5]:
+            # confiure network using TC
+            cmd = "sudo %s restart %d" % (os.path.abspath("./traffic_shaping"), network_bw)
+            LOG.debug(cmd)
+            LOG.debug(subprocess.check_output(cmd.split(" ")))
 
-            time.sleep(30)
+            for each_mode in mode_list:
+                VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH = network_bw
+                # generate mode
+                LOG.debug("network-test\t%s-%s (Mbps)" % (VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH, num_core))
+                is_url, overlay_url = PackagingUtil.is_zip_contained(overlay_path)
+                #run_file(base_path, overlay_url, overlay_mode)
+                run_network(base_path, overlay_url, each_mode)
+
+                time.sleep(30)
 

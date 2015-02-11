@@ -72,6 +72,7 @@ class ProcessManager(threading.Thread):
 
         # load profiling information
         profile_path = os.path.abspath(VMOverlayCreationMode.PROFILE_DATAPATH)
+        LOG.info("Load adaptation profile at: %s" % profile_path)
         if os.path.exists(profile_path) == False:
             raise ProcessManagerError("Cannot load profile at : %s" % profile_path)
         self.mode_profile = ModeProfile.load_from_file(profile_path)

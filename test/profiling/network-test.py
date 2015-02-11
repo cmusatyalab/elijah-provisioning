@@ -58,8 +58,8 @@ if __name__ == "__main__":
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
         #(windows_base_path, mar),
-        #(windows_base_path, face),
-        (linux_base_path, moped),
+        (windows_base_path, face),
+        #(linux_base_path, moped),
         #(linux_base_path, speech),
         #(linux_base_path, random),
         #(linux_base_path, fluid),
@@ -72,7 +72,7 @@ if __name__ == "__main__":
 
     num_core = 1
     #bandwidth = [5, 10, 15, 20, 25, 30, 35, 40, 40]
-    bandwidth = [10]
+    bandwidth = [20, 20, 20]
     bandwidth.reverse()
     #num_cores_list = [1,1,2,3,4]; network_bw = 15
 

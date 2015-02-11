@@ -870,16 +870,6 @@ def create_residue(base_disk, base_hashvalue,
     return overlay_metafile, overlay_files
     '''
 
-    # set affinity of VM not to disturb the migration
-    core_index = VMOverlayCreationMode.get_cpu_core_index()
-    assigned_core_list = VMOverlayCreationMode.get_cpu_core_index()
-    excluded_core_list = list(set(range(0,8)) - set(assigned_core_list))
-    for proc in psutil.process_iter():
-        if proc.name.lower().startswith("cloudlet_"):
-            proc.set_cpu_affinity(excluded_core_list)
-            LOG.debug("affinity\tset affinity of %s to %s" % (proc.name, excluded_core_list))
-
-
     cpu_stat_start = psutil.cpu_times(percpu = True)
     time_start = time.time()
     _handoff_start_time[0] = time_start
@@ -899,6 +889,18 @@ def create_residue(base_disk, base_hashvalue,
         overlay_mode.COMPRESSION_ALGORITHM_SPEED = 1
         overlay_mode.MEMORY_DIFF_ALGORITHM = "none"
         overlay_mode.DISK_DIFF_ALGORITHM = "none"
+
+    # set affinity of VM not to disturb the migration
+    # do this after creating overlay mode
+    core_index = VMOverlayCreationMode.get_cpu_core_index()
+    assigned_core_list = VMOverlayCreationMode.get_cpu_core_index()
+    excluded_core_list = list(set(range(0,8)) - set(assigned_core_list))
+    for proc in psutil.process_iter():
+        if proc.name.lower().startswith("cloudlet_"):
+            proc.set_cpu_affinity(excluded_core_list)
+            LOG.debug("affinity\tset affinity of %s to %s" % (proc.name, excluded_core_list))
+
+
 
     process_controller.set_mode(overlay_mode, migration_addr)
     LOG.info("* LIVE MIGRATION STRATEGY: %d" % VMOverlayCreationMode.LIVE_MIGRATION_STOP)
@@ -1081,10 +1083,10 @@ def create_residue(base_disk, base_hashvalue,
             qmp_thread.start()
         # wait to finish creating files
         synthesis_file.join()
+        time_end_transfer = time.time()
         LOG.debug("[time] Time for finishing transferring (%f ~ %f): %f" % (time_start,
                                                                             time_end_transfer,
                                                                             (time_end_transfer-time_start)))
-        time_end_transfer = time.time()
 
         overlay_info, overlay_files = synthesis_file.get_overlay_info()
 
@@ -1106,8 +1108,8 @@ def create_residue(base_disk, base_hashvalue,
 
         # 7. terminting
         qmp_thread.join()
-        cpu_stat = process_controller.cpu_statistics
-        open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
+        #cpu_stat = process_controller.cpu_statistics
+        #open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
         process_manager.kill_instance()
 
         memory_read_proc.finish()   # deallocate resources for snapshotting
@@ -1124,10 +1126,10 @@ def create_residue(base_disk, base_hashvalue,
 
         LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
                                                                 (time_end-time_start)))
+
         cpu_monitor.terminate()
         cpu_monitor.join()
-        assigned_core_list = VMOverlayCreationMode.get_cpu_core_index()
-        avg_cpu_usage = cpu_monitor.average_cpu_time(time_start, time_finish_transmission, assigned_core_list)
+        avg_cpu_usage = cpu_monitor.average_cpu_time(time_start, time_end_transfer, assigned_core_list)
         LOG.debug("cpu_usage\t%f\taverage\t%s" % (time.time(), avg_cpu_usage))
         return overlay_zipfile
 

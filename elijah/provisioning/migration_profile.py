@@ -486,23 +486,25 @@ def profiling(test_ret_list):
     # how change in mode will affect system performance?
     moped_exps, fluid_exps, face_exps, mar_exps, speech_exps = _split_experiment(test_ret_list)
     comp_list = list()
-    filename = "profile.json"
     if moped_exps:
+        filename = "moped-profile.json"
         selected_exp_list = select_mediam_exp(moped_exps)
-        ModeProfile.save_to_file(filename, selected_exp_list)
-        print "saved at %s" % filename
-    if face_exps:
-        ModeProfile.save_to_file(filename, face_exps)
-        print "saved at %s" % filename
-    if mar_exps:
-        ModeProfile.save_to_file(filename, mar_exps)
-        print "saved at %s" % filename
-    if fluid_exps:
-        ModeProfile.save_to_file(filename, fluid_exps)
-        print "saved at %s" % filename
-    if speech_exps:
-        ModeProfile.save_to_file(filename, speech_exps)
-        print "saved at %s" % filename
+    elif face_exps:
+        filename = "face-profile.json"
+        selected_exp_list = select_mediam_exp(face_exps)
+    elif mar_exps:
+        filename = "mar-profile.json"
+        selected_exp_list = select_mediam_exp(mar_exps)
+    elif fluid_exps:
+        filename = "fluid-profile.json"
+        selected_exp_list = select_mediam_exp(fluid_exps)
+    elif speech_exps:
+        filename = "speech-profile.json"
+        selected_exp_list = select_mediam_exp(speech_exps)
+    else:
+        raise ValueError("Unsupported workloads")
+    ModeProfile.save_to_file(filename, selected_exp_list)
+    print "saved at %s" % filename
 
 
 

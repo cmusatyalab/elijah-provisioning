@@ -27,9 +27,21 @@ class CPUCoreControl(threading.Thread):
     def __init__(self):
         self.stop = threading.Event()
         # [(time1, [cores]), (time2, [cores]), ...]
-        self.network_bw_changes = [(20.0, [1,2]),
-                                   (40.0, [1])]
+        self.network_bw_changes = [(20.0, [1, 2])]
         threading.Thread.__init__(self, target=self.core_change)
+
+    def _set_affinity_chilren(self, core_list):
+        proc_list = list()
+        cur_proc = psutil.Process(os.getpid())
+        proc_list.append(cur_proc)
+        while True:
+            if len(proc_list) == 0:
+                break
+            proc = proc_list.pop(0)
+            if proc.name.startswith("python"):
+                proc.set_cpu_affinity(core_list)
+                proc_list += proc.get_children()
+                LOG.info("control_core\t%s\t%s" % (proc.name, core_list))
 
     def core_change(self):
         global _handoff_start_time
@@ -37,19 +49,13 @@ class CPUCoreControl(threading.Thread):
         (activate_time, core_list) = self.network_bw_changes.pop(0)
         while(not self.stop.wait(1)):
             duration = time.time() - _handoff_start_time[0]
-            LOG.info("control_core\t%f\t%f\t%s" % (activate_time, duration, core_list))
+            #LOG.info("control_core\t%f\t%f\t%s" % (activate_time, duration, core_list))
             if activate_time <= duration:
-                # change network BW
+                # change number of core
+                self._set_affinity_chilren(core_list)
                 current_cores = VMOverlayCreationMode.get_num_cores()
-                cur_proc = psutil.Process(os.getpid())
-                cur_proc.set_cpu_affinity(core_list)
-                LOG.info("control_core\t%f\t%s\t%s --> %s" % (duration, cur_proc.name, current_cores, core_list))
-                children_proc_list = cur_proc.get_children()
-                for each_child_proc in children_proc_list:
-                    LOG.info("control_core\t%f\t%s\t%s --> %s" % (duration, cur_proc.name, current_cores, core_list))
-                    each_child_proc.set_cpu_affinity(core_list)
-
                 VMOverlayCreationMode.set_num_cores(len(core_list))
+                LOG.info("control_core\t%f\tupdate all children to %s" % (duration, core_list))
                 try:
                     (activate_time, core_list) = self.network_bw_changes.pop(0)
                 except IndexError as e:
@@ -57,7 +63,7 @@ class CPUCoreControl(threading.Thread):
                     break
             else:
                 continue
-        LOG.info("control_network\tfinish bw control thread")
+        LOG.info("control_core\tfinish bw control thread")
 
     def terminate(self):
         self.stop.set()
@@ -97,9 +103,9 @@ if __name__ == "__main__":
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
-        #(windows_base_path, mar),
+        (windows_base_path, mar),
         #(windows_base_path, face),
-        (linux_base_path, moped),
+        #(linux_base_path, moped),
         #(linux_base_path, speech),
         #(linux_base_path, random),
         #(linux_base_path, fluid),
@@ -127,8 +133,8 @@ if __name__ == "__main__":
             # generate mode
             VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
             overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=4)
-            overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_LZMA
-            overlay_mode.COMPRESSION_ALGORITHM_SPEED = 5
+            overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP
+            overlay_mode.COMPRESSION_ALGORITHM_SPEED = 1
             overlay_mode.MEMORY_DIFF_ALGORITHM = "none"
             overlay_mode.DISK_DIFF_ALGORITHM = "none"
 
