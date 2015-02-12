@@ -27,7 +27,8 @@ class CPUCoreControl(threading.Thread):
     def __init__(self):
         self.stop = threading.Event()
         # [(time1, [cores]), (time2, [cores]), ...]
-        self.network_bw_changes = [(20.0, [1, 2])]
+        #self.cpu_bw_changes = [(100.0, [1, 2])]
+        self.cpu_bw_changes = [(30.0, [1, 2])]
         threading.Thread.__init__(self, target=self.core_change)
 
     def _set_affinity_chilren(self, core_list):
@@ -46,10 +47,10 @@ class CPUCoreControl(threading.Thread):
     def core_change(self):
         global _handoff_start_time
 
-        (activate_time, core_list) = self.network_bw_changes.pop(0)
+        (activate_time, core_list) = self.cpu_bw_changes.pop(0)
         while(not self.stop.wait(1)):
             duration = time.time() - _handoff_start_time[0]
-            #LOG.info("control_core\t%f\t%f\t%s" % (activate_time, duration, core_list))
+            LOG.info("control_core\t%f\t%f\t%s" % (activate_time, duration, core_list))
             if activate_time <= duration:
                 # change number of core
                 self._set_affinity_chilren(core_list)
@@ -57,7 +58,7 @@ class CPUCoreControl(threading.Thread):
                 VMOverlayCreationMode.set_num_cores(len(core_list))
                 LOG.info("control_core\t%f\tupdate all children to %s" % (duration, core_list))
                 try:
-                    (activate_time, core_list) = self.network_bw_changes.pop(0)
+                    (activate_time, core_list) = self.cpu_bw_changes.pop(0)
                 except IndexError as e:
                     LOG.info("control_core\tno more data")
                     break
@@ -103,9 +104,9 @@ if __name__ == "__main__":
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
-        (windows_base_path, mar),
+        #(windows_base_path, mar),
         #(windows_base_path, face),
-        #(linux_base_path, moped),
+        (linux_base_path, moped),
         #(linux_base_path, speech),
         #(linux_base_path, random),
         #(linux_base_path, fluid),
@@ -117,7 +118,7 @@ if __name__ == "__main__":
             raise ProfilingError("Invalid path to %s" % overlay_path)
 
     num_core = 1
-    bandwidth = [15]
+    bandwidth = [10] * 4
     for (base_path, overlay_path) in workloads:
         for network_bw in bandwidth:
             # confiure network using TC

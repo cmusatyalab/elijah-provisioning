@@ -997,6 +997,7 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
             resumed_memory=launch_mem.name, memory_overlay_map=memory_overlay_map,
             **kwargs)
     LOG.info("Start FUSE (%f s)" % (time()-time_start_fuse))
+    LOG.debug("Overlay has %ld chunks" % (len(memory_chunk_set) + len(disk_chunk_set)))
 
     # Recover Modified Memory
     named_pipename = overlay_file+".fifo"

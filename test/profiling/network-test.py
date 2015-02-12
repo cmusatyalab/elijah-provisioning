@@ -60,9 +60,9 @@ if __name__ == "__main__":
         #(windows_base_path, mar),
         (windows_base_path, face),
         #(linux_base_path, moped),
-        #(linux_base_path, speech),
-        #(linux_base_path, random),
         #(linux_base_path, fluid),
+        #(linux_base_path, random),
+        #(linux_base_path, speech),
     ]
     for (base_path, overlay_path) in workloads:
         if os.path.exists(base_path) == False:
@@ -71,10 +71,9 @@ if __name__ == "__main__":
             raise ProfilingError("Invalid path to %s" % overlay_path)
 
     num_core = 1
-    #bandwidth = [5, 10, 15, 20, 25, 30, 35, 40, 40]
-    bandwidth = [20, 20, 20]
+    bandwidth = [5, 10, 15, 20, 25, 30, 30]*2
     bandwidth.reverse()
-    #num_cores_list = [1,1,2,3,4]; network_bw = 15
+    #num_cores_list = [4,4,3,2,1]; network_bw = 10
 
     for (base_path, overlay_path) in workloads:
         for network_bw in bandwidth:
@@ -94,7 +93,7 @@ if __name__ == "__main__":
             overlay_mode.MEMORY_DIFF_ALGORITHM = "none"
             overlay_mode.DISK_DIFF_ALGORITHM = "none"
 
-            LOG.debug("network-test\t%s-%s (Mbps)" % (VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH, num_core))
+            LOG.debug("network-test\t%s-%s (Mbps)" % (network_bw, num_core))
             is_url, overlay_url = PackagingUtil.is_zip_contained(overlay_path)
             #run_file(base_path, overlay_url, overlay_mode)
             run_network(base_path, overlay_url, overlay_mode)

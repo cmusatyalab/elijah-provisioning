@@ -70,8 +70,8 @@ if __name__ == "__main__":
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
-        #(windows_base_path, mar),
-        (windows_base_path, face),
+        (windows_base_path, mar),
+        #(windows_base_path, face),
         #(linux_base_path, moped),
         #(linux_base_path, speech),
         #(linux_base_path, random),
@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
     for (base_path, overlay_path) in workloads:
-        for network_bw in [5]:
+        for network_bw in [30]:
             # confiure network using TC
             cmd = "sudo %s restart %d" % (os.path.abspath("./traffic_shaping"), network_bw)
             LOG.debug(cmd)

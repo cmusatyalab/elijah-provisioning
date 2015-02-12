@@ -26,9 +26,9 @@ class NetworkBWcontrol(threading.Thread):
     def __init__(self):
         self.stop = threading.Event()
         # [(time1, BW1), (time2, BW2), ...]
-        self.network_bw_changes = [(0.0, 10),
-                                   (50.0, 30),
-                                   (100.0, 10)]
+        self.network_bw_changes = [(0.0, 5),
+                                   (50.0, 35),
+                                   (100.0, 5)]
         threading.Thread.__init__(self, target=self.bw_change)
 
     def bw_change(self):

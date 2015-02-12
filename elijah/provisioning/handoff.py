@@ -444,7 +444,7 @@ class QmpThread(threading.Thread):
             self.config_migration()
 
         counter_check_comp_size = 0
-        time.sleep(5)
+        time.sleep(2)
 
         if VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
             self.migration_stop_time = self._stop_migration()
@@ -483,13 +483,20 @@ class QmpThread(threading.Thread):
                                 LOG.debug("qemu_control\t%f\tfailed to issue new iteration %d" %\
                                           (time.time(), iter_num+1))
 
-        elif VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_AT_3RD_ITERATION:
-            pass
         elif VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE:
             iteration_issued = dict()
             iteration_issue_time_list = list()
             sleep_between_iteration = 2
             loopping_period = 0.1
+
+            # first wait until data is high enough
+            while(not self.stop.wait(loopping_period)):
+                unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
+                    VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
+                #LOG.debug("qemu_control\tdata left: %s" % (unprocessed_memory_snapshot_size))
+                if unprocessed_memory_snapshot_size > 1024*1024*10: # 10 MB
+                    break
+
             while(not self.stop.wait(loopping_period)):
                 iter_num = self.process_controller.get_migration_iteration_count()
                 unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
@@ -497,6 +504,7 @@ class QmpThread(threading.Thread):
 
                 # issue new iteration
                 is_new_request_issued = False
+                #LOG.debug("qemu_control\tdata left: %s" % (unprocessed_memory_snapshot_size))
                 if unprocessed_memory_snapshot_size < 1024*1024*10: # 10 MB
                     LOG.debug("qemu_control\t%f\tready to request new iteration %d" % (time.time(), (iter_num+1)))
                     is_iter_requested = iteration_issued.get(iter_num, False)
@@ -598,6 +606,8 @@ class StreamSynthesisFile(multiprocessing.Process):
         return overlay_info_list, self.overlay_files
 
     def save_to_file(self):
+        #is_first_recv_disk = False
+        #is_first_recv_memory = False
         comp_file_counter = 0
         input_fd = [self.compdata_queue._reader.fileno()]
         while True:
@@ -614,6 +624,14 @@ class StreamSynthesisFile(multiprocessing.Process):
                 blob_filename = os.path.join(self.temp_compfile_dir, "%s-stream-%d" %\
                                             (Const.OVERLAY_FILE_PREFIX,
                                             comp_file_counter))
+                #if is_first_recv_disk == False and len(disk_chunks) > 0:
+                #    is_first_recv_disk = True
+                #    LOG.debug("[time] Transfer first disk input at : %f (disk:%d, memory:%d)" % \
+                #              (time_process_start, len(disk_chunks), len(memory_chunks)))
+                #if is_first_recv_memory == False and len(memory_chunks) > 0:
+                #    is_first_recv_memory = True
+                #    LOG.debug("[time] Transfer first memory input at : %f (disk:%d, memory:%d)" % \
+                #              (time_process_start, len(disk_chunks), len(memory_chunks)))
                 #LOG.debug("%s --> %d" % (blob_filename, blob_comp_type))
                 #LOG.debug("%s: # of delta memory: %d\t# of delta disk: %d" %\
                 #          (blob_filename, len(memory_chunks), len(disk_chunks)))
@@ -882,7 +900,7 @@ def create_residue(base_disk, base_hashvalue,
 
         # multi-processing
         NUM_CPU_CORES = 1   # set CPU affinity
-        VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
+        VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
 
         overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP
@@ -1063,6 +1081,7 @@ def create_residue(base_disk, base_hashvalue,
                   (time.time(), assigned_core_list,
                    cpu_total_time, 100.0*cpu_total_time/(cpu_total_time+cpu_idle_time)))
 
+        _handoff_start_time[0] = sys.maxint
         return None
     elif migration_addr.startswith("file"):
         temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")
@@ -1131,5 +1150,6 @@ def create_residue(base_disk, base_hashvalue,
         cpu_monitor.join()
         avg_cpu_usage = cpu_monitor.average_cpu_time(time_start, time_end_transfer, assigned_core_list)
         LOG.debug("cpu_usage\t%f\taverage\t%s" % (time.time(), avg_cpu_usage))
+        _handoff_start_time[0] = sys.maxint
         return overlay_zipfile
 

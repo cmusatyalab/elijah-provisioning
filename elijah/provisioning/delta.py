@@ -597,6 +597,7 @@ class Recovered_delta(multiprocessing.Process):
 
         unresolved_deltaitem_list = []
         for delta_item in DeltaList.from_stream(overlay_stream):
+            #LOG.debug("[Delta] proceesing %d" % count)
             ret = self.recover_item(delta_item)
             if ret == None:
                 # cannot find self reference point due to the parallel

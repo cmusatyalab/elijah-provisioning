@@ -1005,7 +1005,6 @@ class MemoryDiffProc(multiprocessing.Process):
                     iter_seq = (ram_offset & Memory.ITER_SEQ_MASK) >> Memory.ITER_SEQ_SHIFT
                     ram_offset = (ram_offset & Memory.CHUNK_POS_MASK) + self.libvirt_header_offset
                     #print "%d, %ld" % (iter_seq, ram_offset)
-                    #self.memory_offset_list.append((iter_seq, ram_offset))
 
                     # get data
                     data = data[Memory.CHUNK_HEADER_SIZE:]
@@ -1026,6 +1025,7 @@ class MemoryDiffProc(multiprocessing.Process):
                         delta_type = DeltaItem.DELTA_MEMORY_LIVE
 
                     if is_modified == True:
+                        #self.memory_offset_list.append((iter_seq, ram_offset))
                         try:
                             # get diff compared to the base VM
                             source_data = self.get_raw_data(ram_offset, len(data))

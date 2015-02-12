@@ -197,7 +197,6 @@ class StreamSynthesisClient(process_manager.ProcWorker):
                 self.is_first_recv = True
                 self.time_first_recv = time.time()
                 LOG.debug("[time] Transfer first input at : %f" % (self.time_first_recv))
-            time_process_start = time.time()
             transfer_size = 0
             if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
                 break
@@ -219,17 +218,6 @@ class StreamSynthesisClient(process_manager.ProcWorker):
             sock.sendall(compdata)
             transfer_size += (4+len(header)+len(compdata))
             blob_counter += 1
-            #print "transfer: %d" % transfer_size
-
-            # wait to emulate network badwidth
-            #time_process_end = time.time()
-            #processed_time = time_process_end-time_process_start
-            #processed_size = transfer_size
-            #emulated_time = (processed_size*8) / (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
-            #if emulated_time > processed_time:
-            #    sleep_time = (emulated_time-processed_time)
-            #    #sys.stdout.write("Emulating BW of %d Mbps, so wait %f s\n" %\ (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps, sleep_time))
-            #    time.sleep(sleep_time)
 
         # end message
         end_header = {

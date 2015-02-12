@@ -7,3 +7,4 @@ bzr==2.5.1
 bsdiff4==1.1.4
 Cython==0.21.2
 psutil==0.6.1
+affinity==0.1.0
