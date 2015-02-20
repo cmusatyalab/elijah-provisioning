@@ -568,7 +568,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             # get each blob
             recv_blob_counter = 0
             while True:
-                data = self.request.recv(4)
+                data = self._recv_all(4)
                 if data == None or len(data) != 4:
                     raise StreamSynthesisError("Failed to receive first byte of header")
                     break
