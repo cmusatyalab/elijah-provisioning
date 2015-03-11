@@ -27,8 +27,7 @@ class CPUCoreControl(threading.Thread):
     def __init__(self):
         self.stop = threading.Event()
         # [(time1, [cores]), (time2, [cores]), ...]
-        #self.cpu_bw_changes = [(100.0, [1, 2])]
-        self.cpu_bw_changes = [(30.0, [1, 2])]
+        self.cpu_bw_changes = [(100.0, [1, 2])]
         threading.Thread.__init__(self, target=self.core_change)
 
     def _set_affinity_chilren(self, core_list):
@@ -104,9 +103,9 @@ if __name__ == "__main__":
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
-        #(windows_base_path, mar),
+        (windows_base_path, mar),
         #(windows_base_path, face),
-        (linux_base_path, moped),
+        #(linux_base_path, moped),
         #(linux_base_path, speech),
         #(linux_base_path, random),
         #(linux_base_path, fluid),
@@ -118,7 +117,7 @@ if __name__ == "__main__":
             raise ProfilingError("Invalid path to %s" % overlay_path)
 
     num_core = 1
-    bandwidth = [10] * 4
+    bandwidth = [15]*10
     for (base_path, overlay_path) in workloads:
         for network_bw in bandwidth:
             # confiure network using TC
@@ -133,7 +132,7 @@ if __name__ == "__main__":
 
             # generate mode
             VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
-            overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=4)
+            overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=num_core)
             overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP
             overlay_mode.COMPRESSION_ALGORITHM_SPEED = 1
             overlay_mode.MEMORY_DIFF_ALGORITHM = "none"

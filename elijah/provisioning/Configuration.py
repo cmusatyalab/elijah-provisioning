@@ -154,7 +154,7 @@ class VMOverlayCreationMode(object):
     MEASURE_AVERAGE_TIME    = 2 # seconds
     MAX_THREAD_NUM = 4
 
-    PROFILE_DATAPATH = os.path.abspath(os.path.join(Const.HOME_DIR, ".cloudlet/config/mode-profile"))
+    PROFILE_DATAPATH = os.path.abspath(os.path.join(Const.HOME_DIR, ".cloudlet/config/mode-profile.face"))
     VARYING_PARAMETERS = ['MEMORY_DIFF_ALGORITHM', 'DISK_DIFF_ALGORITHM', 'COMPRESSION_ALGORITHM_TYPE', 'COMPRESSION_ALGORITHM_SPEED']
 
     LIVE_MIGRATION_FINISH_ASAP = 1
@@ -291,7 +291,7 @@ class VMOverlayCreationMode(object):
 
     @staticmethod
     def get_pipelined_multi_process_finite_queue(num_cores=4):
-        VMOverlayCreationMode.MAX_THREAD_NUM = num_cores
+        VMOverlayCreationMode.MAX_THREAD_NUM = 4
         mode = VMOverlayCreationMode(num_cores)
         update_cores = mode.get_num_cores()
         if update_cores != num_cores:

@@ -43,7 +43,7 @@ class NetworkBWcontrol(threading.Thread):
                 cmd = "sudo %s restart %d" % (os.path.abspath("./traffic_shaping"), network_bw)
                 LOG.info("control_network\t%f\t%s" % (duration, cmd))
                 LOG.info("control_network\t%f\t%s" % (duration, subprocess.check_output(cmd.split(" "))))
-                VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH = network_bw
+                #VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH = network_bw
                 try:
                     (activate_time, network_bw) = self.network_bw_changes.pop(0)
                 except IndexError as e:
@@ -104,7 +104,7 @@ if __name__ == "__main__":
         if os.path.exists(overlay_path) == False:
             raise ProfilingError("Invalid path to %s" % overlay_path)
 
-    num_cores_list = [1]
+    num_cores_list = [1]*10
     for (base_path, overlay_path) in workloads:
         for num_core in num_cores_list:
             # start BW control
@@ -112,9 +112,8 @@ if __name__ == "__main__":
             bw_control.start()
 
             # generate mode
-            NUM_CORES = num_core
             VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
-            overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CORES)
+            overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=num_core)
             overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP
             overlay_mode.COMPRESSION_ALGORITHM_SPEED = 1
             overlay_mode.MEMORY_DIFF_ALGORITHM = "none"

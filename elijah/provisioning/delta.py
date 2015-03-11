@@ -619,11 +619,6 @@ class Recovered_delta(multiprocessing.Process):
 
         self.out_pipe.write(str(Recovered_delta.END_OF_PIPE) + "\n")
         self.out_pipe.close()
-        # fix this
-        self.recover_mem_fd.close()
-        self.recover_mem_fd = None
-        self.recover_disk_fd.close()
-        self.recover_disk_fd = None
         end_time = time.time()
 
         if self.time_queue != None: 
@@ -783,6 +778,15 @@ class Recovered_delta(multiprocessing.Process):
         if self.raw_mem_overlay is not None:
             self.raw_mem_overlay.close()
             self.raw_mem_overlay = None
+        # fix this
+        if self.recover_disk_fd is not None:
+            self.recover_disk_fd.close()
+            self.recover_disk_fd = None
+        if self.recover_mem_fd is not None:
+            time_close_start = time.time()
+            self.recover_mem_fd.close()
+            self.recover_mem_fd = None
+            LOG.debug("File closing time for recover memory snapshot: %f" % (time.time()-time_close_start))
 
 
 def deduplicate_deltaitem(hash_dict, delta_item, ref_id):

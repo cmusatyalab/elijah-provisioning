@@ -57,10 +57,10 @@ if __name__ == "__main__":
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
-        #(windows_base_path, mar),
+        (linux_base_path, moped),
+        (linux_base_path, fluid),
+        (windows_base_path, mar),
         (windows_base_path, face),
-        #(linux_base_path, moped),
-        #(linux_base_path, fluid),
         #(linux_base_path, random),
         #(linux_base_path, speech),
     ]
@@ -71,7 +71,7 @@ if __name__ == "__main__":
             raise ProfilingError("Invalid path to %s" % overlay_path)
 
     num_core = 1
-    bandwidth = [5, 10, 15, 20, 25, 30, 30]*2
+    bandwidth = [5, 10, 15, 20, 25, 30, 30]
     bandwidth.reverse()
     #num_cores_list = [4,4,3,2,1]; network_bw = 10
 
@@ -82,12 +82,11 @@ if __name__ == "__main__":
             cmd = "sudo %s restart %d" % (os.path.abspath("./traffic_shaping"), network_bw)
             LOG.debug(cmd)
             LOG.debug(subprocess.check_output(cmd.split(" ")))
-            VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH = network_bw
+            #VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH = network_bw
 
             # generate mode
-            NUM_CORES = num_core
             VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
-            overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CORES)
+            overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=num_core)
             overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP
             overlay_mode.COMPRESSION_ALGORITHM_SPEED = 1
             overlay_mode.MEMORY_DIFF_ALGORITHM = "none"

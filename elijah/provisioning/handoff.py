@@ -33,6 +33,7 @@ import struct
 import msgpack
 from tempfile import NamedTemporaryFile
 from tempfile import mkdtemp
+from xml.etree import ElementTree
 
 import Memory
 import Disk
@@ -303,6 +304,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
         prev_processed_size = 0
         prev_processed_time = time.time()
         cur_processed_size = 0
+        #dump_memory = open("memory-dump", "w")  # to be deleted
 
         for repeat in xrange(100):
             if os.path.exists(self.input_path) == False:
@@ -324,6 +326,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             new_header = libvirt_header.get_aligned_header(align_size)
             self.result_queue.put(new_header)
             self.total_write_size += len(new_header)
+            #dump_memory.write(new_header)
 
             # get memory snapshot size
             original_header_len = len(original_header)
@@ -333,6 +336,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.memory_snapshot_size.value = long(mem_snapshot_size + len(new_header))
             self.result_queue.put(new_data)
             self.total_write_size += len(new_data)
+            #dump_memory.write(new_data)
             LOG.info("Memory snapshot size: %ld, header size: %ld at %f" % \
                      (mem_snapshot_size, len(new_header), time.time()))
 
@@ -350,6 +354,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
                         break
                     current_size = len(data)
                     self.result_queue.put(data)
+                    #dump_memory.write(data)
                     self.total_write_size += current_size
                     #prog_bar.set_percent(100.0*self.total_write_size/mem_snapshot_size)
                     #prog_bar.show_progress()
@@ -376,6 +381,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
                   (self.__class__.__name__, self.total_write_size, self.total_write_size, 1))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" % \
                   (self.__class__.__name__, time_s, time_e, (time_e-time_s)))
+        #dump_memory.close()
 
     def get_memory_snapshot_size(self):
         if long(self.memory_snapshot_size.value) > 0:
@@ -443,46 +449,9 @@ class QmpThread(threading.Thread):
         if self.done_configuration is False:
             self.config_migration()
 
-        counter_check_comp_size = 0
-        time.sleep(2)
-
         if VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
+            time.sleep(5)
             self.migration_stop_time = self._stop_migration()
-        elif VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_AT_2ND_ITERATION:
-            LOG.debug("qemu_control\tLIVE_MIGRATION_FINISH_AT_2ND_ITERATION")
-            iteration_issued = dict()
-            while(not self.stop.wait(1)):
-                iter_num = self.process_controller.get_migration_iteration_count()
-                if iter_num == None:
-                    continue
-
-                unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
-                    VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
-                LOG.debug("qemu_control\tdata left: %s" % (unprocessed_memory_snapshot_size))
-                if unprocessed_memory_snapshot_size < 1024*1024*50: # 100 MB
-                    is_iter_requested = iteration_issued.get(iter_num, False)
-                    LOG.debug("qemu_control\titeration num: %s\t%s\t" % (iter_num, is_iter_requested))
-                    if is_iter_requested == False:
-                        if iter_num == 5:
-                            if self.compdata_queue.qsize() == 0:
-                                # stop after transmitting everything
-                                self.migration_stop_time = self._stop_migration()
-                                LOG.debug("qemu_control\trequest stop iteration at %d(%s)\t" % (iter_num, self.compdata_queue.qsize()))
-                                iteration_issued[iter_num] = True
-                                break
-                            else:
-                                LOG.debug("qemu_control\twait before stop until transfer everything")
-                        else:
-                            LOG.debug("qemu_control\t%f\trequest new iteration %d\t" % \
-                                      (time.time(), iter_num+1))
-                            ret = self.qmp.iterate_raw_live()
-                            if True:
-                                iteration_issued[iter_num] = True
-                                time.sleep(2)
-                            else:
-                                LOG.debug("qemu_control\t%f\tfailed to issue new iteration %d" %\
-                                          (time.time(), iter_num+1))
-
         elif VMOverlayCreationMode.LIVE_MIGRATION_STOP == VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE:
             iteration_issued = dict()
             iteration_issue_time_list = list()
@@ -490,13 +459,19 @@ class QmpThread(threading.Thread):
             loopping_period = 0.1
 
             # first wait until data is high enough
+            loop_counter = 0
             while(not self.stop.wait(loopping_period)):
                 unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
                     VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
-                #LOG.debug("qemu_control\tdata left: %s" % (unprocessed_memory_snapshot_size))
-                if unprocessed_memory_snapshot_size > 1024*1024*10: # 10 MB
+                if loop_counter % 100 == 0:
+                    LOG.debug("qemu_control\tdata check: %s" % (unprocessed_memory_snapshot_size))
+                loop_counter += 1
+                if unprocessed_memory_snapshot_size > 1024*1024*1: # 10 MB
+                    time.sleep(1)
                     break
 
+            LOG.debug("qemu_control\tfinish data checking: %s" % (unprocessed_memory_snapshot_size))
+            loop_counter = 0
             while(not self.stop.wait(loopping_period)):
                 iter_num = self.process_controller.get_migration_iteration_count()
                 unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
@@ -504,9 +479,12 @@ class QmpThread(threading.Thread):
 
                 # issue new iteration
                 is_new_request_issued = False
-                #LOG.debug("qemu_control\tdata left: %s" % (unprocessed_memory_snapshot_size))
+                if loop_counter % 100 == 0:
+                    LOG.debug("qemu_control\tdata left: %s" % (unprocessed_memory_snapshot_size))
+                loop_counter += 1
                 if unprocessed_memory_snapshot_size < 1024*1024*10: # 10 MB
-                    LOG.debug("qemu_control\t%f\tready to request new iteration %d" % (time.time(), (iter_num+1)))
+                    LOG.debug("qemu_control\t%f\tready to request new iteration %d (data: %d)" % \
+                              (time.time(), (iter_num+1), unprocessed_memory_snapshot_size))
                     is_iter_requested = iteration_issued.get(iter_num, False)
                     if is_iter_requested is False:
                         # request new iteration
@@ -519,9 +497,10 @@ class QmpThread(threading.Thread):
                         is_new_request_issued = True
                     else:
                         # already requested, but no more data to process
-                        iteration_issue_time_list.append(time.time())
-                        LOG.debug("qemu_control\t%f\trepeat new iteration %d\t" % \
+                        LOG.debug("qemu_control\t%f\trequest overlapped iteration %d\t" % \
                                   (time.time(), iter_num+1))
+                        iteration_issue_time_list.append(time.time())
+                        time.sleep(sleep_between_iteration)
                         is_new_request_issued = True
 
                 if is_new_request_issued == False or (len(iteration_issue_time_list) < 2):
@@ -534,7 +513,6 @@ class QmpThread(threading.Thread):
                           (time.time(), unprocessed_memory_snapshot_size,
                            lastest_time_diff, threshold))
                 if lastest_time_diff < threshold:
-                    counter_check_comp_size += 1
                     LOG.debug("qemu_control\t%f\toutput_queue_size:%d\titer_count:%d" %\
                               (time.time(),
                                self.compdata_queue.qsize(), len(iteration_issue_time_list)))
@@ -900,7 +878,8 @@ def create_residue(base_disk, base_hashvalue,
 
         # multi-processing
         NUM_CPU_CORES = 1   # set CPU affinity
-        VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
+        #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
+        VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
 
         overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP

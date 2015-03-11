@@ -46,11 +46,13 @@ def run_network(base_path, overlay_path, overlay_mode):
         sys.stderr.write("%s\nFailed to synthesize" % str(traceback.format_exc()))
 
 
-def profiling_workload(num_cores):
+def profiling_workload():
     mode_list = list()
     for comp_type in (Const.COMPRESSION_LZMA, Const.COMPRESSION_BZIP2, Const.COMPRESSION_GZIP):
+    #for comp_type in [Const.COMPRESSION_GZIP]:
         for comp_level in [1, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
-            overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=num_cores)
+            overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=1)
+
             overlay_mode.COMPRESSION_ALGORITHM_TYPE = comp_type
             overlay_mode.COMPRESSION_ALGORITHM_SPEED = comp_level
             overlay_mode.MEMORY_DIFF_ALGORITHM = "none"
@@ -70,9 +72,9 @@ if __name__ == "__main__":
     fluid = "/home/krha/cloudlet/image/overlay/vmhandoff/fluid-overlay.zip"
     random = "/home/krha/cloudlet/image/overlay/vmhandoff/overlay-random-100mb.zip"
     workloads = [
-        (windows_base_path, mar),
+        #(windows_base_path, mar),
         #(windows_base_path, face),
-        #(linux_base_path, moped),
+        (linux_base_path, moped),
         #(linux_base_path, speech),
         #(linux_base_path, random),
         #(linux_base_path, fluid),
@@ -83,12 +85,11 @@ if __name__ == "__main__":
         if os.path.exists(overlay_path) == False:
             raise ProfilingError("Invalid path to %s" % overlay_path)
 
-    num_core = 1
-    mode_list = profiling_workload(num_core)
+    mode_list = profiling_workload()
 
     VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
     for (base_path, overlay_path) in workloads:
-        for network_bw in [30]:
+        for network_bw in [30, 20, 10, 5]:
             # confiure network using TC
             cmd = "sudo %s restart %d" % (os.path.abspath("./traffic_shaping"), network_bw)
             LOG.debug(cmd)
@@ -96,10 +97,9 @@ if __name__ == "__main__":
 
             for each_mode in mode_list:
                 VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH = network_bw
-                # generate mode
+                num_core = 1
                 LOG.debug("network-test\t%s-%s (Mbps)" % (VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH, num_core))
                 is_url, overlay_url = PackagingUtil.is_zip_contained(overlay_path)
-                #run_file(base_path, overlay_url, overlay_mode)
                 run_network(base_path, overlay_url, each_mode)
 
                 time.sleep(30)

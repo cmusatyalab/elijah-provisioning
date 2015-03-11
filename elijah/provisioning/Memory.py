@@ -961,6 +961,7 @@ class MemoryDiffProc(multiprocessing.Process):
         child_total_block = 0
         indata_size = 0
         outdata_size = 0
+        #dump_memory = open("memory-dump-modi", "w")  # to be deleted
 
         is_proc_running = True
         input_list = [self.task_queue._reader.fileno(),
@@ -1029,6 +1030,7 @@ class MemoryDiffProc(multiprocessing.Process):
                         try:
                             # get diff compared to the base VM
                             source_data = self.get_raw_data(ram_offset, len(data))
+                            #dump_memory.write(data)
                             if source_data == None:
                                 msg = "launch memory snapshot is bigger than base vm at %ld (%ld > %ld)" %\
                                     (ram_offset, ram_offset+chunk_data_len, self.raw_filesize)
@@ -1101,6 +1103,7 @@ class MemoryDiffProc(multiprocessing.Process):
         # to be deleted
         #import json
         #open("memory-access-order", "w").write(json.dumps(self.memory_offset_list))
+        #dump_memory.close()
 
     def get_raw_data(self, offset, length):
         # retrieve page data from raw memory
