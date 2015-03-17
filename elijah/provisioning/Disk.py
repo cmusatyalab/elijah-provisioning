@@ -563,10 +563,6 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
             LOG.debug("profiling\t%s\tblock-time\t%f\t%f\t%f" %\
                     (self.__class__.__name__, time_start, time_end, (time_end-time_start)/1))
 
-        # to be deleted
-        #import json
-        #open("pr-history-disk", "w").write(json.dumps(self.measure_history_cur))
-
 
 def recover_disk(base_disk, base_mem, overlay_mem, overlay_disk, recover_path, chunk_size):
     recover_fd = open(recover_path, "wb")

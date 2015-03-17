@@ -304,7 +304,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
         prev_processed_size = 0
         prev_processed_time = time.time()
         cur_processed_size = 0
-        #dump_memory = open("memory-dump", "w")  # to be deleted
 
         for repeat in xrange(100):
             if os.path.exists(self.input_path) == False:
@@ -326,7 +325,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
             new_header = libvirt_header.get_aligned_header(align_size)
             self.result_queue.put(new_header)
             self.total_write_size += len(new_header)
-            #dump_memory.write(new_header)
 
             # get memory snapshot size
             original_header_len = len(original_header)
@@ -336,7 +334,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.memory_snapshot_size.value = long(mem_snapshot_size + len(new_header))
             self.result_queue.put(new_data)
             self.total_write_size += len(new_data)
-            #dump_memory.write(new_data)
             LOG.info("Memory snapshot size: %ld, header size: %ld at %f" % \
                      (mem_snapshot_size, len(new_header), time.time()))
 
@@ -354,7 +351,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
                         break
                     current_size = len(data)
                     self.result_queue.put(data)
-                    #dump_memory.write(data)
                     self.total_write_size += current_size
                     #prog_bar.set_percent(100.0*self.total_write_size/mem_snapshot_size)
                     #prog_bar.show_progress()
@@ -381,7 +377,6 @@ class MemoryReadProcess(process_manager.ProcWorker):
                   (self.__class__.__name__, self.total_write_size, self.total_write_size, 1))
         LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" % \
                   (self.__class__.__name__, time_s, time_e, (time_e-time_s)))
-        #dump_memory.close()
 
     def get_memory_snapshot_size(self):
         if long(self.memory_snapshot_size.value) > 0:
@@ -954,13 +949,6 @@ def create_residue(base_disk, base_hashvalue,
         time.sleep(5)
         qmp_thread.start()
         _waiting_to_finish(process_controller, "MemoryReadProcess")
-
-    # to be deleted
-    #memory_read_proc.join()
-    #while True:
-    #    data = memory_snapshot_queue.get()
-    #    if data == Const.QUEUE_SUCCESS_MESSAGE:
-    #        break
 
     # 3. get overlay VM (semantic gap + deduplication)
     dedup_proc = get_overlay_deltalist(monitoring_info, options,

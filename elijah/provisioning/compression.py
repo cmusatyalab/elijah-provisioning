@@ -193,10 +193,6 @@ class CompressProc(process_manager.ProcWorker):
                         #           total_block_count, prev_block_count, cur_block_count))
             self.finish_processing_input.value = True
 
-            # to be deleted
-            #import json
-            #open("pr-history-comp", "w").write(json.dumps(self.measure_history))
-
             # send end meesage to every process
             for index in self.proc_list:
                 self.task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)

@@ -775,13 +775,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         self.deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         LOG.debug("[time] Memory xdelta first input at : %f" % (time_first_recv))
-
-        # to be deleted
-        #import json
-        #open("pr-history-memory", "w").write(json.dumps(self.measure_history_cur))
-
         return freed_page_counter
-
 
 
 def recover_memory(base_disk, base_mem, delta_path, out_path, verify_with_original=None):
@@ -961,8 +955,6 @@ class MemoryDiffProc(multiprocessing.Process):
         child_total_block = 0
         indata_size = 0
         outdata_size = 0
-        #dump_memory = open("memory-dump-modi", "w")  # to be deleted
-
         is_proc_running = True
         input_list = [self.task_queue._reader.fileno(),
                       self.mode_queue._reader.fileno()]
@@ -1030,7 +1022,6 @@ class MemoryDiffProc(multiprocessing.Process):
                         try:
                             # get diff compared to the base VM
                             source_data = self.get_raw_data(ram_offset, len(data))
-                            #dump_memory.write(data)
                             if source_data == None:
                                 msg = "launch memory snapshot is bigger than base vm at %ld (%ld > %ld)" %\
                                     (ram_offset, ram_offset+chunk_data_len, self.raw_filesize)
@@ -1100,11 +1091,6 @@ class MemoryDiffProc(multiprocessing.Process):
             msg = "Empty new compression mode that does not refelected"
             sys.stdout.write(msg)
 
-        # to be deleted
-        #import json
-        #open("memory-access-order", "w").write(json.dumps(self.memory_offset_list))
-        #dump_memory.close()
-
     def get_raw_data(self, offset, length):
         # retrieve page data from raw memory
         if offset+length < self.raw_filesize:
@@ -1112,39 +1098,6 @@ class MemoryDiffProc(multiprocessing.Process):
         else:
             return None
 
-
-
-
-
-
-'''
-class FeedingPipe(multiprocessing.Process):
-    def __init__(self, inpath, data_pipe):
-        self.inpath = inpath 
-        self.data_pipe = data_pipe
-        multiprocessing.Process.__init__(self, target=self.process)
-
-    def process(self):
-        recv_pipe, send_pipe = self.data_pipe
-        recv_pipe.close()
-        in_fd = open(self.inpath, 'rb')
-        total_bytes = 0
-        while True:
-            data = in_fd.read(1024*1024*1)
-            total_bytes += len(data)
-            send_pipe.send(data)
-        LOG.debug("finish sending : %ld bytes" % total_bytes)
-        in_fd.close()
-
-def test_piping():
-    memory_snapshot_path = "./memory_snap"
-    (recv_data_pipe, send_data_pipe) = multiprocessing.Pipe()
-    feedingProc = FeedingPipe(memory_snapshot_path, (recv_data_pipe, send_data_pipe))
-    feedingProc.start()
-    feedingProc.join()
-    send_data_pipe.close()
-
-'''
 
 if __name__ == "__main__":
     EXT_META = "-meta"

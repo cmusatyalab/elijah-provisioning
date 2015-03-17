@@ -1005,10 +1005,6 @@ class DeltaDedup(process_manager.ProcWorker):
             LOG.error(str(e))
             LOG.error("failed at %s" % str(traceback.format_exc()))
 
-        # to be deleted
-        #import json
-        #open("pr-history-delta", "w").write(json.dumps(self.measure_history))
-
     @staticmethod
     def memory_import_hashdict(meta_path):
         fd = open(meta_path, "rb")
