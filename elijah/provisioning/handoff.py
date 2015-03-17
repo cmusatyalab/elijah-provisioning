@@ -28,7 +28,6 @@ import hashlib
 import libvirt
 import shutil
 import traceback
-import psutil
 import struct
 import msgpack
 from tempfile import NamedTemporaryFile
@@ -817,6 +816,7 @@ class CPUMonitor(threading.Thread):
         return self.core_cpus
 
     def monitor_cpu(self):
+        import psutil
         while(not self.stop.wait(1)):
             cpu_usage = psutil.cpu_percent(interval=0, percpu=True)
             cur_time = time.time()
@@ -856,15 +856,18 @@ def create_residue(base_disk, base_hashvalue,
                    resumed_vm, options, original_deltalist,
                    migration_addr,
                    overlay_mode=None):
-    global _handoff_start_time
     '''Get residue
     return overlay_metafile, overlay_files
     '''
-
-    cpu_stat_start = psutil.cpu_times(percpu = True)
+    import psutil
+    global _handoff_start_time  # for testing purpose
     time_start = time.time()
     _handoff_start_time[0] = time_start
     LOG.info("control_network\tupdate start time: %f" % _handoff_start_time[0])
+
+    CPU_MONITORING = False
+    if CPU_MONITORING:
+        cpu_stat_start = psutil.cpu_times(percpu = True)
     process_controller = process_manager.get_instance()
     if overlay_mode == None:
         # serial mode for testing
@@ -873,7 +876,6 @@ def create_residue(base_disk, base_hashvalue,
 
         # multi-processing
         NUM_CPU_CORES = 1   # set CPU affinity
-        #VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
         VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
 
@@ -892,8 +894,6 @@ def create_residue(base_disk, base_hashvalue,
             proc.set_cpu_affinity(excluded_core_list)
             LOG.debug("affinity\tset affinity of %s to %s" % (proc.name, excluded_core_list))
 
-
-
     process_controller.set_mode(overlay_mode, migration_addr)
     LOG.info("* LIVE MIGRATION STRATEGY: %d" % VMOverlayCreationMode.LIVE_MIGRATION_STOP)
     LOG.info("* Overlay creation configuration")
@@ -901,7 +901,7 @@ def create_residue(base_disk, base_hashvalue,
     LOG.debug("* Overlay creation mode start\n%s" % str(overlay_mode))
     LOG.debug("* Overlay creation mode end")
 
-    # 1. sanity check
+    # sanity check
     if (options == None) or (isinstance(options, Options) == False):
         raise HandoffError("Given option is invalid: %s" % str(options))
     (base_diskmeta, base_mem, base_memmeta) = \
@@ -909,13 +909,13 @@ def create_residue(base_disk, base_hashvalue,
     qemu_logfile = resumed_vm.qemu_logfile
 
     # start CPU Monitor
-    cpu_monitor = CPUMonitor()
-    cpu_monitor.start()
+    if CPU_MONITORING:
+        cpu_monitor = CPUMonitor()
+        cpu_monitor.start()
 
     memory_snapshot_queue = multiprocessing.Queue(overlay_mode.QUEUE_SIZE_MEMORY_SNAPSHOT)
     residue_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_OPTIMIZATION)
     compdata_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_COMPRESSION)
-
     vm_monitor = VMMonitor(resumed_vm.conn, resumed_vm.machine, options,
                            resumed_vm.monitor,
                            base_disk, base_mem,
@@ -930,17 +930,18 @@ def create_residue(base_disk, base_hashvalue,
     if (time_ss-time_start) > 5:
         raise HandoffError("Time for serialized step takes too long. Check get_monitoring_info()")
 
+    # QEMU control thread
     qmp_thread = QmpThread(resumed_vm.qmp_channel, process_controller,
                            memory_snapshot_queue, compdata_queue,
                            overlay_mode, resumed_vm.monitor)
     qmp_thread.daemon = True
     qmp_thread.config_migration()
 
+    # memory snapshotting thread
     memory_read_proc = save_mem_snapshot(resumed_vm.conn,
                                          resumed_vm.machine,
                                          memory_snapshot_queue,
                                          fuse_stream_monitor=resumed_vm.monitor)
-
     if overlay_mode.PROCESS_PIPELINED == False:
         if overlay_mode.LIVE_MIGRATION_STOP is not VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
             msg = "Use ASAP VM stop for pipelined approach for serialized processing.\n"
@@ -950,7 +951,7 @@ def create_residue(base_disk, base_hashvalue,
         qmp_thread.start()
         _waiting_to_finish(process_controller, "MemoryReadProcess")
 
-    # 3. get overlay VM (semantic gap + deduplication)
+    # process for getting VM overlay
     dedup_proc = get_overlay_deltalist(monitoring_info, options,
                                        overlay_mode,
                                        base_disk, base_mem,
@@ -965,7 +966,7 @@ def create_residue(base_disk, base_hashvalue,
     if overlay_mode.PROCESS_PIPELINED == False:
         _waiting_to_finish(process_controller, "DeltaDedup")
 
-    # 4. compression
+    # process for compression
     LOG.info("Compressing overlay blobs")
     compress_proc = compression.CompressProc(residue_deltalist_queue,
                                              compdata_queue,
@@ -975,10 +976,9 @@ def create_residue(base_disk, base_hashvalue,
     if overlay_mode.PROCESS_PIPELINED == False:
         _waiting_to_finish(process_controller, "CompressProc")
 
-    time_packaging_start = time.time()
     if migration_addr.startswith("network"):
-        migration_dest_ip = migration_addr.split(":")[-1]
         from stream_client import StreamSynthesisClient
+        migration_dest_ip = migration_addr.split(":")[-1]
         resume_disk_size = os.path.getsize(resumed_vm.resumed_disk)
 
         # wait until getting the memory snapshot size
@@ -1027,26 +1027,26 @@ def create_residue(base_disk, base_hashvalue,
                                                                 (time_finish_transmission-time_start)))
         LOG.debug("[time] Start ~ Finish migration (%f ~ %f): %f" % (time_start, vm_resume_time_at_dest,
                                                                 (vm_resume_time_at_dest-time_start)))
-        # measure CPU usage
-        cpu_monitor.terminate()
-        cpu_monitor.join()
-        avg_cpu_usage = cpu_monitor.average_cpu_time(time_start, time_finish_transmission, assigned_core_list)
-        LOG.debug("cpu_usage\t%f\taverage\t%s" % (time.time(), avg_cpu_usage))
-
-        # measrue CPU time
-        cpu_user_time = 0.0
-        cpu_sys_time = 0.0
-        cpu_idle_time = 0.0
-        for core_index in assigned_core_list:
-            cpu_time_start = cpu_stat_start[core_index]
-            cpu_time_end = cpu_stat_end[core_index]
-            cpu_user_time += (cpu_time_end[0] - cpu_time_start[0])
-            cpu_sys_time += (cpu_time_end[2] - cpu_time_start[2])
-            cpu_idle_time += (cpu_time_end[3] - cpu_time_start[3])
-        cpu_total_time = cpu_user_time+cpu_sys_time
-        LOG.debug("cpu_usage\t%f\tostime\t%s\t%f\t%f %%(not accurate)" %\
-                  (time.time(), assigned_core_list,
-                   cpu_total_time, 100.0*cpu_total_time/(cpu_total_time+cpu_idle_time)))
+        if CPU_MONITORING:
+            # measure CPU usage
+            cpu_monitor.terminate()
+            cpu_monitor.join()
+            avg_cpu_usage = cpu_monitor.average_cpu_time(time_start, time_finish_transmission, assigned_core_list)
+            LOG.debug("cpu_usage\t%f\taverage\t%s" % (time.time(), avg_cpu_usage))
+            # measrue CPU time
+            cpu_user_time = 0.0
+            cpu_sys_time = 0.0
+            cpu_idle_time = 0.0
+            for core_index in assigned_core_list:
+                cpu_time_start = cpu_stat_start[core_index]
+                cpu_time_end = cpu_stat_end[core_index]
+                cpu_user_time += (cpu_time_end[0] - cpu_time_start[0])
+                cpu_sys_time += (cpu_time_end[2] - cpu_time_start[2])
+                cpu_idle_time += (cpu_time_end[3] - cpu_time_start[3])
+            cpu_total_time = cpu_user_time+cpu_sys_time
+            LOG.debug("cpu_usage\t%f\tostime\t%s\t%f\t%f %%(not accurate)" %\
+                    (time.time(), assigned_core_list,
+                    cpu_total_time, 100.0*cpu_total_time/(cpu_total_time+cpu_idle_time)))
 
         _handoff_start_time[0] = sys.maxint
         return None
@@ -1056,17 +1056,18 @@ def create_residue(base_disk, base_hashvalue,
         synthesis_file.start()
 
         # wait until getting the memory snapshot size
-        #memory_read_proc.join()
-        resume_memory_size = -1
         LOG.debug("waiting to get memory size")
+        resume_memory_size = -1
         while resume_memory_size < 0:
             resume_memory_size = memory_read_proc.get_memory_snapshot_size()
+            time.sleep(0.001)
         time_memory_snapshot_size = time.time()
         LOG.debug("[time] Getting memory snapshot size (%f~%f):%f" % (time_start,
                                                                         time_memory_snapshot_size,
                                                                         (time_memory_snapshot_size-time_start)))
         if overlay_mode.PROCESS_PIPELINED == True:
             qmp_thread.start()
+
         # wait to finish creating files
         synthesis_file.join()
         time_end_transfer = time.time()
@@ -1075,7 +1076,6 @@ def create_residue(base_disk, base_hashvalue,
                                                                             (time_end_transfer-time_start)))
 
         overlay_info, overlay_files = synthesis_file.get_overlay_info()
-
         overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
         overlay_metafile = _generate_overlaymeta(overlay_metapath,
                                                 overlay_info,
@@ -1083,21 +1083,14 @@ def create_residue(base_disk, base_hashvalue,
                                                 os.path.getsize(resumed_vm.resumed_disk),
                                                 resume_memory_size)
 
-        # 6. packaging VM overlay into a single zip file
+        # packaging VM overlay into a single zip file
         temp_dir = mkdtemp(prefix="cloudlet-overlay-")
         overlay_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
         VMOverlayPackage.create(overlay_zipfile, overlay_metafile, overlay_files)
-        time_packaging_end = time.time()
-        LOG.debug("[time] Time for overlay packaging (%f ~ %f): %f" % (time_packaging_start,
-                                                                    time_packaging_end,
-                                                                    (time_packaging_end-time_packaging_start)))
 
-        # 7. terminting
+        # terminting
         qmp_thread.join()
-        #cpu_stat = process_controller.cpu_statistics
-        #open("cpu-stat.json", "w+").write(json.dumps(cpu_stat))
         process_manager.kill_instance()
-
         memory_read_proc.finish()   # deallocate resources for snapshotting
         # 7. terminting
         if resumed_vm.monitor is not None:
@@ -1109,14 +1102,14 @@ def create_residue(base_disk, base_hashvalue,
         if os.path.exists(temp_compfile_dir) == True:
             shutil.rmtree(temp_compfile_dir)
         time_end = time.time()
-
         LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
                                                                 (time_end-time_start)))
 
-        cpu_monitor.terminate()
-        cpu_monitor.join()
-        avg_cpu_usage = cpu_monitor.average_cpu_time(time_start, time_end_transfer, assigned_core_list)
-        LOG.debug("cpu_usage\t%f\taverage\t%s" % (time.time(), avg_cpu_usage))
+        if CPU_MONITORING:
+            cpu_monitor.terminate()
+            cpu_monitor.join()
+            avg_cpu_usage = cpu_monitor.average_cpu_time(time_start, time_end_transfer, assigned_core_list)
+            LOG.debug("cpu_usage\t%f\taverage\t%s" % (time.time(), avg_cpu_usage))
         _handoff_start_time[0] = sys.maxint
         return overlay_zipfile
 

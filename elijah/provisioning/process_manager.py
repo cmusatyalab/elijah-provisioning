@@ -149,18 +149,6 @@ class ProcessManager(threading.Thread):
                             ["CreateMemoryDeltalist"],
                             data={"diff_algorithm":diff_algorithm})
 
-    def _get_cpu_usage(self):
-        result = dict()
-        query = "cpu_usage_accum"   #"current_bw"
-        worker_names = self.process_list.keys()
-        worker_names = self._send_query(query, worker_names)
-
-        responses = self._recv_response(query, worker_names)
-        for worker_name, (response, duration) in responses.iteritems():
-            #sys.stdout.write("[manager] %s:\t%s:\t%s\t(%f s)\n" % (query, worker_name, str(response), duration))
-            result[worker_name] = response
-        return result
-
     def _get_queue_length(self):
         worker_names = self.process_list.keys()
         responses = dict()
@@ -356,7 +344,6 @@ class ProcessManager(threading.Thread):
         measured_throughput = 0
         mode_change_history = list()
         time_prev_mode_change = self.time_start
-        self.cpu_statistics = list()
         while (not self.stop.wait(0.1)):
             try:
                 network_bw = self.get_network_speed()  # mega bit/s
@@ -472,13 +459,6 @@ class ProcessManager(threading.Thread):
                         LOG.debug("mode-change\t%f\t%0.2f\tcurrent mode is the best" % (
                             time_current_iter,
                             time_from_start))
-                #result = self._get_cpu_usage()
-                #self.cpu_statistics.append((time.time()-time_start, result))
-                #time.sleep(1)
-                #self._change_comp_mode()
-                #break
-                #result = self._get_queue_length()
-                #time.sleep(0.1)
             except Exception as e:
                 sys.stdout.write("[manager] Exception\n")
                 sys.stderr.write(traceback.format_exc())
@@ -547,11 +527,6 @@ class ProcWorker(multiprocessing.Process):
             return True
         elif control_msg == "queue_length":
             return (self.monitor_current_inqueue_length, self.monitor_current_outqueue_length)
-        elif control_msg == "cpu_usage_accum":
-            #(utime, stime, child_utime, child_stime, elaspe_time) = os.times()
-            #all_times = utime+stime+child_utime+child_stime
-            self.response_queue.put(os.times())
-            return True
         elif control_msg == "change_cores":
             new_num_cores = self.control_queue.get()
             num_cores = new_num_cores.get("num_cores", None)
