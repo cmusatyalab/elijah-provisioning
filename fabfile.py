@@ -12,18 +12,38 @@ from fabric.context_managers import settings
 
 import os
 import sys
+import platform
+from distutils.version import LooseVersion
 
 
-def check_support():
+def check_VM_support():
     if run("egrep '^flags.*(vmx|svm)' /proc/cpuinfo > /dev/null").failed:
         abort("Need hardware VM support (vmx)")
 
 
 def check_os_distribution():
     cmd = "cat /etc/lsb-release | grep DISTRIB_CODENAME | awk -F'=' '{print $2}'"
+    os_dist = ''
     with settings(hide('everything'), warn_only=True):
-        result = run(cmd)
-        return result
+        os_dist = run(cmd)
+    if os_dist != 'precise' and os_dist != "trusty":
+        msg = "Support only Ubuntu Precise (12.04) or Ubuntu Trusty (14.04)"
+        abort(msg)
+    return os_dist
+
+
+def check_kernel_version():
+    """check kernel version
+    Kernel has serious bug where the kernel cause crash when EPT support with
+    FUSE+mmap.  This bug is fixed since Linux kernel 3.13.0
+    """
+
+    WORKING_KERNEL_VERSION = "3.13.0"
+    kernel_version = platform.platform().split("-")[1]
+    if LooseVersion(kernel_version) < LooseVersion(WORKING_KERNEL_VERSION):
+        msg = "Linux Kernel lower than %s has serious bug in using FUSE + mmap"\
+            % WORKING_KERNEL_VERSION
+        abort(msg)
 
 
 def package_installed(pkg_name):
@@ -61,13 +81,12 @@ def localhost():
 
 @task
 def install():
-    #check_support()
     current_dir = os.path.abspath(os.curdir)
+
+    # check support
+    check_VM_support()
+    check_kernel_version()
     dist = check_os_distribution()
-    if dist != 'precise' and dist != "trusty":
-        msg = "Only support Ubuntu Precise (12.04) or ubuntu Trusty (14.04)"
-        import pdb;pdb.set_trace()
-        abort(msg)
 
     # install dependent packages
     sudo("apt-get update")
@@ -123,10 +142,6 @@ def install():
     if sudo("sed -i 's/#user_allow_other/user_allow_other/g' /etc/fuse.conf"):
         abort("Failed to allow other user to access FUSE file")
 
-    # (Optional) disable EPT support
-    # When you use EPT support with FUSE+mmap, it randomly causes kernel panic.
-    # We're investigating it whether it's Linux kernel bug or not.
-    disable_EPT()
 
     # install cloudlet package
     with cd(current_dir):

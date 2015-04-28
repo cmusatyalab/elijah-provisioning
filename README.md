@@ -350,9 +350,12 @@ then you can make a port forwarding using -redir parameter as below.**
 
 **Note**: If you have experience kernel panic error like
 [this](https://github.com/cmusatyalab/elijah-cloudlet/issues/1), You should
-follow a workaround at this link. It happens at a machine that does not have
-enough memory with EPT support, and you can avoid this problem by disabling EPT
-support. We're current suspicious about kernel bug, and we'll report this soon.  
+upgrade your Linux kernel to at least 3.13.0 version. This bug is fixed since 
+kernel version 3.13.0. If you cannot upgrade the kernel, then please avoid
+using EPT. You can disable EPT as follows:
+
+    > $ sudo modprobe -r kvm_intel
+    > $ sudo modprobe kvm_intel "ept=0"
 
 
 
