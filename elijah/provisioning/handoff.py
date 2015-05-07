@@ -131,10 +131,10 @@ class PreloadResidueData(threading.Thread):
                 recover_data = self_ref_data
             elif delta_item.ref_id == DeltaItem.REF_SELF_HASH:
                 ref_hashvalue = delta_item.data
-                self_ref_data = recovered_hash_dict.get(ref_hashvalue, None)
-                if self_ref_delta_item == None:
+                self_ref_data_item = recovered_hash_dict.get(ref_hashvalue, None)
+                if self_ref_data_item == None:
                     return None
-                recover_data = self_ref_data
+                recover_data = self_ref_data_item
                 delta_item.hash_value = ref_hashvalue
             elif delta_item.ref_id == DeltaItem.REF_XDELTA:
                 patch_data = delta_item.data
