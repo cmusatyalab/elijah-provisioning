@@ -339,7 +339,7 @@ class ProcessManager(threading.Thread):
         self.prev_measured_time = self.time_start
         self.cur_system_in_bw_list = list()
         self.cur_system_out_bw_list = list()
-        LOG.debug("adaptation start time: %f" % self.time_start)
+        #LOG.debug("adaptation start time: %f" % self.time_start)
         time_first_measurement = 0
         measured_throughput = 0
         mode_change_history = list()
@@ -365,41 +365,27 @@ class ProcessManager(threading.Thread):
                     total_size_dict_in, system_block_per_sec,\
                     system_out_bw_cur_est, system_in_bw_cur_est,\
                     system_out_bw_actual, system_in_bw_actual = system_speed
-                #msg = "throughput\t%f\tsystem:%f(mbps),%f(block/sec)\tnetwork(mbps):%f\tmeasured:%f,%f\tcur:%f,%f" % (time_current_iter,
-                #                                                                                             system_out_mbps,
-                #                                                                                             system_block_per_sec,
-                #                                                                                             network_bw,
-                #                                                                                             system_in_bw_measured,
-                #                                                                                             system_out_bw_measured,
-                #                                                                                           average_cur_system_in,
-                msg = "adaptation\t%f\t%0.2f\t%0.2f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f" % \
-                    (time_current_iter,
-                     time_from_start,
-                     network_bw,
-                     system_out_bw_actual,
-                     system_in_bw_actual,
-                     system_out_bw_cur_est,
-                     system_in_bw_cur_est,
-                     total_p, total_r,
-                     total_p_cur, total_r_cur)
-
-                LOG.debug(msg)
+                #msg = "adaptation\t%f\t%0.2f\t%0.2f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f" % \
+                #    (time_current_iter,
+                #     time_from_start,
+                #     network_bw,
+                #     system_out_bw_actual,
+                #     system_in_bw_actual,
+                #     system_out_bw_cur_est,
+                #     system_in_bw_cur_est,
+                #     total_p, total_r,
+                #     total_p_cur, total_r_cur)
+                #LOG.debug(msg)
 
                 # first predict at 2 seconds and then for every 5 seconds
                 if time_from_start > 5 and (time_current_iter - time_prev_mode_change) > 5:
                     # use current throughput
-                    LOG.debug("mode-test\t%f\t%0.2f\t%f\t%f" % \
-                              (time_current_iter,
-                               time_from_start,
-                               system_out_bw_actual,
-                               network_bw,
-                               ))
-                    #LOG.debug("mode-change\t%f\t%f\tp\t%s" % (time_current_iter,
-                    #                                          time_from_start,
-                    #                                          p_dict_cur))
-                    #LOG.debug("mode-change\t%f\t%f\tr\t%s" % (time_current_iter,
-                    #                                          time_from_start,
-                    #                                          r_dict_cur))
+                    #LOG.debug("mode-test\t%f\t%0.2f\t%f\t%f" % \
+                    #          (time_current_iter,
+                    #           time_from_start,
+                    #           system_out_bw_actual,
+                    #           network_bw,
+                    #           ))
                     item = self.mode_profile.predict_new_mode(self.overlay_creation_mode,
                                                               p_dict_cur, r_dict_cur,
                                                               total_size_dict_in,

@@ -371,8 +371,8 @@ class CompChildProc(multiprocessing.Process):
                                        modified_disk_chunks,
                                        modified_memory_chunks))
 
-        sys.stdout.write("[Comp][Child] child finished. process %d jobs (%f)\n" % \
-                         (loop_counter, time_process_total_time))
+        #sys.stdout.write("[Comp][Child] child finished. process %d jobs (%f)\n" % \
+        #                 (loop_counter, time_process_total_time))
         self.command_queue.put((indata_size, outdata_size, child_total_block, time_process_total_time))
         while self.mode_queue.empty() == False:
             self.mode_queue.get_nowait()

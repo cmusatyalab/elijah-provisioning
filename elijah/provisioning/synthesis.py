@@ -1113,9 +1113,7 @@ class QmpThreadSerial(threading.Thread):
         self.qmp.disconnect()
 
     def _stop_migration(self):
-        LOG.debug("[live] sent stop_raw_live signal at %f" % time())
         stop_time = self.qmp.stop_raw_live()
-        LOG.debug("[live] stop migration at %f" % stop_time)
         self.fuse_stream_monitor.terminate()
         return stop_time
 
@@ -1201,7 +1199,7 @@ class MemoryReadProcessSerial(multiprocessing.Process):
                 prog_bar.show_progress()
             prog_bar.finish()
             time_end = time()
-            print "memory snapshotting time: %f" % (time_end-time_start)
+            LOG.debug("memory snapshotting time: %f" % (time_end-time_start))
 
             prev_data_offset = 0
             for (offset, data) in iter(sorted(self.temp_memory_dict.iteritems())): 
@@ -1762,8 +1760,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
                                              return_residue,
                                              overlay_mode=overlay_mode)
             if residue_overlay is not None:
-                LOG.info("[RESULT] Residue")
-                LOG.info("[RESULT]   Metafile : %s" % \
+                LOG.info("Save new VM overlay at: %s" % \
                         (os.path.abspath(residue_overlay)))
             if (residue_overlay is not None) and os.path.exists(residue_overlay) == True\
                     and is_profiling_test:

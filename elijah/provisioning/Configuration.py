@@ -19,6 +19,8 @@
 #
 
 import os
+import sys
+import pprint
 
 
 class ConfigurationError(Exception):
@@ -143,7 +145,6 @@ class Options(object):
     MEMORY_SAVE_PATH                    = None
 
     def __str__(self):
-        import pprint
         return pprint.pformat(self.__dict__)
 
 
@@ -159,8 +160,6 @@ class VMOverlayCreationMode(object):
 
     LIVE_MIGRATION_FINISH_ASAP = 1
     LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE = 2
-    LIVE_MIGRATION_FINISH_AT_2ND_ITERATION  = 3
-    LIVE_MIGRATION_FINISH_AT_3RD_ITERATION  = 4
     LIVE_MIGRATION_STOP = LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
 
     def __init__(self, num_cores=4):
@@ -186,7 +185,6 @@ class VMOverlayCreationMode(object):
         self.COMPRESSION_ALGORITHM_SPEED             = 5 # 1 (fastest) ~ 9
 
     def __str__(self):
-        import pprint
         return pprint.pformat(self.__dict__)
 
     def update_mode(self, new_mode_dict):
@@ -216,8 +214,6 @@ class VMOverlayCreationMode(object):
         updated_mask = affinity.get_process_affinity_mask(os.getpid())
         if affinity_mask != updated_mask:
             raise Exception("Cannot not set affinity mask: from %s to %s" % (affinity_mask, updated_mask))
-
-        print "[%d] change num core to %d, affinity: %s, %s" % (os.getpid(), num_cores, affinity_mask, updated_mask)
 
     @staticmethod
     def get_num_cores():
@@ -268,7 +264,7 @@ class VMOverlayCreationMode(object):
         mode = VMOverlayCreationMode()
         diff = set(mode.__dict__.keys()) - set(mode_dict.keys())
         if diff:
-            print "error, input dictionary is different: %s" % diff
+            sys.stderr.write("error, input dictionary is different: %s" % diff)
             return None
         mode.__dict__.update(mode_dict)
         return mode
