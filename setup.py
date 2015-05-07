@@ -28,10 +28,12 @@ from provisioning.Configuration import Const
 
 #from setuptools import setup, find_packages
 from distutils.core import setup
+from Cython.Build import cythonize
+
 
 
 def download_dependency(download_dir):
-    URL_MODIFIED_QEMU = "https://github.com/cmusatyalab/elijah-qemu/releases/download/cloudlet-v0.8.6/qemu-system-x86_64"
+    URL_MODIFIED_QEMU = "https://github.com/cmusatyalab/elijah-qemu/releases/download/cloudlet-v0.9.2/qemu-system-x86_64"
 
     msg = "  " + "-"*70+ "\n"
     msg += "  Download modified QEMU from https://github.com/cmusatyalab/elijah-qemu/\n"
@@ -71,7 +73,7 @@ def get_all_files(package_dir, target_path, exclude_names=list()):
 download_dependency('elijah/provisioning/lib/bin/x86_64')
 script_files = get_all_files(".", "bin")
 executable_files = get_all_files('.', 'elijah/provisioning/lib')
-conf_files = get_all_files('.', 'elijah/provisioning/config', 
+conf_files = get_all_files('.', 'elijah/provisioning/config',
         exclude_names=['cloudlet.db'])
 
 setup(
@@ -96,16 +98,17 @@ setup(
             (Const.CONFIGURATION_DIR, conf_files),
             ],
         requires=[
-            'pyliblzma(>=0.5.3)', 
+            'pyliblzma(>=0.5.3)',
             # due to openstack. OpenStack Grizzly is not 
             # compatible with latest version of sqlalchemy 
             'sqlalchemy(==0.7.2)',
             ],
-        #classifier=[
-        #    'Development Status :: 3 - Alpha',
-        #    'License :: OSI Approved :: Apache Software License',
-        #    'Operating System :: POSIX :: Linux',
-        #],
+        ext_modules = cythonize(["elijah/provisioning/cython_xor.pyx"]),
+        classifier=[
+            'Development Status :: 3 - Alpha',
+            'License :: OSI Approved :: Apache Software License',
+            'Operating System :: POSIX :: Linux',
+        ],
         )
 
 

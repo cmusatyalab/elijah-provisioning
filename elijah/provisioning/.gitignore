@@ -1,3 +1,4 @@
 log_synthesis/
 .rope/
-.overlay-log
+overlay-log
+cython_xor.c
