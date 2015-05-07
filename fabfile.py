@@ -75,6 +75,7 @@ def install():
     with settings(hide('stdout'), warn_only=True):
         cmd = "sudo apt-get update"
         sudo(cmd)
+    with settings(hide('running'), warn_only=True):
         cmd = "apt-get install --force-yes -y qemu-kvm libvirt-bin gvncviewer "
         cmd += "python-dev python-libvirt python-lxml python-lzma "
         cmd += "apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev"
