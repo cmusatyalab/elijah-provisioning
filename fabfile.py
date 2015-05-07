@@ -17,6 +17,13 @@ import platform
 from distutils.version import LooseVersion
 
 
+
+# install on local machine
+env.run = local
+env.warn_only = True
+env.hosts = ['localhost']
+
+
 def check_system_support():
     # check hardware support
     if run("egrep '^flags.*(vmx|svm)' /proc/cpuinfo > /dev/null").failed:
@@ -58,13 +65,6 @@ def yes_install(pkg_name):
 
 
 @task
-def localhost():
-    env.run = local
-    env.warn_only = True
-    env.hosts = ['localhost']
-
-
-@task
 def install():
     current_dir = os.path.abspath(os.curdir)
 
@@ -72,29 +72,29 @@ def install():
     dist = check_system_support()
 
     # install dependent packages
-    puts("apt-get update")
-    with settings(hide('everything'), warn_only=True):
-        sudo("apt-get update")
-    cmd = "apt-get install --force-yes -y qemu-kvm libvirt-bin gvncviewer "
-    cmd += "python-dev python-libvirt python-lxml python-lzma "
-    cmd += "apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev"
-    if dist == "precise":
-        cmd += " python-xdelta3"
-        if sudo(cmd).failed:
-            abort("Failed to install libraries")
-    elif dist == "trusty":
-        if sudo(cmd).failed:
-            abort("Failed to install libraries")
-        # Python-xdelta3 is no longer supported in Ubuntu 14.04 LTS.
-        # But you can install deb of Ubunutu 12.04 at Ubuntu 14.04.
-        with cd(current_dir):
-            package_name = "python-xdelta3.deb"
-            cmd = "wget http://mirrors.kernel.org/ubuntu/pool/universe/x/xdelta3/python-xdelta3_3.0.0.dfsg-1build1_amd64.deb -O %s" % package_name
+    with settings(hide('stdout'), warn_only=True):
+        cmd = "sudo apt-get update"
+        sudo(cmd)
+        cmd = "apt-get install --force-yes -y qemu-kvm libvirt-bin gvncviewer "
+        cmd += "python-dev python-libvirt python-lxml python-lzma "
+        cmd += "apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev"
+        if dist == "precise":
+            cmd += " python-xdelta3"
             if sudo(cmd).failed:
-                abort("Failed to download %s" % package_name)
-            if sudo("dpkg -i %s" % package_name).failed:
-                abort("Failed to install %s" % package_name)
-            sudo("rm -rf %s" % package_name)
+                abort("Failed to install libraries")
+        elif dist == "trusty":
+            if sudo(cmd).failed:
+                abort("Failed to install libraries")
+            # Python-xdelta3 is no longer supported in Ubuntu 14.04 LTS.
+            # But you can install deb of Ubunutu 12.04 at Ubuntu 14.04.
+            with cd(current_dir):
+                package_name = "python-xdelta3.deb"
+                cmd = "wget http://mirrors.kernel.org/ubuntu/pool/universe/x/xdelta3/python-xdelta3_3.0.0.dfsg-1build1_amd64.deb -O %s" % package_name
+                if sudo(cmd).failed:
+                    abort("Failed to download %s" % package_name)
+                if sudo("dpkg -i %s" % package_name).failed:
+                    abort("Failed to install %s" % package_name)
+                sudo("rm -rf %s" % package_name)
 
     # install python-packages
     with cd(current_dir):
@@ -131,8 +131,12 @@ def install():
         with settings(hide('everything')):
             sudo("rm -rf ./build")
             sudo("pip uninstall --y elijah-provisioning")
+        # install python package
         if sudo("python setup.py install").failed:
             abort("cannot install cloudlet library")
+        # clean-up
+        with settings(hide('everything')):
+            sudo("rm -rf ./build")
 
     sys.stdout.write("[SUCCESS] VM synthesis code is installed\n")
 

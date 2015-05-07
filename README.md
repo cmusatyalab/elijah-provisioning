@@ -81,7 +81,7 @@ To install, you either
 * run a installation script
   
   > $ sudo apt-get install fabric openssh-server  
-  > $ fab localhost install
+  > $ fab install
   > *(Type your account password when it is asked)*
 
 * install manually

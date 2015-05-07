@@ -36,7 +36,7 @@ def download_dependency(download_dir):
     URL_MODIFIED_QEMU = "https://github.com/cmusatyalab/elijah-qemu/releases/download/cloudlet-v0.9.2/qemu-system-x86_64"
 
     msg = "  " + "-"*70+ "\n"
-    msg += "  Download modified QEMU from https://github.com/cmusatyalab/elijah-qemu/\n"
+    msg += "  Download modified QEMU from %s\n" % URL_MODIFIED_QEMU
     msg += "  It enables on-demand VM fetching. Unlike the codes in elijah-provisioning,\n"
     msg += "  Modified QEMU is distributed under GPL license. Agree (Y/n) ? "
     user_input = raw_input(msg).strip()
