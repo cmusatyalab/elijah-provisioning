@@ -778,11 +778,10 @@ class Recovered_delta(multiprocessing.Process):
         if self.raw_mem_overlay is not None:
             self.raw_mem_overlay.close()
             self.raw_mem_overlay = None
-        # fix this
-        if self.recover_disk_fd is not None:
+        if hasattr(self, "recover_disk_fd"):
             self.recover_disk_fd.close()
             self.recover_disk_fd = None
-        if self.recover_mem_fd is not None:
+        if hasattr(self, "recover_mem_fd"):
             time_close_start = time.time()
             self.recover_mem_fd.close()
             self.recover_mem_fd = None
