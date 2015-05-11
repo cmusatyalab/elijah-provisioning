@@ -662,45 +662,38 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
     if cdrom_source is not None:
         cdrom_source.set("file", os.path.abspath(Const.TEMPLATE_OVF))
 
-    # append QEMU-argument
-    if qemu_logfile is not None:
-        qemu_xmlns="http://libvirt.org/schemas/domain/qemu/1.0"
-        qemu_element = xml.find("{%s}commandline" % qemu_xmlns)
-        if qemu_element is None:
-            qemu_element = Element("{%s}commandline" % qemu_xmlns)
-            xml.append(qemu_element)
+    # append custom QEMU-argument
+    qemu_xmlns="http://libvirt.org/schemas/domain/qemu/1.0"
+    qemu_element = xml.find("{%s}commandline" % qemu_xmlns)
+    if qemu_element is None:
+        qemu_element = Element("{%s}commandline" % qemu_xmlns)
+        xml.append(qemu_element)
 
-        # remove previous logging argument
-        argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
-        remove_list = list()
-        for argument_item in argument_list:
-            arg_value = argument_item.get('value').strip()
-            if arg_value.startswith('-cloudlet') or arg_value.startswith('logfile='):
-                remove_list.append(argument_item)
-        for item in remove_list:
-            qemu_element.remove(item)
-        # append new cloudlet logpath
+    # remove previous logging argument, if it exists
+    argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
+    remove_list = list()
+    for argument_item in argument_list:
+        arg_value = argument_item.get('value').strip()
+        if arg_value.startswith('-cloudlet') or arg_value.startswith('logfile='):
+            remove_list.append(argument_item)
+    for item in remove_list:
+        qemu_element.remove(item)
+    # append qemu logfile
+    if qemu_logfile is not None:
         qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':'-cloudlet'}))
         qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':"logfile=%s" % qemu_logfile}))
 
+    # remove previous qmp argument, if it exists
+    argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
+    remove_list = list()
+    for argument_item in argument_list:
+        arg_value = argument_item.get('value').strip()
+        if arg_value.startswith('-qmp') or arg_value.startswith('unix:'):
+            remove_list.append(argument_item)
+    for item in remove_list:
+        qemu_element.remove(item)
     # append QMP channel for controlling live migration
     if qmp_channel is not None:
-        qemu_xmlns="http://libvirt.org/schemas/domain/qemu/1.0"
-        qemu_element = xml.find("{%s}commandline" % qemu_xmlns)
-        if qemu_element is None:
-            qemu_element = Element("{%s}commandline" % qemu_xmlns)
-            xml.append(qemu_element)
-
-        # remove previous qmp argument
-        argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
-        remove_list = list()
-        for argument_item in argument_list:
-            arg_value = argument_item.get('value').strip()
-            if arg_value.startswith('-qmp') or arg_value.startswith('unix:'):
-                remove_list.append(argument_item)
-        for item in remove_list:
-            qemu_element.remove(item)
-
         qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':'-qmp'}))
         qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':"unix:%s,server,nowait" % qmp_channel}))
 
@@ -713,7 +706,6 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
             xml.append(qemu_element)
         for each_argument in qemu_args:
             qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':each_argument}))
-
 
     # TODO: Handle console/serial element properly
     device_element = xml.find("devices")
