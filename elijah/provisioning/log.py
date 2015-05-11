@@ -43,7 +43,7 @@ def getLogger(name='unknown'):
             open(log_filepath, "w+").close()
             gid = grp.getgrnam("nogroup").gr_gid
             os.chmod(log_filepath, 0o666)
-        logging.basicConfig(level=logging.INFO,
+        logging.basicConfig(level=logging.DEBUG,
                 format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                 datefmt='%m-%d %H:%M',
                 filename=log_filepath,
@@ -56,7 +56,7 @@ def getLogger(name='unknown'):
 
         # add stdout logging with INFO level
         console = logging.StreamHandler(sys.stdout)
-        console.setLevel(logging.DEBUG)
+        console.setLevel(logging.INFO)
         formatter = logging.Formatter('%(levelname)-8s %(message)s')
         console.setFormatter(formatter)
         logger.addHandler(console)

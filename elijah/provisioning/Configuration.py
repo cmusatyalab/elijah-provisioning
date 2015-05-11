@@ -196,58 +196,22 @@ class VMOverlayCreationMode(object):
 
     @staticmethod
     def set_num_cores(num_cores):
-        import affinity
-        # assuming 8 cores
-        affinity_mask = 0x01
-        if num_cores == 1:
-            affinity_mask = 0x02     # cpu 1
-        elif num_cores ==2:
-            affinity_mask = 0x06    # cpu 1,2
-        elif num_cores ==3:
-            affinity_mask = 0x0e    # cpu 1,2,3
-        elif num_cores ==4:
-            affinity_mask = 0x1e # cpu 1,2,3,4
-        else:
-            raise Exception("Do not allocate more than 4 cores at this experiement")
+        import psutil
+        cpu_count = psutil.cpu_count()
+        num_cores = min(cpu_count, num_cores)
 
-        affinity.set_process_affinity_mask(os.getpid(), affinity_mask)
-        updated_mask = affinity.get_process_affinity_mask(os.getpid())
-        if affinity_mask != updated_mask:
-            raise Exception("Cannot not set affinity mask: from %s to %s" % (affinity_mask, updated_mask))
+        p = psutil.Process()
+        desired_cpus = list(range(num_cores))
+        p.cpu_affinity(desired_cpus)
+        updated_cpu = p.cpu_affinity()
+        if desired_cpus != updated_cpu:
+            raise Exception("Cannot not set affinity mask: from %s to %s" % (desired_cpus, updated_cpu))
 
     @staticmethod
     def get_num_cores():
-        import affinity
-        num_cores = 0
-        affinity_mask = affinity.get_process_affinity_mask(os.getpid())
-        if affinity_mask == 0x02:     # cpu 1
-            num_cores = 1
-        elif affinity_mask == 0x06:    # cpu 1,2
-            num_cores = 2
-        elif affinity_mask == 0x0e:    # cpu 1,2,3
-            num_cores = 3
-        elif affinity_mask == 0x1e: # cpu 1,2,3,4
-            num_cores = 4
-        else:
-            raise Exception("Do not allocate more than 4 cores at this experiement")
-        return num_cores
-
-    @staticmethod
-    def get_cpu_core_index():
-        import affinity
-        num_cores = 0
-        affinity_mask = affinity.get_process_affinity_mask(os.getpid())
-        if affinity_mask == 0x02:     # cpu 1
-            return [1]
-        elif affinity_mask == 0x06:    # cpu 1,2
-            return [1,2]
-        elif affinity_mask == 0x0e:    # cpu 1,2,3
-            return [1,2,3]
-        elif affinity_mask == 0x1e: # cpu 1,2,3,4
-            return [1,2,3,4]
-        else:
-            raise Exception("Do not allocate more than 4 cores at this experiement")
-
+        import psutil
+        p = psutil.Process()
+        return len(p.cpu_affinity())
 
     def get_mode_id(self):
         sorted_key = self.__dict__.keys()

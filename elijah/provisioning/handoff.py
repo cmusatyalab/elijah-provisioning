@@ -463,8 +463,8 @@ class QmpThread(threading.Thread):
                 if unprocessed_memory_snapshot_size > 1024*1024*1: # 10 MB
                     time.sleep(1)
                     break
-
             LOG.debug("qemu_control\tfinish data checking: %s" % (unprocessed_memory_snapshot_size))
+
             loop_counter = 0
             while(not self.stop.wait(loopping_period)):
                 iter_num = self.process_controller.get_migration_iteration_count()
@@ -521,9 +521,9 @@ class QmpThread(threading.Thread):
         self.qmp.disconnect()
 
     def _stop_migration(self):
-        #LOG.debug("qemu_control\tsent stop_raw_live signal at %f" % time.time())
+        LOG.debug("qemu_control\tsent stop_raw_live signal at %f" % time.time())
         stop_time = self.qmp.stop_raw_live()
-        #LOG.debug("qemu_control\tstop migration at %f" % stop_time)
+        LOG.debug("qemu_control\tstop migration at %f" % stop_time)
         self.fuse_stream_monitor.terminate()
         return stop_time
 
@@ -870,7 +870,7 @@ def create_residue(base_disk, base_hashvalue,
         cpu_stat_start = psutil.cpu_times(percpu = True)
     process_controller = process_manager.get_instance()
     if overlay_mode == None:
-        NUM_CPU_CORES = 1   # set CPU affinity
+        NUM_CPU_CORES = 2   # set CPU affinity
         VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
         overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
         overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP
@@ -879,14 +879,13 @@ def create_residue(base_disk, base_hashvalue,
         overlay_mode.DISK_DIFF_ALGORITHM = "none"
 
     # set affinity of VM not to disturb the migration
-    # do this after creating overlay mode
-    core_index = VMOverlayCreationMode.get_cpu_core_index()
-    assigned_core_list = VMOverlayCreationMode.get_cpu_core_index()
-    excluded_core_list = list(set(range(0,8)) - set(assigned_core_list))
-    for proc in psutil.process_iter():
-        if proc.name.lower().startswith("cloudlet_"):
-            proc.set_cpu_affinity(excluded_core_list)
-            LOG.debug("affinity\tset affinity of %s to %s" % (proc.name, excluded_core_list))
+    #p = psutil.Process()
+    #assigned_core_list = p.cpu_affinity()
+    #excluded_core_list = list(set(range(psutil.cpu_count())) - set(assigned_core_list))
+    #for proc in psutil.process_iter():
+    #    if proc.name().lower().startswith("cloudlet_"):
+    #        proc.cpu_affinity(excluded_core_list)
+    #        LOG.debug("affinity\tset affinity of %s to %s" % (proc.name, excluded_core_list))
 
     process_controller.set_mode(overlay_mode, migration_addr)
     LOG.info("* LIVE MIGRATION STRATEGY: %d" % VMOverlayCreationMode.LIVE_MIGRATION_STOP)

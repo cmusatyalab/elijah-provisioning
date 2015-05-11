@@ -365,16 +365,16 @@ class ProcessManager(threading.Thread):
                     total_size_dict_in, system_block_per_sec,\
                     system_out_bw_cur_est, system_in_bw_cur_est,\
                     system_out_bw_actual, system_in_bw_actual = system_speed
-                #msg = "adaptation\t%f\t%0.2f\t%0.2f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f" % \
-                #    (time_current_iter,
-                #     time_from_start,
-                #     network_bw,
-                #     system_out_bw_actual,
-                #     system_in_bw_actual,
-                #     system_out_bw_cur_est,
-                #     system_in_bw_cur_est,
-                #     total_p, total_r,
-                #     total_p_cur, total_r_cur)
+                msg = "adaptation\t%f\t%0.2f\t%0.2f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f" % \
+                    (time_current_iter,
+                     time_from_start,
+                     network_bw,
+                     system_out_bw_actual,
+                     system_in_bw_actual,
+                     system_out_bw_cur_est,
+                     system_in_bw_cur_est,
+                     total_p, total_r,
+                     total_p_cur, total_r_cur)
                 #LOG.debug(msg)
 
                 # first predict at 2 seconds and then for every 5 seconds
