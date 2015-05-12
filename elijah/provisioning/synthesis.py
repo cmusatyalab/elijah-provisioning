@@ -155,13 +155,15 @@ class VM_Overlay(threading.Thread):
         # filename for overlay VM
         temp_qemu_dir = mkdtemp(prefix="cloudlet-qemu-")
         self.qemu_logfile = os.path.join(temp_qemu_dir, "qemu-trim-log")
-        open(self.qemu_logfile, "w+").close()
-        os.chmod(os.path.dirname(self.qemu_logfile), 0o771)
-        os.chmod(self.qemu_logfile, 0o666)
         self.qmp_channel = os.path.abspath(os.path.join(temp_qemu_dir, "qmp-channel"))
+        # change permission of the file
+        for qemu_file in [self.qemu_logfile, self.qmp_channel]:
+            open(qemu_file, "w+").close()
+            os.chmod(os.path.dirname(qemu_file), 0o777)
+            os.chmod(qemu_file, 0o666)
+            LOG.info("QEMU access file : %s" % qemu_file)
         if os.path.exists(self.qmp_channel) == True:
             os.remove(self.qmp_channel)
-        LOG.info("QMP channel: %s" % self.qmp_channel)
 
         # option for data-intensive application
         self.cache_manager = None
@@ -371,10 +373,13 @@ class SynthesizedVM(threading.Thread):
 
         temp_qemu_dir = mkdtemp(prefix="cloudlet-overlay-")
         self.qemu_logfile = os.path.join(temp_qemu_dir, "qemu-trim-log")
-        open(self.qemu_logfile, "w+").close()
-        os.chmod(os.path.dirname(self.qemu_logfile), 0o771)
-        os.chmod(self.qemu_logfile, 0o666)
         self.qmp_channel = os.path.abspath(os.path.join(temp_qemu_dir, "qmp-channel"))
+        # change permission of the file
+        for qemu_file in [self.qemu_logfile, self.qmp_channel]:
+            open(qemu_file, "w+").close()
+            os.chmod(os.path.dirname(qemu_file), 0o777)
+            os.chmod(qemu_file, 0o666)
+            LOG.info("QEMU access file : %s" % qemu_file)
         if os.path.exists(self.qmp_channel) == True:
             os.remove(self.qmp_channel)
         LOG.info("Launch disk: %s" % os.path.abspath(launch_disk))
