@@ -409,7 +409,9 @@ class LibvirtThread(threading.Thread):
         threading.Thread.__init__(self, target=self.save_mem)
 
     def save_mem(self):
+        LOG.debug("start machine save")
         self.machine.save(self.outputpath)
+        LOG.debug("finish machine save")
 
 
 class QmpThread(threading.Thread):

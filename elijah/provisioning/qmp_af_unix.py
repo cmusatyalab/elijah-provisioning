@@ -7,7 +7,6 @@ import socket
 import json
 import time
 
-QMP_UNIX_SOCK = "/tmp/qmp_cloudlet"
 
 class QmpAfUnix:
     def __init__(self, s_name):
@@ -45,12 +44,21 @@ class QmpAfUnix:
             return True
 
         # wait for QEVENT_STOP in next 10 responses
-        for i in range(10):
-            response = json.loads(self.sock.recv(1024))
-            if "event" in response and response["event"] == "STOP":
-                timestamp = response["timestamp"]
-                ts = float(timestamp["seconds"]) + float(timestamp["microseconds"]) / 1000000
-                return ts
+        try:
+            for i in range(10):
+                recved_data = self.sock.recv(1024)
+                response = json.loads(recved_data)
+                if "event" in response and response["event"] == "STOP":
+                    timestamp = response["timestamp"]
+                    ts = float(timestamp["seconds"]) + float(timestamp["microseconds"]) / 1000000
+                    return ts
+        except ValueError as e:
+            print "---"
+            print repr(recved_data)
+            print "---"
+            sys.stderr.write(recved_data)
+            print "---"
+
         return None
 
     # returns True on success, False otherwise
@@ -70,7 +78,6 @@ class QmpAfUnix:
             print "---"
             sys.stderr.write(recved_data)
             print "---"
-            #sys.stderr.write("failed at %s" % str(traceback.format_exc()))
 
     # returns True on success, False otherwise
     def randomize_raw_live(self):
@@ -135,11 +142,3 @@ class QmpAfUnix:
 
         return ret
 
-# for debugging
-if __name__ == "__main__":
-    qmp = QmpAfUnix(QMP_UNIX_SOCK)
-    ret = qmp.stop_raw_live_once()
-    if ret:
-        print "successfully sent qmp command for stopping raw live."
-    else:
-        print "failed to stop raw live."

@@ -20,6 +20,7 @@
 
 import sys
 import os
+import select
 import functools
 import subprocess
 import Memory
@@ -205,12 +206,15 @@ class VM_Overlay(threading.Thread):
 
     @wrap_vm_fault
     def create_overlay(self):
+        # handle inconsistency between OpenStack execution user and libvirt-qemu user
+        if self.nova_util:
+            self.nova_util.execute('chmod', 775, self.qmp_channel, run_as_root=True)
         qmp_thread = QmpThreadSerial(self.qmp_channel, self.fuse_stream_monitor)
         qmp_thread.daemon = True
         qmp_thread.start()
 
-        # 2. get montoring info
-        monitoring_info = _get_overlay_monitoring_info(self.conn, self.machine, 
+        # get montoring info
+        monitoring_info = _get_overlay_monitoring_info(self.conn, self.machine,
                                                        self.options,
                                                        self.base_memmeta, self.base_diskmeta,
                                                        self.fuse_stream_monitor,
@@ -220,13 +224,13 @@ class VM_Overlay(threading.Thread):
                                                        self.qmp_channel,
                                                        nova_util=self.nova_util)
 
-        # 3. get overlay VM
+        # get overlay VM
         overlay_deltalist = get_overlay_deltalist(monitoring_info, self.options,
                                                   self.base_disk, self.base_mem,
                                                   self.base_memmeta, self.modified_disk,
                                                   self.modified_mem.name)
 
-        # 4. create_overlayfile
+        # create_overlayfile
         temp_dir = mkdtemp(prefix="cloudlet-overlay-")
         overlay_prefix = os.path.join(temp_dir, Const.OVERLAY_FILE_PREFIX)
         overlay_metapath = os.path.join(temp_dir, Const.OVERLAY_META)
@@ -249,7 +253,7 @@ class VM_Overlay(threading.Thread):
                 if os.path.exists(overlay_file) == True:
                     os.remove(overlay_file)
 
-        # 5. terminate
+        # terminate
         # option for data-intensive application
         if self.options.DATA_SOURCE_URI != None:
             overlay_uri_meta = os.path.join(temp_dir, Const.OVERLAY_URIs)
@@ -1105,8 +1109,10 @@ class QmpThreadSerial(threading.Thread):
         ret = self.qmp.qmp_negotiate()
         if not ret:
             raise CloudletGenerationError("failed to connect to qmp channel")
+        LOG.debug("waiting to start live migration before stopping it")
         sleep(2)
         self.migration_stop_time = self._stop_migration()
+        LOG.debug("Finish sending stop migration")
         self.qmp.disconnect()
 
     def _stop_migration(self):
@@ -1151,8 +1157,10 @@ class MemoryReadProcessSerial(multiprocessing.Process):
 
         for repeat in xrange(100):
             if os.path.exists(self.input_path) == False:
-                print "waiting for %s: " % self.input_path
+                LOG.debug("waiting for qemu memory pipe, %s" % self.input_path)
                 time.sleep(0.1)
+            else:
+                break
 
         # create memory snapshot aligned with 4KB
         try:
@@ -1161,6 +1169,7 @@ class MemoryReadProcessSerial(multiprocessing.Process):
 
             total_write_size = 0
             # read first 40KB and aligen header with 4KB
+            select.select([self.in_fd], [], [])
             data = self.in_fd.read(Memory.Memory.RAM_PAGE_SIZE*10)
             libvirt_header = memory_util._QemuMemoryHeaderData(data)
             original_header = libvirt_header.get_header()
@@ -1178,6 +1187,7 @@ class MemoryReadProcessSerial(multiprocessing.Process):
             # get memory snapshot aligned with chunk size
             new_data = data[original_header_len+Memory.Memory.CHUNK_HEADER_SIZE:]
             chunk_aligned_size = self.header_chunk_size - (len(new_data) % self.header_chunk_size)
+            select.select([self.in_fd], [], [])
             new_data += self.in_fd.read(chunk_aligned_size)
             self.chunking(new_data)
             total_write_size += len(new_data)
@@ -1187,6 +1197,7 @@ class MemoryReadProcessSerial(multiprocessing.Process):
             # write rest of the memory data
             prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
+                select.select([self.in_fd], [], [])
                 data = self.in_fd.read(self.header_chunk_size*250)
                 if data == None or len(data) <= 0:
                     break
@@ -1204,7 +1215,6 @@ class MemoryReadProcessSerial(multiprocessing.Process):
                     # Libvirt generate garbage at the end of the stream
                     continue
                 if (offset != prev_data_offset):
-                    import pdb;pdb.set_trace()
                     msg = "Received memory is not aligned at %ld" % offset
                     raise CloudletGenerationError(msg)
                 self.out_fd.write(data)
@@ -1252,7 +1262,7 @@ def save_mem_snapshot(conn, machine, fout_path, qmp_channel, **kwargs):
         if os.path.exists(named_pipe_output):
             os.remove(named_pipe_output)
         os.mkfifo(named_pipe_output)
-        if nova_util != None:
+        if nova_util:
             # OpenStack runs VM with nova account and snapshot 
             # is generated from system connection
             nova_util.chown(named_pipe_output, os.getuid())
@@ -1346,6 +1356,7 @@ def rettach_nic(machine, old_xml, new_xml, **kwargs):
     #           You should use nova_util in OpenStack, or subprocess
     #           will be returned without finishing their work
     # get xml info of running xml
+    return
 
     old_xml = ElementTree.fromstring(old_xml)
     old_nic = old_xml.find('devices/interface')
