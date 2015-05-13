@@ -66,12 +66,9 @@ class HandoffError(Exception):
     pass
 
 class PreloadResidueData(threading.Thread):
-    def __init__(self, base_diskpath, base_mempath, base_diskmeta, base_memmeta, overlay_filename):
-        self.base_diskpath = base_diskpath
-        self.base_mempath = base_mempath
+    def __init__(self, base_diskmeta, base_memmeta):
         self.base_diskmeta = base_diskmeta
         self.base_memmeta = base_memmeta
-        self.overlay_filename = overlay_filename
         self.basedisk_hashdict = None
         self.basmem_hashdict = None
         threading.Thread.__init__(self, target=self.preloading)
@@ -79,132 +76,6 @@ class PreloadResidueData(threading.Thread):
     def preloading(self):
         self.basedisk_hashdict = delta.DeltaDedup.disk_import_hashdict(self.base_diskmeta)
         self.basemem_hashdict = delta.DeltaDedup.memory_import_hashdict(self.base_memmeta)
-        # FIX: currently we revisit all overlay to reconstruct hash information
-        # we can leverage Recovered_delta class reconstruction process,
-        # but that does not generate hash value
-        self.prev_mem_deltalist = self._reconstruct_mem_deltalist(self.base_diskpath,
-                                                             self.base_mempath,
-                                                             self.overlay_filename)
-
-    def _reconstruct_mem_deltalist(self, base_disk, base_mem, overlay_filepath):
-        ret_deltalist = list()
-        deltalist = DeltaList.fromfile(overlay_filepath)
-
-        #const
-        import struct
-        import tool
-        import mmap
-
-        # initialize reference data to use mmap
-        base_disk_fd = open(base_disk, "rb")
-        raw_disk = mmap.mmap(base_disk_fd.fileno(), 0, prot=mmap.PROT_READ)
-        base_mem_fd = open(base_mem, "rb")
-        raw_mem = mmap.mmap(base_mem_fd.fileno(), 0, prot=mmap.PROT_READ)
-        ZERO_DATA = struct.pack("!s", chr(0x00)) * Const.CHUNK_SIZE
-        chunk_size = Const.CHUNK_SIZE
-        recovered_data_dict = dict()
-        recovered_hash_dict = dict()
-
-        for delta_item in deltalist:
-            if type(delta_item) != DeltaItem:
-                raise HandoffError("Failed to reconstruct deltalist")
-
-            #LOG.info("recovering %ld/%ld" % (index, len(delta_list)))
-            if (delta_item.ref_id == DeltaItem.REF_RAW):
-                recover_data = delta_item.data
-            elif (delta_item.ref_id == DeltaItem.REF_ZEROS):
-                recover_data = ZERO_DATA
-            elif (delta_item.ref_id == DeltaItem.REF_BASE_MEM):
-                offset = delta_item.data
-                recover_data = raw_mem[offset:offset+chunk_size]
-            elif (delta_item.ref_id == DeltaItem.REF_BASE_DISK):
-                offset = delta_item.data
-                recover_data = raw_disk[offset:offset+chunk_size]
-            elif delta_item.ref_id == DeltaItem.REF_SELF:
-                ref_index = delta_item.data
-                self_ref_data = recovered_data_dict.get(ref_index, None)
-                if self_ref_data == None:
-                    msg = "Cannot find self reference: type(%ld), offset(%ld), \
-                            index(%ld), ref_index(%ld)" % \
-                            (delta_item.delta_type, delta_item.offset, \
-                            delta_item.index, ref_index)
-                    raise MemoryError(msg)
-                recover_data = self_ref_data
-            elif delta_item.ref_id == DeltaItem.REF_SELF_HASH:
-                ref_hashvalue = delta_item.data
-                self_ref_data_item = recovered_hash_dict.get(ref_hashvalue, None)
-                if self_ref_data_item == None:
-                    return None
-                recover_data = self_ref_data_item
-                delta_item.hash_value = ref_hashvalue
-            elif delta_item.ref_id == DeltaItem.REF_XDELTA:
-                patch_data = delta_item.data
-                patch_original_size = delta_item.offset_len
-                if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
-                        delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
-                    base_data = raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
-                elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
-                    delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
-                    base_data = raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
-                else:
-                    msg = "Delta should be either disk or memory"
-                    raise HandoffError(msg)
-                recover_data = tool.merge_data(base_data, patch_data, len(base_data)*5)
-            elif delta_item.ref_id == DeltaItem.REF_BSDIFF:
-                patch_data = delta_item.data
-                patch_original_size = delta_item.offset_len
-                if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
-                        delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
-                    base_data = self.raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
-                elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
-                    delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
-                    base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
-                else:
-                    raise DeltaError("Delta type should be either disk or memory")
-                recover_data = tool.merge_data_bsdiff(base_data, patch_data)
-            elif delta_item.ref_id == DeltaItem.REF_XOR:
-                patch_data = delta_item.data
-                patch_original_size = delta_item.offset_len
-                if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
-                        delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
-                    base_data = self.raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
-                elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
-                    delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
-                    base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
-                else:
-                    raise DeltaError("Delta type should be either disk or memory")
-                recover_data = tool.cython_xor(base_data, patch_data)
-            else:
-                msg ="Cannot recover: invalid referce id %d" % delta_item.ref_id
-                raise MemoryError(msg)
-
-            if len(recover_data) != delta_item.offset_len:
-                msg = "Recovered Size Error: %d, ref_id: %s, %ld %ld" % \
-                        (len(recover_data), delta_item.ref_id, \
-                        delta_item.data_len, delta_item.offset)
-                raise HandoffError(msg)
-
-            # recover
-            #delta_item.ref_id = DeltaItem.REF_RAW
-            #delta_item.data = recover_data
-            #delta_item.data_len = len(recover_data)
-            if delta_item.hash_value == None or len(delta_item.hash_value) == 0:
-                delta_item.hash_value = hashlib.sha256(recover_data).digest()
-            recovered_data_dict[delta_item.index] = recover_data
-            recovered_hash_dict[delta_item.hash_value] = recover_data
-            ret_deltalist.append(delta_item)
-
-        base_disk_fd.close()
-        base_mem_fd.close()
-        raw_disk.close()
-        raw_disk = None
-        raw_mem.close()
-        raw_mem = None
-        recovered_data_dict = None
-        recovered_hash_dict = None
-
-        return ret_deltalist
-
 
 
 class VMMonitor(object):
@@ -213,7 +84,7 @@ class VMMonitor(object):
                  base_disk, base_mem,
                  modified_disk,
                  qemu_logfile, 
-                 original_deltalist=None,
+                 dirty_disk_chunks=None,
                  nova_util=None):
         self.conn = conn
         self.machine = machine
@@ -223,7 +94,7 @@ class VMMonitor(object):
         self.base_mem = base_mem
         self.modified_disk = modified_disk
         self.qemu_logfile = qemu_logfile
-        self.original_deltalist = original_deltalist
+        self.dirty_disk_chunks = dirty_disk_chunks
         self.nova_util = nova_util
         self.memory_snapshot_size = -1
         #threading.Thread.__init__(self, target=self.load_monitoring_info)
@@ -266,11 +137,9 @@ class VMMonitor(object):
         modified_chunk_queue = self.fuse_stream_monitor.get_modified_chunk_queue()
         time4 = time.time()
         # mark the modifid disk area in the original VM overlay as modified area
-        if self.original_deltalist is not None:
-            for o_delta_item in self.original_deltalist:
-                if o_delta_item.delta_type == DeltaItem.DELTA_DISK:
-                    modified_index = o_delta_item.offset / Const.CHUNK_SIZE
-                    modified_chunk_queue.put((modified_index, 1.0))
+        if self.dirty_disk_chunks is not None:
+            for dirty_chunk in self.dirty_disk_chunks:
+                modified_chunk_queue.put((dirty_chunk, 1.0))
         info_dict[_MonitoringInfo.DISK_MODIFIED_BLOCKS] = modified_chunk_queue
         time5 = time.time()
 
@@ -635,7 +504,7 @@ class StreamSynthesisFile(multiprocessing.Process):
                     time.sleep(sleep_time)
 
 
-def get_overlay_deltalist(monitoring_info, options,
+def create_delta_proc(monitoring_info, options,
                           overlay_mode,
                           base_image, base_mem, 
                           base_memmeta, 
@@ -645,15 +514,7 @@ def get_overlay_deltalist(monitoring_info, options,
                           modified_mem_queue,
                           merged_deltalist_queue,
                           process_controller):
-    '''return overlay deltalist
-    Get difference between base vm (base_image, base_mem) and 
-    launch vm (modified_disk, modified_mem) using monitoring information
-
-    Args:
-        prev_mem_deltalist : Option only for creating_residue.
-            Different from disk, we create whole memory snapshot even for residue.
-            So, to get the precise difference between previous memory overlay,
-            we need previous memory deltalist
+    '''
     '''
 
     INFO = _MonitoringInfo
@@ -667,7 +528,7 @@ def get_overlay_deltalist(monitoring_info, options,
     LOG.info("Get memory delta")
     time_s = time.time()
 
-    # memory hashdict is neede at memory deltaand dedup
+    # memory hashdict is needed at memory delta and dedup
     if not options.DISK_ONLY:
         memory_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_MEMORY_DELTA_LIST)
         memory_deltalist_proc = Memory.CreateMemoryDeltalist(modified_mem_queue,
@@ -856,7 +717,7 @@ class CPUMonitor(threading.Thread):
 
 def create_residue(base_disk, base_hashvalue,
                    basedisk_hashdict, basemem_hashdict,
-                   resumed_vm, options, original_deltalist,
+                   resumed_vm, options, dirty_disk_chunks,
                    migration_addr,
                    overlay_mode=None):
     '''Get residue
@@ -917,7 +778,7 @@ def create_residue(base_disk, base_hashvalue,
                            base_disk, base_mem,
                            resumed_vm.resumed_disk,
                            qemu_logfile,
-                           original_deltalist=original_deltalist)
+                           dirty_disk_chunks=dirty_disk_chunks)
     monitoring_info = vm_monitor.get_monitoring_info()
     time_ss = time.time()
     LOG.debug("[time] serialized step (%f ~ %f): %f" % (time_start,
@@ -948,16 +809,16 @@ def create_residue(base_disk, base_hashvalue,
         _waiting_to_finish(process_controller, "MemoryReadProcess")
 
     # process for getting VM overlay
-    dedup_proc = get_overlay_deltalist(monitoring_info, options,
-                                       overlay_mode,
-                                       base_disk, base_mem,
-                                       base_memmeta,
-                                       basedisk_hashdict,
-                                       basemem_hashdict,
-                                       resumed_vm.resumed_disk,
-                                       memory_snapshot_queue,
-                                       residue_deltalist_queue,
-                                       process_controller)
+    dedup_proc = create_delta_proc(monitoring_info, options,
+                                   overlay_mode,
+                                   base_disk, base_mem,
+                                   base_memmeta,
+                                   basedisk_hashdict,
+                                   basemem_hashdict,
+                                   resumed_vm.resumed_disk,
+                                   memory_snapshot_queue,
+                                   residue_deltalist_queue,
+                                   process_controller)
     time_dedup = time.time()
     if overlay_mode.PROCESS_PIPELINED == False:
         _waiting_to_finish(process_controller, "DeltaDedup")

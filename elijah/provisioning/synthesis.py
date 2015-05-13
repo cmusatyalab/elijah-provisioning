@@ -815,12 +815,6 @@ def get_overlay_deltalist(monitoring_info, options,
     '''return overlay deltalist
     Get difference between base vm (base_image, base_mem) and 
     launch vm (modified_disk, modified_mem) using monitoring information
-
-    Args:
-        prev_mem_deltalist : Option only for creating_residue.
-            Different from disk, we create whole memory snapshot even for residue.
-            So, to get the precise difference between previous memory overlay,
-            we need previous memory deltalist
     '''
 
     INFO = OverlayMonitoringInfo
@@ -977,17 +971,15 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
     # Get modified list from overlay_meta
     vm_disk_size = meta_info[Const.META_RESUME_VM_DISK_SIZE]
     vm_memory_size = meta_info[Const.META_RESUME_VM_MEMORY_SIZE]
-    memory_chunk_all = set()
-    disk_chunk_all = set()
+    memory_chunks_all = list()
+    disk_chunks_all = list()
     for each_file in meta_info[Const.META_OVERLAY_FILES]:
-        memory_chunks = each_file[Const.META_OVERLAY_FILE_MEMORY_CHUNKS]
-        disk_chunks = each_file[Const.META_OVERLAY_FILE_DISK_CHUNKS]
-        memory_chunk_set = set(["%ld:0" % item for item in memory_chunks])
-        disk_chunk_set = set(["%ld:0" % item for item in disk_chunks])
-        memory_chunk_all.update(memory_chunk_set)
-        disk_chunk_all.update(disk_chunk_set)
-    disk_overlay_map = ','.join(disk_chunk_all)
-    memory_overlay_map = ','.join(memory_chunk_all)
+        memory_chunks_all += each_file[Const.META_OVERLAY_FILE_MEMORY_CHUNKS]
+        disk_chunks_all += each_file[Const.META_OVERLAY_FILE_DISK_CHUNKS]
+    memory_chunk_str = ["%ld:0" % item for item in memory_chunks_all]
+    disk_chunk_str = ["%ld:0" % item for item in disk_chunks_all]
+    memory_overlay_map = ','.join(memory_chunk_str)
+    disk_overlay_map = ','.join(disk_chunk_str)
 
     # make FUSE disk & memory
     kwargs['meta_info'] = meta_info
@@ -998,16 +990,20 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
             resumed_memory=launch_mem.name, memory_overlay_map=memory_overlay_map,
             **kwargs)
     LOG.info("Start FUSE (%f s)" % (time()-time_start_fuse))
-    LOG.debug("Overlay has %ld chunks" % (len(memory_chunk_set) + len(disk_chunk_set)))
+    LOG.debug("Overlay has %ld chunks" % (len(memory_chunks_all) + len(disk_chunks_all)))
 
     # Recover Modified Memory
     named_pipename = overlay_file+".fifo"
     os.mkfifo(named_pipename)
 
-    delta_proc = delta.Recovered_delta(base_image, base_mem, overlay_file, \
-            launch_mem.name, vm_memory_size,
-            launch_disk.name, vm_disk_size, Const.CHUNK_SIZE,
-            out_pipename=named_pipename)
+    delta_proc = delta.Recovered_delta(base_image, base_mem, overlay_file,
+                                       launch_mem.name, vm_memory_size,
+                                       launch_disk.name, vm_disk_size,
+                                       Const.CHUNK_SIZE,
+                                       out_pipename=named_pipename,
+                                       modified_disk_chunks=disk_chunks_all,
+                                       modified_memory_chunks=memory_chunks_all)
+
     fuse_thread = cloudletfs.FuseFeedingProc(fuse,
             named_pipename, delta.Recovered_delta.END_OF_PIPE)
     return [launch_disk.name, launch_mem.name, fuse, delta_proc, fuse_thread]
@@ -1431,7 +1427,6 @@ def copy_with_xml(in_path, out_path, xml):
     fout.write(fin.read())
 
 
-
 def synthesis_statistics(meta_info, decomp_overlay_file,
         mem_access_list, disk_access_list):
     start_time = time()
@@ -1682,19 +1677,18 @@ def create_baseVM(disk_image_path):
     return disk_image_path, base_mempath
 
 
-
 def synthesis(base_disk, overlay_path, **kwargs):
-    # VM Synthesis and run recoverd VM
-    # param base_disk : path to base disk
-    # param overlay_path: path to VM overlay file
-    # param disk_only: synthesis size VM with only disk image
-    # param return_residue: return residue of changed portion
+    """VM Synthesis and run recoverd VM
+    @param base_disk: path to base disk
+    @param overlay_path: path to VM overlay file
+    @param kwargs-disk_only: synthesis size VM with only disk image
+    @param kwargs-return_residue: return residue of changed portion
+    """
     if os.path.exists(base_disk) == False:
         msg = "Base disk does not exist at %s" % base_disk
         raise CloudletGenerationError(msg)
     LOG.debug("==========================================")
     LOG.debug(overlay_path)
-
 
     disk_only = kwargs.get('disk_only', False)
     zip_container = kwargs.get('zip_container', False)
@@ -1740,11 +1734,8 @@ def synthesis(base_disk, overlay_path, **kwargs):
         # preload basevm hash dictionary for creating residue
         (base_diskmeta, base_mem, base_memmeta) =\
             Const.get_basepath(base_disk, check_exist=False)
-        preload_thread = handoff.PreloadResidueData(base_disk,
-                                                    base_mem,
-                                                    base_diskmeta,
-                                                    base_memmeta,
-                                                    overlay_filename.name)
+        preload_thread = handoff.PreloadResidueData(base_diskmeta, base_memmeta)
+                                                    
         preload_thread.daemon = True
         preload_thread.start()
 
@@ -1770,7 +1761,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
                                              preload_thread.basemem_hashdict,
                                              synthesized_VM,
                                              options,
-                                             preload_thread.prev_mem_deltalist,
+                                             delta_proc.modified_disk_chunks,
                                              return_residue,
                                              overlay_mode=overlay_mode)
             if residue_overlay is not None:
