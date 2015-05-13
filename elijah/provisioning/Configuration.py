@@ -155,7 +155,7 @@ class VMOverlayCreationMode(object):
     MEASURE_AVERAGE_TIME    = 2 # seconds
     MAX_THREAD_NUM = 4
 
-    PROFILE_DATAPATH = os.path.abspath(os.path.join(Const.HOME_DIR, ".cloudlet/config/mode-profile.face"))
+    PROFILE_DATAPATH = os.path.join(Const.CONFIGURATION_DIR, "mode-profile.face")
     VARYING_PARAMETERS = ['MEMORY_DIFF_ALGORITHM', 'DISK_DIFF_ALGORITHM', 'COMPRESSION_ALGORITHM_TYPE', 'COMPRESSION_ALGORITHM_SPEED']
 
     LIVE_MIGRATION_FINISH_ASAP = 1

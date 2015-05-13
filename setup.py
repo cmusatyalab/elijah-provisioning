@@ -54,7 +54,7 @@ def download_dependency(download_dir):
     os.chmod(download_path, 0775)
     os.chown(download_path, userinfo.pw_uid, userinfo.pw_gid)
 
-# get all data file under ./src/cloudlet/lib
+
 def get_all_files(package_dir, target_path, exclude_names=list()):
     data_files = list()
     cur_dir = os.path.abspath(os.curdir)

@@ -1,0 +1,1188 @@
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 1, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 611885502, "CreateDiskDeltalist": 75318273, "DeltaDedup": 687203775, "CompressProc": 189240341}
+{"CreateMemoryDeltalist": 611885502, "CreateDiskDeltalist": 75318273, "DeltaDedup": 189056791, "CompressProc": 70671622}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27511, "CompressProc": 0.373449}
+{"CreateMemoryDeltalist": 5.78, "CreateDiskDeltalist": 0.57, "DeltaDedup": 0.38, "CompressProc": 3.18}
+{"CreateMemoryDeltalist": "148986", "CreateDiskDeltalist": "18339", "DeltaDedup": "167325", "CompressProc": "167325"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1130.974696}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1129.877729, "CompressProc": 422.361404}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27511023350377406, "CompressProc": 0.37344903072880065}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.031, "DeltaDedup": 0.002, "CompressProc": 0.019}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 2, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 609519870, "CreateDiskDeltalist": 75314166, "DeltaDedup": 684834036, "CompressProc": 187634964}
+{"CreateMemoryDeltalist": 609519870, "CreateDiskDeltalist": 75314166, "DeltaDedup": 187455604, "CompressProc": 69246264}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273724, "CompressProc": 0.369048}
+{"CreateMemoryDeltalist": 5.71, "CreateDiskDeltalist": 0.6, "DeltaDedup": 0.35, "CompressProc": 3.4}
+{"CreateMemoryDeltalist": "148410", "CreateDiskDeltalist": "18338", "DeltaDedup": "166748", "CompressProc": "166748"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1125.260657}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1124.185022, "CompressProc": 415.27493}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2737241348916484, "CompressProc": 0.36904776454829874}
+{"CreateMemoryDeltalist": 0.038, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.02}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 3, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 626194290, "CreateDiskDeltalist": 73244238, "DeltaDedup": 699438528, "CompressProc": 188987220}
+{"CreateMemoryDeltalist": 626194290, "CreateDiskDeltalist": 73244238, "DeltaDedup": 188800928, "CompressProc": 69066587}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.269932, "CompressProc": 0.365456}
+{"CreateMemoryDeltalist": 5.96, "CreateDiskDeltalist": 0.57, "DeltaDedup": 0.45, "CompressProc": 3.76}
+{"CreateMemoryDeltalist": "152470", "CreateDiskDeltalist": "17834", "DeltaDedup": "170304", "CompressProc": "170304"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1109.705116}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1108.611236, "CompressProc": 405.548824}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2699321246652057, "CompressProc": 0.36545638850600737}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.032, "DeltaDedup": 0.003, "CompressProc": 0.022}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 4, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 629677026, "CreateDiskDeltalist": 75305952, "DeltaDedup": 704982978, "CompressProc": 188951076}
+{"CreateMemoryDeltalist": 629677026, "CreateDiskDeltalist": 75305952, "DeltaDedup": 188762986, "CompressProc": 67578025}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.267755, "CompressProc": 0.357648}
+{"CreateMemoryDeltalist": 5.7, "CreateDiskDeltalist": 0.6, "DeltaDedup": 0.33, "CompressProc": 4.28}
+{"CreateMemoryDeltalist": "153318", "CreateDiskDeltalist": "18336", "DeltaDedup": "171654", "CompressProc": "171654"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1100.767101}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1099.671351, "CompressProc": 393.687447}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.26775538130021914, "CompressProc": 0.35764826786915394}
+{"CreateMemoryDeltalist": 0.037, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.025}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 5, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 618481344, "CreateDiskDeltalist": 73433160, "DeltaDedup": 691914504, "CompressProc": 189435470}
+{"CreateMemoryDeltalist": 618481344, "CreateDiskDeltalist": 73433160, "DeltaDedup": 189251400, "CompressProc": 66779747}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273518, "CompressProc": 0.35252}
+{"CreateMemoryDeltalist": 6.03, "CreateDiskDeltalist": 0.57, "DeltaDedup": 0.4, "CompressProc": 4.97}
+{"CreateMemoryDeltalist": "150592", "CreateDiskDeltalist": "17880", "DeltaDedup": "168472", "CompressProc": "168472"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1124.432962}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1123.340377, "CompressProc": 396.384841}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2735184750426102, "CompressProc": 0.3525197627566524}
+{"CreateMemoryDeltalist": 0.04, "CreateDiskDeltalist": 0.032, "DeltaDedup": 0.002, "CompressProc": 0.03}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 6, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 614518089, "CreateDiskDeltalist": 75544158, "DeltaDedup": 690062247, "CompressProc": 188274957}
+{"CreateMemoryDeltalist": 614518089, "CreateDiskDeltalist": 75544158, "DeltaDedup": 188095223, "CompressProc": 66108415}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.272577, "CompressProc": 0.351127}
+{"CreateMemoryDeltalist": 5.91, "CreateDiskDeltalist": 0.55, "DeltaDedup": 0.48, "CompressProc": 6.2}
+{"CreateMemoryDeltalist": "149627", "CreateDiskDeltalist": "18394", "DeltaDedup": "168021", "CompressProc": "168021"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1120.5442}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1119.474488, "CompressProc": 393.453289}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27257718237156076, "CompressProc": 0.3511269693779147}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.03, "DeltaDedup": 0.003, "CompressProc": 0.037}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 7, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 615696798, "CreateDiskDeltalist": 75486660, "DeltaDedup": 691183458, "CompressProc": 187780032}
+{"CreateMemoryDeltalist": 615696798, "CreateDiskDeltalist": 75486660, "DeltaDedup": 187597426, "CompressProc": 65782932}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.271415, "CompressProc": 0.350319}
+{"CreateMemoryDeltalist": 5.86, "CreateDiskDeltalist": 0.59, "DeltaDedup": 0.36, "CompressProc": 7.19}
+{"CreateMemoryDeltalist": "149914", "CreateDiskDeltalist": "18380", "DeltaDedup": "168294", "CompressProc": "168294"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1115.785661}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1114.700619, "CompressProc": 390.88103}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27141480861943024, "CompressProc": 0.35031910129556687}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.032, "DeltaDedup": 0.002, "CompressProc": 0.043}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 8, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 620296638, "CreateDiskDeltalist": 73363341, "DeltaDedup": 693659979, "CompressProc": 188211269}
+{"CreateMemoryDeltalist": 620296638, "CreateDiskDeltalist": 73363341, "DeltaDedup": 188028931, "CompressProc": 65741874}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.271068, "CompressProc": 0.349298}
+{"CreateMemoryDeltalist": 5.92, "CreateDiskDeltalist": 0.55, "DeltaDedup": 0.34, "CompressProc": 13.59}
+{"CreateMemoryDeltalist": "151034", "CreateDiskDeltalist": "17863", "DeltaDedup": "168897", "CompressProc": "168897"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1114.355311}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1113.27573, "CompressProc": 389.242402}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27106786705624547, "CompressProc": 0.349298287680526}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.031, "DeltaDedup": 0.002, "CompressProc": 0.08}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 9, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 624806124, "CreateDiskDeltalist": 73211382, "DeltaDedup": 698017506, "CompressProc": 195408674}
+{"CreateMemoryDeltalist": 624806124, "CreateDiskDeltalist": 73211382, "DeltaDedup": 195210898, "CompressProc": 67752453}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.279665, "CompressProc": 0.346722}
+{"CreateMemoryDeltalist": 5.89, "CreateDiskDeltalist": 0.58, "DeltaDedup": 0.32, "CompressProc": 30.43}
+{"CreateMemoryDeltalist": "152132", "CreateDiskDeltalist": "17826", "DeltaDedup": "169958", "CompressProc": "169958"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1149.746843}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1148.583168, "CompressProc": 398.642329}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2796647596785975, "CompressProc": 0.3467218296158436}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.179}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 1, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 615598230, "CreateDiskDeltalist": 75540051, "DeltaDedup": 691138281, "CompressProc": 186861425}
+{"CreateMemoryDeltalist": 615598230, "CreateDiskDeltalist": 75540051, "DeltaDedup": 186683921, "CompressProc": 66467174}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.270111, "CompressProc": 0.355703}
+{"CreateMemoryDeltalist": 5.87, "CreateDiskDeltalist": 0.57, "DeltaDedup": 0.39, "CompressProc": 15.63}
+{"CreateMemoryDeltalist": "149890", "CreateDiskDeltalist": "18393", "DeltaDedup": "168283", "CompressProc": "168283"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1110.399892}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1109.345097, "CompressProc": 394.9726}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2701108100803506, "CompressProc": 0.35570302451002045}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.031, "DeltaDedup": 0.002, "CompressProc": 0.093}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 2, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 613187421, "CreateDiskDeltalist": 73170312, "DeltaDedup": 686357733, "CompressProc": 190104981}
+{"CreateMemoryDeltalist": 613187421, "CreateDiskDeltalist": 73170312, "DeltaDedup": 189922141, "CompressProc": 67140660}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27671, "CompressProc": 0.353177}
+{"CreateMemoryDeltalist": 5.72, "CreateDiskDeltalist": 0.59, "DeltaDedup": 0.39, "CompressProc": 15.27}
+{"CreateMemoryDeltalist": "149303", "CreateDiskDeltalist": "17816", "DeltaDedup": "167119", "CompressProc": "167119"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1137.542595}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1136.448525, "CompressProc": 401.753601}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27671013513513515, "CompressProc": 0.35317675379004165}
+{"CreateMemoryDeltalist": 0.038, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.091}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 3, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 607811358, "CreateDiskDeltalist": 75277203, "DeltaDedup": 683088561, "CompressProc": 187084225}
+{"CreateMemoryDeltalist": 607811358, "CreateDiskDeltalist": 75277203, "DeltaDedup": 186906217, "CompressProc": 66073748}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273619, "CompressProc": 0.353176}
+{"CreateMemoryDeltalist": 5.7, "CreateDiskDeltalist": 0.6, "DeltaDedup": 0.4, "CompressProc": 15.04}
+{"CreateMemoryDeltalist": "147994", "CreateDiskDeltalist": "18329", "DeltaDedup": "166323", "CompressProc": "166323"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1124.824739}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1123.754484, "CompressProc": 397.261642}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2736193046018992, "CompressProc": 0.3531764800560632}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.09}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 4, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 612760293, "CreateDiskDeltalist": 75765936, "DeltaDedup": 688526229, "CompressProc": 188517043}
+{"CreateMemoryDeltalist": 612760293, "CreateDiskDeltalist": 75765936, "DeltaDedup": 188334389, "CompressProc": 66156720}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273533, "CompressProc": 0.350932}
+{"CreateMemoryDeltalist": 5.68, "CreateDiskDeltalist": 0.58, "DeltaDedup": 0.27, "CompressProc": 14.99}
+{"CreateMemoryDeltalist": "149199", "CreateDiskDeltalist": "18448", "DeltaDedup": "167647", "CompressProc": "167647"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1124.488019}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1123.398504, "CompressProc": 394.61917}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27353262819576335, "CompressProc": 0.35093230281895965}
+{"CreateMemoryDeltalist": 0.038, "CreateDiskDeltalist": 0.031, "DeltaDedup": 0.002, "CompressProc": 0.089}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 5, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 610489122, "CreateDiskDeltalist": 75363450, "DeltaDedup": 685852572, "CompressProc": 188275286}
+{"CreateMemoryDeltalist": 610489122, "CreateDiskDeltalist": 75363450, "DeltaDedup": 188094196, "CompressProc": 65869994}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.274249, "CompressProc": 0.34986}
+{"CreateMemoryDeltalist": 5.34, "CreateDiskDeltalist": 0.61, "DeltaDedup": 0.41, "CompressProc": 15.06}
+{"CreateMemoryDeltalist": "148646", "CreateDiskDeltalist": "18350", "DeltaDedup": "166996", "CompressProc": "166996"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1127.423926}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1126.339529, "CompressProc": 394.440549}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2742487287557828, "CompressProc": 0.3498600126391144}
+{"CreateMemoryDeltalist": 0.036, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.09}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 6, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 606940674, "CreateDiskDeltalist": 75544158, "DeltaDedup": 682484832, "CompressProc": 186735738}
+{"CreateMemoryDeltalist": 606940674, "CreateDiskDeltalist": 75544158, "DeltaDedup": 186558856, "CompressProc": 65326833}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273352, "CompressProc": 0.349836}
+{"CreateMemoryDeltalist": 5.86, "CreateDiskDeltalist": 0.6, "DeltaDedup": 0.42, "CompressProc": 14.88}
+{"CreateMemoryDeltalist": "147782", "CreateDiskDeltalist": "18394", "DeltaDedup": "166176", "CompressProc": "166176"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1123.722668}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1122.658242, "CompressProc": 393.118338}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2733523842220599, "CompressProc": 0.34983572832936743}
+{"CreateMemoryDeltalist": 0.04, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.003, "CompressProc": 0.09}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 7, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 610957320, "CreateDiskDeltalist": 75314166, "DeltaDedup": 686271486, "CompressProc": 186841380}
+{"CreateMemoryDeltalist": 610957320, "CreateDiskDeltalist": 75314166, "DeltaDedup": 186662638, "CompressProc": 65044386}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.271995, "CompressProc": 0.348126}
+{"CreateMemoryDeltalist": 6.34, "CreateDiskDeltalist": 0.59, "DeltaDedup": 0.24, "CompressProc": 15.04}
+{"CreateMemoryDeltalist": "148760", "CreateDiskDeltalist": "18338", "DeltaDedup": "167098", "CompressProc": "167098"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1118.154496}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1117.084813, "CompressProc": 389.258914}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27199532822011196, "CompressProc": 0.34812623424804434}
+{"CreateMemoryDeltalist": 0.043, "CreateDiskDeltalist": 0.032, "DeltaDedup": 0.001, "CompressProc": 0.09}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 8, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 606378015, "CreateDiskDeltalist": 75420948, "DeltaDedup": 681798963, "CompressProc": 187076291}
+{"CreateMemoryDeltalist": 606378015, "CreateDiskDeltalist": 75420948, "DeltaDedup": 186899355, "CompressProc": 64931803}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.274127, "CompressProc": 0.347087}
+{"CreateMemoryDeltalist": 5.9, "CreateDiskDeltalist": 0.58, "DeltaDedup": 0.32, "CompressProc": 15.07}
+{"CreateMemoryDeltalist": "147645", "CreateDiskDeltalist": "18364", "DeltaDedup": "166009", "CompressProc": "166009"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1126.904511}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1125.838689, "CompressProc": 391.134234}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27412678086194303, "CompressProc": 0.3470872910544237}
+{"CreateMemoryDeltalist": 0.04, "CreateDiskDeltalist": 0.032, "DeltaDedup": 0.002, "CompressProc": 0.091}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 9, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 609708792, "CreateDiskDeltalist": 75511302, "DeltaDedup": 685220094, "CompressProc": 186368696}
+{"CreateMemoryDeltalist": 609708792, "CreateDiskDeltalist": 75511302, "DeltaDedup": 186191414, "CompressProc": 64652625}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.271725, "CompressProc": 0.346907}
+{"CreateMemoryDeltalist": 5.76, "CreateDiskDeltalist": 0.6, "DeltaDedup": 0.33, "CompressProc": 15.01}
+{"CreateMemoryDeltalist": "148456", "CreateDiskDeltalist": "18386", "DeltaDedup": "166842", "CompressProc": "166842"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1117.037053}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1115.974479, "CompressProc": 387.508091}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2717249766252739, "CompressProc": 0.3469071056857771}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.09}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 1, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 611864967, "CreateDiskDeltalist": 75449697, "DeltaDedup": 687314664, "CompressProc": 186872868}
+{"CreateMemoryDeltalist": 611864967, "CreateDiskDeltalist": 75449697, "DeltaDedup": 186693688, "CompressProc": 56204516}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.271628, "CompressProc": 0.300763}
+{"CreateMemoryDeltalist": 6.05, "CreateDiskDeltalist": 0.55, "DeltaDedup": 0.31, "CompressProc": 13.95}
+{"CreateMemoryDeltalist": "148981", "CreateDiskDeltalist": "18371", "DeltaDedup": "167352", "CompressProc": "167352"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1116.645561}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1115.574884, "CompressProc": 335.846097}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2716276805454103, "CompressProc": 0.30076338341347686}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.03, "DeltaDedup": 0.002, "CompressProc": 0.083}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 2, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 608973639, "CreateDiskDeltalist": 75322380, "DeltaDedup": 684296019, "CompressProc": 187356975}
+{"CreateMemoryDeltalist": 608973639, "CreateDiskDeltalist": 75322380, "DeltaDedup": 187178259, "CompressProc": 55580248}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273534, "CompressProc": 0.296654}
+{"CreateMemoryDeltalist": 5.81, "CreateDiskDeltalist": 0.63, "DeltaDedup": 0.28, "CompressProc": 16.99}
+{"CreateMemoryDeltalist": "148277", "CreateDiskDeltalist": "18340", "DeltaDedup": "166617", "CompressProc": "166617"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1124.476944}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1123.404328, "CompressProc": 333.580895}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27353404626247874, "CompressProc": 0.2966542771551926}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.034, "DeltaDedup": 0.002, "CompressProc": 0.102}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 3, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 609076314, "CreateDiskDeltalist": 75548265, "DeltaDedup": 684624579, "CompressProc": 186715497}
+{"CreateMemoryDeltalist": 609076314, "CreateDiskDeltalist": 75548265, "DeltaDedup": 186537835, "CompressProc": 55308724}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.272467, "CompressProc": 0.296219}
+{"CreateMemoryDeltalist": 5.72, "CreateDiskDeltalist": 0.65, "DeltaDedup": 0.36, "CompressProc": 18.6}
+{"CreateMemoryDeltalist": "148302", "CreateDiskDeltalist": "18395", "DeltaDedup": "166697", "CompressProc": "166697"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1120.089126}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1119.023348, "CompressProc": 331.791958}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2724673357682006, "CompressProc": 0.296219247467277}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.035, "DeltaDedup": 0.002, "CompressProc": 0.112}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 4, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 612772614, "CreateDiskDeltalist": 75494874, "DeltaDedup": 688267488, "CompressProc": 188627490}
+{"CreateMemoryDeltalist": 612772614, "CreateDiskDeltalist": 75494874, "DeltaDedup": 188444480, "CompressProc": 53057716}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273795, "CompressProc": 0.281283}
+{"CreateMemoryDeltalist": 6.15, "CreateDiskDeltalist": 0.61, "DeltaDedup": 0.35, "CompressProc": 38.23}
+{"CreateMemoryDeltalist": "149202", "CreateDiskDeltalist": "18382", "DeltaDedup": "167584", "CompressProc": "167584"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1125.569804}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1124.477754, "CompressProc": 316.603709}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2737954112490869, "CompressProc": 0.2812830513708415}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.228}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 5, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 605667504, "CreateDiskDeltalist": 73145670, "DeltaDedup": 678813174, "CompressProc": 186296800}
+{"CreateMemoryDeltalist": 605667504, "CreateDiskDeltalist": 73145670, "DeltaDedup": 186121926, "CompressProc": 52148040}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.274187, "CompressProc": 0.279919}
+{"CreateMemoryDeltalist": 5.82, "CreateDiskDeltalist": 0.57, "DeltaDedup": 0.3, "CompressProc": 45.16}
+{"CreateMemoryDeltalist": "147472", "CreateDiskDeltalist": "17810", "DeltaDedup": "165282", "CompressProc": "165282"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1127.145122}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1126.087088, "CompressProc": 315.509493}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27418726272218163, "CompressProc": 0.27991913981773864}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.032, "DeltaDedup": 0.002, "CompressProc": 0.273}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 6, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 610328949, "CreateDiskDeltalist": 75609870, "DeltaDedup": 685938819, "CompressProc": 188008233}
+{"CreateMemoryDeltalist": 610328949, "CreateDiskDeltalist": 75609870, "DeltaDedup": 187827619, "CompressProc": 52475528}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273826, "CompressProc": 0.279113}
+{"CreateMemoryDeltalist": 5.89, "CreateDiskDeltalist": 0.59, "DeltaDedup": 0.32, "CompressProc": 51.14}
+{"CreateMemoryDeltalist": "148607", "CreateDiskDeltalist": "18410", "DeltaDedup": "167017", "CompressProc": "167017"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1125.683212}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1124.601801, "CompressProc": 314.192735}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27382561504747993, "CompressProc": 0.27911292595522874}
+{"CreateMemoryDeltalist": 0.04, "CreateDiskDeltalist": 0.032, "DeltaDedup": 0.002, "CompressProc": 0.306}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 7, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 610296093, "CreateDiskDeltalist": 75572907, "DeltaDedup": 685869000, "CompressProc": 186456768}
+{"CreateMemoryDeltalist": 610296093, "CreateDiskDeltalist": 75572907, "DeltaDedup": 186279008, "CompressProc": 52065880}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.271596, "CompressProc": 0.279238}
+{"CreateMemoryDeltalist": 5.83, "CreateDiskDeltalist": 0.57, "DeltaDedup": 0.35, "CompressProc": 50.58}
+{"CreateMemoryDeltalist": "148599", "CreateDiskDeltalist": "18401", "DeltaDedup": "167000", "CompressProc": "167000"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1116.507593}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1115.443162, "CompressProc": 311.771737}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27159560798636473, "CompressProc": 0.2792383490758759}
+{"CreateMemoryDeltalist": 0.039, "CreateDiskDeltalist": 0.031, "DeltaDedup": 0.002, "CompressProc": 0.303}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 8, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 607766181, "CreateDiskDeltalist": 75330594, "DeltaDedup": 683096775, "CompressProc": 186976551}
+{"CreateMemoryDeltalist": 607766181, "CreateDiskDeltalist": 75330594, "DeltaDedup": 186799103, "CompressProc": 52248204}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273459, "CompressProc": 0.279437}
+{"CreateMemoryDeltalist": 5.51, "CreateDiskDeltalist": 0.64, "DeltaDedup": 0.24, "CompressProc": 50.71}
+{"CreateMemoryDeltalist": "147983", "CreateDiskDeltalist": "18342", "DeltaDedup": "166325", "CompressProc": "166325"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1124.163842}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1123.096967, "CompressProc": 314.133197}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27345920793766737, "CompressProc": 0.2794372005784545}
+{"CreateMemoryDeltalist": 0.037, "CreateDiskDeltalist": 0.035, "DeltaDedup": 0.001, "CompressProc": 0.305}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 9, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "none", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "none"}
+{"CreateMemoryDeltalist": 620916795, "CreateDiskDeltalist": 73461909, "DeltaDedup": 694378704, "CompressProc": 187075676}
+{"CreateMemoryDeltalist": 620916795, "CreateDiskDeltalist": 73461909, "DeltaDedup": 186894856, "CompressProc": 52226804}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.269154, "CompressProc": 0.279175}
+{"CreateMemoryDeltalist": 5.72, "CreateDiskDeltalist": 0.56, "DeltaDedup": 0.22, "CompressProc": 50.72}
+{"CreateMemoryDeltalist": "151185", "CreateDiskDeltalist": "17887", "DeltaDedup": "169072", "CompressProc": "169072"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1106.485261}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1105.415776, "CompressProc": 308.90274}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.26915407255904555, "CompressProc": 0.27917474447045526}
+{"CreateMemoryDeltalist": 0.038, "CreateDiskDeltalist": 0.031, "DeltaDedup": 0.001, "CompressProc": 0.3}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 1, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 631894806, "CreateDiskDeltalist": 75507195, "DeltaDedup": 707402001, "CompressProc": 196116089}
+{"CreateMemoryDeltalist": 631894806, "CreateDiskDeltalist": 75507195, "DeltaDedup": 195912337, "CompressProc": 98324253}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.276946, "CompressProc": 0.501357}
+{"CreateMemoryDeltalist": 6.36, "CreateDiskDeltalist": 0.61, "DeltaDedup": 0.28, "CompressProc": 4.13}
+{"CreateMemoryDeltalist": "153858", "CreateDiskDeltalist": "18385", "DeltaDedup": "172243", "CompressProc": "172243"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1138.601215}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1137.418281, "CompressProc": 570.846148}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27694625785244703, "CompressProc": 0.5013574028199154}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.024}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 2, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 608271342, "CreateDiskDeltalist": 75264882, "DeltaDedup": 683536224, "CompressProc": 187707908}
+{"CreateMemoryDeltalist": 608271342, "CreateDiskDeltalist": 75264882, "DeltaDedup": 187528704, "CompressProc": 93538548}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.274351, "CompressProc": 0.49832}
+{"CreateMemoryDeltalist": 6.26, "CreateDiskDeltalist": 0.67, "DeltaDedup": 0.35, "CompressProc": 3.99}
+{"CreateMemoryDeltalist": "148106", "CreateDiskDeltalist": "18326", "DeltaDedup": "166432", "CompressProc": "166432"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1127.83544}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1126.7587, "CompressProc": 562.022616}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27435079133187246, "CompressProc": 0.49831969812901067}
+{"CreateMemoryDeltalist": 0.042, "CreateDiskDeltalist": 0.037, "DeltaDedup": 0.002, "CompressProc": 0.024}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 3, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 618280101, "CreateDiskDeltalist": 75412734, "DeltaDedup": 693692835, "CompressProc": 189100649}
+{"CreateMemoryDeltalist": 618280101, "CreateDiskDeltalist": 75412734, "DeltaDedup": 188914643, "CompressProc": 93684256}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.272332, "CompressProc": 0.49542}
+{"CreateMemoryDeltalist": 6.21, "CreateDiskDeltalist": 0.62, "DeltaDedup": 0.46, "CompressProc": 4.44}
+{"CreateMemoryDeltalist": "150543", "CreateDiskDeltalist": "18362", "DeltaDedup": "168905", "CompressProc": "168905"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1119.568094}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1118.466848, "CompressProc": 554.656499}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27233183540297057, "CompressProc": 0.49542006598126587}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.034, "DeltaDedup": 0.003, "CompressProc": 0.026}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 4, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 615191637, "CreateDiskDeltalist": 73137456, "DeltaDedup": 688329093, "CompressProc": 191624957}
+{"CreateMemoryDeltalist": 615191637, "CreateDiskDeltalist": 73137456, "DeltaDedup": 191438597, "CompressProc": 93327371}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.278121, "CompressProc": 0.487031}
+{"CreateMemoryDeltalist": 6.28, "CreateDiskDeltalist": 0.6, "DeltaDedup": 0.36, "CompressProc": 4.95}
+{"CreateMemoryDeltalist": "149791", "CreateDiskDeltalist": "17808", "DeltaDedup": "167599", "CompressProc": "167599"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1143.353821}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1142.241881, "CompressProc": 556.849212}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27812074044314583, "CompressProc": 0.4870313998801951}
+{"CreateMemoryDeltalist": 0.042, "CreateDiskDeltalist": 0.034, "DeltaDedup": 0.002, "CompressProc": 0.03}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 5, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 607552617, "CreateDiskDeltalist": 75548265, "DeltaDedup": 683100882, "CompressProc": 186405038}
+{"CreateMemoryDeltalist": 607552617, "CreateDiskDeltalist": 75548265, "DeltaDedup": 186228602, "CompressProc": 90195011}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.272622, "CompressProc": 0.483866}
+{"CreateMemoryDeltalist": 6.08, "CreateDiskDeltalist": 0.66, "DeltaDedup": 0.39, "CompressProc": 5.39}
+{"CreateMemoryDeltalist": "147931", "CreateDiskDeltalist": "18395", "DeltaDedup": "166326", "CompressProc": "166326"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1120.720982}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1119.660197, "CompressProc": 542.278483}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2726224000486973, "CompressProc": 0.48386573617303796}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.036, "DeltaDedup": 0.002, "CompressProc": 0.032}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 6, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 612982071, "CreateDiskDeltalist": 75314166, "DeltaDedup": 688296237, "CompressProc": 187582657}
+{"CreateMemoryDeltalist": 612982071, "CreateDiskDeltalist": 75314166, "DeltaDedup": 187401365, "CompressProc": 90540926}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.272268, "CompressProc": 0.482672}
+{"CreateMemoryDeltalist": 6.38, "CreateDiskDeltalist": 0.65, "DeltaDedup": 0.49, "CompressProc": 6.58}
+{"CreateMemoryDeltalist": "149253", "CreateDiskDeltalist": "18338", "DeltaDedup": "167591", "CompressProc": "167591"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1119.288369}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1118.206616, "CompressProc": 540.249333}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2722684723642561, "CompressProc": 0.48267215845606626}
+{"CreateMemoryDeltalist": 0.043, "CreateDiskDeltalist": 0.035, "DeltaDedup": 0.003, "CompressProc": 0.039}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 7, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 609421302, "CreateDiskDeltalist": 75535944, "DeltaDedup": 684957246, "CompressProc": 186438660}
+{"CreateMemoryDeltalist": 609421302, "CreateDiskDeltalist": 75535944, "DeltaDedup": 186261310, "CompressProc": 89910873}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.271931, "CompressProc": 0.482254}
+{"CreateMemoryDeltalist": 6.27, "CreateDiskDeltalist": 0.6, "DeltaDedup": 0.35, "CompressProc": 7.52}
+{"CreateMemoryDeltalist": "148386", "CreateDiskDeltalist": "18392", "DeltaDedup": "166778", "CompressProc": "166778"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1117.885213}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1116.821823, "CompressProc": 539.105116}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27193129364499635, "CompressProc": 0.48225444771135006}
+{"CreateMemoryDeltalist": 0.042, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.045}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 8, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 620793585, "CreateDiskDeltalist": 73170312, "DeltaDedup": 693963897, "CompressProc": 184505345}
+{"CreateMemoryDeltalist": 620793585, "CreateDiskDeltalist": 73170312, "DeltaDedup": 184329233, "CompressProc": 88923844}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.265618, "CompressProc": 0.481958}
+{"CreateMemoryDeltalist": 6.26, "CreateDiskDeltalist": 0.61, "DeltaDedup": 0.32, "CompressProc": 12.25}
+{"CreateMemoryDeltalist": "151155", "CreateDiskDeltalist": "17816", "DeltaDedup": "168971", "CompressProc": "168971"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1091.934977}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1090.892715, "CompressProc": 526.266898}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.26561789992695395, "CompressProc": 0.48195809190568684}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.034, "DeltaDedup": 0.002, "CompressProc": 0.072}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 9, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 616427844, "CreateDiskDeltalist": 75314166, "DeltaDedup": 691742010, "CompressProc": 188429950}
+{"CreateMemoryDeltalist": 616427844, "CreateDiskDeltalist": 75314166, "DeltaDedup": 188248650, "CompressProc": 90563676}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.272137, "CompressProc": 0.480623}
+{"CreateMemoryDeltalist": 6.27, "CreateDiskDeltalist": 0.66, "DeltaDedup": 0.37, "CompressProc": 25.88}
+{"CreateMemoryDeltalist": "150092", "CreateDiskDeltalist": "18338", "DeltaDedup": "168430", "CompressProc": "168430"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1118.743395}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1117.666983, "CompressProc": 537.693261}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2721370788897005, "CompressProc": 0.4806225121892228}
+{"CreateMemoryDeltalist": 0.042, "CreateDiskDeltalist": 0.036, "DeltaDedup": 0.002, "CompressProc": 0.154}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 1, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 624551490, "CreateDiskDeltalist": 75457911, "DeltaDedup": 700009401, "CompressProc": 193026665}
+{"CreateMemoryDeltalist": 624551490, "CreateDiskDeltalist": 75457911, "DeltaDedup": 192829945, "CompressProc": 97154734}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.275468, "CompressProc": 0.503323}
+{"CreateMemoryDeltalist": 6.35, "CreateDiskDeltalist": 0.61, "DeltaDedup": 0.42, "CompressProc": 17.04}
+{"CreateMemoryDeltalist": "152070", "CreateDiskDeltalist": "18373", "DeltaDedup": "170443", "CompressProc": "170443"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1132.499809}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1131.34564, "CompressProc": 570.013048}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27546765035305576, "CompressProc": 0.5033228645780726}
+{"CreateMemoryDeltalist": 0.042, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.1}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 2, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 623689020, "CreateDiskDeltalist": 75745401, "DeltaDedup": 699434421, "CompressProc": 189483881}
+{"CreateMemoryDeltalist": 623689020, "CreateDiskDeltalist": 75745401, "DeltaDedup": 189294541, "CompressProc": 95140559}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.270639, "CompressProc": 0.502104}
+{"CreateMemoryDeltalist": 6.27, "CreateDiskDeltalist": 0.62, "DeltaDedup": 0.43, "CompressProc": 16.09}
+{"CreateMemoryDeltalist": "151860", "CreateDiskDeltalist": "18443", "DeltaDedup": "170303", "CompressProc": "170303"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1112.627969}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1111.516186, "CompressProc": 558.654627}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2706394414414415, "CompressProc": 0.5021037063288134}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.034, "DeltaDedup": 0.003, "CompressProc": 0.094}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 3, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 612813684, "CreateDiskDeltalist": 73457802, "DeltaDedup": 686271486, "CompressProc": 184127686}
+{"CreateMemoryDeltalist": 612813684, "CreateDiskDeltalist": 73457802, "DeltaDedup": 183956422, "CompressProc": 92079117}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.268052, "CompressProc": 0.500083}
+{"CreateMemoryDeltalist": 6.18, "CreateDiskDeltalist": 0.59, "DeltaDedup": 0.3, "CompressProc": 15.71}
+{"CreateMemoryDeltalist": "149212", "CreateDiskDeltalist": "17886", "DeltaDedup": "167098", "CompressProc": "167098"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1101.914362}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1100.88943, "CompressProc": 551.048588}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.26805196737277814, "CompressProc": 0.5000829529073694}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.094}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 4, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 609018816, "CreateDiskDeltalist": 75531837, "DeltaDedup": 684550653, "CompressProc": 187309425}
+{"CreateMemoryDeltalist": 609018816, "CreateDiskDeltalist": 75531837, "DeltaDedup": 187130573, "CompressProc": 93742534}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273363, "CompressProc": 0.500469}
+{"CreateMemoryDeltalist": 6.18, "CreateDiskDeltalist": 0.66, "DeltaDedup": 0.35, "CompressProc": 16.01}
+{"CreateMemoryDeltalist": "148288", "CreateDiskDeltalist": "18391", "DeltaDedup": "166679", "CompressProc": "166679"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1123.773391}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1122.700358, "CompressProc": 562.413585}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27336263890917945, "CompressProc": 0.5004688574264347}
+{"CreateMemoryDeltalist": 0.042, "CreateDiskDeltalist": 0.036, "DeltaDedup": 0.002, "CompressProc": 0.096}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 5, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 610328949, "CreateDiskDeltalist": 75519516, "DeltaDedup": 685848465, "CompressProc": 187408845}
+{"CreateMemoryDeltalist": 610328949, "CreateDiskDeltalist": 75519516, "DeltaDedup": 187229289, "CompressProc": 93611424}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.272989, "CompressProc": 0.499504}
+{"CreateMemoryDeltalist": 6.2, "CreateDiskDeltalist": 0.61, "DeltaDedup": 0.43, "CompressProc": 16.0}
+{"CreateMemoryDeltalist": "148607", "CreateDiskDeltalist": "18388", "DeltaDedup": "166995", "CompressProc": "166995"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1122.242253}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1121.167035, "CompressProc": 560.564232}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27298929510591674, "CompressProc": 0.4995037662336173}
+{"CreateMemoryDeltalist": 0.042, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.003, "CompressProc": 0.096}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 6, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 626017689, "CreateDiskDeltalist": 75642726, "DeltaDedup": 701660415, "CompressProc": 191676705}
+{"CreateMemoryDeltalist": 626017689, "CreateDiskDeltalist": 75642726, "DeltaDedup": 191482039, "CompressProc": 95743758}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.272898, "CompressProc": 0.499506}
+{"CreateMemoryDeltalist": 6.25, "CreateDiskDeltalist": 0.65, "DeltaDedup": 0.38, "CompressProc": 16.38}
+{"CreateMemoryDeltalist": "152427", "CreateDiskDeltalist": "18418", "DeltaDedup": "170845", "CompressProc": "170845"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1121.933361}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1120.79393, "CompressProc": 560.412994}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2728984489895301, "CompressProc": 0.49950648895981975}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.035, "DeltaDedup": 0.002, "CompressProc": 0.096}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 7, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 615668049, "CreateDiskDeltalist": 75355236, "DeltaDedup": 691023285, "CompressProc": 188398529}
+{"CreateMemoryDeltalist": 615668049, "CreateDiskDeltalist": 75355236, "DeltaDedup": 188217821, "CompressProc": 93915053}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.272376, "CompressProc": 0.498491}
+{"CreateMemoryDeltalist": 6.26, "CreateDiskDeltalist": 0.63, "DeltaDedup": 0.33, "CompressProc": 16.14}
+{"CreateMemoryDeltalist": "149907", "CreateDiskDeltalist": "18348", "DeltaDedup": "168255", "CompressProc": "168255"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1119.72024}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1118.646227, "CompressProc": 558.170949}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2723755118091064, "CompressProc": 0.498491434789104}
+{"CreateMemoryDeltalist": 0.042, "CreateDiskDeltalist": 0.034, "DeltaDedup": 0.002, "CompressProc": 0.096}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 8, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 615335382, "CreateDiskDeltalist": 75728973, "DeltaDedup": 691064355, "CompressProc": 189007613}
+{"CreateMemoryDeltalist": 615335382, "CreateDiskDeltalist": 75728973, "DeltaDedup": 188822843, "CompressProc": 93886528}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273235, "CompressProc": 0.496734}
+{"CreateMemoryDeltalist": 6.48, "CreateDiskDeltalist": 0.96, "DeltaDedup": 0.48, "CompressProc": 16.31}
+{"CreateMemoryDeltalist": "149826", "CreateDiskDeltalist": "18439", "DeltaDedup": "168265", "CompressProc": "168265"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1123.273485}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1122.175396, "CompressProc": 557.968252}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27323481762843926, "CompressProc": 0.49673410745558555}
+{"CreateMemoryDeltalist": 0.043, "CreateDiskDeltalist": 0.052, "DeltaDedup": 0.003, "CompressProc": 0.097}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 9, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 607909926, "CreateDiskDeltalist": 75544158, "DeltaDedup": 683454084, "CompressProc": 187643912}
+{"CreateMemoryDeltalist": 607909926, "CreateDiskDeltalist": 75544158, "DeltaDedup": 187465300, "CompressProc": 93038589}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.274291, "CompressProc": 0.495825}
+{"CreateMemoryDeltalist": 6.2, "CreateDiskDeltalist": 0.64, "DeltaDedup": 0.38, "CompressProc": 16.09}
+{"CreateMemoryDeltalist": "148018", "CreateDiskDeltalist": "18394", "DeltaDedup": "166412", "CompressProc": "166412"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1127.586424}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1126.513112, "CompressProc": 559.085817}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2742909939128318, "CompressProc": 0.4958252468282644}
+{"CreateMemoryDeltalist": 0.042, "CreateDiskDeltalist": 0.035, "DeltaDedup": 0.002, "CompressProc": 0.097}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 1, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 608513655, "CreateDiskDeltalist": 75293631, "DeltaDedup": 683807286, "CompressProc": 187005020}
+{"CreateMemoryDeltalist": 608513655, "CreateDiskDeltalist": 75293631, "DeltaDedup": 186827342, "CompressProc": 79984944}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273216, "CompressProc": 0.427715}
+{"CreateMemoryDeltalist": 6.25, "CreateDiskDeltalist": 0.65, "DeltaDedup": 0.27, "CompressProc": 18.6}
+{"CreateMemoryDeltalist": "148165", "CreateDiskDeltalist": "18333", "DeltaDedup": "166498", "CompressProc": "166498"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1123.166765}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1122.099617, "CompressProc": 480.395825}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2732163664475286, "CompressProc": 0.42771549156371275}
+{"CreateMemoryDeltalist": 0.042, "CreateDiskDeltalist": 0.035, "DeltaDedup": 0.002, "CompressProc": 0.112}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 2, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 613339380, "CreateDiskDeltalist": 73207275, "DeltaDedup": 686546655, "CompressProc": 188557523}
+{"CreateMemoryDeltalist": 613339380, "CreateDiskDeltalist": 73207275, "DeltaDedup": 188377343, "CompressProc": 80056436}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.274384, "CompressProc": 0.424573}
+{"CreateMemoryDeltalist": 6.1, "CreateDiskDeltalist": 0.84, "DeltaDedup": 0.43, "CompressProc": 23.16}
+{"CreateMemoryDeltalist": "149340", "CreateDiskDeltalist": "17825", "DeltaDedup": "167165", "CompressProc": "167165"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1127.9725}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1126.894643, "CompressProc": 478.906685}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2743838916484052, "CompressProc": 0.42457301485630183}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.047, "DeltaDedup": 0.003, "CompressProc": 0.139}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 3, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 608998281, "CreateDiskDeltalist": 76780365, "DeltaDedup": 685778646, "CompressProc": 187338314}
+{"CreateMemoryDeltalist": 608998281, "CreateDiskDeltalist": 76780365, "DeltaDedup": 187159414, "CompressProc": 79582852}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.272915, "CompressProc": 0.424808}
+{"CreateMemoryDeltalist": 6.32, "CreateDiskDeltalist": 0.65, "DeltaDedup": 0.3, "CompressProc": 22.46}
+{"CreateMemoryDeltalist": "148283", "CreateDiskDeltalist": "18695", "DeltaDedup": "166978", "CompressProc": "166978"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1121.934111}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1120.862712, "CompressProc": 476.60681}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2729151964937911, "CompressProc": 0.4248081998105858}
+{"CreateMemoryDeltalist": 0.043, "CreateDiskDeltalist": 0.035, "DeltaDedup": 0.002, "CompressProc": 0.135}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 4, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 612476910, "CreateDiskDeltalist": 75301845, "DeltaDedup": 687778755, "CompressProc": 188349881}
+{"CreateMemoryDeltalist": 612476910, "CreateDiskDeltalist": 75301845, "DeltaDedup": 188167747, "CompressProc": 76267696}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.273588, "CompressProc": 0.404926}
+{"CreateMemoryDeltalist": 6.03, "CreateDiskDeltalist": 0.64, "DeltaDedup": 0.23, "CompressProc": 40.94}
+{"CreateMemoryDeltalist": "149130", "CreateDiskDeltalist": "18335", "DeltaDedup": "167465", "CompressProc": "167465"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1124.711916}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1123.624322, "CompressProc": 455.424692}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2735876118821524, "CompressProc": 0.4049256396426407}
+{"CreateMemoryDeltalist": 0.04, "CreateDiskDeltalist": 0.035, "DeltaDedup": 0.001, "CompressProc": 0.244}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 5, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 608760075, "CreateDiskDeltalist": 75347022, "DeltaDedup": 684107097, "CompressProc": 187863321}
+{"CreateMemoryDeltalist": 608760075, "CreateDiskDeltalist": 75347022, "DeltaDedup": 187683705, "CompressProc": 76023012}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.274348, "CompressProc": 0.404672}
+{"CreateMemoryDeltalist": 6.07, "CreateDiskDeltalist": 0.6, "DeltaDedup": 0.26, "CompressProc": 45.77}
+{"CreateMemoryDeltalist": "148225", "CreateDiskDeltalist": "18346", "DeltaDedup": "166571", "CompressProc": "166571"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1127.827299}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1126.748984, "CompressProc": 456.400046}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.274348425614804, "CompressProc": 0.4046719266368813}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.033, "DeltaDedup": 0.002, "CompressProc": 0.275}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 6, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 615758403, "CreateDiskDeltalist": 75618084, "DeltaDedup": 691376487, "CompressProc": 188517133}
+{"CreateMemoryDeltalist": 615758403, "CreateDiskDeltalist": 75618084, "DeltaDedup": 188333471, "CompressProc": 76105896}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.272404, "CompressProc": 0.403708}
+{"CreateMemoryDeltalist": 6.17, "CreateDiskDeltalist": 0.65, "DeltaDedup": 0.26, "CompressProc": 49.99}
+{"CreateMemoryDeltalist": "149929", "CreateDiskDeltalist": "18412", "DeltaDedup": "168341", "CompressProc": "168341"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1119.852757}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1118.761746, "CompressProc": 452.093643}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27240363915266613, "CompressProc": 0.4037081126728877}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.035, "DeltaDedup": 0.002, "CompressProc": 0.297}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 7, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 622226928, "CreateDiskDeltalist": 75544158, "DeltaDedup": 697771086, "CompressProc": 191398964}
+{"CreateMemoryDeltalist": 622226928, "CreateDiskDeltalist": 75544158, "DeltaDedup": 191208662, "CompressProc": 77234664}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.274028, "CompressProc": 0.403527}
+{"CreateMemoryDeltalist": 6.25, "CreateDiskDeltalist": 0.65, "DeltaDedup": 0.46, "CompressProc": 50.38}
+{"CreateMemoryDeltalist": "151504", "CreateDiskDeltalist": "18394", "DeltaDedup": "169898", "CompressProc": "169898"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1126.55219}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1125.432095, "CompressProc": 454.59431}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.2740277806184563, "CompressProc": 0.40352707494181866}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.035, "DeltaDedup": 0.003, "CompressProc": 0.297}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 8, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 619479345, "CreateDiskDeltalist": 73437267, "DeltaDedup": 692916612, "CompressProc": 186320384}
+{"CreateMemoryDeltalist": 619479345, "CreateDiskDeltalist": 73437267, "DeltaDedup": 186141436, "CompressProc": 75246148}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.268635, "CompressProc": 0.403854}
+{"CreateMemoryDeltalist": 6.13, "CreateDiskDeltalist": 0.6, "DeltaDedup": 0.33, "CompressProc": 48.86}
+{"CreateMemoryDeltalist": "150835", "CreateDiskDeltalist": "17881", "DeltaDedup": "168716", "CompressProc": "168716"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1104.343299}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1103.282653, "CompressProc": 445.992959}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.26863468541514485, "CompressProc": 0.40385354753712327}
+{"CreateMemoryDeltalist": 0.041, "CreateDiskDeltalist": 0.034, "DeltaDedup": 0.002, "CompressProc": 0.29}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 9, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xor", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xor"}
+{"CreateMemoryDeltalist": 611080530, "CreateDiskDeltalist": 75589335, "DeltaDedup": 686669865, "CompressProc": 188364091}
+{"CreateMemoryDeltalist": 611080530, "CreateDiskDeltalist": 75589335, "DeltaDedup": 188182689, "CompressProc": 76139376}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.274051, "CompressProc": 0.404214}
+{"CreateMemoryDeltalist": 6.23, "CreateDiskDeltalist": 0.59, "DeltaDedup": 0.42, "CompressProc": 49.54}
+{"CreateMemoryDeltalist": "148790", "CreateDiskDeltalist": "18405", "DeltaDedup": "167195", "CompressProc": "167195"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 4107.0, "CompressProc": 1126.613182}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1125.52821, "CompressProc": 455.392661}
+{"CreateMemoryDeltalist": 1.0, "CreateDiskDeltalist": 1.0, "DeltaDedup": 0.27405118334550765, "CompressProc": 0.4042138582042616}
+{"CreateMemoryDeltalist": 0.042, "CreateDiskDeltalist": 0.032, "DeltaDedup": 0.003, "CompressProc": 0.296}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 1, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 608443836, "CreateDiskDeltalist": 75285417, "DeltaDedup": 271837568, "CompressProc": 85710455}
+{"CreateMemoryDeltalist": 234786307, "CreateDiskDeltalist": 37051261, "DeltaDedup": 85529499, "CompressProc": 70553582}
+{"CreateMemoryDeltalist": 0.38588, "CreateDiskDeltalist": 0.492144, "DeltaDedup": 0.314635, "CompressProc": 0.823162}
+{"CreateMemoryDeltalist": 52.74, "CreateDiskDeltalist": 7.45, "DeltaDedup": 0.41, "CompressProc": 2.96}
+{"CreateMemoryDeltalist": "148148", "CreateDiskDeltalist": "18331", "DeltaDedup": "166479", "CompressProc": "166479"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1632.864013, "CompressProc": 514.842443}
+{"CreateMemoryDeltalist": 1584.809157, "CreateDiskDeltalist": 2021.235121, "DeltaDedup": 513.755483, "CompressProc": 423.798689}
+{"CreateMemoryDeltalist": 0.3858799992695398, "CreateDiskDeltalist": 0.49214393011930846, "DeltaDedup": 0.3146345800444804, "CompressProc": 0.8231619105264794}
+{"CreateMemoryDeltalist": 0.356, "CreateDiskDeltalist": 0.406, "DeltaDedup": 0.002, "CompressProc": 0.018}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 2, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 621549273, "CreateDiskDeltalist": 75527730, "DeltaDedup": 276485257, "CompressProc": 86749957}
+{"CreateMemoryDeltalist": 239409265, "CreateDiskDeltalist": 37075992, "DeltaDedup": 86559261, "CompressProc": 71252412}
+{"CreateMemoryDeltalist": 0.385181, "CreateDiskDeltalist": 0.490892, "DeltaDedup": 0.31307, "CompressProc": 0.821354}
+{"CreateMemoryDeltalist": 54.13, "CreateDiskDeltalist": 7.42, "DeltaDedup": 0.36, "CompressProc": 3.14}
+{"CreateMemoryDeltalist": "151339", "CreateDiskDeltalist": "18390", "DeltaDedup": "169729", "CompressProc": "169729"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1628.980652, "CompressProc": 511.108632}
+{"CreateMemoryDeltalist": 1581.940313, "CreateDiskDeltalist": 2016.095269, "DeltaDedup": 509.9851, "CompressProc": 419.801048}
+{"CreateMemoryDeltalist": 0.38518147382517653, "CreateDiskDeltalist": 0.49089244436328217, "DeltaDedup": 0.3130700781337457, "CompressProc": 0.8213538604450726}
+{"CreateMemoryDeltalist": 0.358, "CreateDiskDeltalist": 0.403, "DeltaDedup": 0.002, "CompressProc": 0.019}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 3, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 626362677, "CreateDiskDeltalist": 75482553, "DeltaDedup": 279019095, "CompressProc": 86595172}
+{"CreateMemoryDeltalist": 241954779, "CreateDiskDeltalist": 37064316, "DeltaDedup": 86402132, "CompressProc": 71014576}
+{"CreateMemoryDeltalist": 0.386285, "CreateDiskDeltalist": 0.491032, "DeltaDedup": 0.309664, "CompressProc": 0.820075}
+{"CreateMemoryDeltalist": 54.5, "CreateDiskDeltalist": 7.49, "DeltaDedup": 0.34, "CompressProc": 3.4}
+{"CreateMemoryDeltalist": "152511", "CreateDiskDeltalist": "18379", "DeltaDedup": "170890", "CompressProc": "170890"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1632.740915, "CompressProc": 506.730482}
+{"CreateMemoryDeltalist": 1586.474281, "CreateDiskDeltalist": 2016.66663, "DeltaDedup": 505.600866, "CompressProc": 415.557236}
+{"CreateMemoryDeltalist": 0.3862854348672997, "CreateDiskDeltalist": 0.4910315631848064, "DeltaDedup": 0.3096638672768239, "CompressProc": 0.820075465679209}
+{"CreateMemoryDeltalist": 0.357, "CreateDiskDeltalist": 0.408, "DeltaDedup": 0.002, "CompressProc": 0.02}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 4, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 607240485, "CreateDiskDeltalist": 75301845, "DeltaDedup": 271360693, "CompressProc": 85254309}
+{"CreateMemoryDeltalist": 234314026, "CreateDiskDeltalist": 37046667, "DeltaDedup": 85075693, "CompressProc": 69805599}
+{"CreateMemoryDeltalist": 0.385867, "CreateDiskDeltalist": 0.491976, "DeltaDedup": 0.313515, "CompressProc": 0.818793}
+{"CreateMemoryDeltalist": 52.45, "CreateDiskDeltalist": 7.45, "DeltaDedup": 0.29, "CompressProc": 3.53}
+{"CreateMemoryDeltalist": "147855", "CreateDiskDeltalist": "18335", "DeltaDedup": "166190", "CompressProc": "166190"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1632.834063, "CompressProc": 512.993014}
+{"CreateMemoryDeltalist": 1584.75551, "CreateDiskDeltalist": 2020.543605, "DeltaDedup": 511.918244, "CompressProc": 420.034894}
+{"CreateMemoryDeltalist": 0.3858669369369369, "CreateDiskDeltalist": 0.49197555514974434, "DeltaDedup": 0.31351516703384696, "CompressProc": 0.8187926200492079}
+{"CreateMemoryDeltalist": 0.355, "CreateDiskDeltalist": 0.406, "DeltaDedup": 0.002, "CompressProc": 0.021}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 5, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 615947325, "CreateDiskDeltalist": 75326487, "DeltaDedup": 274488013, "CompressProc": 85635794}
+{"CreateMemoryDeltalist": 237418517, "CreateDiskDeltalist": 37069496, "DeltaDedup": 85451982, "CompressProc": 69977291}
+{"CreateMemoryDeltalist": 0.385453, "CreateDiskDeltalist": 0.492118, "DeltaDedup": 0.311314, "CompressProc": 0.81715}
+{"CreateMemoryDeltalist": 53.75, "CreateDiskDeltalist": 7.51, "DeltaDedup": 0.26, "CompressProc": 3.8}
+{"CreateMemoryDeltalist": "149975", "CreateDiskDeltalist": "18341", "DeltaDedup": "168316", "CompressProc": "168316"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1630.789782, "CompressProc": 508.779878}
+{"CreateMemoryDeltalist": 1583.053956, "CreateDiskDeltalist": 2021.12731, "DeltaDedup": 507.687813, "CompressProc": 415.749489}
+{"CreateMemoryDeltalist": 0.3854526311176041, "CreateDiskDeltalist": 0.49211767957146335, "DeltaDedup": 0.3113140753048942, "CompressProc": 0.8171500229810582}
+{"CreateMemoryDeltalist": 0.358, "CreateDiskDeltalist": 0.409, "DeltaDedup": 0.002, "CompressProc": 0.023}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 6, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 607125489, "CreateDiskDeltalist": 75482553, "DeltaDedup": 271641804, "CompressProc": 84779349}
+{"CreateMemoryDeltalist": 234573098, "CreateDiskDeltalist": 37068706, "DeltaDedup": 84603309, "CompressProc": 69283213}
+{"CreateMemoryDeltalist": 0.386367, "CreateDiskDeltalist": 0.49109, "DeltaDedup": 0.311452, "CompressProc": 0.817218}
+{"CreateMemoryDeltalist": 52.57, "CreateDiskDeltalist": 7.5, "DeltaDedup": 0.3, "CompressProc": 3.99}
+{"CreateMemoryDeltalist": "147827", "CreateDiskDeltalist": "18379", "DeltaDedup": "166206", "CompressProc": "166206"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1634.368218, "CompressProc": 510.085972}
+{"CreateMemoryDeltalist": 1586.808215, "CreateDiskDeltalist": 2016.90549, "DeltaDedup": 509.026804, "CompressProc": 416.851455}
+{"CreateMemoryDeltalist": 0.3863667433649866, "CreateDiskDeltalist": 0.49108972242512783, "DeltaDedup": 0.3114517269693995, "CompressProc": 0.8172180335906198}
+{"CreateMemoryDeltalist": 0.356, "CreateDiskDeltalist": 0.408, "DeltaDedup": 0.002, "CompressProc": 0.024}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 7, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 623356353, "CreateDiskDeltalist": 75692010, "DeltaDedup": 277190778, "CompressProc": 87503134}
+{"CreateMemoryDeltalist": 240016484, "CreateDiskDeltalist": 37174294, "DeltaDedup": 87307694, "CompressProc": 71471621}
+{"CreateMemoryDeltalist": 0.385039, "CreateDiskDeltalist": 0.491126, "DeltaDedup": 0.314973, "CompressProc": 0.816789}
+{"CreateMemoryDeltalist": 54.26, "CreateDiskDeltalist": 7.52, "DeltaDedup": 0.33, "CompressProc": 4.18}
+{"CreateMemoryDeltalist": "151779", "CreateDiskDeltalist": "18430", "DeltaDedup": "170209", "CompressProc": "170209"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1628.531852, "CompressProc": 514.092287}
+{"CreateMemoryDeltalist": 1581.355023, "CreateDiskDeltalist": 2017.053391, "DeltaDedup": 512.944051, "CompressProc": 419.905064}
+{"CreateMemoryDeltalist": 0.3850389634769905, "CreateDiskDeltalist": 0.49112573435597756, "DeltaDedup": 0.3149732996441263, "CompressProc": 0.8167892703669369}
+{"CreateMemoryDeltalist": 0.357, "CreateDiskDeltalist": 0.408, "DeltaDedup": 0.002, "CompressProc": 0.025}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 8, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 612641190, "CreateDiskDeltalist": 75453804, "DeltaDedup": 273440226, "CompressProc": 85229730}
+{"CreateMemoryDeltalist": 236286487, "CreateDiskDeltalist": 37153739, "DeltaDedup": 85052544, "CompressProc": 69641670}
+{"CreateMemoryDeltalist": 0.385685, "CreateDiskDeltalist": 0.492404, "DeltaDedup": 0.311046, "CompressProc": 0.817105}
+{"CreateMemoryDeltalist": 53.29, "CreateDiskDeltalist": 7.49, "DeltaDedup": 0.4, "CompressProc": 4.48}
+{"CreateMemoryDeltalist": "149170", "CreateDiskDeltalist": "18372", "DeltaDedup": "167542", "CompressProc": "167542"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1632.069726, "CompressProc": 508.706653}
+{"CreateMemoryDeltalist": 1584.008091, "CreateDiskDeltalist": 2022.302362, "DeltaDedup": 507.649091, "CompressProc": 415.666937}
+{"CreateMemoryDeltalist": 0.3856849503287071, "CreateDiskDeltalist": 0.4924037891404918, "DeltaDedup": 0.31104620281400897, "CompressProc": 0.817105368189474}
+{"CreateMemoryDeltalist": 0.357, "CreateDiskDeltalist": 0.408, "DeltaDedup": 0.002, "CompressProc": 0.027}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 9, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 608480799, "CreateDiskDeltalist": 75293631, "DeltaDedup": 272025248, "CompressProc": 85384405}
+{"CreateMemoryDeltalist": 234994166, "CreateDiskDeltalist": 37031082, "DeltaDedup": 85205713, "CompressProc": 69793968}
+{"CreateMemoryDeltalist": 0.386198, "CreateDiskDeltalist": 0.491822, "DeltaDedup": 0.313227, "CompressProc": 0.817409}
+{"CreateMemoryDeltalist": 52.8, "CreateDiskDeltalist": 7.46, "DeltaDedup": 0.38, "CompressProc": 4.52}
+{"CreateMemoryDeltalist": "148157", "CreateDiskDeltalist": "18333", "DeltaDedup": "166490", "CompressProc": "166490"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1633.883404, "CompressProc": 512.850051}
+{"CreateMemoryDeltalist": 1586.11585, "CreateDiskDeltalist": 2019.913926, "DeltaDedup": 511.776761, "CompressProc": 419.208169}
+{"CreateMemoryDeltalist": 0.38619816167518867, "CreateDiskDeltalist": 0.4918222366691015, "DeltaDedup": 0.3132272227914741, "CompressProc": 0.8174088472499732}
+{"CreateMemoryDeltalist": 0.356, "CreateDiskDeltalist": 0.407, "DeltaDedup": 0.002, "CompressProc": 0.027}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 1, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 611971749, "CreateDiskDeltalist": 75367557, "DeltaDedup": 273450298, "CompressProc": 86195428}
+{"CreateMemoryDeltalist": 236339689, "CreateDiskDeltalist": 37110609, "DeltaDedup": 86010424, "CompressProc": 71196905}
+{"CreateMemoryDeltalist": 0.386194, "CreateDiskDeltalist": 0.492395, "DeltaDedup": 0.314538, "CompressProc": 0.825994}
+{"CreateMemoryDeltalist": 53.39, "CreateDiskDeltalist": 7.44, "DeltaDedup": 0.41, "CompressProc": 9.3}
+{"CreateMemoryDeltalist": "149007", "CreateDiskDeltalist": "18351", "DeltaDedup": "167358", "CompressProc": "167358"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1633.92427, "CompressProc": 515.036198}
+{"CreateMemoryDeltalist": 1586.097895, "CreateDiskDeltalist": 2022.266307, "DeltaDedup": 513.930759, "CompressProc": 425.416801}
+{"CreateMemoryDeltalist": 0.38619378987095204, "CreateDiskDeltalist": 0.49239501022644266, "DeltaDedup": 0.3145376860091563, "CompressProc": 0.8259939838248029}
+{"CreateMemoryDeltalist": 0.358, "CreateDiskDeltalist": 0.405, "DeltaDedup": 0.002, "CompressProc": 0.056}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 2, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 617006931, "CreateDiskDeltalist": 75564693, "DeltaDedup": 275272861, "CompressProc": 85341915}
+{"CreateMemoryDeltalist": 238094691, "CreateDiskDeltalist": 37178170, "DeltaDedup": 85159015, "CompressProc": 69881860}
+{"CreateMemoryDeltalist": 0.385887, "CreateDiskDeltalist": 0.492005, "DeltaDedup": 0.309362, "CompressProc": 0.818846}
+{"CreateMemoryDeltalist": 53.72, "CreateDiskDeltalist": 7.51, "DeltaDedup": 0.4, "CompressProc": 9.02}
+{"CreateMemoryDeltalist": "150233", "CreateDiskDeltalist": "18399", "DeltaDedup": "168632", "CompressProc": "168632"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1632.388046, "CompressProc": 506.08375}
+{"CreateMemoryDeltalist": 1584.836161, "CreateDiskDeltalist": 2020.662536, "DeltaDedup": 504.99914, "CompressProc": 414.404502}
+{"CreateMemoryDeltalist": 0.38588657438519597, "CreateDiskDeltalist": 0.4920045132700268, "DeltaDedup": 0.30936218948518324, "CompressProc": 0.8188456989579294}
+{"CreateMemoryDeltalist": 0.358, "CreateDiskDeltalist": 0.408, "DeltaDedup": 0.002, "CompressProc": 0.053}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 3, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 607856535, "CreateDiskDeltalist": 75334701, "DeltaDedup": 271731855, "CompressProc": 85092034}
+{"CreateMemoryDeltalist": 234673212, "CreateDiskDeltalist": 37058643, "DeltaDedup": 84914378, "CompressProc": 69316421}
+{"CreateMemoryDeltalist": 0.386067, "CreateDiskDeltalist": 0.49192, "DeltaDedup": 0.312493, "CompressProc": 0.814605}
+{"CreateMemoryDeltalist": 52.74, "CreateDiskDeltalist": 7.41, "DeltaDedup": 0.36, "CompressProc": 8.91}
+{"CreateMemoryDeltalist": "148005", "CreateDiskDeltalist": "18343", "DeltaDedup": "166348", "CompressProc": "166348"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1633.51441, "CompressProc": 511.53025}
+{"CreateMemoryDeltalist": 1585.576244, "CreateDiskDeltalist": 2020.31527, "DeltaDedup": 510.462272, "CompressProc": 416.695247}
+{"CreateMemoryDeltalist": 0.3860667747747748, "CreateDiskDeltalist": 0.4919199586072559, "DeltaDedup": 0.3124932776075113, "CompressProc": 0.8146052887390335}
+{"CreateMemoryDeltalist": 0.356, "CreateDiskDeltalist": 0.404, "DeltaDedup": 0.002, "CompressProc": 0.054}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 4, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 620165214, "CreateDiskDeltalist": 75310059, "DeltaDedup": 276319815, "CompressProc": 85526584}
+{"CreateMemoryDeltalist": 239281124, "CreateDiskDeltalist": 37038691, "DeltaDedup": 85342148, "CompressProc": 69375878}
+{"CreateMemoryDeltalist": 0.385834, "CreateDiskDeltalist": 0.491816, "DeltaDedup": 0.308853, "CompressProc": 0.811162}
+{"CreateMemoryDeltalist": 53.89, "CreateDiskDeltalist": 7.43, "DeltaDedup": 0.32, "CompressProc": 9.04}
+{"CreateMemoryDeltalist": "151002", "CreateDiskDeltalist": "18337", "DeltaDedup": "169339", "CompressProc": "169339"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1631.755325, "CompressProc": 505.06135}
+{"CreateMemoryDeltalist": 1584.622217, "CreateDiskDeltalist": 2019.888259, "DeltaDedup": 503.972198, "CompressProc": 409.686357}
+{"CreateMemoryDeltalist": 0.38583448186023866, "CreateDiskDeltalist": 0.4918159870952033, "DeltaDedup": 0.3088527981362647, "CompressProc": 0.8111615687876333}
+{"CreateMemoryDeltalist": 0.357, "CreateDiskDeltalist": 0.405, "DeltaDedup": 0.002, "CompressProc": 0.053}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 5, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 608604009, "CreateDiskDeltalist": 75322380, "DeltaDedup": 271805527, "CompressProc": 85115270}
+{"CreateMemoryDeltalist": 234745475, "CreateDiskDeltalist": 37060052, "DeltaDedup": 84936832, "CompressProc": 68787043}
+{"CreateMemoryDeltalist": 0.385711, "CreateDiskDeltalist": 0.492019, "DeltaDedup": 0.312491, "CompressProc": 0.808163}
+{"CreateMemoryDeltalist": 52.76, "CreateDiskDeltalist": 7.48, "DeltaDedup": 0.47, "CompressProc": 8.92}
+{"CreateMemoryDeltalist": "148187", "CreateDiskDeltalist": "18340", "DeltaDedup": "166527", "CompressProc": "166527"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1632.200946, "CompressProc": 511.119939}
+{"CreateMemoryDeltalist": 1584.116522, "CreateDiskDeltalist": 2020.722574, "DeltaDedup": 510.048413, "CompressProc": 413.068409}
+{"CreateMemoryDeltalist": 0.38571135183832483, "CreateDiskDeltalist": 0.4920191317263209, "DeltaDedup": 0.3124911882020193, "CompressProc": 0.8081633633940467}
+{"CreateMemoryDeltalist": 0.356, "CreateDiskDeltalist": 0.408, "DeltaDedup": 0.003, "CompressProc": 0.054}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 6, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 611244810, "CreateDiskDeltalist": 75482553, "DeltaDedup": 273084073, "CompressProc": 85424253}
+{"CreateMemoryDeltalist": 236045063, "CreateDiskDeltalist": 37039010, "DeltaDedup": 85243737, "CompressProc": 68866620}
+{"CreateMemoryDeltalist": 0.386171, "CreateDiskDeltalist": 0.490696, "DeltaDedup": 0.312152, "CompressProc": 0.806172}
+{"CreateMemoryDeltalist": 53.21, "CreateDiskDeltalist": 7.46, "DeltaDedup": 0.32, "CompressProc": 8.96}
+{"CreateMemoryDeltalist": "148830", "CreateDiskDeltalist": "18379", "DeltaDedup": "167209", "CompressProc": "167209"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1633.190038, "CompressProc": 510.883104}
+{"CreateMemoryDeltalist": 1586.004589, "CreateDiskDeltalist": 2015.289733, "DeltaDedup": 509.803521, "CompressProc": 411.859529}
+{"CreateMemoryDeltalist": 0.38617107109812515, "CreateDiskDeltalist": 0.49069630703676653, "DeltaDedup": 0.31215199036133234, "CompressProc": 0.8061717558778377}
+{"CreateMemoryDeltalist": 0.358, "CreateDiskDeltalist": 0.406, "DeltaDedup": 0.002, "CompressProc": 0.054}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 7, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 625479672, "CreateDiskDeltalist": 75310059, "DeltaDedup": 278186647, "CompressProc": 85912538}
+{"CreateMemoryDeltalist": 241169559, "CreateDiskDeltalist": 37017088, "DeltaDedup": 85726374, "CompressProc": 68957383}
+{"CreateMemoryDeltalist": 0.385575, "CreateDiskDeltalist": 0.491529, "DeltaDedup": 0.308161, "CompressProc": 0.802646}
+{"CreateMemoryDeltalist": 54.45, "CreateDiskDeltalist": 7.43, "DeltaDedup": 0.35, "CompressProc": 9.08}
+{"CreateMemoryDeltalist": "152296", "CreateDiskDeltalist": "18337", "DeltaDedup": "170633", "CompressProc": "170633"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1630.321491, "CompressProc": 503.493099}
+{"CreateMemoryDeltalist": 1583.558065, "CreateDiskDeltalist": 2018.710149, "DeltaDedup": 502.402079, "CompressProc": 404.126886}
+{"CreateMemoryDeltalist": 0.3855753749695641, "CreateDiskDeltalist": 0.49152913294375455, "DeltaDedup": 0.3081613545386307, "CompressProc": 0.8026463258436836}
+{"CreateMemoryDeltalist": 0.358, "CreateDiskDeltalist": 0.405, "DeltaDedup": 0.002, "CompressProc": 0.053}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 8, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 619569699, "CreateDiskDeltalist": 73457802, "DeltaDedup": 275612876, "CompressProc": 85101359}
+{"CreateMemoryDeltalist": 239066399, "CreateDiskDeltalist": 36546477, "DeltaDedup": 84920763, "CompressProc": 68181491}
+{"CreateMemoryDeltalist": 0.385859, "CreateDiskDeltalist": 0.497517, "DeltaDedup": 0.308116, "CompressProc": 0.80118}
+{"CreateMemoryDeltalist": 53.8, "CreateDiskDeltalist": 7.17, "DeltaDedup": 0.32, "CompressProc": 9.04}
+{"CreateMemoryDeltalist": "150857", "CreateDiskDeltalist": "17886", "DeltaDedup": "168743", "CompressProc": "168743"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1633.32924, "CompressProc": 504.32527}
+{"CreateMemoryDeltalist": 1584.721949, "CreateDiskDeltalist": 2043.300738, "DeltaDedup": 503.255027, "CompressProc": 404.055226}
+{"CreateMemoryDeltalist": 0.3858587652787923, "CreateDiskDeltalist": 0.4975166150474799, "DeltaDedup": 0.30811609482972335, "CompressProc": 0.8011798139720423}
+{"CreateMemoryDeltalist": 0.357, "CreateDiskDeltalist": 0.401, "DeltaDedup": 0.002, "CompressProc": 0.054}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 9, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 611581584, "CreateDiskDeltalist": 73104600, "DeltaDedup": 272313783, "CompressProc": 85243785}
+{"CreateMemoryDeltalist": 235913125, "CreateDiskDeltalist": 36400658, "DeltaDedup": 85066769, "CompressProc": 68218253}
+{"CreateMemoryDeltalist": 0.385743, "CreateDiskDeltalist": 0.497926, "DeltaDedup": 0.312385, "CompressProc": 0.800272}
+{"CreateMemoryDeltalist": 52.94, "CreateDiskDeltalist": 7.17, "DeltaDedup": 0.4, "CompressProc": 9.11}
+{"CreateMemoryDeltalist": "148912", "CreateDiskDeltalist": "17800", "DeltaDedup": "166712", "CompressProc": "166712"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1633.438403, "CompressProc": 511.32363}
+{"CreateMemoryDeltalist": 1584.245225, "CreateDiskDeltalist": 2044.980787, "DeltaDedup": 510.261823, "CompressProc": 409.198216}
+{"CreateMemoryDeltalist": 0.38574268931093253, "CreateDiskDeltalist": 0.4979256846846847, "DeltaDedup": 0.31238510253147267, "CompressProc": 0.8002724536708777}
+{"CreateMemoryDeltalist": 0.356, "CreateDiskDeltalist": 0.403, "DeltaDedup": 0.002, "CompressProc": 0.055}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 1, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 611532300, "CreateDiskDeltalist": 75486660, "DeltaDedup": 273153028, "CompressProc": 85747584}
+{"CreateMemoryDeltalist": 236101641, "CreateDiskDeltalist": 37051387, "DeltaDedup": 85564898, "CompressProc": 64106796}
+{"CreateMemoryDeltalist": 0.386082, "CreateDiskDeltalist": 0.490834, "DeltaDedup": 0.313249, "CompressProc": 0.747622}
+{"CreateMemoryDeltalist": 53.23, "CreateDiskDeltalist": 7.49, "DeltaDedup": 0.31, "CompressProc": 15.56}
+{"CreateMemoryDeltalist": "148900", "CreateDiskDeltalist": "18380", "DeltaDedup": "167280", "CompressProc": "167280"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1632.909063, "CompressProc": 512.599139}
+{"CreateMemoryDeltalist": 1585.638959, "CreateDiskDeltalist": 2015.853482, "DeltaDedup": 511.507042, "CompressProc": 383.230488}
+{"CreateMemoryDeltalist": 0.38608204504504506, "CreateDiskDeltalist": 0.4908335724373022, "DeltaDedup": 0.3132489454496953, "CompressProc": 0.747622184359541}
+{"CreateMemoryDeltalist": 0.357, "CreateDiskDeltalist": 0.408, "DeltaDedup": 0.002, "CompressProc": 0.093}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 2, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 616842651, "CreateDiskDeltalist": 75310059, "DeltaDedup": 274730739, "CompressProc": 86338961}
+{"CreateMemoryDeltalist": 237700281, "CreateDiskDeltalist": 37030458, "DeltaDedup": 86154623, "CompressProc": 64199476}
+{"CreateMemoryDeltalist": 0.38535, "CreateDiskDeltalist": 0.491707, "DeltaDedup": 0.313597, "CompressProc": 0.743575}
+{"CreateMemoryDeltalist": 53.64, "CreateDiskDeltalist": 7.45, "DeltaDedup": 0.4, "CompressProc": 18.87}
+{"CreateMemoryDeltalist": "150193", "CreateDiskDeltalist": "18337", "DeltaDedup": "168530", "CompressProc": "168530"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1630.159254, "CompressProc": 512.306183}
+{"CreateMemoryDeltalist": 1582.63222, "CreateDiskDeltalist": 2019.439276, "DeltaDedup": 511.212384, "CompressProc": 380.93797}
+{"CreateMemoryDeltalist": 0.3853499439980521, "CreateDiskDeltalist": 0.49170666569271976, "DeltaDedup": 0.31359659048379085, "CompressProc": 0.7435748047569435}
+{"CreateMemoryDeltalist": 0.357, "CreateDiskDeltalist": 0.406, "DeltaDedup": 0.002, "CompressProc": 0.112}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 3, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 607491012, "CreateDiskDeltalist": 75301845, "DeltaDedup": 271633053, "CompressProc": 85021620}
+{"CreateMemoryDeltalist": 234625740, "CreateDiskDeltalist": 37007313, "DeltaDedup": 84844938, "CompressProc": 63144028}
+{"CreateMemoryDeltalist": 0.386221, "CreateDiskDeltalist": 0.491453, "DeltaDedup": 0.312351, "CompressProc": 0.742682}
+{"CreateMemoryDeltalist": 52.88, "CreateDiskDeltalist": 7.48, "DeltaDedup": 0.27, "CompressProc": 17.87}
+{"CreateMemoryDeltalist": "147916", "CreateDiskDeltalist": "18335", "DeltaDedup": "166251", "CompressProc": "166251"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1633.873198, "CompressProc": 511.405164}
+{"CreateMemoryDeltalist": 1586.209335, "CreateDiskDeltalist": 2018.397218, "DeltaDedup": 510.342422, "CompressProc": 379.811418}
+{"CreateMemoryDeltalist": 0.38622092403214026, "CreateDiskDeltalist": 0.4914529383978573, "DeltaDedup": 0.3123513027967547, "CompressProc": 0.7426820156239173}
+{"CreateMemoryDeltalist": 0.358, "CreateDiskDeltalist": 0.408, "DeltaDedup": 0.002, "CompressProc": 0.107}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 4, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 611717115, "CreateDiskDeltalist": 73223703, "DeltaDedup": 272624895, "CompressProc": 85003662}
+{"CreateMemoryDeltalist": 236207491, "CreateDiskDeltalist": 36417404, "DeltaDedup": 84828092, "CompressProc": 61260088}
+{"CreateMemoryDeltalist": 0.386138, "CreateDiskDeltalist": 0.497344, "DeltaDedup": 0.311153, "CompressProc": 0.720676}
+{"CreateMemoryDeltalist": 53.29, "CreateDiskDeltalist": 7.18, "DeltaDedup": 0.3, "CompressProc": 23.86}
+{"CreateMemoryDeltalist": "148945", "CreateDiskDeltalist": "17829", "DeltaDedup": "166774", "CompressProc": "166774"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1634.696625, "CompressProc": 509.693729}
+{"CreateMemoryDeltalist": 1585.870563, "CreateDiskDeltalist": 2042.593752, "DeltaDedup": 508.640987, "CompressProc": 367.323971}
+{"CreateMemoryDeltalist": 0.38613843754565375, "CreateDiskDeltalist": 0.4973444733382031, "DeltaDedup": 0.31115313950073153, "CompressProc": 0.7206758688608468}
+{"CreateMemoryDeltalist": 0.358, "CreateDiskDeltalist": 0.403, "DeltaDedup": 0.002, "CompressProc": 0.143}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 5, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 621549273, "CreateDiskDeltalist": 75728973, "DeltaDedup": 276530615, "CompressProc": 87204619}
+{"CreateMemoryDeltalist": 239358149, "CreateDiskDeltalist": 37172466, "DeltaDedup": 87013285, "CompressProc": 62776288}
+{"CreateMemoryDeltalist": 0.385099, "CreateDiskDeltalist": 0.490862, "DeltaDedup": 0.314661, "CompressProc": 0.719873}
+{"CreateMemoryDeltalist": 54.15, "CreateDiskDeltalist": 7.44, "DeltaDedup": 0.28, "CompressProc": 24.56}
+{"CreateMemoryDeltalist": "151339", "CreateDiskDeltalist": "18439", "DeltaDedup": "169778", "CompressProc": "169778"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1628.777668, "CompressProc": 513.639099}
+{"CreateMemoryDeltalist": 1581.602555, "CreateDiskDeltalist": 2015.969738, "DeltaDedup": 512.512133, "CompressProc": 369.755139}
+{"CreateMemoryDeltalist": 0.3850992342342342, "CreateDiskDeltalist": 0.49086187923058194, "DeltaDedup": 0.31466058447947726, "CompressProc": 0.7198734280935261}
+{"CreateMemoryDeltalist": 0.358, "CreateDiskDeltalist": 0.403, "DeltaDedup": 0.002, "CompressProc": 0.145}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 6, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 606287661, "CreateDiskDeltalist": 75552372, "DeltaDedup": 271295977, "CompressProc": 84889772}
+{"CreateMemoryDeltalist": 234098291, "CreateDiskDeltalist": 37197686, "DeltaDedup": 84714146, "CompressProc": 61158040}
+{"CreateMemoryDeltalist": 0.386118, "CreateDiskDeltalist": 0.492343, "DeltaDedup": 0.312257, "CompressProc": 0.720441}
+{"CreateMemoryDeltalist": 52.73, "CreateDiskDeltalist": 7.53, "DeltaDedup": 0.35, "CompressProc": 24.04}
+{"CreateMemoryDeltalist": "147623", "CreateDiskDeltalist": "18396", "DeltaDedup": "166019", "CompressProc": "166019"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1634.126076, "CompressProc": 511.325643}
+{"CreateMemoryDeltalist": 1585.784674, "CreateDiskDeltalist": 2022.052946, "DeltaDedup": 510.267777, "CompressProc": 368.379764}
+{"CreateMemoryDeltalist": 0.3861175247139031, "CreateDiskDeltalist": 0.49234305965424885, "DeltaDedup": 0.3122572881579793, "CompressProc": 0.7204406214377949}
+{"CreateMemoryDeltalist": 0.357, "CreateDiskDeltalist": 0.409, "DeltaDedup": 0.002, "CompressProc": 0.145}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 7, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 610000389, "CreateDiskDeltalist": 75297738, "DeltaDedup": 272523291, "CompressProc": 85427193}
+{"CreateMemoryDeltalist": 235509658, "CreateDiskDeltalist": 37013633, "DeltaDedup": 85246673, "CompressProc": 61546684}
+{"CreateMemoryDeltalist": 0.386081, "CreateDiskDeltalist": 0.491564, "DeltaDedup": 0.312805, "CompressProc": 0.720458}
+{"CreateMemoryDeltalist": 53.03, "CreateDiskDeltalist": 7.46, "DeltaDedup": 0.2, "CompressProc": 23.85}
+{"CreateMemoryDeltalist": "148527", "CreateDiskDeltalist": "18334", "DeltaDedup": "166861", "CompressProc": "166861"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1633.235394, "CompressProc": 511.966205}
+{"CreateMemoryDeltalist": 1585.635326, "CreateDiskDeltalist": 2018.852024, "DeltaDedup": 510.884347, "CompressProc": 368.850025}
+{"CreateMemoryDeltalist": 0.3860811604577551, "CreateDiskDeltalist": 0.4915636776235695, "DeltaDedup": 0.31280509158497943, "CompressProc": 0.720457759511685}
+{"CreateMemoryDeltalist": 0.357, "CreateDiskDeltalist": 0.407, "DeltaDedup": 0.001, "CompressProc": 0.143}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 8, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 607388337, "CreateDiskDeltalist": 75453804, "DeltaDedup": 271739023, "CompressProc": 84931920}
+{"CreateMemoryDeltalist": 234605676, "CreateDiskDeltalist": 37133347, "DeltaDedup": 84755888, "CompressProc": 61161512}
+{"CreateMemoryDeltalist": 0.386253, "CreateDiskDeltalist": 0.492134, "DeltaDedup": 0.311902, "CompressProc": 0.720124}
+{"CreateMemoryDeltalist": 52.68, "CreateDiskDeltalist": 7.49, "DeltaDedup": 0.38, "CompressProc": 23.67}
+{"CreateMemoryDeltalist": "147891", "CreateDiskDeltalist": "18372", "DeltaDedup": "166263", "CompressProc": "166263"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1634.392637, "CompressProc": 510.828747}
+{"CreateMemoryDeltalist": 1586.341806, "CreateDiskDeltalist": 2021.192412, "DeltaDedup": 509.769991, "CompressProc": 367.860029}
+{"CreateMemoryDeltalist": 0.3862531789627465, "CreateDiskDeltalist": 0.4921335310445581, "DeltaDedup": 0.31190179119731315, "CompressProc": 0.7201239772827428}
+{"CreateMemoryDeltalist": 0.356, "CreateDiskDeltalist": 0.408, "DeltaDedup": 0.002, "CompressProc": 0.142}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 9, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "xdelta3", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "xdelta3"}
+{"CreateMemoryDeltalist": 608513655, "CreateDiskDeltalist": 75326487, "DeltaDedup": 272000229, "CompressProc": 85139263}
+{"CreateMemoryDeltalist": 234950922, "CreateDiskDeltalist": 37049307, "DeltaDedup": 84961229, "CompressProc": 61323840}
+{"CreateMemoryDeltalist": 0.386106, "CreateDiskDeltalist": 0.49185, "DeltaDedup": 0.312357, "CompressProc": 0.720277}
+{"CreateMemoryDeltalist": 53.04, "CreateDiskDeltalist": 7.49, "DeltaDedup": 0.34, "CompressProc": 23.62}
+{"CreateMemoryDeltalist": "148165", "CreateDiskDeltalist": "18341", "DeltaDedup": "166506", "CompressProc": "166506"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1633.576141, "CompressProc": 511.328499}
+{"CreateMemoryDeltalist": 1585.738346, "CreateDiskDeltalist": 2020.026553, "DeltaDedup": 510.259264, "CompressProc": 368.298079}
+{"CreateMemoryDeltalist": 0.38610624446067693, "CreateDiskDeltalist": 0.4918496598490382, "DeltaDedup": 0.3123571967007566, "CompressProc": 0.7202768469198897}
+{"CreateMemoryDeltalist": 0.358, "CreateDiskDeltalist": 0.408, "DeltaDedup": 0.002, "CompressProc": 0.142}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 1, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 609495228, "CreateDiskDeltalist": 75314166, "DeltaDedup": 262710868, "CompressProc": 77202483}
+{"CreateMemoryDeltalist": 232631924, "CreateDiskDeltalist": 30078944, "DeltaDedup": 77024891, "CompressProc": 72131486}
+{"CreateMemoryDeltalist": 0.38168, "CreateDiskDeltalist": 0.39938, "DeltaDedup": 0.293193, "CompressProc": 0.934316}
+{"CreateMemoryDeltalist": 191.68, "CreateDiskDeltalist": 23.31, "DeltaDedup": 0.4, "CompressProc": 2.74}
+{"CreateMemoryDeltalist": "148404", "CreateDiskDeltalist": "18338", "DeltaDedup": "166742", "CompressProc": "166742"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1575.553058, "CompressProc": 463.005619}
+{"CreateMemoryDeltalist": 1567.558314, "CreateDiskDeltalist": 1640.252154, "DeltaDedup": 461.940549, "CompressProc": 432.593384}
+{"CreateMemoryDeltalist": 0.3816796479181885, "CreateDiskDeltalist": 0.3993796333089847, "DeltaDedup": 0.2931926326787022, "CompressProc": 0.9343156243639453}
+{"CreateMemoryDeltalist": 1.292, "CreateDiskDeltalist": 1.271, "DeltaDedup": 0.002, "CompressProc": 0.016}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 2, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 607950996, "CreateDiskDeltalist": 75655047, "DeltaDedup": 262268077, "CompressProc": 77039160}
+{"CreateMemoryDeltalist": 232009506, "CreateDiskDeltalist": 30258571, "DeltaDedup": 76862636, "CompressProc": 71826587}
+{"CreateMemoryDeltalist": 0.381625, "CreateDiskDeltalist": 0.399954, "DeltaDedup": 0.293069, "CompressProc": 0.932339}
+{"CreateMemoryDeltalist": 191.42, "CreateDiskDeltalist": 23.52, "DeltaDedup": 0.33, "CompressProc": 2.73}
+{"CreateMemoryDeltalist": "148028", "CreateDiskDeltalist": "18421", "DeltaDedup": "166449", "CompressProc": "166449"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1575.666282, "CompressProc": 462.839428}
+{"CreateMemoryDeltalist": 1567.335274, "CreateDiskDeltalist": 1642.612833, "DeltaDedup": 461.778899, "CompressProc": 431.523091}
+{"CreateMemoryDeltalist": 0.38162534063793524, "CreateDiskDeltalist": 0.3999544273192111, "DeltaDedup": 0.29306897296416223, "CompressProc": 0.932338657630525}
+{"CreateMemoryDeltalist": 1.293, "CreateDiskDeltalist": 1.277, "DeltaDedup": 0.002, "CompressProc": 0.016}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 3, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 616920684, "CreateDiskDeltalist": 75322380, "DeltaDedup": 265290742, "CompressProc": 77805542}
+{"CreateMemoryDeltalist": 235232944, "CreateDiskDeltalist": 30057798, "DeltaDedup": 77622418, "CompressProc": 72354590}
+{"CreateMemoryDeltalist": 0.381302, "CreateDiskDeltalist": 0.399055, "DeltaDedup": 0.292594, "CompressProc": 0.929941}
+{"CreateMemoryDeltalist": 194.32, "CreateDiskDeltalist": 23.44, "DeltaDedup": 0.39, "CompressProc": 2.85}
+{"CreateMemoryDeltalist": "150212", "CreateDiskDeltalist": "18340", "DeltaDedup": "168552", "CompressProc": "168552"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1573.940042, "CompressProc": 461.611503}
+{"CreateMemoryDeltalist": 1566.006338, "CreateDiskDeltalist": 1638.920284, "DeltaDedup": 460.525049, "CompressProc": 429.271619}
+{"CreateMemoryDeltalist": 0.3813017623569515, "CreateDiskDeltalist": 0.39905534063793524, "DeltaDedup": 0.29259376895628914, "CompressProc": 0.9299413385718855}
+{"CreateMemoryDeltalist": 1.294, "CreateDiskDeltalist": 1.278, "DeltaDedup": 0.002, "CompressProc": 0.017}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 4, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 619836654, "CreateDiskDeltalist": 75618084, "DeltaDedup": 266663279, "CompressProc": 78195370}
+{"CreateMemoryDeltalist": 236433410, "CreateDiskDeltalist": 30229869, "DeltaDedup": 78007822, "CompressProc": 72594748}
+{"CreateMemoryDeltalist": 0.381445, "CreateDiskDeltalist": 0.39977, "DeltaDedup": 0.292533, "CompressProc": 0.928377}
+{"CreateMemoryDeltalist": 194.89, "CreateDiskDeltalist": 23.57, "DeltaDedup": 0.38, "CompressProc": 3.01}
+{"CreateMemoryDeltalist": "150922", "CreateDiskDeltalist": "18412", "DeltaDedup": "169334", "CompressProc": "169334"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1574.776944, "CompressProc": 461.781863}
+{"CreateMemoryDeltalist": 1566.593406, "CreateDiskDeltalist": 1641.856887, "DeltaDedup": 460.6743, "CompressProc": 428.707454}
+{"CreateMemoryDeltalist": 0.38144470562454347, "CreateDiskDeltalist": 0.39977036449963477, "DeltaDedup": 0.2925330484137441, "CompressProc": 0.9283765525455469}
+{"CreateMemoryDeltalist": 1.291, "CreateDiskDeltalist": 1.28, "DeltaDedup": 0.002, "CompressProc": 0.018}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 5, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 606336945, "CreateDiskDeltalist": 75277203, "DeltaDedup": 261495852, "CompressProc": 77173573}
+{"CreateMemoryDeltalist": 231446466, "CreateDiskDeltalist": 30049386, "DeltaDedup": 76998023, "CompressProc": 71455825}
+{"CreateMemoryDeltalist": 0.381713, "CreateDiskDeltalist": 0.399183, "DeltaDedup": 0.294452, "CompressProc": 0.925911}
+{"CreateMemoryDeltalist": 190.81, "CreateDiskDeltalist": 23.3, "DeltaDedup": 0.44, "CompressProc": 3.02}
+{"CreateMemoryDeltalist": "147635", "CreateDiskDeltalist": "18329", "DeltaDedup": "165964", "CompressProc": "165964"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1575.617917, "CompressProc": 465.001886}
+{"CreateMemoryDeltalist": 1567.693745, "CreateDiskDeltalist": 1639.444923, "DeltaDedup": 463.944126, "CompressProc": 430.550149}
+{"CreateMemoryDeltalist": 0.38171262356951546, "CreateDiskDeltalist": 0.39918308327246166, "DeltaDedup": 0.2944521771390849, "CompressProc": 0.9259105435112148}
+{"CreateMemoryDeltalist": 1.292, "CreateDiskDeltalist": 1.271, "DeltaDedup": 0.003, "CompressProc": 0.018}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 6, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 609367911, "CreateDiskDeltalist": 75310059, "DeltaDedup": 262483431, "CompressProc": 77575561}
+{"CreateMemoryDeltalist": 232440022, "CreateDiskDeltalist": 30043409, "DeltaDedup": 77396397, "CompressProc": 71749050}
+{"CreateMemoryDeltalist": 0.381444, "CreateDiskDeltalist": 0.39893, "DeltaDedup": 0.294862, "CompressProc": 0.924892}
+{"CreateMemoryDeltalist": 191.46, "CreateDiskDeltalist": 23.47, "DeltaDedup": 0.41, "CompressProc": 3.15}
+{"CreateMemoryDeltalist": "148373", "CreateDiskDeltalist": "18337", "DeltaDedup": "166710", "CompressProc": "166710"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1574.491218, "CompressProc": 465.33238}
+{"CreateMemoryDeltalist": 1566.592453, "CreateDiskDeltalist": 1638.403719, "DeltaDedup": 464.257675, "CompressProc": 430.382401}
+{"CreateMemoryDeltalist": 0.3814444735816898, "CreateDiskDeltalist": 0.39892956391526657, "DeltaDedup": 0.2948620288843047, "CompressProc": 0.9248924413985548}
+{"CreateMemoryDeltalist": 1.29, "CreateDiskDeltalist": 1.28, "DeltaDedup": 0.002, "CompressProc": 0.019}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 7, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 611335164, "CreateDiskDeltalist": 75486660, "DeltaDedup": 263277642, "CompressProc": 77583828}
+{"CreateMemoryDeltalist": 233207380, "CreateDiskDeltalist": 30070262, "DeltaDedup": 77403924, "CompressProc": 71740209}
+{"CreateMemoryDeltalist": 0.381472, "CreateDiskDeltalist": 0.398352, "DeltaDedup": 0.294001, "CompressProc": 0.92468}
+{"CreateMemoryDeltalist": 192.25, "CreateDiskDeltalist": 23.37, "DeltaDedup": 0.36, "CompressProc": 3.29}
+{"CreateMemoryDeltalist": "148852", "CreateDiskDeltalist": "18380", "DeltaDedup": "167232", "CompressProc": "167232"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1574.325739, "CompressProc": 463.92932}
+{"CreateMemoryDeltalist": 1566.706393, "CreateDiskDeltalist": 1636.031665, "DeltaDedup": 462.853545, "CompressProc": 428.986133}
+{"CreateMemoryDeltalist": 0.3814722164597029, "CreateDiskDeltalist": 0.3983520002434867, "DeltaDedup": 0.2940011292034145, "CompressProc": 0.92467993400374}
+{"CreateMemoryDeltalist": 1.292, "CreateDiskDeltalist": 1.271, "DeltaDedup": 0.002, "CompressProc": 0.02}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 8, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 609281664, "CreateDiskDeltalist": 75453804, "DeltaDedup": 262665054, "CompressProc": 77580362}
+{"CreateMemoryDeltalist": 232552579, "CreateDiskDeltalist": 30112475, "DeltaDedup": 77400546, "CompressProc": 71693235}
+{"CreateMemoryDeltalist": 0.381683, "CreateDiskDeltalist": 0.399085, "DeltaDedup": 0.294674, "CompressProc": 0.924116}
+{"CreateMemoryDeltalist": 191.88, "CreateDiskDeltalist": 23.43, "DeltaDedup": 0.3, "CompressProc": 3.87}
+{"CreateMemoryDeltalist": "148352", "CreateDiskDeltalist": "18372", "DeltaDedup": "166724", "CompressProc": "166724"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1575.44837, "CompressProc": 465.322101}
+{"CreateMemoryDeltalist": 1567.572928, "CreateDiskDeltalist": 1639.041748, "DeltaDedup": 464.243576, "CompressProc": 430.011486}
+{"CreateMemoryDeltalist": 0.3816832062332603, "CreateDiskDeltalist": 0.3990849155101047, "DeltaDedup": 0.2946739384420449, "CompressProc": 0.9241157578285757}
+{"CreateMemoryDeltalist": 1.293, "CreateDiskDeltalist": 1.275, "DeltaDedup": 0.002, "CompressProc": 0.023}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 3, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 9, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 613548837, "CreateDiskDeltalist": 75527730, "DeltaDedup": 264053735, "CompressProc": 77555966}
+{"CreateMemoryDeltalist": 233945972, "CreateDiskDeltalist": 30107763, "DeltaDedup": 77374794, "CompressProc": 71679621}
+{"CreateMemoryDeltalist": 0.3813, "CreateDiskDeltalist": 0.398632, "DeltaDedup": 0.293027, "CompressProc": 0.924231}
+{"CreateMemoryDeltalist": 192.91, "CreateDiskDeltalist": 23.43, "DeltaDedup": 0.35, "CompressProc": 3.94}
+{"CreateMemoryDeltalist": "149391", "CreateDiskDeltalist": "18390", "DeltaDedup": "167781", "CompressProc": "167781"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1573.799983, "CompressProc": 462.245224}
+{"CreateMemoryDeltalist": 1565.997764, "CreateDiskDeltalist": 1637.18124, "DeltaDedup": 461.165412, "CompressProc": 427.221324}
+{"CreateMemoryDeltalist": 0.38129967470172876, "CreateDiskDeltalist": 0.39863190650109565, "DeltaDedup": 0.29302669778971524, "CompressProc": 0.9242309099552751}
+{"CreateMemoryDeltalist": 1.291, "CreateDiskDeltalist": 1.274, "DeltaDedup": 0.002, "CompressProc": 0.023}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 1, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 607831893, "CreateDiskDeltalist": 75425055, "DeltaDedup": 261983948, "CompressProc": 77715007}
+{"CreateMemoryDeltalist": 231877868, "CreateDiskDeltalist": 30106080, "DeltaDedup": 77535489, "CompressProc": 72355880}
+{"CreateMemoryDeltalist": 0.381484, "CreateDiskDeltalist": 0.399152, "DeltaDedup": 0.295955, "CompressProc": 0.931041}
+{"CreateMemoryDeltalist": 191.05, "CreateDiskDeltalist": 23.42, "DeltaDedup": 0.34, "CompressProc": 10.09}
+{"CreateMemoryDeltalist": "147999", "CreateDiskDeltalist": "18365", "DeltaDedup": "166364", "CompressProc": "166364"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1574.763458, "CompressProc": 467.138365}
+{"CreateMemoryDeltalist": 1566.752938, "CreateDiskDeltalist": 1639.318268, "DeltaDedup": 466.059298, "CompressProc": 434.925104}
+{"CreateMemoryDeltalist": 0.38148354954954955, "CreateDiskDeltalist": 0.3991522444606769, "DeltaDedup": 0.29595511353299386, "CompressProc": 0.9310412858083278}
+{"CreateMemoryDeltalist": 1.291, "CreateDiskDeltalist": 1.275, "DeltaDedup": 0.002, "CompressProc": 0.061}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 2, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 603363477, "CreateDiskDeltalist": 73260666, "DeltaDedup": 259805863, "CompressProc": 77037236}
+{"CreateMemoryDeltalist": 230488067, "CreateDiskDeltalist": 29317796, "DeltaDedup": 76863232, "CompressProc": 71266216}
+{"CreateMemoryDeltalist": 0.382005, "CreateDiskDeltalist": 0.400185, "DeltaDedup": 0.295849, "CompressProc": 0.925088}
+{"CreateMemoryDeltalist": 190.08, "CreateDiskDeltalist": 22.68, "DeltaDedup": 0.29, "CompressProc": 9.73}
+{"CreateMemoryDeltalist": "146911", "CreateDiskDeltalist": "17838", "DeltaDedup": "164749", "CompressProc": "164749"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1576.979909, "CompressProc": 467.603664}
+{"CreateMemoryDeltalist": 1568.89591, "CreateDiskDeltalist": 1643.558471, "DeltaDedup": 466.547487, "CompressProc": 432.574498}
+{"CreateMemoryDeltalist": 0.3820053347942537, "CreateDiskDeltalist": 0.4001846776235695, "DeltaDedup": 0.2958487196554386, "CompressProc": 0.9250879137679298}
+{"CreateMemoryDeltalist": 1.294, "CreateDiskDeltalist": 1.271, "DeltaDedup": 0.002, "CompressProc": 0.059}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 3, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 613294203, "CreateDiskDeltalist": 75326487, "DeltaDedup": 263911649, "CompressProc": 77358698}
+{"CreateMemoryDeltalist": 233865291, "CreateDiskDeltalist": 30046358, "DeltaDedup": 77181466, "CompressProc": 71285205}
+{"CreateMemoryDeltalist": 0.381326, "CreateDiskDeltalist": 0.398882, "DeltaDedup": 0.292452, "CompressProc": 0.921489}
+{"CreateMemoryDeltalist": 193.26, "CreateDiskDeltalist": 23.38, "DeltaDedup": 0.26, "CompressProc": 9.77}
+{"CreateMemoryDeltalist": "149329", "CreateDiskDeltalist": "18341", "DeltaDedup": "167670", "CompressProc": "167670"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1573.994447, "CompressProc": 461.374712}
+{"CreateMemoryDeltalist": 1566.107662, "CreateDiskDeltalist": 1638.207186, "DeltaDedup": 460.317684, "CompressProc": 425.151816}
+{"CreateMemoryDeltalist": 0.38132643340637934, "CreateDiskDeltalist": 0.3988817107377648, "DeltaDedup": 0.2924519110454015, "CompressProc": 0.9214892037689313}
+{"CreateMemoryDeltalist": 1.294, "CreateDiskDeltalist": 1.275, "DeltaDedup": 0.002, "CompressProc": 0.058}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 4, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 613244919, "CreateDiskDeltalist": 75310059, "DeltaDedup": 263758689, "CompressProc": 77807241}
+{"CreateMemoryDeltalist": 233716541, "CreateDiskDeltalist": 30042148, "DeltaDedup": 77625007, "CompressProc": 71570108}
+{"CreateMemoryDeltalist": 0.381115, "CreateDiskDeltalist": 0.398913, "DeltaDedup": 0.294303, "CompressProc": 0.919839}
+{"CreateMemoryDeltalist": 192.73, "CreateDiskDeltalist": 23.33, "DeltaDedup": 0.42, "CompressProc": 9.83}
+{"CreateMemoryDeltalist": "149317", "CreateDiskDeltalist": "18337", "DeltaDedup": "167654", "CompressProc": "167654"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1573.232306, "CompressProc": 464.094152}
+{"CreateMemoryDeltalist": 1565.237321, "CreateDiskDeltalist": 1638.334951, "DeltaDedup": 463.007187, "CompressProc": 426.891741}
+{"CreateMemoryDeltalist": 0.38111451692232773, "CreateDiskDeltalist": 0.39891281981981985, "DeltaDedup": 0.29430312690260757, "CompressProc": 0.9198386559285927}
+{"CreateMemoryDeltalist": 1.291, "CreateDiskDeltalist": 1.272, "DeltaDedup": 0.003, "CompressProc": 0.059}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 5, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 607987959, "CreateDiskDeltalist": 75540051, "DeltaDedup": 262218840, "CompressProc": 77484343}
+{"CreateMemoryDeltalist": 232004767, "CreateDiskDeltalist": 30214073, "DeltaDedup": 77305719, "CompressProc": 71159410}
+{"CreateMemoryDeltalist": 0.381594, "CreateDiskDeltalist": 0.399974, "DeltaDedup": 0.294814, "CompressProc": 0.918371}
+{"CreateMemoryDeltalist": 191.23, "CreateDiskDeltalist": 23.41, "DeltaDedup": 0.34, "CompressProc": 9.76}
+{"CreateMemoryDeltalist": "148037", "CreateDiskDeltalist": "18393", "DeltaDedup": "166430", "CompressProc": "166430"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1575.550321, "CompressProc": 465.567163}
+{"CreateMemoryDeltalist": 1567.207975, "CreateDiskDeltalist": 1642.694123, "DeltaDedup": 464.493895, "CompressProc": 427.5636}
+{"CreateMemoryDeltalist": 0.3815943450206964, "CreateDiskDeltalist": 0.39997422035549063, "DeltaDedup": 0.29481374781174, "CompressProc": 0.9183714702834401}
+{"CreateMemoryDeltalist": 1.292, "CreateDiskDeltalist": 1.273, "DeltaDedup": 0.002, "CompressProc": 0.059}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 6, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 608041350, "CreateDiskDeltalist": 75572907, "DeltaDedup": 262178510, "CompressProc": 77496122}
+{"CreateMemoryDeltalist": 232025073, "CreateDiskDeltalist": 30153437, "DeltaDedup": 77317668, "CompressProc": 71088533}
+{"CreateMemoryDeltalist": 0.381594, "CreateDiskDeltalist": 0.398998, "DeltaDedup": 0.294905, "CompressProc": 0.917317}
+{"CreateMemoryDeltalist": 191.45, "CreateDiskDeltalist": 23.52, "DeltaDedup": 0.33, "CompressProc": 9.78}
+{"CreateMemoryDeltalist": "148050", "CreateDiskDeltalist": "18401", "DeltaDedup": "166451", "CompressProc": "166451"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1575.109251, "CompressProc": 465.579191}
+{"CreateMemoryDeltalist": 1567.207518, "CreateDiskDeltalist": 1638.684691, "DeltaDedup": 464.50708, "CompressProc": 427.083844}
+{"CreateMemoryDeltalist": 0.38159423374726076, "CreateDiskDeltalist": 0.39899797686876065, "DeltaDedup": 0.2949046738853799, "CompressProc": 0.9173172947929282}
+{"CreateMemoryDeltalist": 1.293, "CreateDiskDeltalist": 1.278, "DeltaDedup": 0.002, "CompressProc": 0.059}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 7, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 610476801, "CreateDiskDeltalist": 73478337, "DeltaDedup": 262721628, "CompressProc": 76233034}
+{"CreateMemoryDeltalist": 233269371, "CreateDiskDeltalist": 29452257, "DeltaDedup": 76062502, "CompressProc": 69808576}
+{"CreateMemoryDeltalist": 0.38211, "CreateDiskDeltalist": 0.400829, "DeltaDedup": 0.289517, "CompressProc": 0.915726}
+{"CreateMemoryDeltalist": 192.36, "CreateDiskDeltalist": 22.74, "DeltaDedup": 0.29, "CompressProc": 9.69}
+{"CreateMemoryDeltalist": "148643", "CreateDiskDeltalist": "17891", "DeltaDedup": "166534", "CompressProc": "166534"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1577.585526, "CompressProc": 457.762583}
+{"CreateMemoryDeltalist": 1569.326312, "CreateDiskDeltalist": 1646.205187, "DeltaDedup": 456.738576, "CompressProc": 419.185127}
+{"CreateMemoryDeltalist": 0.38211013196980764, "CreateDiskDeltalist": 0.4008291178475773, "DeltaDedup": 0.2895174736789516, "CompressProc": 0.9157260609917521}
+{"CreateMemoryDeltalist": 1.294, "CreateDiskDeltalist": 1.271, "DeltaDedup": 0.002, "CompressProc": 0.058}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 8, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 610768398, "CreateDiskDeltalist": 75326487, "DeltaDedup": 263026335, "CompressProc": 77801496}
+{"CreateMemoryDeltalist": 232990158, "CreateDiskDeltalist": 30036177, "DeltaDedup": 77620902, "CompressProc": 71228722}
+{"CreateMemoryDeltalist": 0.381471, "CreateDiskDeltalist": 0.398747, "DeltaDedup": 0.295107, "CompressProc": 0.915519}
+{"CreateMemoryDeltalist": 192.09, "CreateDiskDeltalist": 23.39, "DeltaDedup": 0.26, "CompressProc": 9.84}
+{"CreateMemoryDeltalist": "148714", "CreateDiskDeltalist": "18341", "DeltaDedup": "167055", "CompressProc": "167055"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1574.48945, "CompressProc": 465.723839}
+{"CreateMemoryDeltalist": 1566.699558, "CreateDiskDeltalist": 1637.652091, "DeltaDedup": 464.642794, "CompressProc": 426.378869}
+{"CreateMemoryDeltalist": 0.3814705522279036, "CreateDiskDeltalist": 0.3987465524713903, "DeltaDedup": 0.29510695927495734, "CompressProc": 0.9155186685644409}
+{"CreateMemoryDeltalist": 1.292, "CreateDiskDeltalist": 1.275, "DeltaDedup": 0.002, "CompressProc": 0.059}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 2, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 9, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 615462699, "CreateDiskDeltalist": 75240240, "DeltaDedup": 264818646, "CompressProc": 77893401}
+{"CreateMemoryDeltalist": 234756987, "CreateDiskDeltalist": 30061659, "DeltaDedup": 77709699, "CompressProc": 71280958}
+{"CreateMemoryDeltalist": 0.381432, "CreateDiskDeltalist": 0.399542, "DeltaDedup": 0.293445, "CompressProc": 0.915109}
+{"CreateMemoryDeltalist": 193.96, "CreateDiskDeltalist": 23.39, "DeltaDedup": 0.35, "CompressProc": 9.95}
+{"CreateMemoryDeltalist": "149857", "CreateDiskDeltalist": "18320", "DeltaDedup": "168177", "CompressProc": "168177"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1574.642466, "CompressProc": 463.163221}
+{"CreateMemoryDeltalist": 1566.540015, "CreateDiskDeltalist": 1640.920251, "DeltaDedup": 462.070907, "CompressProc": 423.844866}
+{"CreateMemoryDeltalist": 0.3814317056245435, "CreateDiskDeltalist": 0.3995423060628196, "DeltaDedup": 0.2934449673352071, "CompressProc": 0.9151090733951002}
+{"CreateMemoryDeltalist": 1.294, "CreateDiskDeltalist": 1.277, "DeltaDedup": 0.002, "CompressProc": 0.059}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 1, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 601330512, "CreateDiskDeltalist": 75486660, "DeltaDedup": 259761983, "CompressProc": 76712216}
+{"CreateMemoryDeltalist": 229589867, "CreateDiskDeltalist": 30172116, "DeltaDedup": 76540104, "CompressProc": 70037584}
+{"CreateMemoryDeltalist": 0.381803, "CreateDiskDeltalist": 0.399701, "DeltaDedup": 0.294655, "CompressProc": 0.912991}
+{"CreateMemoryDeltalist": 189.51, "CreateDiskDeltalist": 23.49, "DeltaDedup": 0.41, "CompressProc": 13.74}
+{"CreateMemoryDeltalist": "146416", "CreateDiskDeltalist": "18380", "DeltaDedup": "164796", "CompressProc": "164796"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1576.263884, "CompressProc": 465.498046}
+{"CreateMemoryDeltalist": 1568.065423, "CreateDiskDeltalist": 1641.573232, "DeltaDedup": 464.453652, "CompressProc": 424.995655}
+{"CreateMemoryDeltalist": 0.38180312223033847, "CreateDiskDeltalist": 0.39970129827124423, "DeltaDedup": 0.29465475718531403, "CompressProc": 0.9129912760149373}
+{"CreateMemoryDeltalist": 1.294, "CreateDiskDeltalist": 1.278, "DeltaDedup": 0.002, "CompressProc": 0.083}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 2, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 607511547, "CreateDiskDeltalist": 75478446, "DeltaDedup": 261999921, "CompressProc": 77090434}
+{"CreateMemoryDeltalist": 231869341, "CreateDiskDeltalist": 30130580, "DeltaDedup": 76914690, "CompressProc": 70267760}
+{"CreateMemoryDeltalist": 0.381671, "CreateDiskDeltalist": 0.399194, "DeltaDedup": 0.293568, "CompressProc": 0.911498}
+{"CreateMemoryDeltalist": 191.48, "CreateDiskDeltalist": 23.49, "DeltaDedup": 0.29, "CompressProc": 15.25}
+{"CreateMemoryDeltalist": "147921", "CreateDiskDeltalist": "18378", "DeltaDedup": "166299", "CompressProc": "166299"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1575.475024, "CompressProc": 463.565229}
+{"CreateMemoryDeltalist": 1567.521454, "CreateDiskDeltalist": 1639.491784, "DeltaDedup": 462.508434, "CompressProc": 422.53868}
+{"CreateMemoryDeltalist": 0.38167067299732166, "CreateDiskDeltalist": 0.39919449330411494, "DeltaDedup": 0.2935676078353369, "CompressProc": 0.9114977862155403}
+{"CreateMemoryDeltalist": 1.294, "CreateDiskDeltalist": 1.278, "DeltaDedup": 0.002, "CompressProc": 0.092}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 3, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 612099066, "CreateDiskDeltalist": 75556479, "DeltaDedup": 263801779, "CompressProc": 78288352}
+{"CreateMemoryDeltalist": 233580029, "CreateDiskDeltalist": 30221750, "DeltaDedup": 78103574, "CompressProc": 71352984}
+{"CreateMemoryDeltalist": 0.381605, "CreateDiskDeltalist": 0.399989, "DeltaDedup": 0.296069, "CompressProc": 0.911413}
+{"CreateMemoryDeltalist": 192.23, "CreateDiskDeltalist": 23.45, "DeltaDedup": 0.42, "CompressProc": 15.06}
+{"CreateMemoryDeltalist": "149038", "CreateDiskDeltalist": "18397", "DeltaDedup": "167435", "CompressProc": "167435"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1575.5474, "CompressProc": 467.574593}
+{"CreateMemoryDeltalist": 1567.2515, "CreateDiskDeltalist": 1642.754253, "DeltaDedup": 466.471013, "CompressProc": 426.153337}
+{"CreateMemoryDeltalist": 0.38160494278061846, "CreateDiskDeltalist": 0.39998886121256394, "DeltaDedup": 0.2960691712607314, "CompressProc": 0.9114125176600433}
+{"CreateMemoryDeltalist": 1.29, "CreateDiskDeltalist": 1.275, "DeltaDedup": 0.003, "CompressProc": 0.09}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 4, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 616756404, "CreateDiskDeltalist": 75683796, "DeltaDedup": 265315865, "CompressProc": 78361661}
+{"CreateMemoryDeltalist": 235160231, "CreateDiskDeltalist": 30155634, "DeltaDedup": 78178955, "CompressProc": 71036364}
+{"CreateMemoryDeltalist": 0.381285, "CreateDiskDeltalist": 0.398442, "DeltaDedup": 0.294664, "CompressProc": 0.906519}
+{"CreateMemoryDeltalist": 194.22, "CreateDiskDeltalist": 23.49, "DeltaDedup": 0.36, "CompressProc": 18.47}
+{"CreateMemoryDeltalist": "150172", "CreateDiskDeltalist": "18428", "DeltaDedup": "168600", "CompressProc": "168600"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1573.640955, "CompressProc": 464.778535}
+{"CreateMemoryDeltalist": 1565.939263, "CreateDiskDeltalist": 1636.402974, "DeltaDedup": 463.69487, "CompressProc": 421.330747}
+{"CreateMemoryDeltalist": 0.3812854304845386, "CreateDiskDeltalist": 0.3984424090577064, "DeltaDedup": 0.2946637023691341, "CompressProc": 0.9065193748674302}
+{"CreateMemoryDeltalist": 1.293, "CreateDiskDeltalist": 1.275, "DeltaDedup": 0.002, "CompressProc": 0.11}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 5, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 622329603, "CreateDiskDeltalist": 75540051, "DeltaDedup": 267026507, "CompressProc": 79432589}
+{"CreateMemoryDeltalist": 236952467, "CreateDiskDeltalist": 30074040, "DeltaDedup": 79240581, "CompressProc": 71912568}
+{"CreateMemoryDeltalist": 0.380751, "CreateDiskDeltalist": 0.39812, "DeltaDedup": 0.296752, "CompressProc": 0.905328}
+{"CreateMemoryDeltalist": 195.84, "CreateDiskDeltalist": 23.45, "DeltaDedup": 0.38, "CompressProc": 18.3}
+{"CreateMemoryDeltalist": "151529", "CreateDiskDeltalist": "18393", "DeltaDedup": "169922", "CompressProc": "169922"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1571.465184, "CompressProc": 467.465007}
+{"CreateMemoryDeltalist": 1563.743356, "CreateDiskDeltalist": 1635.080737, "DeltaDedup": 466.33503, "CompressProc": 423.209284}
+{"CreateMemoryDeltalist": 0.3807507562697833, "CreateDiskDeltalist": 0.39812046189432676, "DeltaDedup": 0.29675174146269856, "CompressProc": 0.9053282655657688}
+{"CreateMemoryDeltalist": 1.292, "CreateDiskDeltalist": 1.275, "DeltaDedup": 0.002, "CompressProc": 0.108}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 6, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 611647296, "CreateDiskDeltalist": 75556479, "DeltaDedup": 263555930, "CompressProc": 78209107}
+{"CreateMemoryDeltalist": 233366226, "CreateDiskDeltalist": 30189704, "DeltaDedup": 78025209, "CompressProc": 70802676}
+{"CreateMemoryDeltalist": 0.381537, "CreateDiskDeltalist": 0.399565, "DeltaDedup": 0.296048, "CompressProc": 0.9053}
+{"CreateMemoryDeltalist": 192.73, "CreateDiskDeltalist": 23.5, "DeltaDedup": 0.36, "CompressProc": 18.27}
+{"CreateMemoryDeltalist": "148928", "CreateDiskDeltalist": "18397", "DeltaDedup": "167325", "CompressProc": "167325"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1575.11388, "CompressProc": 467.408379}
+{"CreateMemoryDeltalist": 1566.973477, "CreateDiskDeltalist": 1641.012339, "DeltaDedup": 466.309332, "CompressProc": 423.144635}
+{"CreateMemoryDeltalist": 0.3815372478694911, "CreateDiskDeltalist": 0.3995647282688094, "DeltaDedup": 0.296048011461876, "CompressProc": 0.905299635204015}
+{"CreateMemoryDeltalist": 1.294, "CreateDiskDeltalist": 1.277, "DeltaDedup": 0.002, "CompressProc": 0.109}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 7, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 616575696, "CreateDiskDeltalist": 75338808, "DeltaDedup": 265343452, "CompressProc": 77961857}
+{"CreateMemoryDeltalist": 235288914, "CreateDiskDeltalist": 30054538, "DeltaDedup": 77780953, "CompressProc": 70551096}
+{"CreateMemoryDeltalist": 0.381606, "CreateDiskDeltalist": 0.398925, "DeltaDedup": 0.293133, "CompressProc": 0.904944}
+{"CreateMemoryDeltalist": 194.29, "CreateDiskDeltalist": 23.44, "DeltaDedup": 0.31, "CompressProc": 18.22}
+{"CreateMemoryDeltalist": "150128", "CreateDiskDeltalist": "18344", "DeltaDedup": "168472", "CompressProc": "168472"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1575.000309, "CompressProc": 462.758541}
+{"CreateMemoryDeltalist": 1567.255369, "CreateDiskDeltalist": 1638.385194, "DeltaDedup": 461.684749, "CompressProc": 418.770454}
+{"CreateMemoryDeltalist": 0.38160588483077673, "CreateDiskDeltalist": 0.39892505332359385, "DeltaDedup": 0.2931331164583283, "CompressProc": 0.9049437598602853}
+{"CreateMemoryDeltalist": 1.294, "CreateDiskDeltalist": 1.278, "DeltaDedup": 0.002, "CompressProc": 0.108}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 8, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 619401312, "CreateDiskDeltalist": 75757722, "DeltaDedup": 266440623, "CompressProc": 79313311}
+{"CreateMemoryDeltalist": 236207563, "CreateDiskDeltalist": 30233060, "DeltaDedup": 79121777, "CompressProc": 71791064}
+{"CreateMemoryDeltalist": 0.381348, "CreateDiskDeltalist": 0.399076, "DeltaDedup": 0.296958, "CompressProc": 0.905158}
+{"CreateMemoryDeltalist": 194.58, "CreateDiskDeltalist": 23.52, "DeltaDedup": 0.44, "CompressProc": 18.22}
+{"CreateMemoryDeltalist": "150816", "CreateDiskDeltalist": "18446", "DeltaDedup": "169262", "CompressProc": "169262"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1574.131364, "CompressProc": 468.58309}
+{"CreateMemoryDeltalist": 1566.196975, "CreateDiskDeltalist": 1639.003578, "DeltaDedup": 467.451507, "CompressProc": 424.14165}
+{"CreateMemoryDeltalist": 0.38134817993669345, "CreateDiskDeltalist": 0.39907562162162163, "DeltaDedup": 0.29695838459896157, "CompressProc": 0.9051578237703798}
+{"CreateMemoryDeltalist": 1.29, "CreateDiskDeltalist": 1.275, "DeltaDedup": 0.003, "CompressProc": 0.108}
+face-overlay.zip
+{"OPTIMIZATION_DEDUP_BASE_DISK": true, "OPTIMIZATION_DEDUP_BASE_MEMORY": true, "OPTIMIZATION_DEDUP_BASE_SELF": true, "QUEUE_SIZE_MEMORY_DELTA_LIST": 4, "COMPRESSION_ALGORITHM_TYPE": 1, "PROCESS_PIPELINED": true, "COMPRESSION_ALGORITHM_SPEED": 9, "QUEUE_SIZE_OPTIMIZATION": 4, "DISK_DIFF_ALGORITHM": "bsdiff", "QUEUE_SIZE_DISK_DELTA_LIST": 4, "QUEUE_SIZE_MEMORY_SNAPSHOT": -1, "QUEUE_SIZE_COMPRESSION": 4, "MEMORY_DIFF_ALGORITHM": "bsdiff"}
+{"CreateMemoryDeltalist": 621771051, "CreateDiskDeltalist": 76073961, "DeltaDedup": 267203057, "CompressProc": 79016813}
+{"CreateMemoryDeltalist": 236915145, "CreateDiskDeltalist": 30287912, "DeltaDedup": 78828239, "CompressProc": 71526316}
+{"CreateMemoryDeltalist": 0.381033, "CreateDiskDeltalist": 0.398138, "DeltaDedup": 0.295012, "CompressProc": 0.905204}
+{"CreateMemoryDeltalist": 195.81, "CreateDiskDeltalist": 23.62, "DeltaDedup": 0.45, "CompressProc": 18.18}
+{"CreateMemoryDeltalist": "151393", "CreateDiskDeltalist": "18523", "DeltaDedup": "169916", "CompressProc": "169916"}
+{"CreateMemoryDeltalist": 4107.0, "CreateDiskDeltalist": 4107.0, "DeltaDedup": 1572.559718, "CompressProc": 465.034564}
+{"CreateMemoryDeltalist": 1564.901581, "CreateDiskDeltalist": 1635.151541, "DeltaDedup": 463.924757, "CompressProc": 420.951035}
+{"CreateMemoryDeltalist": 0.38103276868760655, "CreateDiskDeltalist": 0.3981377017287558, "DeltaDedup": 0.29501248931266344, "CompressProc": 0.9052037581447386}
+{"CreateMemoryDeltalist": 1.293, "CreateDiskDeltalist": 1.275, "DeltaDedup": 0.003, "CompressProc": 0.107}
