@@ -978,18 +978,14 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
         disk_chunks = each_file[Const.META_OVERLAY_FILE_DISK_CHUNKS]
         memory_chunks_all.update(set(memory_chunks))
         disk_chunks_all.update(set(disk_chunks))
-    memory_chunk_str = ["%ld:0" % item for item in memory_chunks_all]
-    disk_chunk_str = ["%ld:0" % item for item in disk_chunks_all]
-    memory_overlay_map = ','.join(memory_chunk_str)
-    disk_overlay_map = ','.join(disk_chunk_str)
 
     # make FUSE disk & memory
     kwargs['meta_info'] = meta_info
     time_start_fuse = time()
     fuse = run_fuse(Const.CLOUDLETFS_PATH, Const.CHUNK_SIZE,
             base_image, vm_disk_size, base_mem, vm_memory_size,
-            resumed_disk=launch_disk.name,  disk_overlay_map=disk_overlay_map,
-            resumed_memory=launch_mem.name, memory_overlay_map=memory_overlay_map,
+            resumed_disk=launch_disk.name,  disk_chunks=disk_chunks_all,
+            resumed_memory=launch_mem.name, memory_chunks=memory_chunks_all,
             **kwargs)
     LOG.info("Start FUSE (%f s)" % (time()-time_start_fuse))
     LOG.debug("Overlay has %ld chunks" % (len(memory_chunks_all) + len(disk_chunks_all)))
@@ -1002,9 +998,7 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
                                        launch_mem.name, vm_memory_size,
                                        launch_disk.name, vm_disk_size,
                                        Const.CHUNK_SIZE,
-                                       out_pipename=named_pipename,
-                                       modified_disk_chunks=disk_chunks_all,
-                                       modified_memory_chunks=memory_chunks_all)
+                                       out_pipename=named_pipename)
 
     fuse_thread = cloudletfs.FuseFeedingProc(fuse,
             named_pipename, delta.Recovered_delta.END_OF_PIPE)
@@ -1013,8 +1007,8 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
 
 def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
         original_memory, fuse_memory_size,
-        resumed_disk=None, disk_overlay_map=None,
-        resumed_memory=None, memory_overlay_map=None,
+        resumed_disk=None, disk_chunks=None,
+        resumed_memory=None, memory_chunks=None,
         **kwargs):
     if fuse_disk_size <= 0:
         raise CloudletGenerationError("FUSE disk size should be bigger than 0")
@@ -1024,16 +1018,14 @@ def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
     # run fuse file system
     resumed_disk = os.path.abspath(resumed_disk) if resumed_disk else ""
     resumed_memory = os.path.abspath(resumed_memory) if resumed_memory else ""
-    disk_overlay_map = str(disk_overlay_map) if disk_overlay_map else ""
-    memory_overlay_map = str(memory_overlay_map) if memory_overlay_map else ""
-
-    # save overlay maps to files and pass file paths
-    #disk_overlay_path = NamedTemporaryFile(prefix="cloudletfs-disk-overlaymap-", delete=True)
-    #LOG.debug("write disk overlay map info to %s" % disk_overlay_path.name)
-    #open(disk_overlay_path.name, "w+").write(disk_overlay_map)
-    #memory_overlay_path = NamedTemporaryFile(prefix="cloudletfs-memory-overlaymap-", delete=True)
-    #LOG.debug("write memory overlay map info to %s" % memory_overlay_path.name)
-    #open(memory_overlay_path.name, "w+").write(memory_overlay_map)
+    disk_overlay_map = ''
+    memory_overlay_map = ''
+    if disk_chunks:
+        disk_chunk_str = ["%ld:0" % item for item in disk_chunks]
+        disk_overlay_map = ','.join(disk_chunk_str)
+    if memory_chunks:
+        memory_chunk_str = ["%ld:0" % item for item in memory_chunks]
+        memory_overlay_map = ','.join(memory_chunk_str)
 
     # launch fuse
     execute_args = [
@@ -1054,7 +1046,10 @@ def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
                 ]:
             execute_args.append(parameter)
 
-    fuse_process = cloudletfs.CloudletFS(bin_path, execute_args, **kwargs)
+    fuse_process = cloudletfs.CloudletFS(bin_path, execute_args,
+                                         modified_disk_chunks=disk_chunks,
+                                         modified_memory_chunks=memory_chunks,
+                                         **kwargs)
     fuse_process.launch()
     fuse_process.start()
     return fuse_process
@@ -1762,7 +1757,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
                                              preload_thread.basemem_hashdict,
                                              synthesized_VM,
                                              options,
-                                             delta_proc.modified_disk_chunks,
+                                             fuse.modified_disk_chunks,
                                              return_residue,
                                              overlay_mode=overlay_mode)
             if residue_overlay is not None:

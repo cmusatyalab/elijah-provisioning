@@ -45,13 +45,15 @@ class CloudletFS(threading.Thread):
     FUSE_TYPE_DISK      =   "disk"
     FUSE_TYPE_MEMORY    =   "memory"
 
-    def __init__(self, bin_path, args, **kwargs):
+    def __init__(self, bin_path, args, modified_disk_chunks=None, modified_memory_chunks=None, **kwargs):
         self.cloudletfs_path = bin_path
         self._args = '%d\n%s\n' % (len(args),
                 '\n'.join(a.replace('\n', '') for a in args))
         self._pipe = None
         self.mountpoint = None
         self.stop = threading.Event()
+        self.modified_disk_chunks = modified_disk_chunks
+        self.modified_memory_chunks = modified_memory_chunks
 
         # fuse can handle on-demand fetching
         # TODO: passing these argument through kwargs

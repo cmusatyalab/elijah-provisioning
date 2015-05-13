@@ -547,8 +547,7 @@ class Recovered_delta(multiprocessing.Process):
     def __init__(self, base_disk, base_mem, overlay_path, 
                  output_mem_path, output_mem_size, 
                  output_disk_path, output_disk_size, chunk_size,
-                 out_pipename=None, time_queue=None, deltalist_savepath=None,
-                 modified_disk_chunks=None, modified_memory_chunks=None):
+                 out_pipename=None, time_queue=None, deltalist_savepath=None):
         ''' recover delta list using base disk/memory
         Args:
         '''
@@ -566,8 +565,6 @@ class Recovered_delta(multiprocessing.Process):
         self.base_disk = base_disk
         self.base_mem = base_mem
         self.deltalist_savepath = deltalist_savepath
-        self.modified_disk_chunks = modified_disk_chunks
-        self.modified_memory_chunks = modified_memory_chunks
 
         self.base_disk_fd = None
         self.base_mem_fd = None
