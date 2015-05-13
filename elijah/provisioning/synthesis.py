@@ -1751,7 +1751,10 @@ def synthesis(base_disk, overlay_path, **kwargs):
         options.DISK_ONLY = False
         try:
             preload_thread.join()
-            residue_overlay = handoff.create_residue(base_disk,
+            (base_diskmeta, base_mem, base_memmeta) = \
+                    Const.get_basepath(base_disk, check_exist=False)
+            base_vm_paths = [base_disk, base_mem, base_diskmeta, base_memmeta]
+            residue_overlay = handoff.create_residue(base_vm_paths,
                                              meta_info[Const.META_BASE_VM_SHA256],
                                              preload_thread.basedisk_hashdict,
                                              preload_thread.basemem_hashdict,

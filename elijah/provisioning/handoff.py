@@ -715,10 +715,9 @@ class CPUMonitor(threading.Thread):
         self.stop.set()
 
 
-def create_residue(base_disk, base_hashvalue,
+def create_residue(base_vm_paths, base_hashvalue,
                    basedisk_hashdict, basemem_hashdict,
-                   resumed_vm, options, dirty_disk_chunks,
-                   migration_addr,
+                   synthesized_vm, options, migration_addr,
                    overlay_mode=None):
     '''Get residue
     return overlay_metafile, overlay_files
@@ -761,9 +760,8 @@ def create_residue(base_disk, base_hashvalue,
     # sanity check
     if (options == None) or (isinstance(options, Options) == False):
         raise HandoffError("Given option is invalid: %s" % str(options))
-    (base_diskmeta, base_mem, base_memmeta) = \
-            Const.get_basepath(base_disk, check_exist=True)
-    qemu_logfile = resumed_vm.qemu_logfile
+    (base_disk, base_mem, base_diskmeta, base_memmeta) = base_vm_paths
+    qemu_logfile = synthesized_vm.qemu_logfile
 
     # start CPU Monitor
     if CPU_MONITORING:
@@ -773,12 +771,10 @@ def create_residue(base_disk, base_hashvalue,
     memory_snapshot_queue = multiprocessing.Queue(overlay_mode.QUEUE_SIZE_MEMORY_SNAPSHOT)
     residue_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_OPTIMIZATION)
     compdata_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_COMPRESSION)
-    vm_monitor = VMMonitor(resumed_vm.conn, resumed_vm.machine, options,
-                           resumed_vm.monitor,
-                           base_disk, base_mem,
-                           resumed_vm.resumed_disk,
-                           qemu_logfile,
-                           dirty_disk_chunks=dirty_disk_chunks)
+    vm_monitor = VMMonitor(synthesized_vm.conn, synthesized_vm.machine, options,
+                           synthesized_vm.monitor, base_disk, base_mem,
+                           synthesized_vm.resumed_disk, qemu_logfile,
+                           dirty_disk_chunks=synthesized_vm.fuse.modified_disk_chunks)
     monitoring_info = vm_monitor.get_monitoring_info()
     time_ss = time.time()
     LOG.debug("[time] serialized step (%f ~ %f): %f" % (time_start,
@@ -788,17 +784,17 @@ def create_residue(base_disk, base_hashvalue,
         raise HandoffError("Time for serialized step takes too long. Check get_monitoring_info()")
 
     # QEMU control thread
-    qmp_thread = QmpThread(resumed_vm.qmp_channel, process_controller,
+    qmp_thread = QmpThread(synthesized_vm.qmp_channel, process_controller,
                            memory_snapshot_queue, compdata_queue,
-                           overlay_mode, resumed_vm.monitor)
+                           overlay_mode, synthesized_vm.monitor)
     qmp_thread.daemon = True
     qmp_thread.config_migration()
 
     # memory snapshotting thread
-    memory_read_proc = save_mem_snapshot(resumed_vm.conn,
-                                         resumed_vm.machine,
+    memory_read_proc = save_mem_snapshot(synthesized_vm.conn,
+                                         synthesized_vm.machine,
                                          memory_snapshot_queue,
-                                         fuse_stream_monitor=resumed_vm.monitor)
+                                         fuse_stream_monitor=synthesized_vm.monitor)
     if overlay_mode.PROCESS_PIPELINED == False:
         if overlay_mode.LIVE_MIGRATION_STOP is not VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
             msg = "Use ASAP VM stop for pipelined approach for serialized processing.\n"
@@ -815,7 +811,7 @@ def create_residue(base_disk, base_hashvalue,
                                    base_memmeta,
                                    basedisk_hashdict,
                                    basemem_hashdict,
-                                   resumed_vm.resumed_disk,
+                                   synthesized_vm.resumed_disk,
                                    memory_snapshot_queue,
                                    residue_deltalist_queue,
                                    process_controller)
@@ -836,7 +832,7 @@ def create_residue(base_disk, base_hashvalue,
     if migration_addr.startswith("network"):
         from stream_client import StreamSynthesisClient
         migration_dest_ip = migration_addr.split(":")[-1]
-        resume_disk_size = os.path.getsize(resumed_vm.resumed_disk)
+        resume_disk_size = os.path.getsize(synthesized_vm.resumed_disk)
 
         # wait until getting the memory snapshot size
         resume_memory_size = -1
@@ -867,10 +863,10 @@ def create_residue(base_disk, base_hashvalue,
         process_manager.kill_instance()
 
         # 7. terminting
-        if resumed_vm.monitor is not None:
-            resumed_vm.monitor.terminate()
-            resumed_vm.monitor.join()
-        resumed_vm.machine = None   # protecting malaccess to machine 
+        if synthesized_vm.monitor is not None:
+            synthesized_vm.monitor.terminate()
+            synthesized_vm.monitor.join()
+        synthesized_vm.machine = None   # protecting malaccess to machine 
         time_end = time.time()
 
         qmp_thread.join()
@@ -937,7 +933,7 @@ def create_residue(base_disk, base_hashvalue,
         overlay_metafile = _generate_overlaymeta(overlay_metapath,
                                                 overlay_info,
                                                 base_hashvalue,
-                                                os.path.getsize(resumed_vm.resumed_disk),
+                                                os.path.getsize(synthesized_vm.resumed_disk),
                                                 resume_memory_size)
 
         # packaging VM overlay into a single zip file
@@ -950,10 +946,10 @@ def create_residue(base_disk, base_hashvalue,
         process_manager.kill_instance()
         memory_read_proc.finish()   # deallocate resources for snapshotting
         # 7. terminting
-        if resumed_vm.monitor is not None:
-            resumed_vm.monitor.terminate()
-            resumed_vm.monitor.join()
-        resumed_vm.machine = None   # protecting malaccess to machine 
+        if synthesized_vm.monitor is not None:
+            synthesized_vm.monitor.terminate()
+            synthesized_vm.monitor.join()
+        synthesized_vm.machine = None   # protecting malaccess to machine 
         if os.path.exists(overlay_metafile) == True:
             os.remove(overlay_metafile)
         if os.path.exists(temp_compfile_dir) == True:
