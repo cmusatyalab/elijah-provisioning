@@ -66,10 +66,11 @@ class HandoffError(Exception):
     pass
 
 class PreloadResidueData(threading.Thread):
-    def __init__(self, base_diskpath, overlay_filename):
-        (self.base_diskmeta, self.base_mem, self.base_memmeta) = \
-                Const.get_basepath(base_diskpath, check_exist=True)
+    def __init__(self, base_diskpath, base_mempath, base_diskmeta, base_memmeta, overlay_filename):
         self.base_diskpath = base_diskpath
+        self.base_mempath = base_mempath
+        self.base_diskmeta = base_diskmeta
+        self.base_memmeta = base_memmeta
         self.overlay_filename = overlay_filename
         self.basedisk_hashdict = None
         self.basmem_hashdict = None
@@ -82,7 +83,7 @@ class PreloadResidueData(threading.Thread):
         # we can leverage Recovered_delta class reconstruction process,
         # but that does not generate hash value
         self.prev_mem_deltalist = self._reconstruct_mem_deltalist(self.base_diskpath,
-                                                             self.base_mem,
+                                                             self.base_mempath,
                                                              self.overlay_filename)
 
     def _reconstruct_mem_deltalist(self, base_disk, base_mem, overlay_filepath):

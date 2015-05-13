@@ -53,11 +53,12 @@ class QmpAfUnix:
                     ts = float(timestamp["seconds"]) + float(timestamp["microseconds"]) / 1000000
                     return ts
         except ValueError as e:
-            print "---"
-            print repr(recved_data)
-            print "---"
-            sys.stderr.write(recved_data)
-            print "---"
+            pass
+            #print "---"
+            #print repr(recved_data)
+            #print "---"
+            #sys.stderr.write(recved_data)
+            #print "---"
 
         return None
 
@@ -73,11 +74,12 @@ class QmpAfUnix:
             else:
                 return False
         except Exception as e:
-            print "---"
-            print repr(recved_data)
-            print "---"
-            sys.stderr.write(recved_data)
-            print "---"
+            pass
+            #print "---"
+            #print repr(recved_data)
+            #print "---"
+            #sys.stderr.write(recved_data)
+            #print "---"
 
     # returns True on success, False otherwise
     def randomize_raw_live(self):

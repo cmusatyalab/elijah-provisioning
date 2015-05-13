@@ -1738,7 +1738,13 @@ def synthesis(base_disk, overlay_path, **kwargs):
     synthesized_VM.resume()
     if return_residue is not None:
         # preload basevm hash dictionary for creating residue
-        preload_thread = handoff.PreloadResidueData(base_disk, overlay_filename.name)
+        (base_diskmeta, base_mem, base_memmeta) =\
+            Const.get_basepath(base_disk, check_exist=False)
+        preload_thread = handoff.PreloadResidueData(base_disk,
+                                                    base_mem,
+                                                    base_diskmeta,
+                                                    base_memmeta,
+                                                    overlay_filename.name)
         preload_thread.daemon = True
         preload_thread.start()
 
