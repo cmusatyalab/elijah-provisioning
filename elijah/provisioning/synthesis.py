@@ -971,11 +971,13 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
     # Get modified list from overlay_meta
     vm_disk_size = meta_info[Const.META_RESUME_VM_DISK_SIZE]
     vm_memory_size = meta_info[Const.META_RESUME_VM_MEMORY_SIZE]
-    memory_chunks_all = list()
-    disk_chunks_all = list()
+    memory_chunks_all = set()
+    disk_chunks_all = set()
     for each_file in meta_info[Const.META_OVERLAY_FILES]:
-        memory_chunks_all += each_file[Const.META_OVERLAY_FILE_MEMORY_CHUNKS]
-        disk_chunks_all += each_file[Const.META_OVERLAY_FILE_DISK_CHUNKS]
+        memory_chunks = each_file[Const.META_OVERLAY_FILE_MEMORY_CHUNKS]
+        disk_chunks = each_file[Const.META_OVERLAY_FILE_DISK_CHUNKS]
+        memory_chunks_all.update(set(memory_chunks))
+        disk_chunks_all.update(set(disk_chunks))
     memory_chunk_str = ["%ld:0" % item for item in memory_chunks_all]
     disk_chunk_str = ["%ld:0" % item for item in disk_chunks_all]
     memory_overlay_map = ','.join(memory_chunk_str)
@@ -1735,7 +1737,6 @@ def synthesis(base_disk, overlay_path, **kwargs):
         (base_diskmeta, base_mem, base_memmeta) =\
             Const.get_basepath(base_disk, check_exist=False)
         preload_thread = handoff.PreloadResidueData(base_diskmeta, base_memmeta)
-                                                    
         preload_thread.daemon = True
         preload_thread.start()
 
