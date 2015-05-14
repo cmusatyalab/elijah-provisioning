@@ -56,7 +56,7 @@ def getLogger(name='unknown'):
 
         # add stdout logging with INFO level
         console = logging.StreamHandler(sys.stdout)
-        console.setLevel(logging.INFO)
+        console.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(levelname)-8s %(message)s')
         console.setFormatter(formatter)
         logger.addHandler(console)

@@ -821,16 +821,16 @@ class DeltaDedup(process_manager.ProcWorker):
         self.self_hashset = set()
 
         # shared data with other process
-        self.manager = multiprocessing.Manager()
-        self.statistics = self.manager.dict()
-        self.statistics['number_of_zero_page_disk'] = 0
-        self.statistics['number_of_zero_page_memory'] = 0
-        self.statistics['number_of_base_disk_disk'] = 0
-        self.statistics['number_of_base_disk_memory'] = 0
-        self.statistics['number_of_base_mem_disk'] = 0
-        self.statistics['number_of_base_mem_memory'] = 0
-        self.statistics['number_of_self_ref_disk'] = 0
-        self.statistics['number_of_self_ref_memory'] = 0
+        #self.manager = multiprocessing.Manager()
+        #self.statistics = self.manager.dict()
+        #self.statistics['number_of_zero_page_disk'] = 0
+        #self.statistics['number_of_zero_page_memory'] = 0
+        #self.statistics['number_of_base_disk_disk'] = 0
+        #self.statistics['number_of_base_disk_memory'] = 0
+        #self.statistics['number_of_base_mem_disk'] = 0
+        #self.statistics['number_of_base_mem_memory'] = 0
+        #self.statistics['number_of_self_ref_disk'] = 0
+        #self.statistics['number_of_self_ref_memory'] = 0
         super(DeltaDedup, self).__init__(target=self.perform_dedup)
 
     def perform_dedup(self):
@@ -971,14 +971,14 @@ class DeltaDedup(process_manager.ProcWorker):
             self.monitor_is_alive = False
             self.merged_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
-            self.statistics['number_of_zero_page_disk'] = number_of_zero_page_disk
-            self.statistics['number_of_base_disk_disk'] = number_of_base_disk_disk
-            self.statistics['number_of_base_mem_disk'] = number_of_base_mem_disk
-            self.statistics['number_of_self_ref_disk'] = number_of_self_ref_disk
-            self.statistics['number_of_zero_page_memory'] = number_of_zero_page_memory
-            self.statistics['number_of_base_disk_memory'] = number_of_base_disk_memory
-            self.statistics['number_of_base_mem_memory'] = number_of_base_mem_memory
-            self.statistics['number_of_self_ref_memory'] = number_of_self_ref_memory
+            #self.statistics['number_of_zero_page_disk'] = number_of_zero_page_disk
+            #self.statistics['number_of_base_disk_disk'] = number_of_base_disk_disk
+            #self.statistics['number_of_base_mem_disk'] = number_of_base_mem_disk
+            #self.statistics['number_of_self_ref_disk'] = number_of_self_ref_disk
+            #self.statistics['number_of_zero_page_memory'] = number_of_zero_page_memory
+            #self.statistics['number_of_base_disk_memory'] = number_of_base_disk_memory
+            #self.statistics['number_of_base_mem_memory'] = number_of_base_mem_memory
+            #self.statistics['number_of_self_ref_memory'] = number_of_self_ref_memory
             saved_item = number_of_zero_page_disk + number_of_base_disk_disk + number_of_base_mem_disk +\
                 number_of_self_ref_disk + number_of_zero_page_memory + number_of_base_disk_memory +\
                 number_of_base_mem_memory + number_of_self_ref_memory

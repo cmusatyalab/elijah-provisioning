@@ -55,6 +55,16 @@ import process_manager
 import qmp_af_unix
 import log as logging
 
+
+# to work with OpenStack which uses eventlet 
+try:
+    from eventlet import patcher
+    native_threading = patcher.original("threading")
+except:
+    import threading
+    native_threading = threading
+
+
 LOG = logging.getLogger(__name__)
 
 # This is only for experiemental purpose.
@@ -140,6 +150,7 @@ class VMMonitor(object):
         if self.dirty_disk_chunks is not None:
             for dirty_chunk in self.dirty_disk_chunks:
                 modified_chunk_queue.put((dirty_chunk, 1.0))
+        import pdb;pdb.set_trace()
         info_dict[_MonitoringInfo.DISK_MODIFIED_BLOCKS] = modified_chunk_queue
         time5 = time.time()
 
@@ -178,11 +189,14 @@ class MemoryReadProcess(process_manager.ProcWorker):
             if os.path.exists(self.input_path) == False:
                 print "waiting for %s: " % self.input_path
                 time.sleep(0.1)
+            else:
+                break
         try:
             self.in_fd = open(self.input_path, 'rb')
             self.total_read_size = 0
             self.total_write_size = 0
             # read first 40KB and aligen header with 4KB
+            select.select([self.in_fd], [], [])
             data = self.in_fd.read(Memory.Memory.RAM_PAGE_SIZE*10)
             if is_first_recv == False:
                 is_first_recv = True
@@ -272,16 +286,10 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.machine = None
 
 
-class LibvirtThread(threading.Thread):
-    def __init__(self, machine, outputpath):
-        self.machine = machine
-        self.outputpath = outputpath
-        threading.Thread.__init__(self, target=self.save_mem)
-
-    def save_mem(self):
-        LOG.debug("start machine save")
-        self.machine.save(self.outputpath)
-        LOG.debug("finish machine save")
+def save_mem_thread(machine, outputpath):
+    LOG.debug("start machine save")
+    machine.save(outputpath) # green thread blocked in here
+    LOG.debug("finish machine save")
 
 
 class QmpThread(threading.Thread):
@@ -430,15 +438,19 @@ class _MonitoringInfo(object):
 
 
 
-class StreamSynthesisFile(multiprocessing.Process):
+class StreamSynthesisFile(threading.Thread):
+#class StreamSynthesisFile(multiprocessing.Process):
     def __init__(self, basevm_uuid, compdata_queue, temp_compfile_dir):
         self.basevm_uuid = basevm_uuid
         self.compdata_queue = compdata_queue
         self.temp_compfile_dir = temp_compfile_dir
         self.manager = multiprocessing.Manager()
-        self.overlay_info = self.manager.list()
-        self.overlay_files = self.manager.list()
-        super(StreamSynthesisFile, self).__init__(target=self.save_to_file)
+        self.overlay_info = list()
+        self.overlay_files = list()
+        self.overlay_info_path = os.path.join(self.temp_compfile_dir, "overlay-info")
+        self.overlay_filenames = os.path.join(self.temp_compfile_dir, "overlay-names")
+        #super(StreamSynthesisFile, self).__init__(target=self.save_to_file)
+        threading.Thread.__init__(self, target=self.save_to_file)
 
     def get_overlay_info(self):
         overlay_info_list = list()
@@ -448,6 +460,31 @@ class StreamSynthesisFile(multiprocessing.Process):
                 item_dict[key] = value
             overlay_info_list.append(item_dict)
         return overlay_info_list, self.overlay_files
+
+        # read overlay info from file and return it
+        # should be called after finishing process
+        #import json
+        #overlay_info_list = list()
+        #oerlay_files_list = list()
+        #with open(self.overlay_info_path, "r") as f:
+        #    overlay_info_list = json.loads(f.read())
+        #with open(self.overlay_filenames, "r") as f:
+        #    overlay_files_list = json.loads(f.read())
+        #return overlay_info_list, overlay_files_list
+
+    def _save_overlay_info_tofile(self):
+        pass
+        #overlay_info_list = list()
+        #for overlay_item_dict in self.overlay_info:
+        #    item_dict = dict()
+        #    for key, value in overlay_item_dict.iteritems():
+        #        item_dict[key] = value
+        #    overlay_info_list.append(item_dict)
+
+        #with open(self.overlay_info_path, "w") as f:
+        #    f.write(json.dump(overlay_info_list))
+        #with open(self.overlay_files_list, "w") as f:
+        #    f.write(json.dump(overlay_files))
 
     def save_to_file(self):
         #is_first_recv_disk = False
@@ -519,6 +556,7 @@ def create_delta_proc(monitoring_info, options,
 
     INFO = _MonitoringInfo
     free_memory_dict = getattr(monitoring_info, INFO.MEMORY_FREE_BLOCKS, None)
+    import pdb;pdb.set_trace()
     m_chunk_queue = getattr(monitoring_info, INFO.DISK_MODIFIED_BLOCKS, dict())
     trim_dict = getattr(monitoring_info, INFO.DISK_FREE_BLOCKS, None)
     used_blocks_dict = getattr(monitoring_info, INFO.DISK_USED_BLOCKS, None)
@@ -625,7 +663,11 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
                                              machine,
                                              output_queue)
         memory_read_proc.start()
-        libvirt_thread = LibvirtThread(machine, named_pipe_output)
+        # machine.save() is blocked libvirt command, which blocks entire
+        # process in evenetlet case. So we use original thread, instead.
+        libvirt_thread = native_threading.Thread(target=save_mem_thread,
+                                                 args=(machine, named_pipe_output))
+        libvirt_thread.setDaemon(True)
         libvirt_thread.start()
     except libvirt.libvirtError, e:
         # we intentionally ignore seek error from libvirt since we have cause

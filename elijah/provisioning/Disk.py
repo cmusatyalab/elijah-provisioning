@@ -319,8 +319,8 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         self.num_proc = VMOverlayCreationMode.MAX_THREAD_NUM
         self.diff_algorithm = overlay_mode.DISK_DIFF_ALGORITHM
 
-        self.manager = multiprocessing.Manager()
-        self.ret_statistics = self.manager.dict()
+        #self.manager = multiprocessing.Manager()
+        #self.ret_statistics = self.manager.dict()
         super(CreateDiskDeltalist, self).__init__(target=self.create_disk_deltalist)
 
     def change_mode(self, new_mode):
@@ -528,11 +528,11 @@ class CreateDiskDeltalist(process_manager.ProcWorker):
         # send end message after the next stage finishes processing
         self.disk_deltalist_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
-        if self.ret_statistics != None:
-            self.ret_statistics['trimed'] = trim_counter
-            self.ret_statistics['xrayed'] = xray_counter
-            self.ret_statistics['trimed_list'] = trimed_list
-            self.ret_statistics['xrayed_list'] = xrayed_list
+        #if self.ret_statistics != None:
+        #    self.ret_statistics['trimed'] = trim_counter
+        #    self.ret_statistics['xrayed'] = xray_counter
+        #    self.ret_statistics['trimed_list'] = trimed_list
+        #    self.ret_statistics['xrayed_list'] = xrayed_list
         #LOG.debug("1-1. Trim(%d, overwritten after trim(%d)), Xray(%d)" % \
         #        (trim_counter, overwritten_after_trim, xray_counter))
         time_end = time.time()

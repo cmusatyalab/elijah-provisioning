@@ -722,12 +722,14 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
         # Therefore, process the last memory page only when it's aligned
         if len(memory_page_list) > 0 and len(memory_page_list[0]) == (Memory.RAM_PAGE_SIZE + Memory.CHUNK_HEADER_SIZE):
             LOG.debug("[Memory][child] send last data to child: %d" % len(memory_page_list))
+            #select.select([], [self.task_queue._writer.fileno()], [])
             self.task_queue.put(memory_page_list)
         self.finish_processing_input.value = True
 
         # send end meesage to every process
         for child_proc in self.proc_list:
             LOG.debug("[Memory] send end message to each child")
+            #select.select([], [self.task_queue._writer.fileno()], [])
             self.task_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
 
         # after this for loop, all processing finished, but child process still
@@ -738,6 +740,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             fileno = c_queue._reader.fileno()
             input_list.append(fileno)
             finished_proc_dict[fileno] = c_queue
+            LOG.debug("finished_proc_dict fileno : %d" % fileno)
         while len(finished_proc_dict.keys()) > 0:
             (input_ready, [], []) = select.select(input_list, [], [], 0.01)
             for in_queue in input_ready:
@@ -745,6 +748,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     control_msg = self.control_queue.get()
                     self._handle_control_msg(control_msg)
                 else:
+                    LOG.debug("finished_proc_dict key: %d" % in_queue)
                     cq = finished_proc_dict[in_queue]
                     (input_size, output_size, blocks, processed_time) = cq.get()
                     self.in_size += input_size
@@ -960,6 +964,7 @@ class MemoryDiffProc(multiprocessing.Process):
                       self.mode_queue._reader.fileno()]
         freed_page_counter = 0
         while is_proc_running:
+            #LOG.debug("[Memory][Child] %d waiting on select" % int(os.getpid()))
             inready, outread, errready = select.select(input_list, [], [])
             if self.mode_queue._reader.fileno() in inready:
                 # change mode
@@ -978,9 +983,9 @@ class MemoryDiffProc(multiprocessing.Process):
                         VMOverlayCreationMode.set_num_cores(new_num_cores)
             if self.task_queue._reader.fileno() in inready:
                 memory_chunk_list = self.task_queue.get()
-                #print "getting a new job: %s %d" % (type(memory_chunk_list), len(memory_chunk_list))
+                #LOG.debug("[Memory][Child] %d getting a new job: %s %d" %\ (int(os.getpid()), type(memory_chunk_list), len(memory_chunk_list)))
                 if memory_chunk_list == Const.QUEUE_SUCCESS_MESSAGE:
-                    #LOG.debug("[Memory][Child] %d diff proc get end message" % (int(os.getpid())))
+                    LOG.debug("[Memory][Child] %d diff proc get end message" % (int(os.getpid())))
                     is_proc_running = False
                     break
 

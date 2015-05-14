@@ -27,6 +27,7 @@ import multiprocessing
 import time
 import sys
 import log as logging
+import Queue
 from Configuration import Const
 
 LOG = logging.getLogger(__name__)
@@ -179,7 +180,7 @@ class StreamMonitor(threading.Thread):
                             # Condition.wait() overhead in green thread 
                             # of Openstack
         self.modified_chunk_dict = dict()
-        self.modified_chunk_queue = multiprocessing.Queue()
+        self.modified_chunk_queue = Queue.Queue()
         self.is_queue_accessed = False
         self.disk_access_chunk_list = list()
         self.mem_access_chunk_list = list()
@@ -213,7 +214,14 @@ class StreamMonitor(threading.Thread):
 
             while len(self.del_list) > 0:
                 fileno = self.del_list.pop()
-                self.epoll.unregister(fileno)
+                try:
+                    self.epoll.unregister(fileno)
+                except IOError as e:
+                    data = self.stream_dict.get(fileno)
+                    if data is not None:
+                        filename = data['path'] + data['name']
+                        LOG.debug(str(e))
+                        LOG.debug("epoll unregister error for file %s\n" % filename)
                 os.close(fileno)
                 del self.stream_dict[fileno]
 
@@ -375,7 +383,6 @@ class FuseFeedingProc(multiprocessing.Process):
         LOG.info("[FUSE] : (%s)-(%s)=(%s)\n" % \
                 (start_time, end_time, (end_time-start_time)))
         self.fuse.fuse_write("END_OF_TRANSMISSION")
-
 
     def terminate(self):
         self.stop.set()

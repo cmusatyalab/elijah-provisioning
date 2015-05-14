@@ -6,6 +6,7 @@ import sys
 import socket
 import json
 import time
+import select
 
 
 class QmpAfUnix:
@@ -13,7 +14,8 @@ class QmpAfUnix:
         self.s_name = s_name
 
     def connect(self):
-        #print "connecting to %s" % (self.s_name)
+        #for line in traceback.format_stack():
+        #    print line.strip()
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(self.s_name)
 
@@ -25,10 +27,12 @@ class QmpAfUnix:
     # returns True on success, False otherwise
     def qmp_negotiate(self):
         # qemu provides capabilities information first
+        select.select([self.sock], [], [])
         capabilities = json.loads(self.sock.recv(1024))
 
         json_cmd = json.dumps({"execute":"qmp_capabilities"})
         self.sock.sendall(json_cmd)
+        select.select([self.sock], [], [])
         response = json.loads(self.sock.recv(1024))
         if "return" in response:
             return True
@@ -39,6 +43,7 @@ class QmpAfUnix:
     def stop_raw_live(self):
         json_cmd = json.dumps({"execute":"stop-raw-live"})
         self.sock.sendall(json_cmd)
+        select.select([self.sock], [], [])
         response = json.loads(self.sock.recv(1024))
         if "return" not in response:
             return True
@@ -46,6 +51,7 @@ class QmpAfUnix:
         # wait for QEVENT_STOP in next 10 responses
         try:
             for i in range(10):
+                select.select([self.sock], [], [])
                 recved_data = self.sock.recv(1024)
                 response = json.loads(recved_data)
                 if "event" in response and response["event"] == "STOP":
@@ -67,6 +73,7 @@ class QmpAfUnix:
         try:
             json_cmd = json.dumps({"execute":"iterate-raw-live"})
             self.sock.sendall(json_cmd)
+            select.select([self.sock], [], [])
             recved_data = self.sock.recv(1024)
             response = json.loads(recved_data)
             if "return" in response:
@@ -86,6 +93,7 @@ class QmpAfUnix:
         json_cmd = json.dumps({"execute":"randomize-raw-live"})
         self.sock.sendall(json_cmd)
         try:
+            select.select([self.sock], [], [])
             recved_data = self.sock.recv(1024)
             response = json.loads(recved_data)
             if "return" in response:
@@ -103,6 +111,7 @@ class QmpAfUnix:
     def unrandomize_raw_live(self):
         json_cmd = json.dumps({"execute":"unrandomize-raw-live"})
         self.sock.sendall(json_cmd)
+        select.select([self.sock], [], [])
         response = json.loads(self.sock.recv(1024))
         if "return" in response:
             return True

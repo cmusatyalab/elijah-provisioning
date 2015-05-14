@@ -60,6 +60,15 @@ import threading
 import traceback
 from optparse import OptionParser
 
+# to work with OpenStack which uses eventlet 
+try:
+    from eventlet import patcher
+    native_threading = patcher.original("threading")
+except:
+    import threading
+    native_threading = threading
+
+
 from tool import comp_lzma
 from tool import diff_files
 import compression
@@ -209,6 +218,7 @@ class VM_Overlay(threading.Thread):
         # handle inconsistency between OpenStack execution user and libvirt-qemu user
         if self.nova_util:
             self.nova_util.execute('chmod', 775, self.qmp_channel, run_as_root=True)
+
         qmp_thread = QmpThreadSerial(self.qmp_channel, self.fuse_stream_monitor)
         qmp_thread.daemon = True
         qmp_thread.start()
@@ -362,6 +372,7 @@ class SynthesizedVM(threading.Thread):
     def __init__(self, launch_disk, launch_mem, fuse, disk_only=False, qemu_args=None, **kwargs):
         # kwargs
         self.nova_xml= kwargs.get("nova_xml", None)
+        self.nova_util= kwargs.get("nova_util", None)
         self.conn = kwargs.get("nova_conn", None) or get_libvirt_connection()
         self.LOG = kwargs.get("log", None)
         if self.LOG == None:
@@ -427,15 +438,17 @@ class SynthesizedVM(threading.Thread):
         try:
             if self.disk_only:
                 # edit default XML to have new disk path
-                self.machine = run_vm(self.conn, self.new_xml_string, 
+                self.machine = run_vm(self.conn, self.new_xml_string,
                         vnc_disable=True)
             else:
-                self.machine = run_snapshot(self.conn, self.resumed_disk, 
-                        self.resumed_mem, self.new_xml_str, 
+                self.machine = run_snapshot(self.conn, self.resumed_disk,
+                        self.resumed_mem, self.new_xml_str,
                         resume_time=self.resume_time)
         except Exception as e:
             sys.stdout.write(str(e)+"\n")
 
+        if self.nova_util:
+            self.nova_util.execute('chmod', 775, self.qmp_channel, run_as_root=True)
         return self.machine
 
     def terminate(self):
@@ -1088,22 +1101,23 @@ def run_vm(conn, domain_xml, **kwargs):
                 machine.destroy()
     return machine
 
-class QmpThreadSerial(threading.Thread):
+
+class QmpThreadSerial(native_threading.Thread):
     def __init__(self, qmp_path, fuse_stream_monitor):
         self.qmp_path = qmp_path
         self.stop = threading.Event()
         self.qmp = qmp_af_unix.QmpAfUnix(self.qmp_path)
         self.fuse_stream_monitor = fuse_stream_monitor
-        threading.Thread.__init__(self, target=self.stop_migration)
+        native_threading.Thread.__init__(self, target=self.stop_migration)
 
     def stop_migration(self):
         self.qmp.connect()
+        sleep(2)    # wait until qemu is ready read negotiation command
         counter_check_comp_size = 0
         ret = self.qmp.qmp_negotiate()
         if not ret:
             raise CloudletGenerationError("failed to connect to qmp channel")
         LOG.debug("waiting to start live migration before stopping it")
-        sleep(2)
         self.migration_stop_time = self._stop_migration()
         LOG.debug("Finish sending stop migration")
         self.qmp.disconnect()
@@ -1175,7 +1189,6 @@ class MemoryReadProcessSerial(multiprocessing.Process):
             memory_size_data = data[original_header_len:original_header_len+Memory.Memory.CHUNK_HEADER_SIZE]
             mem_snapshot_size, = struct.unpack(Memory.Memory.CHUNK_HEADER_FMT, memory_size_data)
             self.memory_snapshot_size = long(mem_snapshot_size + len(new_header))
-
 
             # get memory snapshot aligned with chunk size
             new_data = data[original_header_len+Memory.Memory.CHUNK_HEADER_SIZE:]
@@ -1265,7 +1278,11 @@ def save_mem_snapshot(conn, machine, fout_path, qmp_channel, **kwargs):
                                                    result_queue,
                                                    qmp_channel)
         memory_read_proc.start()
-        libvirt_thread = handoff.LibvirtThread(machine, named_pipe_output)
+        # machine.save() is blocked libvirt command, which blocks entire
+        # process in evenetlet case. So we use original thread, instead.
+        libvirt_thread = native_threading.Thread(target=handoff.save_mem_thread,
+                                                 args=(machine, named_pipe_output))
+        libvirt_thread.setDaemon(True)
         libvirt_thread.start()
         memory_read_proc.join()
     except libvirt.libvirtError, e:
