@@ -180,7 +180,8 @@ class StreamMonitor(threading.Thread):
                             # Condition.wait() overhead in green thread 
                             # of Openstack
         self.modified_chunk_dict = dict()
-        self.modified_chunk_queue = Queue.Queue()
+        #self.modified_chunk_queue = Queue.Queue()
+        self.modified_chunk_queue = multiprocessing.Queue()
         self.is_queue_accessed = False
         self.disk_access_chunk_list = list()
         self.mem_access_chunk_list = list()

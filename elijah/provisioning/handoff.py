@@ -150,7 +150,6 @@ class VMMonitor(object):
         if self.dirty_disk_chunks is not None:
             for dirty_chunk in self.dirty_disk_chunks:
                 modified_chunk_queue.put((dirty_chunk, 1.0))
-        import pdb;pdb.set_trace()
         info_dict[_MonitoringInfo.DISK_MODIFIED_BLOCKS] = modified_chunk_queue
         time5 = time.time()
 
@@ -556,7 +555,6 @@ def create_delta_proc(monitoring_info, options,
 
     INFO = _MonitoringInfo
     free_memory_dict = getattr(monitoring_info, INFO.MEMORY_FREE_BLOCKS, None)
-    import pdb;pdb.set_trace()
     m_chunk_queue = getattr(monitoring_info, INFO.DISK_MODIFIED_BLOCKS, dict())
     trim_dict = getattr(monitoring_info, INFO.DISK_FREE_BLOCKS, None)
     used_blocks_dict = getattr(monitoring_info, INFO.DISK_USED_BLOCKS, None)

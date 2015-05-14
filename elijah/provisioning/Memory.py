@@ -740,7 +740,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
             fileno = c_queue._reader.fileno()
             input_list.append(fileno)
             finished_proc_dict[fileno] = c_queue
-            LOG.debug("finished_proc_dict fileno : %d" % fileno)
         while len(finished_proc_dict.keys()) > 0:
             (input_ready, [], []) = select.select(input_list, [], [], 0.01)
             for in_queue in input_ready:
@@ -748,7 +747,6 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                     control_msg = self.control_queue.get()
                     self._handle_control_msg(control_msg)
                 else:
-                    LOG.debug("finished_proc_dict key: %d" % in_queue)
                     cq = finished_proc_dict[in_queue]
                     (input_size, output_size, blocks, processed_time) = cq.get()
                     self.in_size += input_size
