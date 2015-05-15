@@ -30,6 +30,7 @@ import shutil
 import traceback
 import struct
 import msgpack
+import psutil
 from tempfile import NamedTemporaryFile
 from tempfile import mkdtemp
 from xml.etree import ElementTree
@@ -220,7 +221,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
                      (mem_snapshot_size, len(new_header), time.time()))
 
             # write rest of the memory data
-            #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
+            prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
                 input_fd = [self.control_queue._reader.fileno(), self.in_fd]
                 input_ready, out_ready, err_ready = select.select(input_fd, [], [])
@@ -234,8 +235,8 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     current_size = len(data)
                     self.result_queue.put(data)
                     self.total_write_size += current_size
-                    #prog_bar.set_percent(100.0*self.total_write_size/mem_snapshot_size)
-                    #prog_bar.show_progress()
+                    prog_bar.set_percent(100.0*self.total_write_size/mem_snapshot_size)
+                    prog_bar.show_progress()
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time.time()
@@ -243,7 +244,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
                         prev_processed_size = self.total_read_size
                         prev_processed_time = cur_time
                         self.monitor_current_bw = (throughput/Const.CHUNK_SIZE)
-            #prog_bar.finish()
+            prog_bar.finish()
         except Exception, e:
             sys.stdout.write("[MemorySnapshotting] Exception1n")
             sys.stderr.write(traceback.format_exc())
@@ -291,7 +292,7 @@ def save_mem_thread(machine, outputpath):
     LOG.debug("finish machine save")
 
 
-class QmpThread(threading.Thread):
+class QmpThread(native_threading.Thread):
     def __init__(self, qmp_path, process_controller, memory_snapshot_queue,
                  compdata_queue, overlay_mode, fuse_stream_monitor):
         self.qmp_path = qmp_path
@@ -304,7 +305,7 @@ class QmpThread(threading.Thread):
         self.fuse_stream_monitor = fuse_stream_monitor
         self.migration_stop_time = 0
         self.done_configuration = False
-        threading.Thread.__init__(self, target=self.control_migration)
+        native_threading.Thread.__init__(self, target=self.control_migration)
 
     def config_migration(self):
         self.qmp.connect()
@@ -720,12 +721,11 @@ class CPUMonitor(threading.Thread):
         return self.core_cpus
 
     def monitor_cpu(self):
-        import psutil
         while(not self.stop.wait(1)):
             cpu_usage = psutil.cpu_percent(interval=0, percpu=True)
             cur_time = time.time()
             self.cpu_percent_list.append((cur_time, cpu_usage))
-            #LOG.debug("cpu_usage\t%f\t%s" % (cur_time, str(cpu_usage)))
+            LOG.debug("cpu_usage\t%f\t%s" % (cur_time, str(cpu_usage)))
 
     def average_cpu_time(self, start_time, end_time, assigned_core_list):
         core_cpus = {}.fromkeys(range(8), 0)
@@ -762,7 +762,6 @@ def create_residue(base_vm_paths, base_hashvalue,
     '''Get residue
     return overlay_metafile, overlay_files
     '''
-    import psutil
     global _handoff_start_time  # for testing purpose
     time_start = time.time()
     _handoff_start_time[0] = time_start
@@ -828,7 +827,7 @@ def create_residue(base_vm_paths, base_hashvalue,
                            memory_snapshot_queue, compdata_queue,
                            overlay_mode, synthesized_vm.monitor)
     qmp_thread.daemon = True
-    qmp_thread.config_migration()
+    #qmp_thread.config_migration()
 
     # memory snapshotting thread
     memory_read_proc = save_mem_snapshot(synthesized_vm.conn,
@@ -844,6 +843,7 @@ def create_residue(base_vm_paths, base_hashvalue,
         qmp_thread.start()
         _waiting_to_finish(process_controller, "MemoryReadProcess")
 
+    import pdb;pdb.set_trace()
     # process for getting VM overlay
     dedup_proc = create_delta_proc(monitoring_info, options,
                                    overlay_mode,

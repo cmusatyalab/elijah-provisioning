@@ -375,7 +375,7 @@ class ProcessManager(threading.Thread):
                      system_in_bw_cur_est,
                      total_p, total_r,
                      total_p_cur, total_r_cur)
-                #LOG.debug(msg)
+                LOG.debug(msg)
 
                 # first predict at 2 seconds and then for every 5 seconds
                 if time_from_start > 5 and (time_current_iter - time_prev_mode_change) > 5:

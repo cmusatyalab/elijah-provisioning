@@ -32,7 +32,6 @@ class QmpAfUnix:
 
         json_cmd = json.dumps({"execute":"qmp_capabilities"})
         self.sock.sendall(json_cmd)
-        select.select([self.sock], [], [])
         response = json.loads(self.sock.recv(1024))
         if "return" in response:
             return True
@@ -93,7 +92,6 @@ class QmpAfUnix:
         json_cmd = json.dumps({"execute":"randomize-raw-live"})
         self.sock.sendall(json_cmd)
         try:
-            select.select([self.sock], [], [])
             recved_data = self.sock.recv(1024)
             response = json.loads(recved_data)
             if "return" in response:

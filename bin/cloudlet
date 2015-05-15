@@ -19,7 +19,7 @@
 #
 
 import eventlet
-eventlet.monkey_patch(os=False)
+#eventlet.monkey_patch(os=False)
 
 import os
 import sys
