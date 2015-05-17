@@ -1766,33 +1766,39 @@ def synthesis(base_disk, overlay_path, **kwargs):
         options.TRIM_SUPPORT = True
         options.FREE_SUPPORT = True
         options.DISK_ONLY = False
-        try:
-            preload_thread.join()
-            (base_diskmeta, base_mem, base_memmeta) = \
-                    Const.get_basepath(base_disk, check_exist=False)
-            base_vm_paths = [base_disk, base_mem, base_diskmeta, base_memmeta]
+        preload_thread.join()
+        (base_diskmeta, base_mem, base_memmeta) = \
+                Const.get_basepath(base_disk, check_exist=False)
+        base_vm_paths = [base_disk, base_mem, base_diskmeta, base_memmeta]
 
-            # Testing Handoff Data structure
-            # start
-            if return_residue.startswith("file"):
-                temp_dir = mkdtemp(prefix="cloudlet-residue-")
-                residue_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
-                return_residue = "file:%s" % residue_zipfile
-            residue_file = NamedTemporaryFile(prefix="cloudlet-residue-", delete=False)
-            handoff_ds = handoff.HandoffData()
-            LOG.debug("save data to file")
-            handoff_ds.save_data(
-                base_vm_paths, meta_info[Const.META_BASE_VM_SHA256],
-                preload_thread.basedisk_hashdict,
-                preload_thread.basemem_hashdict,
-                options, return_residue, overlay_mode,
-                synthesized_VM.fuse.mountpoint, synthesized_VM.qemu_logfile,
-                synthesized_VM.qmp_channel, synthesized_VM.machine.ID(),
-                synthesized_VM.fuse.modified_disk_chunks, "qemu:///session",
-            )
-            handoff_datafile = "/tmp/handoff_tmp_data"
+        # Testing Handoff Data structure
+        residue_zipfile = None
+        temp_dir = mkdtemp(prefix="cloudlet-residue-")
+        if return_residue.startswith("file"):
+            residue_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
+            return_residue = "file:%s" % residue_zipfile
+        handoff_ds = handoff.HandoffData()
+        LOG.debug("save data to file")
+        handoff_ds.save_data(
+            base_vm_paths, meta_info[Const.META_BASE_VM_SHA256],
+            preload_thread.basedisk_hashdict,
+            preload_thread.basemem_hashdict,
+            options, return_residue, overlay_mode,
+            synthesized_VM.fuse.mountpoint, synthesized_VM.qemu_logfile,
+            synthesized_VM.qmp_channel, synthesized_VM.machine.ID(),
+            synthesized_VM.fuse.modified_disk_chunks, "qemu:///session",
+        )
+        if True:
+            # using in-memory data structure
+            handoff_ds._load_vm_data()
+            try:
+                handoff.perform_handoff(handoff_ds)
+            except handoff.HandoffError as e:
+                LOG.error("Cannot perform VM handoff: %s" % (str(e)))
+        else:
+            # using subprocess example
+            handoff_datafile = os.path.join(temp_dir, "handoff_datafile")
             handoff_ds.to_file(handoff_datafile)
-            import pdb;pdb.set_trace()
             try:
                 LOG.debug("start handoff")
                 output = subprocess.check_output([
@@ -1801,12 +1807,12 @@ def synthesis(base_disk, overlay_path, **kwargs):
                 LOG.debug("finish handoff")
             except subprocess.CalledProcessError as e:
                 LOG.error("Failed to launch subprocess")
-            else:
-                if os.path.exists(residue_zipfile):
-                    LOG.info("Save new VM overlay at: %s" %\
-                            (os.path.abspath(residue_zipfile)))
-        except CloudletGenerationError, e:
-            LOG.error("Cannot create residue : %s" % (str(e)))
+                LOG.error("Cannot create residue : %s" % (str(e)))
+
+        # print out residue location
+        if residue_zipfile and os.path.exists(residue_zipfile):
+            LOG.info("Save new VM overlay at: %s" %\
+                    (os.path.abspath(residue_zipfile)))
 
     # terminate
     synthesized_VM.monitor.terminate()

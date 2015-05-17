@@ -967,7 +967,6 @@ def perform_handoff(handoff_data):
         LOG.debug("[time] Network transmission (%f~%f):%f" % (time_network_start,
                                                               time_network_end,
                                                               (time_network_end-time_network_start)))
-        cpu_stat = process_controller.cpu_statistics
         process_manager.kill_instance()
 
         # 7. terminting
