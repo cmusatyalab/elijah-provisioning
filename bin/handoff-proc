@@ -1,0 +1,43 @@
+#!/usr/bin/env python 
+#
+# Cloudlet Infrastructure for Mobile Computing
+#
+#   Author: Kiryong Ha <krha@cmu.edu>
+#
+#   Copyright (C) 2011-2013 Carnegie Mellon University
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+import os
+import sys
+import signal
+
+if os.path.exists("../elijah") is True:
+    sys.path.insert(0, "../")
+import msgpack
+from elijah.provisioning.handoff import *
+
+import msgpack
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        sys.stdout.write("usage: %prog handoff_data_file\n")
+        sys.exit(1)
+    handoff_data = HandoffData.from_file(sys.argv[1])
+    if handoff_data == None:
+        sys.stdout.write("Malformatted file: %s\n" % sys.argv[1])
+        sys.exit(1)
+    perform_handoff(handoff_data)
+
+
+
+
