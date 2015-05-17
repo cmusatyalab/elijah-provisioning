@@ -24,6 +24,7 @@ import sys
 import select
 import multiprocessing
 import threading
+import json
 import hashlib
 import libvirt
 import shutil
@@ -90,22 +91,19 @@ class PreloadResidueData(threading.Thread):
 
 
 class VMMonitor(object):
-    def __init__(self, conn, machine, options,
-                 fuse_stream_monitor,
+    def __init__(self, handoff_data,
                  base_disk, base_mem,
-                 modified_disk,
-                 qemu_logfile, 
-                 dirty_disk_chunks=None,
                  nova_util=None):
-        self.conn = conn
-        self.machine = machine
-        self.options = options
-        self.fuse_stream_monitor = fuse_stream_monitor
+        self.conn = handoff_data._conn
+        self.machine = handoff_data._vm_instance
+        self.options = handoff_data.options
+        self.fuse_stream_monitor = handoff_data._monitor
+        self.modified_disk = handoff_data._resumed_disk
+        self.qemu_logfile = handoff_data.qemu_logpath
+        self.dirty_disk_chunks = handoff_data.dirty_disk_chunks
+
         self.base_disk = base_disk
         self.base_mem = base_mem
-        self.modified_disk = modified_disk
-        self.qemu_logfile = qemu_logfile
-        self.dirty_disk_chunks = dirty_disk_chunks
         self.nova_util = nova_util
         self.memory_snapshot_size = -1
         #threading.Thread.__init__(self, target=self.load_monitoring_info)
@@ -542,15 +540,15 @@ class StreamSynthesisFile(threading.Thread):
 
 
 def create_delta_proc(monitoring_info, options,
-                          overlay_mode,
-                          base_image, base_mem, 
-                          base_memmeta, 
-                          basedisk_hashdict, 
-                          basemem_hashdict,
-                          modified_disk,
-                          modified_mem_queue,
-                          merged_deltalist_queue,
-                          process_controller):
+                      overlay_mode,
+                      base_image, base_mem, 
+                      base_memmeta, 
+                      basedisk_hashdict, 
+                      basemem_hashdict,
+                      modified_disk,
+                      modified_mem_queue,
+                      merged_deltalist_queue,
+                      process_controller):
     '''
     '''
 
@@ -755,12 +753,84 @@ class CPUMonitor(threading.Thread):
         self.stop.set()
 
 
-def create_residue(base_vm_paths, base_hashvalue,
-                   basedisk_hashdict, basemem_hashdict,
-                   synthesized_vm, options, migration_addr,
-                   overlay_mode=None):
-    '''Get residue
-    return overlay_metafile, overlay_files
+class HandoffData(object):
+    def __init__(self):
+        pass
+
+    def save_data(self, base_vm_paths, basevm_sha256_hash,  # base VM
+                  basedisk_hashdict, basemem_hashdict,      # base VM
+                  options, migration_addr, overlay_mode,    # handoff configuration
+                  fuse_mountpoint, qemu_logpath,            # running VM instance
+                  qmp_channel_path, vm_id,                  # running VM instance
+                  dirty_disk_chunks, libvirt_conn_addr):    # running VM instance
+        self.base_vm_paths = base_vm_paths
+        self.basevm_sha256_hash = basevm_sha256_hash
+        self.basedisk_hashdict = basedisk_hashdict
+        self.basemem_hashdict = basemem_hashdict
+        self.options = options
+        self.migration_addr = migration_addr
+        self.overlay_mode = overlay_mode
+
+        self.fuse_mountpoint = fuse_mountpoint
+        self.qemu_logpath = qemu_logpath
+        self.qmp_channel_path = qmp_channel_path
+        self.libvirt_conn_addr = libvirt_conn_addr
+        self.vm_id = vm_id
+        self.dirty_disk_chunks = dirty_disk_chunks
+
+    def to_file(self, filename):
+        serialized_buf = dict()
+        for key, value in self.__dict__.iteritems():
+            serialized_buf[key] = value
+        serialized_buf['options'] = self.options.to_dict()
+        with open(filename, "w") as fd:
+            fd.write(msgpack.packb(serialized_buf))
+
+    @staticmethod
+    def from_file(handoff_datafile):
+        with open(handoff_datafile, "r") as handoff_fd:
+            handoff_data_dict = msgpack.unpackb(handoff_fd.read())
+            option = Options.from_dict(handoff_data_dict['options'])
+            handoff_data = HandoffData()
+            handoff_data.save_data(
+                handoff_data_dict['base_vm_paths'],
+                handoff_data_dict['basevm_sha256_hash'],
+                handoff_data_dict['basedisk_hashdict'],
+                handoff_data_dict['basemem_hashdict'],
+                option,
+                handoff_data_dict['migration_addr'],
+                handoff_data_dict['overlay_mode'],
+                handoff_data_dict['fuse_mountpoint'],
+                handoff_data_dict['qemu_logpath'],
+                handoff_data_dict['qmp_channel_path'],
+                handoff_data_dict['vm_id'],
+                handoff_data_dict['dirty_disk_chunks'],
+                handoff_data_dict['libvirt_conn_addr']
+            )
+            handoff_data._load_vm_data()
+            return handoff_data
+        return None
+
+    def _load_vm_data(self):
+        self._conn = libvirt.open(self.libvirt_conn_addr)
+        self._vm_instance = None
+        for each_id in self._conn.listDomainsID():
+            if each_id == self.vm_id:
+                self._vm_instance = self._conn.lookupByID(self.vm_id)
+                break
+
+        self._resumed_disk = os.path.join(self.fuse_mountpoint, 'disk', 'image')
+        self._resumed_mem = os.path.join(self.fuse_mountpoint, 'memory', 'image')
+        self._stream_modified = os.path.join(self.fuse_mountpoint, 'disk', 'streams', 'chunks_modified')
+        self._monitor = cloudletfs.StreamMonitor()
+        self._monitor.add_path(self._stream_modified, cloudletfs.StreamMonitor.DISK_MODIFY)
+        self._monitor.start()
+
+
+def perform_handoff(handoff_data):
+    '''Perform VM handoff
+    @param handoff_data: object of HandoffData
+    @return residue_filepath if perform VM handoff to a file
     '''
     global _handoff_start_time  # for testing purpose
     time_start = time.time()
@@ -771,6 +841,7 @@ def create_residue(base_vm_paths, base_hashvalue,
     if CPU_MONITORING:
         cpu_stat_start = psutil.cpu_times(percpu = True)
     process_controller = process_manager.get_instance()
+    overlay_mode = handoff_data.overlay_mode
     if overlay_mode == None:
         NUM_CPU_CORES = 2   # set CPU affinity
         VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
@@ -789,31 +860,29 @@ def create_residue(base_vm_paths, base_hashvalue,
     #        proc.cpu_affinity(excluded_core_list)
     #        LOG.debug("affinity\tset affinity of %s to %s" % (proc.name, excluded_core_list))
 
-    process_controller.set_mode(overlay_mode, migration_addr)
+    process_controller.set_mode(overlay_mode, handoff_data.migration_addr)
     LOG.info("* LIVE MIGRATION STRATEGY: %d" % VMOverlayCreationMode.LIVE_MIGRATION_STOP)
     LOG.info("* Overlay creation configuration")
-    LOG.info("  - %s" % str(options))
+    LOG.info("  - %s" % str(handoff_data.options))
     LOG.debug("* Overlay creation mode start\n%s" % str(overlay_mode))
     LOG.debug("* Overlay creation mode end")
 
     # sanity check
-    if (options == None) or (isinstance(options, Options) == False):
-        raise HandoffError("Given option is invalid: %s" % str(options))
-    (base_disk, base_mem, base_diskmeta, base_memmeta) = base_vm_paths
-    qemu_logfile = synthesized_vm.qemu_logfile
+    if (handoff_data.options == None) or (isinstance(handoff_data.options, Options) == False):
+        raise HandoffError("Given option is invalid: %s" % str(handoff_data.options))
+    (base_disk, base_mem, base_diskmeta, base_memmeta) = handoff_data.base_vm_paths
 
     # start CPU Monitor
     if CPU_MONITORING:
         cpu_monitor = CPUMonitor()
         cpu_monitor.start()
 
-    memory_snapshot_queue = multiprocessing.Queue(overlay_mode.QUEUE_SIZE_MEMORY_SNAPSHOT)
-    residue_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_OPTIMIZATION)
+    memory_snapshot_queue = multiprocessing.Queue(
+        overlay_mode.QUEUE_SIZE_MEMORY_SNAPSHOT)
+    residue_deltalist_queue = multiprocessing.Queue(
+        maxsize=overlay_mode.QUEUE_SIZE_OPTIMIZATION)
     compdata_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_COMPRESSION)
-    vm_monitor = VMMonitor(synthesized_vm.conn, synthesized_vm.machine, options,
-                           synthesized_vm.monitor, base_disk, base_mem,
-                           synthesized_vm.resumed_disk, qemu_logfile,
-                           dirty_disk_chunks=synthesized_vm.fuse.modified_disk_chunks)
+    vm_monitor = VMMonitor(handoff_data, base_disk, base_mem)
     monitoring_info = vm_monitor.get_monitoring_info()
     time_ss = time.time()
     LOG.debug("[time] serialized step (%f ~ %f): %f" % (time_start,
@@ -823,17 +892,17 @@ def create_residue(base_vm_paths, base_hashvalue,
         raise HandoffError("Time for serialized step takes too long. Check get_monitoring_info()")
 
     # QEMU control thread
-    qmp_thread = QmpThread(synthesized_vm.qmp_channel, process_controller,
+    qmp_thread = QmpThread(handoff_data.qmp_channel_path, process_controller,
                            memory_snapshot_queue, compdata_queue,
-                           overlay_mode, synthesized_vm.monitor)
+                           overlay_mode, handoff_data._monitor)
     qmp_thread.daemon = True
     #qmp_thread.config_migration()
 
     # memory snapshotting thread
-    memory_read_proc = save_mem_snapshot(synthesized_vm.conn,
-                                         synthesized_vm.machine,
+    memory_read_proc = save_mem_snapshot(handoff_data._conn,
+                                         handoff_data._vm_instance,
                                          memory_snapshot_queue,
-                                         fuse_stream_monitor=synthesized_vm.monitor)
+                                         fuse_stream_monitor=handoff_data._monitor)
     if overlay_mode.PROCESS_PIPELINED == False:
         if overlay_mode.LIVE_MIGRATION_STOP is not VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
             msg = "Use ASAP VM stop for pipelined approach for serialized processing.\n"
@@ -843,15 +912,14 @@ def create_residue(base_vm_paths, base_hashvalue,
         qmp_thread.start()
         _waiting_to_finish(process_controller, "MemoryReadProcess")
 
-    import pdb;pdb.set_trace()
     # process for getting VM overlay
-    dedup_proc = create_delta_proc(monitoring_info, options,
+    dedup_proc = create_delta_proc(monitoring_info, handoff_data.options,
                                    overlay_mode,
                                    base_disk, base_mem,
                                    base_memmeta,
-                                   basedisk_hashdict,
-                                   basemem_hashdict,
-                                   synthesized_vm.resumed_disk,
+                                   handoff_data.basedisk_hashdict,
+                                   handoff_data.basemem_hashdict,
+                                   handoff_data._resumed_disk,
                                    memory_snapshot_queue,
                                    residue_deltalist_queue,
                                    process_controller)
@@ -869,10 +937,10 @@ def create_residue(base_vm_paths, base_hashvalue,
     if overlay_mode.PROCESS_PIPELINED == False:
         _waiting_to_finish(process_controller, "CompressProc")
 
-    if migration_addr.startswith("network"):
+    if handoff_data.migration_addr.startswith("network"):
         from stream_client import StreamSynthesisClient
-        migration_dest_ip = migration_addr.split(":")[-1]
-        resume_disk_size = os.path.getsize(synthesized_vm.resumed_disk)
+        migration_dest_ip = handoff_data.migration_addr.split(":")[-1]
+        resume_disk_size = os.path.getsize(handoff_data._resumed_disk)
 
         # wait until getting the memory snapshot size
         resume_memory_size = -1
@@ -887,7 +955,7 @@ def create_residue(base_vm_paths, base_hashvalue,
             qmp_thread.start()
 
         metadata = dict()
-        metadata[Const.META_BASE_VM_SHA256] = base_hashvalue
+        metadata[Const.META_BASE_VM_SHA256] = handoff_data.basevm_sha256_hash
         metadata[Const.META_RESUME_VM_DISK_SIZE] = resume_disk_size
         metadata[Const.META_RESUME_VM_MEMORY_SIZE] = resume_memory_size
         time_network_start = time.time()
@@ -903,10 +971,10 @@ def create_residue(base_vm_paths, base_hashvalue,
         process_manager.kill_instance()
 
         # 7. terminting
-        if synthesized_vm.monitor is not None:
-            synthesized_vm.monitor.terminate()
-            synthesized_vm.monitor.join()
-        synthesized_vm.machine = None   # protecting malaccess to machine 
+        if handoff_data._monitor is not None:
+            handoff_data._monitor.terminate()
+            handoff_data._monitor.join()
+        handoff_data._vm_instance = None   # protecting malaccess to machine 
         time_end = time.time()
 
         qmp_thread.join()
@@ -942,10 +1010,10 @@ def create_residue(base_vm_paths, base_hashvalue,
                     cpu_total_time, 100.0*cpu_total_time/(cpu_total_time+cpu_idle_time)))
 
         _handoff_start_time[0] = sys.maxint
-        return None
-    elif migration_addr.startswith("file"):
+    elif handoff_data.migration_addr.startswith("file"):
+        residue_zipfile = handoff_data.migration_addr.split(":")[-1]
         temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")
-        synthesis_file = StreamSynthesisFile(base_hashvalue, compdata_queue, temp_compfile_dir)
+        synthesis_file = StreamSynthesisFile(handoff_data.basevm_sha256_hash, compdata_queue, temp_compfile_dir)
         synthesis_file.start()
 
         # wait until getting the memory snapshot size
@@ -972,24 +1040,22 @@ def create_residue(base_vm_paths, base_hashvalue,
         overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
         overlay_metafile = _generate_overlaymeta(overlay_metapath,
                                                 overlay_info,
-                                                base_hashvalue,
-                                                os.path.getsize(synthesized_vm.resumed_disk),
+                                                handoff_data.basevm_sha256_hash,
+                                                os.path.getsize(handoff_data._resumed_disk),
                                                 resume_memory_size)
 
         # packaging VM overlay into a single zip file
-        temp_dir = mkdtemp(prefix="cloudlet-overlay-")
-        overlay_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
-        VMOverlayPackage.create(overlay_zipfile, overlay_metafile, overlay_files)
+        VMOverlayPackage.create(residue_zipfile, overlay_metafile, overlay_files)
 
         # terminting
         qmp_thread.join()
         process_manager.kill_instance()
         memory_read_proc.finish()   # deallocate resources for snapshotting
         # 7. terminting
-        if synthesized_vm.monitor is not None:
-            synthesized_vm.monitor.terminate()
-            synthesized_vm.monitor.join()
-        synthesized_vm.machine = None   # protecting malaccess to machine 
+        if handoff_data._monitor is not None:
+            handoff_data._monitor.terminate()
+            handoff_data._monitor.join()
+        handoff_data._vm_instance = None   # protecting malaccess to machine 
         if os.path.exists(overlay_metafile) == True:
             os.remove(overlay_metafile)
         if os.path.exists(temp_compfile_dir) == True:
@@ -1004,5 +1070,6 @@ def create_residue(base_vm_paths, base_hashvalue,
             avg_cpu_usage = cpu_monitor.average_cpu_time(time_start, time_end_transfer, assigned_core_list)
             LOG.debug("cpu_usage\t%f\taverage\t%s" % (time.time(), avg_cpu_usage))
         _handoff_start_time[0] = sys.maxint
-        return overlay_zipfile
+    return None
+
 

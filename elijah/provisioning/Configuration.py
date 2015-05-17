@@ -132,20 +132,30 @@ class Const(object):
 
 
 class Options(object):
-    TRIM_SUPPORT                        = True
-    FREE_SUPPORT                        = False
-    XRAY_SUPPORT                        = False
-    DISK_ONLY                           = False
-    ZIP_CONTAINER                       = False
-    DATA_SOURCE_URI                     = None
+    def __init__(self):
+        self.TRIM_SUPPORT                        = True
+        self.FREE_SUPPORT                        = False
+        self.XRAY_SUPPORT                        = False
+        self.DISK_ONLY                           = False
+        self.ZIP_CONTAINER                       = False
+        self.DATA_SOURCE_URI                     = None
 
-    # see the effect of dedup and reducing semantic by generating two indenpendent overlay
-    SEPERATE_DEDUP_REDUCING_SEMANTICS   = False
-    # for test purposes, we can optionally save modified memory snapshot
-    MEMORY_SAVE_PATH                    = None
+        # see the effect of dedup and reducing semantic by generating two indenpendent overlay
+        self.SEPERATE_DEDUP_REDUCING_SEMANTICS   = False
+        # for test purposes, we can optionally save modified memory snapshot
+        self.MEMORY_SAVE_PATH                    = None
 
     def __str__(self):
         return pprint.pformat(self.__dict__)
+
+    def to_dict(self):
+        return self.__dict__
+
+    @staticmethod
+    def from_dict(dictionary):
+        o = Options()
+        o.__dict__ = dictionary
+        return o
 
 
 class VMOverlayCreationMode(object):

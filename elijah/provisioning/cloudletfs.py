@@ -53,8 +53,8 @@ class CloudletFS(threading.Thread):
         self._pipe = None
         self.mountpoint = None
         self.stop = threading.Event()
-        self.modified_disk_chunks = modified_disk_chunks
-        self.modified_memory_chunks = modified_memory_chunks
+        self.modified_disk_chunks = list(modified_disk_chunks)
+        self.modified_memory_chunks = list(modified_memory_chunks)
 
         # fuse can handle on-demand fetching
         # TODO: passing these argument through kwargs
@@ -281,13 +281,16 @@ class StreamMonitor(threading.Thread):
         return self.modified_chunk_queue
 
     def _handle_chunks_modification(self, line):
-        ctime, chunk = line.split("\t")
-        ctime = float(ctime)
-        chunk = int(chunk)
-        self.modified_chunk_dict[chunk] = ctime
-        if self.modified_chunk_queue is not None:
-            self.modified_chunk_queue.put((chunk, ctime))
-        #LOG.debug("%s: %f, %d" % ("modification", ctime, chunk))
+        try:
+            ctime, chunk = line.split("\t")
+            ctime = float(ctime)
+            chunk = int(chunk)
+            self.modified_chunk_dict[chunk] = ctime
+            if self.modified_chunk_queue is not None:
+                self.modified_chunk_queue.put((chunk, ctime))
+            #LOG.debug("%s: %f, %d" % ("modification", ctime, chunk))
+        except ValueError as e:
+            LOG.debug("warning: %s" % str(e))
 
     def _handle_disk_access(self, line):
         ctime, chunk = line.split("\t")
