@@ -53,8 +53,8 @@ class CloudletFS(threading.Thread):
         self._pipe = None
         self.mountpoint = None
         self.stop = threading.Event()
-        self.modified_disk_chunks = list(modified_disk_chunks)
-        self.modified_memory_chunks = list(modified_memory_chunks)
+        self.modified_disk_chunks = list(modified_disk_chunks) if modified_disk_chunks else None
+        self.modified_memory_chunks = list(modified_memory_chunks) if modified_memory_chunks else None
 
         # fuse can handle on-demand fetching
         # TODO: passing these argument through kwargs
