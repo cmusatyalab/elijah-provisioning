@@ -991,15 +991,23 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
         disk_chunks = each_file[Const.META_OVERLAY_FILE_DISK_CHUNKS]
         memory_chunks_all.update(set(memory_chunks))
         disk_chunks_all.update(set(disk_chunks))
+    disk_chunk_str = ["%ld:0" % item for item in disk_chunks_all]
+    disk_overlay_map = ','.join(disk_chunk_str)
+    memory_chunk_str = ["%ld:0" % item for item in memory_chunks_all]
+    memory_overlay_map = ','.join(memory_chunk_str)
 
     # make FUSE disk & memory
     kwargs['meta_info'] = meta_info
     time_start_fuse = time()
-    fuse = run_fuse(Const.CLOUDLETFS_PATH, Const.CHUNK_SIZE,
-            base_image, vm_disk_size, base_mem, vm_memory_size,
-            resumed_disk=launch_disk.name,  disk_chunks=disk_chunks_all,
-            resumed_memory=launch_mem.name, memory_chunks=memory_chunks_all,
-            **kwargs)
+    fuse = run_fuse(
+        Const.CLOUDLETFS_PATH, Const.CHUNK_SIZE,
+        base_image, vm_disk_size, base_mem, vm_memory_size,
+        resumed_disk=launch_disk.name, disk_overlay_map=disk_overlay_map,
+        resumed_memory=launch_mem.name, memory_overlay_map=memory_overlay_map,
+        disk_chunks=disk_chunks_all,
+        memory_chunks=memory_chunks_all,
+        **kwargs
+    )
     LOG.info("Start FUSE (%f s)" % (time()-time_start_fuse))
     LOG.debug("Overlay has %ld chunks" % (len(memory_chunks_all) + len(disk_chunks_all)))
 
@@ -1019,10 +1027,11 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
 
 
 def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
-        original_memory, fuse_memory_size,
-        resumed_disk=None, disk_chunks=None,
-        resumed_memory=None, memory_chunks=None,
-        **kwargs):
+             original_memory, fuse_memory_size,
+             resumed_disk=None, disk_overlay_map="",
+             resumed_memory=None, memory_overlay_map="",
+             disk_chunks=None, memory_chunks=None,
+             **kwargs):
     if fuse_disk_size <= 0:
         raise CloudletGenerationError("FUSE disk size should be bigger than 0")
     if original_memory != None and fuse_memory_size <= 0:
@@ -1031,8 +1040,6 @@ def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
     # run fuse file system
     resumed_disk = os.path.abspath(resumed_disk) if resumed_disk else ""
     resumed_memory = os.path.abspath(resumed_memory) if resumed_memory else ""
-    disk_overlay_map = ''
-    memory_overlay_map = ''
     if disk_chunks:
         disk_chunk_str = ["%ld:0" % item for item in disk_chunks]
         disk_overlay_map = ','.join(disk_chunk_str)

@@ -219,7 +219,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
                      (mem_snapshot_size, len(new_header), time.time()))
 
             # write rest of the memory data
-            prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
+            #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
                 input_fd = [self.control_queue._reader.fileno(), self.in_fd]
                 input_ready, out_ready, err_ready = select.select(input_fd, [], [])
@@ -233,8 +233,8 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     current_size = len(data)
                     self.result_queue.put(data)
                     self.total_write_size += current_size
-                    prog_bar.set_percent(100.0*self.total_write_size/mem_snapshot_size)
-                    prog_bar.show_progress()
+                    #prog_bar.set_percent(100.0*self.total_write_size/mem_snapshot_size)
+                    #prog_bar.show_progress()
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time.time()
@@ -242,7 +242,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
                         prev_processed_size = self.total_read_size
                         prev_processed_time = cur_time
                         self.monitor_current_bw = (throughput/Const.CHUNK_SIZE)
-            prog_bar.finish()
+            #prog_bar.finish()
         except Exception, e:
             sys.stdout.write("[MemorySnapshotting] Exception1n")
             sys.stderr.write(traceback.format_exc())
