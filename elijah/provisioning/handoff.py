@@ -58,11 +58,14 @@ import qmp_af_unix
 import log as logging
 
 
-# to work with OpenStack which uses eventlet 
+# to work with OpenStack's eventlet 
 try:
     from eventlet import patcher
-    native_threading = patcher.original("threading")
-except:
+    if patcher.is_monkey_patched("thread"):
+        native_threading = patcher.original("threading")
+    else:
+        raise ImportError("threading is not monkey-patched")
+except ImportError as e:
     import threading
     native_threading = threading
 
