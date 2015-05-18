@@ -1821,8 +1821,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
             try:
                 LOG.debug("start handoff")
                 output = subprocess.check_output([
-                    "/home/stack/cloudlet/provisioning/bin/handoff-proc",
-                    "%s" % handoff_datafile])
+                    "/usr/local/bin/handoff-proc", "%s" % handoff_datafile])
                 LOG.debug("finish handoff")
             except subprocess.CalledProcessError as e:
                 LOG.error("Failed to launch subprocess")

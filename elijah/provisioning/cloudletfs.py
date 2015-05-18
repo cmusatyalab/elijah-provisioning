@@ -282,15 +282,27 @@ class StreamMonitor(threading.Thread):
 
     def _handle_chunks_modification(self, line):
         try:
-            ctime, chunk = line.split("\t")
-            ctime = float(ctime)
-            chunk = int(chunk)
+            values = line.split("\t")
+            if len(values) == 2:
+                # expected result
+                ctime = float(values[0])
+                chunk = int(values[1])
+            elif len(values) == 1:
+                # This happens when there's a modified chunk before opening
+                # the stream file. We encounter this problem at commit
+                # 333992a5a4a99e96a5ffc7c39ff7b3ab459ce1fc because we execute
+                # handoff code using serializable DS, which reopens log file.
+                # To workaround, we assign the recent time for those modified
+                # chunks. This may increase handoff size by preventing TRIM,
+                # but preserve correctness.
+                ctime = time.time()
+                chunk = int(values[0])
             self.modified_chunk_dict[chunk] = ctime
             if self.modified_chunk_queue is not None:
                 self.modified_chunk_queue.put((chunk, ctime))
             #LOG.debug("%s: %f, %d" % ("modification", ctime, chunk))
         except ValueError as e:
-            LOG.debug("warning: %s" % str(e))
+            LOG.debug("warning failed to handle modified chunks: %s" % str(e))
 
     def _handle_disk_access(self, line):
         ctime, chunk = line.split("\t")
