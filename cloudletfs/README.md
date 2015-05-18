@@ -16,6 +16,7 @@ Installing from source
 
 To install:
 
+  > $ sudo apt-get install autoconf libtool
   > $ autoreconf -i  
   > $ ./configure && make && sudo make install  
   >
