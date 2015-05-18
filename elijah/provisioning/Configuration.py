@@ -164,6 +164,7 @@ class VMOverlayCreationMode(object):
     USE_STATIC_NETWORK_BANDWIDTH = -1 # only used for experiement. If it's bigger than 0, adaptation use this value to transmit over the network
     MEASURE_AVERAGE_TIME    = 2 # seconds
     MAX_THREAD_NUM = 4
+    HANDOFF_DEST_PORT_DEFAULT = 8022
 
     PROFILE_DATAPATH = os.path.join(Const.CONFIGURATION_DIR, "mode-profile.face")
     VARYING_PARAMETERS = ['MEMORY_DIFF_ALGORITHM', 'DISK_DIFF_ALGORITHM', 'COMPRESSION_ALGORITHM_TYPE', 'COMPRESSION_ALGORITHM_SPEED']

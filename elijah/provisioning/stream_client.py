@@ -150,8 +150,9 @@ class NetworkMeasurementThread(threading.Thread):
 
 class StreamSynthesisClient(process_manager.ProcWorker):
 
-    def __init__(self, remote_addr, metadata, compdata_queue):
+    def __init__(self, remote_addr, remote_port, metadata, compdata_queue):
         self.remote_addr = remote_addr
+        self.remote_port = remote_port
         self.metadata = metadata
         self.compdata_queue = compdata_queue
 
@@ -168,8 +169,7 @@ class StreamSynthesisClient(process_manager.ProcWorker):
 
     def transfer(self):
         # connect
-        address = (self.remote_addr, 8022)
-        #address = ("128.2.213.12", 8022)
+        address = (self.remote_addr, self.remote_port)
         print "Connecting to (%s).." % str(address)
         sock = socket.create_connection(address, 10)
         sock.setblocking(True)

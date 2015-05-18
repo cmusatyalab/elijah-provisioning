@@ -71,7 +71,7 @@ class CPUCoreControl(threading.Thread):
 def run_file(base_path, overlay_path, overlay_mode):
     try:
         synthesis.synthesis(base_path, overlay_path,
-                            return_residue="file",
+                            handoff_url="file://",
                             zip_container=True,
                             overlay_mode=overlay_mode,
                             is_profiling_test=True)
@@ -83,7 +83,7 @@ def run_file(base_path, overlay_path, overlay_mode):
 def run_network(base_path, overlay_path, overlay_mode):
     try:
         synthesis.synthesis(base_path, overlay_path,
-                            return_residue="network:rain.elijah.cs.cmu.edu",
+                            handoff_url="tcp://rain.elijah.cs.cmu.edu",
                             zip_container=True,
                             overlay_mode=overlay_mode,
                             is_profiling_test=True)

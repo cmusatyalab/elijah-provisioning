@@ -35,6 +35,7 @@ import psutil
 from tempfile import NamedTemporaryFile
 from tempfile import mkdtemp
 from xml.etree import ElementTree
+from urlparse import urlsplit
 
 import Memory
 import Disk
@@ -762,7 +763,7 @@ class HandoffData(object):
 
     def save_data(self, base_vm_paths, basevm_sha256_hash,  # base VM
                   basedisk_hashdict, basemem_hashdict,      # base VM
-                  options, migration_addr, overlay_mode,    # handoff configuration
+                  options, handoff_addr, overlay_mode,    # handoff configuration
                   fuse_mountpoint, qemu_logpath,            # running VM instance
                   qmp_channel_path, vm_id,                  # running VM instance
                   dirty_disk_chunks, libvirt_conn_addr):    # running VM instance
@@ -771,7 +772,7 @@ class HandoffData(object):
         self.basedisk_hashdict = basedisk_hashdict
         self.basemem_hashdict = basemem_hashdict
         self.options = options
-        self.migration_addr = migration_addr
+        self.handoff_addr = handoff_addr
         self.overlay_mode = overlay_mode
 
         self.fuse_mountpoint = fuse_mountpoint
@@ -801,7 +802,7 @@ class HandoffData(object):
                 handoff_data_dict['basedisk_hashdict'],
                 handoff_data_dict['basemem_hashdict'],
                 option,
-                handoff_data_dict['migration_addr'],
+                handoff_data_dict['handoff_addr'],
                 handoff_data_dict['overlay_mode'],
                 handoff_data_dict['fuse_mountpoint'],
                 handoff_data_dict['qemu_logpath'],
@@ -833,7 +834,7 @@ class HandoffData(object):
 def perform_handoff(handoff_data):
     '''Perform VM handoff
     @param handoff_data: object of HandoffData
-    @return residue_filepath if perform VM handoff to a file
+    @return None
     '''
     global _handoff_start_time  # for testing purpose
     time_start = time.time()
@@ -863,7 +864,7 @@ def perform_handoff(handoff_data):
     #        proc.cpu_affinity(excluded_core_list)
     #        LOG.debug("affinity\tset affinity of %s to %s" % (proc.name, excluded_core_list))
 
-    process_controller.set_mode(overlay_mode, handoff_data.migration_addr)
+    process_controller.set_mode(overlay_mode, handoff_data.handoff_addr)
     LOG.info("* LIVE MIGRATION STRATEGY: %d" % VMOverlayCreationMode.LIVE_MIGRATION_STOP)
     LOG.info("* Overlay creation configuration")
     LOG.info("  - %s" % str(handoff_data.options))
@@ -940,9 +941,16 @@ def perform_handoff(handoff_data):
     if overlay_mode.PROCESS_PIPELINED == False:
         _waiting_to_finish(process_controller, "CompressProc")
 
-    if handoff_data.migration_addr.startswith("network"):
+    migration_url = urlsplit(handoff_data.handoff_addr)
+    if migration_url.scheme == "tcp":
         from stream_client import StreamSynthesisClient
-        migration_dest_ip = handoff_data.migration_addr.split(":")[-1]
+        url_value = migration_url.netloc.split(":")
+        if len(url_value) == 1:
+            migration_dest_ip = url_value[0]
+            migration_dest_port = VMOverlayCreationMode.HANDOFF_DEST_PORT_DEFAULT
+        elif len(url_value) == 2:
+            migration_dest_ip = url_value[0]
+            migration_dest_port = url_value[1]
         resume_disk_size = os.path.getsize(handoff_data._resumed_disk)
 
         # wait until getting the memory snapshot size
@@ -962,7 +970,8 @@ def perform_handoff(handoff_data):
         metadata[Const.META_RESUME_VM_DISK_SIZE] = resume_disk_size
         metadata[Const.META_RESUME_VM_MEMORY_SIZE] = resume_memory_size
         time_network_start = time.time()
-        client = StreamSynthesisClient(migration_dest_ip, metadata, compdata_queue)
+        client = StreamSynthesisClient(migration_dest_ip, migration_dest_port,
+                                       metadata, compdata_queue)
         client.start()
         client.join()
         cpu_stat_end = psutil.cpu_times(percpu=True)
@@ -1012,8 +1021,8 @@ def perform_handoff(handoff_data):
                     cpu_total_time, 100.0*cpu_total_time/(cpu_total_time+cpu_idle_time)))
 
         _handoff_start_time[0] = sys.maxint
-    elif handoff_data.migration_addr.startswith("file"):
-        residue_zipfile = handoff_data.migration_addr.split(":")[-1]
+    elif migration_url.scheme == "file":
+        residue_zipfile = str(migration_url.path)
         temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")
         synthesis_file = StreamSynthesisFile(handoff_data.basevm_sha256_hash, compdata_queue, temp_compfile_dir)
         synthesis_file.start()

@@ -35,6 +35,7 @@ import multiprocessing
 import struct
 import json
 from operator import itemgetter
+from urlparse import urlsplit
 
 from db import api as db_api
 from db import table_def as db_table
@@ -1706,7 +1707,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
     @param base_disk: path to base disk
     @param overlay_path: path to VM overlay file
     @param kwargs-disk_only: synthesis size VM with only disk image
-    @param kwargs-return_residue: return residue of changed portion
+    @param kwargs-handoff_url: return residue of changed portion
     """
     if os.path.exists(base_disk) == False:
         msg = "Base disk does not exist at %s" % base_disk
@@ -1716,7 +1717,13 @@ def synthesis(base_disk, overlay_path, **kwargs):
 
     disk_only = kwargs.get('disk_only', False)
     zip_container = kwargs.get('zip_container', False)
-    return_residue = kwargs.get('return_residue', None)
+    handoff_url = kwargs.get('handoff_url', None)
+    if handoff_url is not None:
+        parsed_handoff_url = urlsplit(handoff_url)
+        if parsed_handoff_url.scheme != "file" and parsed_handoff_url.scheme != "tcp":
+            msg = "invalid handoff_url (%s). Only support file and tcp scheme" % handoff_url
+            raise CloudletGenerationError(msg)
+
     qemu_args = kwargs.get('qemu_args', False)
     overlay_mode = kwargs.get('overlay_mode', None)
     is_profiling_test = kwargs.get('is_profiling_test', False)
@@ -1754,7 +1761,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
     fuse_thread.join()
 
     synthesized_VM.resume()
-    if return_residue is not None:
+    if handoff_url is not None:
         # preload basevm hash dictionary for creating residue
         (base_diskmeta, base_mem, base_memmeta) =\
             Const.get_basepath(base_disk, check_exist=False)
@@ -1771,7 +1778,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
     #synthesis_statistics(meta_info, overlay_filename.name, \
     #        mem_access_list, disk_access_list)
 
-    if return_residue is not None:
+    if handoff_url is not None:
         options = Options()
         options.TRIM_SUPPORT = True
         options.FREE_SUPPORT = True
@@ -1781,19 +1788,20 @@ def synthesis(base_disk, overlay_path, **kwargs):
                 Const.get_basepath(base_disk, check_exist=False)
         base_vm_paths = [base_disk, base_mem, base_diskmeta, base_memmeta]
 
-        # Testing Handoff Data structure
         residue_zipfile = None
-        temp_dir = mkdtemp(prefix="cloudlet-residue-")
-        if return_residue.startswith("file"):
+        dest_handoff_url = handoff_url
+        parsed_handoff_url = urlsplit(handoff_url)
+        if parsed_handoff_url.scheme == "file":
+            temp_dir = mkdtemp(prefix="cloudlet-residue-")
             residue_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
-            return_residue = "file:%s" % residue_zipfile
+            dest_handoff_url = "file://%s" % os.path.abspath(residue_zipfile)
         handoff_ds = handoff.HandoffData()
         LOG.debug("save data to file")
         handoff_ds.save_data(
             base_vm_paths, meta_info[Const.META_BASE_VM_SHA256],
             preload_thread.basedisk_hashdict,
             preload_thread.basemem_hashdict,
-            options, return_residue, overlay_mode,
+            options, dest_handoff_url, overlay_mode,
             synthesized_VM.fuse.mountpoint, synthesized_VM.qemu_logfile,
             synthesized_VM.qmp_channel, synthesized_VM.machine.ID(),
             synthesized_VM.fuse.modified_disk_chunks, "qemu:///session",
@@ -1806,7 +1814,8 @@ def synthesis(base_disk, overlay_path, **kwargs):
             except handoff.HandoffError as e:
                 LOG.error("Cannot perform VM handoff: %s" % (str(e)))
         else:
-            # using subprocess example
+            # Testing Handoff Data structure using subprocess example
+            temp_dir = mkdtemp(prefix="cloudlet-handoffdata-")
             handoff_datafile = os.path.join(temp_dir, "handoff_datafile")
             handoff_ds.to_file(handoff_datafile)
             try:
@@ -1818,6 +1827,9 @@ def synthesis(base_disk, overlay_path, **kwargs):
             except subprocess.CalledProcessError as e:
                 LOG.error("Failed to launch subprocess")
                 LOG.error("Cannot create residue : %s" % (str(e)))
+            finally:
+                if os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir)
 
         # print out residue location
         if residue_zipfile and os.path.exists(residue_zipfile):

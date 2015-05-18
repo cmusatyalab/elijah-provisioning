@@ -30,7 +30,7 @@ import urlparse
 from lxml import etree
 from tempfile import mkdtemp
 from urlparse import urlsplit
-from urllib import pathname2url 
+from urllib import pathname2url
 import zipfile
 from lxml.builder import ElementMaker
 import sys

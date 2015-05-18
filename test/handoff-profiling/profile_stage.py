@@ -33,7 +33,7 @@ class ProfilingError(Exception):
 def run_profile(base_path, overlay_path, overlay_mode):
     try:
         synthesis.synthesis(base_path, overlay_path,
-                            return_residue="file",
+                            handoff_url="file://",
                             zip_container=True,
                             overlay_mode=overlay_mode,
                             is_profiling_test=True)
