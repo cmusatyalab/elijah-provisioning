@@ -50,7 +50,7 @@ def main(argv=sys.argv):
                       help="terminate after one VM handoff operation")
     settings, args = parser.parse_args(argv)
 
-    server = StreamSynthesisServer(int(settings.port_number))
+    server = StreamSynthesisServer(int(settings.port_number), timeout=120)
     try:
         if settings.terminate:
             server.handle_request()

@@ -692,10 +692,11 @@ class StreamSynthesisConst(object):
 
 
 class StreamSynthesisServer(SocketServer.TCPServer):
-    def __init__(self, port_number=StreamSynthesisConst.SERVER_PORT_NUMBER):
+    def __init__(self, port_number=StreamSynthesisConst.SERVER_PORT_NUMBER, timeout=None):
         self.dbconn = DBConnector()
         self.basevm_list = self.check_basevm()
         self.port_number = port_number
+        self.timeout = timeout
 
         server_address = ("0.0.0.0", self.port_number)
         self.allow_reuse_address = True
@@ -709,6 +710,7 @@ class StreamSynthesisServer(SocketServer.TCPServer):
         self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         LOG.info("* Server configuration")
         LOG.info(" - Open TCP Server at %s" % (str(server_address)))
+        LOG.info(" - Time out for waiting: %d" % (self.timeout))
         LOG.info(" - Disable Nagle(No TCP delay)  : %s" \
                 % str(self.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY)))
         LOG.info("-"*50)
@@ -716,6 +718,9 @@ class StreamSynthesisServer(SocketServer.TCPServer):
     def handle_error(self, request, client_address):
         #SocketServer.TCPServer.handle_error(self, request, client_address)
         #sys.stderr.write("handling error from client %s\n" % (str(client_address)))
+        pass
+
+    def handle_timeout(self):
         pass
 
     def terminate(self):
@@ -762,22 +767,4 @@ class StreamSynthesisServer(SocketServer.TCPServer):
             LOG.error("[Error] NO valid Base VM")
             sys.exit(2)
         return ret_list
-
-
-if __name__ == "__main__":
-    server = StreamSynthesisServer(sys.argv[1:])
-    try:
-        server.serve_forever()
-    except Exception as e:
-        #sys.stderr.write(str(e))
-        server.terminate()
-        sys.exit(1)
-    except KeyboardInterrupt as e:
-        sys.stdout.write("Exit by user\n")
-        server.terminate()
-        sys.exit(1)
-    else:
-        server.terminate()
-        sys.exit(0)
-
 
