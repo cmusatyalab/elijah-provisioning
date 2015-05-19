@@ -47,7 +47,6 @@ from db.table_def import BaseVM
 from Configuration import Const as Cloudlet_Const
 from compression import DecompProc
 from pprint import pformat
-from optparse import OptionParser
 import log as logging
 
 import mmap
@@ -185,7 +184,7 @@ class RecoverDeltaProc(multiprocessing.Process):
 
         LOG.info("[time] Delta delta %ld chunks, (%s~%s): %s" % \
                 (count, time_start, time_end, (time_end-time_start)))
-        self.finish()
+        LOG.info("Finish VM handoff")
 
     def recover_item(self, delta_item):
         if type(delta_item) != DeltaItem:
@@ -490,7 +489,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 ack_data = struct.pack("!Q", data_diff)
                 self.request.sendall(ack_data)
                 if (cur_recv_size-prev_ack_sent_size) >= ack_size*2:
-                    print "we missed to send acks"
+                    #LOG.debug("we missed to send acks")
+                    pass
                 prev_ack_sent_size = cur_recv_size
         return data
 
@@ -642,8 +642,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                                                                   time_fuse_end,
                                                                   actual_resume_time,
                                                                   ))
-        #connect_vnc(synthesized_VM.machine)
-        print "finishing VM in 3 seconds"
+        connect_vnc(synthesized_VM.machine)
+        LOG.debug("Finishing VM in 3 seconds")
         time.sleep(3)
 
         # terminate
@@ -692,14 +692,12 @@ class StreamSynthesisConst(object):
 
 
 class StreamSynthesisServer(SocketServer.TCPServer):
-    def __init__(self, args):
-        settings, args = StreamSynthesisServer.process_command_line(args)
+    def __init__(self, port_number=StreamSynthesisConst.SERVER_PORT_NUMBER):
         self.dbconn = DBConnector()
         self.basevm_list = self.check_basevm()
+        self.port_number = port_number
 
-        StreamSynthesisConst.LOCAL_IPADDRESS = "0.0.0.0"
-        server_address = (StreamSynthesisConst.LOCAL_IPADDRESS, StreamSynthesisConst.SERVER_PORT_NUMBER)
-
+        server_address = ("0.0.0.0", self.port_number)
         self.allow_reuse_address = True
         try:
             SocketServer.TCPServer.__init__(self, server_address, StreamSynthesisHandler)
@@ -736,15 +734,6 @@ class StreamSynthesisServer(SocketServer.TCPServer):
                 LOG.warning(msg)
         LOG.info("[TERMINATE] Finish synthesis server connection")
 
-
-    @staticmethod
-    def process_command_line(argv):
-        global operation_mode
-        VERSION = 'VM Stream Server: %s' % StreamSynthesisConst.VERSION
-        parser = OptionParser(usage="usage: %prog " + " [option]",
-                version=VERSION)
-        settings, args = parser.parse_args(argv)
-        return settings, args
 
     def check_basevm(self):
         basevm_list = self.dbconn.list_item(BaseVM)

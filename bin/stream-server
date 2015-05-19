@@ -17,13 +17,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+
 import os
 import sys
 import signal
+from optparse import OptionParser
 
 if os.path.exists("../elijah") is True:
     sys.path.insert(0, "../")
 from elijah.provisioning.stream_server import StreamSynthesisServer
+from elijah.provisioning.stream_server import StreamSynthesisConst
 from elijah.provisioning.synthesis import validate_congifuration
 
 
@@ -33,24 +36,39 @@ def sigint_handler(signum, frame):
         server.terminate()
     sys.exit(0)
 
+def main(argv=sys.argv):
+    if not validate_congifuration():
+        sys.stderr.write("failed to validate configuration\n")
+        sys.exit(1)
 
-if not validate_congifuration():
-    sys.stderr.write("failed to validate configuration\n")
-    sys.exit(1)
+    parser = OptionParser(usage="usage: %prog ")
+    parser.add_option("-t", "--terminate", action="store_true",
+                      dest="terminate", default=False,
+                      help="terminate after one VM handoff operation")
+    parser.add_option("-p", "--port", action="store", dest="port_number",
+                      default=StreamSynthesisConst.SERVER_PORT_NUMBER,
+                      help="terminate after one VM handoff operation")
+    settings, args = parser.parse_args(argv)
 
-server = StreamSynthesisServer(sys.argv[1:])
-try:
-    server.serve_forever()
-except Exception as e:
-    #sys.stderr.write(str(e))
-    server.terminate()
-    sys.exit(1)
-except KeyboardInterrupt as e:
-    sys.stdout.write("Exit by user\n")
-    server.terminate()
-    sys.exit(1)
-else:
-    server.terminate()
-    sys.exit(0)
+    server = StreamSynthesisServer(int(settings.port_number))
+    try:
+        if settings.terminate:
+            server.handle_request()
+        else:
+            server.serve_forever()
+    except Exception as e:
+        #sys.stderr.write(str(e))
+        server.terminate()
+        sys.exit(1)
+    except KeyboardInterrupt as e:
+        sys.stdout.write("Exit by user\n")
+        server.terminate()
+        sys.exit(1)
+    else:
+        server.terminate()
+        sys.exit(0)
 
 
+
+if __name__ == "__main__":
+    main()
