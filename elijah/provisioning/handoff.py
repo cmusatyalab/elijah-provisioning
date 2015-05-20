@@ -836,11 +836,11 @@ class HandoffDataRecv(object):
         pass
 
     def save_data(self, base_vm_paths, basevm_sha256_hash,  # base VM
-                  libvirt_xml, libvirt_conn_addr):          # vm instance
+                  launch_diskpath, launch_memorypath):          # vm instance
         self.base_vm_paths = base_vm_paths
         self.basevm_sha256_hash = basevm_sha256_hash
-        self.libvirt_xml = libvirt_xml
-        self.libvirt_conn_addr = libvirt_conn_addr
+        self.launch_diskpath = launch_diskpath
+        self.launch_memorypath = launch_memorypath
 
     def to_file(self, filename):
         serialized_buf = dict()
@@ -857,16 +857,11 @@ class HandoffDataRecv(object):
             handoff_data.save_data(
                 handoff_data_dict['base_vm_paths'],
                 handoff_data_dict['basevm_sha256_hash'],
-                handoff_data_dict['libvirt_xml'],
-                handoff_data_dict['libvirt_conn_addr']
+                handoff_data_dict['launch_diskpath'],
+                handoff_data_dict['launch_memorypath']
             )
-            handoff_data._load_vm_data()
             return handoff_data
         return None
-
-    def _load_vm_data(self):
-        self._conn = libvirt.open(self.libvirt_conn_addr)
-        self._libvirt_utils = MockLibvirtUtil()
 
 
 class MockLibvirtUtil(object):

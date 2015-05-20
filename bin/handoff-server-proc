@@ -32,28 +32,32 @@ import subprocess
 import tempfile
 import multiprocessing
 import threading
+from optparse import OptionParser
 from hashlib import sha256
 
-import delta
-from server import NetworkUtil
-from synthesis_protocol import Protocol as Protocol
-from synthesis import run_fuse
-from synthesis import SynthesizedVM
-from synthesis import connect_vnc
-from handoff import HandoffDataRecv
+if os.path.exists("../elijah") is True:
+    sys.path.insert(0, "../")
+from elijah.provisioning.synthesis import validate_congifuration
+from elijah.provisioning import delta
+from elijah.provisioning.delta import DeltaItem
+from elijah.provisioning.server import NetworkUtil
+from elijah.provisioning.synthesis_protocol import Protocol as Protocol
+from elijah.provisioning.synthesis import run_fuse
+from elijah.provisioning.synthesis import SynthesizedVM
+from elijah.provisioning.synthesis import connect_vnc
+from elijah.provisioning.handoff import HandoffDataRecv
 
 #import synthesis as synthesis
 #from package import VMOverlayPackage
-from db.api import DBConnector
-from db.table_def import BaseVM
-from Configuration import Const as Cloudlet_Const
-from compression import DecompProc
-from pprint import pformat
-import log as logging
+from elijah.provisioning.db.api import DBConnector
+from elijah.provisioning.db.table_def import BaseVM
+from elijah.provisioning.Configuration import Const as Cloudlet_Const
+from elijah.provisioning.compression import DecompProc
+from elijah.provisioning import tool
+from elijah.provisioning import log as logging
 
 import mmap
-import tool
-from delta import DeltaItem
+from pprint import pformat
 
 
 LOG = logging.getLogger(__name__)
@@ -411,39 +415,6 @@ class RecoverDeltaProc(multiprocessing.Process):
             self.raw_mem_overlay = None
 
 
-class FuseFeedingProc(multiprocessing.Process):
-    def __init__(self, fuse, fuse_info_queue):
-        self.fuse = fuse
-        self.fuse_info_queue = fuse_info_queue
-        self.stop = threading.Event()
-        multiprocessing.Process.__init__(self, target=self.feeding_thread)
-
-    def feeding_thread(self):
-        time_start = time.time()
-        while True:
-            self._running = True
-            try:
-                chunks = self.fuse_info_queue.get()
-                if chunks == Cloudlet_Const.QUEUE_SUCCESS_MESSAGE:
-                    break
-                chunk_str = ','.join(chunks)
-                #sys.stdout.write(chunk_str)
-                self.fuse.fuse_write(chunk_str)
-            except EOFError:
-                break
-
-        time_end = time.time()
-        LOG.info("[time] [FUSE] %s ~ %s: %s\n" % \
-                (time_start, time_end, (time_end-time_start)))
-        self.fuse.fuse_write("END_OF_TRANSMISSION")
-
-    def terminate(self):
-        self.stop.set()
-
-    def terminate(self):
-        self.stop.set()
-
-
 class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
     synthesis_option = {
             Protocol.SYNTHESIS_OPTION_DISPLAY_VNC : False,
@@ -530,11 +501,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         | header size | header | blob header size | blob header | blob data  |
         |  (4 bytes)  | (var)  | (4 bytes)        | (var bytes) | (var bytes)|
         '''
-        if self.server.handoff_data is not None:
-            LOG.debug("VM synthesis using OpenStack")
-        else:
-            LOG.debug("VM synthesis as standalone")
-
         # variable
         self.total_recved_size_cur = 0
         self.total_recved_size_prev = 0
@@ -552,19 +518,14 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         synthesis_option, base_diskpath = self._check_validity(metadata)
         if base_diskpath == None:
             raise StreamSynthesisError("No matching base VM")
-        if self.server.handoff_data:
-            base_diskpath, base_diskmeta, base_mempath, base_memmeta =\
-                self.server.handoff_data.base_vm_paths
-        else:
-            (base_diskmeta, base_mempath, base_memmeta) = \
-                    Cloudlet_Const.get_basepath(base_diskpath, check_exist=True)
+        base_diskpath, base_diskmeta, base_mempath, base_memmeta =\
+            self.server.handoff_data.base_vm_paths
         LOG.info("  - %s" % str(pformat(self.synthesis_option)))
         LOG.info("  - Base VM     : %s" % base_diskpath)
 
         # variables for FUSE
-        temp_synthesis_dir = tempfile.mkdtemp(prefix="cloudlet-comp-")
-        launch_disk = os.path.join(temp_synthesis_dir, "launch-disk")
-        launch_mem = os.path.join(temp_synthesis_dir, "launch-mem")
+        launch_disk = self.server.handoff_data.launch_diskpath
+        launch_mem = self.server.handoff_data.launch_memorypath
         memory_chunk_all = set()
         disk_chunk_all = set()
 
@@ -624,69 +585,12 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         delta_proc.join()
         LOG.debug("%f\tdeltaproc join" % (time.time()))
 
-        # We told to FUSE that we have everything ready, so we need to wait
-        # until delta_proc fininshes. we cannot start VM before delta_proc
-        # finishes, because we don't know what will be modified in the future
-        time_fuse_start = time.time()
-        disk_overlay_map = ','.join(disk_chunk_all)
-        memory_overlay_map = ','.join(memory_chunk_all)
-        fuse = run_fuse(Cloudlet_Const.CLOUDLETFS_PATH, Cloudlet_Const.CHUNK_SIZE,
-                base_diskpath, launch_disk_size, base_mempath, launch_memory_size,
-                resumed_disk=launch_disk,  disk_overlay_map=disk_overlay_map,
-                resumed_memory=launch_mem, memory_overlay_map=memory_overlay_map)
-        time_fuse_end = time.time()
-        memory_path = os.path.join(fuse.mountpoint, 'memory', 'image')
-
-        if self.server.handoff_data:
-            synthesized_vm = SynthesizedVM(
-                launch_disk, launch_mem, fuse,
-                disk_only=False, qemu_args=None,
-                nova_xml=self.server.handoff_data.libvirt_xml,
-                nova_conn=self.server.handoff_data._conn,
-                nova_util=self.server.handoff_data._libvirt_utils
-            )
-        else:
-            synthesized_vm = SynthesizedVM(launch_disk, launch_mem, fuse)
-
-        synthesized_vm.start()
-        synthesized_vm.join()
-
-        # to be delete
-        #libvirt_xml = synthesized_vm.new_xml_str
-        #vmpaths = [base_diskpath, base_diskmeta, base_mempath, base_memmeta]
-        #base_hashvalue = metadata.get(Cloudlet_Const.META_BASE_VM_SHA256, None)
-        #ds = HandoffDataRecv()
-        #ds.save_data(vmpaths, base_hashvalue, libvirt_xml, "qemu:///session")
-        #ds.to_file("/home/stack/cloudlet/provisioning/handff_recv_data")
-
-        # since libvirt does not return immediately after resuming VM, we
-        # measure resume time directly from QEMU
-        actual_resume_time = 0
-        splited_log = open("/tmp/qemu_debug_messages", "r").read().split("\n")
-        for line in splited_log:
-            if line.startswith("INCOMING_FINISH"):
-                actual_resume_time = float(line.split(" ")[-1])
-        time_resume_end = time.time()
-        LOG.info("[time] non-pipelined time %f (%f ~ %f ~ %f)" % (
-            actual_resume_time-time_fuse_start,
-            time_fuse_start,
-            time_fuse_end,
-            actual_resume_time,
-        ))
-        if self.server.handoff_data == None:
-            # for a standalone version, terminate a VM for the next testing
-            #connect_vnc(synthesized_vm.machine)
-            LOG.debug("Finishing VM in 3 seconds")
-            time.sleep(3)
-            synthesized_vm.monitor.terminate()
-            synthesized_vm.monitor.join()
-            synthesized_vm.terminate()
-
         # send end message
+        actual_resume_time = time.time()
         ack_data = struct.pack("!Qd", 0x10, actual_resume_time)
-        print "send ack to client: %d" % len(ack_data)
+        LOG.debug("send ack to client: %d" % len(ack_data))
         self.request.sendall(ack_data)
-        print "finished"
+        LOG.info("finished")
 
     def terminate(self):
         # force terminate when something wrong in handling request
@@ -696,23 +600,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             if self.delta_proc.is_alive():
                 self.delta_proc.terminate()
             self.delta_proc = None
-        if hasattr(self, 'resumed') and self.resumed_VM != None:
-            self.resumed_VM.terminate()
-            self.resumed_VM = None
-        if hasattr(self, 'fuse') and self.fuse != None:
-            self.fuse.terminate()
-            self.fuse = None
-        if hasattr(self, 'overlay_pipe') and os.path.exists(self.overlay_pipe):
-            os.unlink(self.overlay_pipe)
-        if hasattr(self, 'tmp_overlay_dir') and os.path.exists(self.tmp_overlay_dir):
-            shutil.rmtree(self.tmp_overlay_dir)
-
-def get_local_ipaddress():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(("gmail.com",80))
-    ipaddress = (s.getsockname()[0])
-    s.close()
-    return ipaddress
 
 
 class StreamSynthesisConst(object):
@@ -721,28 +608,24 @@ class StreamSynthesisConst(object):
 
 
 class StreamSynthesisServer(SocketServer.TCPServer):
-    def __init__(self, port_number=StreamSynthesisConst.SERVER_PORT_NUMBER,
-                 timeout=None, handoff_datafile=None):
+    def __init__(self, handoff_datafile, 
+                 port_number=StreamSynthesisConst.SERVER_PORT_NUMBER,
+                 timeout=120):
+        self._handoff_datafile = handoff_datafile
         self.port_number = port_number
         self.timeout = timeout
-        self._handoff_datafile = handoff_datafile
-        if self._handoff_datafile:
-            self.handoff_data = self._load_handoff_data(self._handoff_datafile)
-            self.basevm_list = self.check_basevm(
-                self.handoff_data.base_vm_paths,
-                self.handoff_data.basevm_sha256_hash
-            )
-        else:
-            self.handoff_data = None
-            self.basevm_list = self.check_basevm_from_db(DBConnector())
-
+        self.handoff_data = self._load_handoff_data(self._handoff_datafile)
+        self.basevm_list = self.check_basevm(
+            self.handoff_data.base_vm_paths,
+            self.handoff_data.basevm_sha256_hash
+        )
         server_address = ("0.0.0.0", self.port_number)
         self.allow_reuse_address = True
         try:
             SocketServer.TCPServer.__init__(self, server_address, StreamSynthesisHandler)
         except socket.error as e:
-            sys.stderr.write(str(e))
-            sys.stderr.write("Check IP/Port : %s\n" % (str(server_address)))
+            LOG.error(str(e))
+            LOG.error("Check IP/Port : %s\n" % (str(server_address)))
             sys.exit(1)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -762,12 +645,12 @@ class StreamSynthesisServer(SocketServer.TCPServer):
 
     def handle_error(self, request, client_address):
         SocketServer.TCPServer.handle_error(self, request, client_address)
-        sys.stderr.write("handling error from client %s\n" % (str(client_address)))
-        sys.stderr.write(traceback.format_exc())
-        sys.stderr.write("%s" % str(e))
+        LOG.error("handling error from client %s\n" % (str(client_address)))
+        LOG.error(traceback.format_exc())
+        LOG.error("%s" % str(e))
 
     def handle_timeout(self):
-        sys.stderr.write("timeout error\n")
+        LOG.error("timeout error\n")
 
     def terminate(self):
         # close all thread
@@ -808,31 +691,50 @@ class StreamSynthesisServer(SocketServer.TCPServer):
         LOG.info("-"*50)
         return ret_list
 
-    def check_basevm_from_db(self, dbconn):
-        basevm_list = dbconn.list_item(BaseVM)
-        ret_list = list()
-        LOG.info("-"*50)
-        LOG.info("* Base VM Configuration")
-        for index, item in enumerate(basevm_list):
-            # check file location
-            (base_diskmeta, base_mempath, base_memmeta) = \
-                    Cloudlet_Const.get_basepath(item.disk_path)
-            if not os.path.exists(item.disk_path):
-                LOG.warning("disk image (%s) is not exist" % (item.disk_path))
-                continue
-            if not os.path.exists(base_mempath):
-                LOG.warning("memory snapshot (%s) is not exist" % (base_mempath))
-                continue
 
-            # add to list
-            basevm_item = {'hash_value':item.hash_value, 'diskpath':item.disk_path}
-            ret_list.append(basevm_item)
-            LOG.info(" %d : %s (Disk %d MB, Memory %d MB)" % \
-                    (index, item.disk_path, os.path.getsize(item.disk_path)/1024/1024, \
-                    os.path.getsize(base_mempath)/1024/1024))
-        LOG.info("-"*50)
+def sigint_handler(signum, frame):
+    sys.stdout.write("Exit by user\n")
+    if server != None:
+        server.terminate()
+    sys.exit(0)
 
-        if len(ret_list) == 0:
-            LOG.error("[Error] NO valid Base VM")
-            sys.exit(2)
-        return ret_list
+
+def main(argv=sys.argv):
+    if not validate_congifuration():
+        sys.stderr.write("failed to validate configuration\n")
+        sys.exit(1)
+
+    parser = OptionParser(usage="usage: %prog ")
+    parser.add_option("-p", "--port", action="store", dest="port_number",
+                      default=StreamSynthesisConst.SERVER_PORT_NUMBER,
+                      help="port number for handoff")
+    parser.add_option("-d", "--datafile", action="store",
+                      dest="handoff_datafile", default=None,
+                      help="specify datafile for handoff destination")
+    settings, args = parser.parse_args(argv)
+    if settings.handoff_datafile == None:
+        sys.stderr.write("Need to specify path to the handoff datafile\n")
+        sys.exit(1)
+    settings.handoff_datafile = os.path.abspath(settings.handoff_datafile)
+
+    server = StreamSynthesisServer(
+        settings.handoff_datafile,
+        int(settings.port_number), timeout=120,
+    )
+    try:
+        server.handle_request()
+    except Exception as e:
+        #sys.stderr.write(str(e))
+        server.terminate()
+        sys.exit(1)
+    except KeyboardInterrupt as e:
+        sys.stdout.write("Exit by user\n")
+        server.terminate()
+        sys.exit(1)
+    else:
+        server.terminate()
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
