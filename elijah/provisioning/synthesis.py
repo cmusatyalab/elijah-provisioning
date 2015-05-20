@@ -1795,7 +1795,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
             temp_dir = mkdtemp(prefix="cloudlet-residue-")
             residue_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
             dest_handoff_url = "file://%s" % os.path.abspath(residue_zipfile)
-        handoff_ds = handoff.HandoffData()
+        handoff_ds = handoff.HandoffDataSend()
         LOG.debug("save data to file")
         handoff_ds.save_data(
             base_vm_paths, meta_info[Const.META_BASE_VM_SHA256],

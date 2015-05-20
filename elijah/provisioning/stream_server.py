@@ -19,6 +19,7 @@
 #
 
 import os
+import functools
 import traceback
 import sys
 import time
@@ -39,6 +40,7 @@ from synthesis_protocol import Protocol as Protocol
 from synthesis import run_fuse
 from synthesis import SynthesizedVM
 from synthesis import connect_vnc
+from handoff import HandoffDataRecv
 
 #import synthesis as synthesis
 #from package import VMOverlayPackage
@@ -58,23 +60,36 @@ LOG = logging.getLogger(__name__)
 session_resources = dict()   # dict[session_id] = obj(SessionResource)
 
 
+def wrap_process_fault(function):
+    """Wraps a method to catch exceptions related to instances.
+    This decorator wraps a method to catch any exceptions and
+    terminate the request gracefully.
+    """
+    @functools.wraps(function)
+    def decorated_function(self, *args, **kwargs):
+        try:
+            return function(self, *args, **kwargs)
+        except Exception, e:
+            if hasattr(self, 'exception_handler'):
+                self.exception_handler()
+            kwargs.update(dict(zip(function.func_code.co_varnames[2:], args)))
+            LOG.error("failed with : %s" % str(kwargs))
+
+    return decorated_function
+
+
+def try_except(fn):
+    def wrapped(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception, e:
+            et, ei, tb = sys.exc_info()
+            raise MyError, MyError(e), tb
+    return wrapped
+
+
 class StreamSynthesisError(Exception):
     pass
-
-class DummyMemoryReadThread(multiprocessing.Process):
-    def __init__(self, filename):
-        self.filename = filename
-        multiprocessing.Process.__init__(self, target=self.read_file)
-
-    def read_file(self):
-        FNULL = open(os.devnull, 'w')
-        time_start = time.time()
-        ret = subprocess.call(["cat", "%s" % self.filename], stdout=FNULL, stderr=FNULL)
-        if ret != 0:
-            raise IOError("cannot read %s" % self.filename)
-        time_end = time.time()
-        print "memory read time: %s %f" % (self.filename, (time_end-time_start))
-
 
 
 class AckThread(threading.Thread):
@@ -503,10 +518,9 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
 
         # check base VM
         for each_basevm in self.server.basevm_list:
-            if base_hashvalue == each_basevm.hash_value:
-                LOG.info("New client request %s VM" \
-                        % (each_basevm.disk_path))
-                requested_base = each_basevm.disk_path
+            if base_hashvalue == each_basevm['hash_value']:
+                LOG.info("New client request %s VM" % (each_basevm['diskpath']))
+                requested_base = each_basevm['diskpath']
         return [synthesis_option, requested_base]
 
     def handle(self):
@@ -516,93 +530,95 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         | header size | header | blob header size | blob header | blob data  |
         |  (4 bytes)  | (var)  | (4 bytes)        | (var bytes) | (var bytes)|
         '''
-        try:
-            # variable
-            #self.ack_thread = AckThread(self.request)
-            #self.ack_thread.daemon = True
-            #self.ack_thread.start()
-            self.total_recved_size_cur = 0
-            self.total_recved_size_prev = 0
+        if self.server.handoff_data is not None:
+            LOG.debug("VM synthesis using OpenStack")
+        else:
+            LOG.debug("VM synthesis as standalone")
 
-            # get header
+        # variable
+        self.total_recved_size_cur = 0
+        self.total_recved_size_prev = 0
+
+        # get header
+        data = self._recv_all(4)
+        if data == None or len(data) != 4:
+            raise StreamSynthesisError("Failed to receive first byte of header")
+        message_size = struct.unpack("!I", data)[0]
+        msgpack_data = self._recv_all(message_size)
+        metadata = NetworkUtil.decoding(msgpack_data)
+        launch_disk_size = metadata[Cloudlet_Const.META_RESUME_VM_DISK_SIZE]
+        launch_memory_size = metadata[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
+
+        synthesis_option, base_diskpath = self._check_validity(metadata)
+        if base_diskpath == None:
+            raise StreamSynthesisError("No matching base VM")
+        if self.server.handoff_data:
+            base_diskpath, base_diskmeta, base_mempath, base_memmeta =\
+                self.server.handoff_data.base_vm_paths
+        else:
+            (base_diskmeta, base_mempath, base_memmeta) = \
+                    Cloudlet_Const.get_basepath(base_diskpath, check_exist=True)
+        LOG.info("  - %s" % str(pformat(self.synthesis_option)))
+        LOG.info("  - Base VM     : %s" % base_diskpath)
+
+        # variables for FUSE
+        temp_synthesis_dir = tempfile.mkdtemp(prefix="cloudlet-comp-")
+        launch_disk = os.path.join(temp_synthesis_dir, "launch-disk")
+        launch_mem = os.path.join(temp_synthesis_dir, "launch-mem")
+        memory_chunk_all = set()
+        disk_chunk_all = set()
+
+        # start pipelining processes
+        network_out_queue = multiprocessing.Queue()
+        decomp_queue = multiprocessing.Queue()
+        fuse_info_queue = multiprocessing.Queue()
+        decomp_proc = DecompProc(network_out_queue, decomp_queue, num_proc=4)
+        decomp_proc.start()
+        LOG.info("Start Decompression process")
+        delta_proc = RecoverDeltaProc(base_diskpath, base_mempath,
+                                    decomp_queue,
+                                    launch_mem,
+                                    launch_disk,
+                                    Cloudlet_Const.CHUNK_SIZE,
+                                    fuse_info_queue)
+        delta_proc.start()
+        LOG.info("Start Synthesis process")
+
+        # get each blob
+        recv_blob_counter = 0
+        while True:
             data = self._recv_all(4)
             if data == None or len(data) != 4:
                 raise StreamSynthesisError("Failed to receive first byte of header")
-            message_size = struct.unpack("!I", data)[0]
-            msgpack_data = self._recv_all(message_size)
-            metadata = NetworkUtil.decoding(msgpack_data)
-            launch_disk_size = metadata[Cloudlet_Const.META_RESUME_VM_DISK_SIZE]
-            launch_memory_size = metadata[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
+                break
+            blob_header_size = struct.unpack("!I", data)[0]
+            blob_header_raw = self._recv_all(blob_header_size)
+            blob_header = NetworkUtil.decoding(blob_header_raw)
+            blob_size = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_SIZE)
+            if blob_size == None:
+                raise StreamSynthesisError("Failed to receive blob")
+            if blob_size == 0:
+                LOG.debug("%f\tend of stream" % (time.time()))
+                break
+            blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
+            blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
+            blob_memory_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
 
-            synthesis_option, base_diskpath = self._check_validity(metadata)
-            if base_diskpath == None:
-                raise StreamSynthesisError("No matching base VM")
-            (base_diskmeta, base_mempath, base_memmeta) = \
-                    Cloudlet_Const.get_basepath(base_diskpath, check_exist=True)
-            LOG.info("  - %s" % str(pformat(self.synthesis_option)))
-            LOG.info("  - Base VM     : %s" % base_diskpath)
+            # send ack right before getting the blob
+            ack_data = struct.pack("!Q", 0x01)
+            self.request.send(ack_data)
+            compressed_blob = self._recv_all(blob_size, ack_size=200*1024)
+            # send ack right after getting the blob
+            ack_data = struct.pack("!Q", 0x02)
+            self.request.send(ack_data)
 
-            # variables for FUSE
-            temp_synthesis_dir = tempfile.mkdtemp(prefix="cloudlet-comp-")
-            launch_disk = os.path.join(temp_synthesis_dir, "launch-disk")
-            launch_mem = os.path.join(temp_synthesis_dir, "launch-mem")
-            memory_chunk_all = set()
-            disk_chunk_all = set()
-
-            # start pipelining processes
-            network_out_queue = multiprocessing.Queue()
-            decomp_queue = multiprocessing.Queue()
-            fuse_info_queue = multiprocessing.Queue()
-            decomp_proc = DecompProc(network_out_queue, decomp_queue, num_proc=4)
-            decomp_proc.start()
-            LOG.info("Start Decompression process")
-            delta_proc = RecoverDeltaProc(base_diskpath, base_mempath,
-                                        decomp_queue,
-                                        launch_mem,
-                                        launch_disk,
-                                        Cloudlet_Const.CHUNK_SIZE,
-                                        fuse_info_queue)
-            delta_proc.start()
-            LOG.info("Start Synthesis process")
-
-            # get each blob
-            recv_blob_counter = 0
-            while True:
-                data = self._recv_all(4)
-                if data == None or len(data) != 4:
-                    raise StreamSynthesisError("Failed to receive first byte of header")
-                    break
-                blob_header_size = struct.unpack("!I", data)[0]
-                blob_header_raw = self._recv_all(blob_header_size)
-                blob_header = NetworkUtil.decoding(blob_header_raw)
-                blob_size = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_SIZE)
-                if blob_size == None:
-                    raise StreamSynthesisError("Failed to receive blob")
-                if blob_size == 0:
-                    LOG.debug("%f\tend of stream" % (time.time()))
-                    break
-                blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
-                blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
-                blob_memory_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
-
-                # send ack right before getting the blob
-                ack_data = struct.pack("!Q", 0x01)
-                self.request.send(ack_data)
-                compressed_blob = self._recv_all(blob_size, ack_size=200*1024)
-                # send ack right after getting the blob
-                ack_data = struct.pack("!Q", 0x02)
-                self.request.send(ack_data)
-
-                network_out_queue.put((blob_comp_type, compressed_blob))
-                memory_chunk_set = set(["%ld:1" % item for item in blob_memory_chunk])
-                disk_chunk_set = set(["%ld:1" % item for item in blob_disk_chunk])
-                memory_chunk_all.update(memory_chunk_set)
-                disk_chunk_all.update(disk_chunk_set)
-                LOG.debug("%f\treceive one blob" % (time.time()))
-                recv_blob_counter += 1
-        except Exception, e:
-            sys.stderr.write("%sn" % str(e))
-            sys.stderr.write("failed at %sn" % str(traceback.format_exc()))
+            network_out_queue.put((blob_comp_type, compressed_blob))
+            memory_chunk_set = set(["%ld:1" % item for item in blob_memory_chunk])
+            disk_chunk_set = set(["%ld:1" % item for item in blob_disk_chunk])
+            memory_chunk_all.update(memory_chunk_set)
+            disk_chunk_all.update(disk_chunk_set)
+            LOG.debug("%f\treceive one blob" % (time.time()))
+            recv_blob_counter += 1
 
         network_out_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
         delta_proc.join()
@@ -620,13 +636,28 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 resumed_memory=launch_mem, memory_overlay_map=memory_overlay_map)
         time_fuse_end = time.time()
         memory_path = os.path.join(fuse.mountpoint, 'memory', 'image')
-        #dummy_thread = DummyMemoryReadThread(memory_path)
-        #dummy_thread.daemon=True
-        #dummy_thread.start()
 
-        synthesized_VM = SynthesizedVM(launch_disk, launch_mem, fuse)
-        synthesized_VM.start()
-        synthesized_VM.join()
+        if self.server.handoff_data:
+            synthesized_vm = SynthesizedVM(
+                launch_disk, launch_mem, fuse,
+                disk_only=False, qemu_args=None,
+                nova_xml=self.server.handoff_data.libvirt_xml,
+                nova_conn=self.server.handoff_data._conn,
+                nova_util=self.server.handoff_data._libvirt_utils
+            )
+        else:
+            synthesized_vm = SynthesizedVM(launch_disk, launch_mem, fuse)
+
+        synthesized_vm.start()
+        synthesized_vm.join()
+
+        # to be delete
+        #libvirt_xml = synthesized_vm.new_xml_str
+        #vmpaths = [base_diskpath, base_diskmeta, base_mempath, base_memmeta]
+        #base_hashvalue = metadata.get(Cloudlet_Const.META_BASE_VM_SHA256, None)
+        #ds = HandoffDataRecv()
+        #ds.save_data(vmpaths, base_hashvalue, libvirt_xml, "qemu:///session")
+        #ds.to_file("/home/stack/cloudlet/provisioning/handff_recv_data")
 
         # since libvirt does not return immediately after resuming VM, we
         # measure resume time directly from QEMU
@@ -636,22 +667,20 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             if line.startswith("INCOMING_FINISH"):
                 actual_resume_time = float(line.split(" ")[-1])
         time_resume_end = time.time()
-        LOG.info("[time] non-pipelined time %f (%f ~ %f ~ %f)" % (\
-                                                                  actual_resume_time-time_fuse_start,
-                                                                  time_fuse_start,
-                                                                  time_fuse_end,
-                                                                  actual_resume_time,
-                                                                  ))
-        connect_vnc(synthesized_VM.machine)
-        LOG.debug("Finishing VM in 3 seconds")
-        time.sleep(3)
-
-        # terminate
-        synthesized_VM.monitor.terminate()
-        synthesized_VM.monitor.join()
-        synthesized_VM.terminate()
-        '''
-        '''
+        LOG.info("[time] non-pipelined time %f (%f ~ %f ~ %f)" % (
+            actual_resume_time-time_fuse_start,
+            time_fuse_start,
+            time_fuse_end,
+            actual_resume_time,
+        ))
+        if self.server.handoff_data == None:
+            # for a standalone version, terminate a VM for the next testing
+            #connect_vnc(synthesized_vm.machine)
+            LOG.debug("Finishing VM in 3 seconds")
+            time.sleep(3)
+            synthesized_vm.monitor.terminate()
+            synthesized_vm.monitor.join()
+            synthesized_vm.terminate()
 
         # send end message
         ack_data = struct.pack("!Qd", 0x10, actual_resume_time)
@@ -692,11 +721,20 @@ class StreamSynthesisConst(object):
 
 
 class StreamSynthesisServer(SocketServer.TCPServer):
-    def __init__(self, port_number=StreamSynthesisConst.SERVER_PORT_NUMBER, timeout=None):
-        self.dbconn = DBConnector()
-        self.basevm_list = self.check_basevm()
+    def __init__(self, port_number=StreamSynthesisConst.SERVER_PORT_NUMBER,
+                 timeout=None, handoff_datafile=None):
         self.port_number = port_number
         self.timeout = timeout
+        self._handoff_datafile = handoff_datafile
+        if self._handoff_datafile:
+            self.handoff_data = self._load_handoff_data(self._handoff_datafile)
+            self.basevm_list = self.check_basevm(
+                self.handoff_data.base_vm_paths,
+                self.handoff_data.basevm_sha256_hash
+            )
+        else:
+            self.handoff_data = None
+            self.basevm_list = self.check_basevm_from_db(DBConnector())
 
         server_address = ("0.0.0.0", self.port_number)
         self.allow_reuse_address = True
@@ -715,13 +753,21 @@ class StreamSynthesisServer(SocketServer.TCPServer):
                 % str(self.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY)))
         LOG.info("-"*50)
 
+    def _load_handoff_data(self, filepath):
+        handoff_data = HandoffDataRecv.from_file(filepath)
+        if handoff_data == None:
+            raise StreamSynthesisError("Invalid handoff recv data at %s" % filepath)
+        LOG.info("Load handoff data file at %s" % filepath)
+        return handoff_data
+
     def handle_error(self, request, client_address):
-        #SocketServer.TCPServer.handle_error(self, request, client_address)
-        #sys.stderr.write("handling error from client %s\n" % (str(client_address)))
-        pass
+        SocketServer.TCPServer.handle_error(self, request, client_address)
+        sys.stderr.write("handling error from client %s\n" % (str(client_address)))
+        sys.stderr.write(traceback.format_exc())
+        sys.stderr.write("%s" % str(e))
 
     def handle_timeout(self):
-        pass
+        sys.stderr.write("timeout error\n")
 
     def terminate(self):
         # close all thread
@@ -739,9 +785,31 @@ class StreamSynthesisServer(SocketServer.TCPServer):
                 LOG.warning(msg)
         LOG.info("[TERMINATE] Finish synthesis server connection")
 
+    def check_basevm(self, base_vm_paths, hash_value):
+        ret_list = list()
+        LOG.info("-"*50)
+        LOG.info("* Base VM Configuration")
+        # check file location
+        (base_diskpath, base_diskmeta, base_mempath, base_memmeta) = base_vm_paths
+        if not os.path.exists(base_diskpath):
+            LOG.warning("base disk is not available at %s" % base_diskpath)
+        if not os.path.exists(base_mempath):
+            LOG.warning("base memory is not available at %s" % base_mempath)
+        if not os.path.exists(base_diskmeta):
+            LOG.warning("disk hashlist is not available at %s" % base_diskmeta)
+        if not os.path.exists(base_memmeta):
+            LOG.warning("memory hashlist is not available at %s" % base_memmeta)
+        basevm_item = {'hash_value':hash_value, 'diskpath':base_diskpath}
+        ret_list.append(basevm_item)
 
-    def check_basevm(self):
-        basevm_list = self.dbconn.list_item(BaseVM)
+        LOG.info("  %s (Disk %d MB, Memory %d MB)" % \
+                (base_diskpath, os.path.getsize(base_diskpath)/1024/1024, \
+                os.path.getsize(base_mempath)/1024/1024))
+        LOG.info("-"*50)
+        return ret_list
+
+    def check_basevm_from_db(self, dbconn):
+        basevm_list = dbconn.list_item(BaseVM)
         ret_list = list()
         LOG.info("-"*50)
         LOG.info("* Base VM Configuration")
@@ -757,7 +825,8 @@ class StreamSynthesisServer(SocketServer.TCPServer):
                 continue
 
             # add to list
-            ret_list.append(item)
+            basevm_item = {'hash_value':item.hash_value, 'diskpath':item.disk_path}
+            ret_list.append(basevm_item)
             LOG.info(" %d : %s (Disk %d MB, Memory %d MB)" % \
                     (index, item.disk_path, os.path.getsize(item.disk_path)/1024/1024, \
                     os.path.getsize(base_mempath)/1024/1024))
@@ -767,4 +836,3 @@ class StreamSynthesisServer(SocketServer.TCPServer):
             LOG.error("[Error] NO valid Base VM")
             sys.exit(2)
         return ret_list
-

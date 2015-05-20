@@ -36,6 +36,7 @@ def sigint_handler(signum, frame):
         server.terminate()
     sys.exit(0)
 
+
 def main(argv=sys.argv):
     if not validate_congifuration():
         sys.stderr.write("failed to validate configuration\n")
@@ -48,9 +49,17 @@ def main(argv=sys.argv):
     parser.add_option("-p", "--port", action="store", dest="port_number",
                       default=StreamSynthesisConst.SERVER_PORT_NUMBER,
                       help="terminate after one VM handoff operation")
+    parser.add_option("-d", "--datafile", action="store",
+                      dest="handoff_datafile", default=None,
+                      help="specify datafile for handoff destination")
     settings, args = parser.parse_args(argv)
+    if settings.handoff_datafile:
+        settings.handoff_datafile = os.path.abspath(settings.handoff_datafile)
 
-    server = StreamSynthesisServer(int(settings.port_number), timeout=120)
+    server = StreamSynthesisServer(
+        int(settings.port_number), timeout=120,
+        handoff_datafile=settings.handoff_datafile
+    )
     try:
         if settings.terminate:
             server.handle_request()
@@ -67,7 +76,6 @@ def main(argv=sys.argv):
     else:
         server.terminate()
         sys.exit(0)
-
 
 
 if __name__ == "__main__":

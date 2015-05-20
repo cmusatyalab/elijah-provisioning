@@ -757,7 +757,7 @@ class CPUMonitor(threading.Thread):
         self.stop.set()
 
 
-class HandoffData(object):
+class HandoffDataSend(object):
     def __init__(self):
         pass
 
@@ -795,7 +795,7 @@ class HandoffData(object):
         with open(handoff_datafile, "r") as handoff_fd:
             handoff_data_dict = msgpack.unpackb(handoff_fd.read())
             option = Options.from_dict(handoff_data_dict['options'])
-            handoff_data = HandoffData()
+            handoff_data = HandoffDataSend()
             handoff_data.save_data(
                 handoff_data_dict['base_vm_paths'],
                 handoff_data_dict['basevm_sha256_hash'],
@@ -831,9 +831,52 @@ class HandoffData(object):
         self._monitor.start()
 
 
+class HandoffDataRecv(object):
+    def __init__(self):
+        pass
+
+    def save_data(self, base_vm_paths, basevm_sha256_hash,  # base VM
+                  libvirt_xml, libvirt_conn_addr):          # vm instance
+        self.base_vm_paths = base_vm_paths
+        self.basevm_sha256_hash = basevm_sha256_hash
+        self.libvirt_xml = libvirt_xml
+        self.libvirt_conn_addr = libvirt_conn_addr
+
+    def to_file(self, filename):
+        serialized_buf = dict()
+        for key, value in self.__dict__.iteritems():
+            serialized_buf[key] = value
+        with open(filename, "w") as fd:
+            fd.write(msgpack.packb(serialized_buf))
+
+    @staticmethod
+    def from_file(handoff_datafile):
+        with open(handoff_datafile, "r") as handoff_fd:
+            handoff_data_dict = msgpack.unpackb(handoff_fd.read())
+            handoff_data = HandoffDataRecv()
+            handoff_data.save_data(
+                handoff_data_dict['base_vm_paths'],
+                handoff_data_dict['basevm_sha256_hash'],
+                handoff_data_dict['libvirt_xml'],
+                handoff_data_dict['libvirt_conn_addr']
+            )
+            handoff_data._load_vm_data()
+            return handoff_data
+        return None
+
+    def _load_vm_data(self):
+        self._conn = libvirt.open(self.libvirt_conn_addr)
+        self._libvirt_utils = MockLibvirtUtil()
+
+
+class MockLibvirtUtil(object):
+    def execute(self, *args, **kwargs):
+        pass
+
+
 def perform_handoff(handoff_data):
     '''Perform VM handoff
-    @param handoff_data: object of HandoffData
+    @param handoff_data: object of HandoffDataSend
     @return None
     '''
     global _handoff_start_time  # for testing purpose
