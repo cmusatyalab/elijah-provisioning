@@ -170,8 +170,18 @@ class StreamSynthesisClient(process_manager.ProcWorker):
     def transfer(self):
         # connect
         address = (self.remote_addr, self.remote_port)
-        print "Connecting to (%s).." % str(address)
-        sock = socket.create_connection(address, 10)
+        sock = None
+        for index in range(5):
+            LOG.info("Connecting to (%s).." % str(address))
+            try:
+                sock = socket.create_connection(address, 10)
+                break
+            except Exception as e:
+                time.sleep(1)
+                pass
+        if sock == None:
+            msg = "failed to connect to %s" % str(address)
+            raise StreamSynthesisClientError(msg)
         sock.setblocking(True)
         self.blob_sent_time_dict = dict()
         self.receive_thread = NetworkMeasurementThread(sock,
