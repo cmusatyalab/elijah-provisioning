@@ -114,6 +114,7 @@ class AckThread(threading.Thread):
         self.ack_queue.put(bytes_recved)
 
 
+#class RecoverDeltaProc(threading.Thread):
 class RecoverDeltaProc(multiprocessing.Process):
     FUSE_INDEX_DISK = 1
     FUSE_INDEX_MEMORY = 2
@@ -145,6 +146,7 @@ class RecoverDeltaProc(multiprocessing.Process):
         self.live_migration_iteration_dict = dict()
 
         multiprocessing.Process.__init__(self, target=self.recover_deltaitem)
+        #threading.Thread.__init__(self, target=self.recover_deltaitem)
 
     def recover_deltaitem(self):
         time_start = time.time()
@@ -518,7 +520,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         synthesis_option, base_diskpath = self._check_validity(metadata)
         if base_diskpath == None:
             raise StreamSynthesisError("No matching base VM")
-        base_diskpath, base_diskmeta, base_mempath, base_memmeta =\
+        base_diskpath, base_mempath, base_diskmeta, base_memmeta =\
             self.server.handoff_data.base_vm_paths
         LOG.info("  - %s" % str(pformat(self.synthesis_option)))
         LOG.info("  - Base VM     : %s" % base_diskpath)
@@ -537,11 +539,11 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         decomp_proc.start()
         LOG.info("Start Decompression process")
         delta_proc = RecoverDeltaProc(base_diskpath, base_mempath,
-                                    decomp_queue,
-                                    launch_mem,
-                                    launch_disk,
-                                    Cloudlet_Const.CHUNK_SIZE,
-                                    fuse_info_queue)
+                                      decomp_queue,
+                                      launch_mem,
+                                      launch_disk,
+                                      Cloudlet_Const.CHUNK_SIZE,
+                                      fuse_info_queue)
         delta_proc.start()
         LOG.info("Start Synthesis process")
 
@@ -591,6 +593,12 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         LOG.debug("send ack to client: %d" % len(ack_data))
         self.request.sendall(ack_data)
         LOG.info("finished")
+
+        disk_overlay_map = ','.join(disk_chunk_all)
+        memory_overlay_map = ','.join(memory_chunk_all)
+        sys.stdout.write("openstack\t%s\t%s\t%s\t%s" % (
+                         launch_disk_size, launch_memory_size,
+                         disk_overlay_map, memory_overlay_map))
 
     def terminate(self):
         # force terminate when something wrong in handling request
@@ -661,19 +669,16 @@ class StreamSynthesisServer(SocketServer.TCPServer):
         for (session_id, resource) in session_resources.iteritems():
             try:
                 resource.deallocate()
-                msg = "Deallocate resources for Session: %s" % str(session_id)
-                LOG.info(msg)
             except Exception as e:
                 msg = "Failed to deallocate resources for Session : %s" % str(session_id)
                 LOG.warning(msg)
-        LOG.info("[TERMINATE] Finish synthesis server connection")
 
     def check_basevm(self, base_vm_paths, hash_value):
         ret_list = list()
         LOG.info("-"*50)
         LOG.info("* Base VM Configuration")
         # check file location
-        (base_diskpath, base_diskmeta, base_mempath, base_memmeta) = base_vm_paths
+        (base_diskpath, base_mempath, base_diskmeta, base_memmeta) = base_vm_paths
         if not os.path.exists(base_diskpath):
             LOG.warning("base disk is not available at %s" % base_diskpath)
         if not os.path.exists(base_mempath):

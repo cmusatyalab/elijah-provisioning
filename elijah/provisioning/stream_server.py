@@ -684,9 +684,10 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
 
         # send end message
         ack_data = struct.pack("!Qd", 0x10, actual_resume_time)
-        print "send ack to client: %d" % len(ack_data)
+        LOG.info("send ack to client: %d" % len(ack_data))
         self.request.sendall(ack_data)
-        print "finished"
+        LOG.info("finished")
+
 
     def terminate(self):
         # force terminate when something wrong in handling request
