@@ -1377,8 +1377,6 @@ def rettach_nic(machine, old_xml, new_xml, **kwargs):
     #           You should use nova_util in OpenStack, or subprocess
     #           will be returned without finishing their work
     # get xml info of running xml
-    return
-
     old_xml = ElementTree.fromstring(old_xml)
     old_nic = old_xml.find('devices/interface')
     filter_element = old_nic.find("filterref")
