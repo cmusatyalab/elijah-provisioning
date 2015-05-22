@@ -172,17 +172,15 @@ class StreamMonitor(threading.Thread):
     DISK_ACCESS = "DISK_ACCESS"
     MEMORY_ACCESS = "MEMORY_ACCESS"
 
-    def __init__(self):
-        self.epoll = select.epoll()
+    def __init__(self, modified_disk_queue=None):
+        self.monitor_file_list = list()
         self.stream_dict = dict()
         self._running = False
-        self.stop = False   # use boolean instead of thread to minimize 
+        self.stop = False   # use boolean instead of Event to minimize 
                             # Condition.wait() overhead in green thread 
                             # of Openstack
         self.modified_chunk_dict = dict()
-        #self.modified_chunk_queue = Queue.Queue()
-        self.modified_chunk_queue = multiprocessing.Queue()
-        self.is_queue_accessed = False
+        self.modified_disk_queue = modified_disk_queue
         self.disk_access_chunk_list = list()
         self.mem_access_chunk_list = list()
         self.del_list = list()
@@ -194,7 +192,7 @@ class StreamMonitor(threading.Thread):
         LOG.info("start monitoring at %s" % path)
         fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
         self.stream_dict[fd] = {'name':name, 'buf':'', 'path':path}
-        self.epoll.register(fd, select.EPOLLIN | select.EPOLLOUT | select.EPOLLPRI)
+        self.monitor_file_list.append(fd)
 
     def del_path(self, name):
         # We need to set O_NONBLOCK in open() because FUSE doesn't pass
@@ -209,76 +207,60 @@ class StreamMonitor(threading.Thread):
     def io_watch(self):
         while(not self.stop):
             self._running = True
-            events = self.epoll.poll(1)
-            for fileno, event in events:
-                self._handle(fileno, event)
+            input_ready, out_ready, err_ready = select.select(
+                self.monitor_file_list, [], []
+            )
+            for each_fd in input_ready:
+                self._handle(each_fd)
 
             while len(self.del_list) > 0:
                 fileno = self.del_list.pop()
-                try:
-                    self.epoll.unregister(fileno)
-                except IOError as e:
-                    data = self.stream_dict.get(fileno)
-                    if data is not None:
-                        filename = data['path'] + data['name']
-                        LOG.debug(str(e))
-                        LOG.debug("epoll unregister error for file %s\n" % filename)
+                self.monitor_file_list.remove(fileno)
                 os.close(fileno)
                 del self.stream_dict[fileno]
 
         for fileno, item in self.stream_dict.items():
-            self.epoll.unregister(fileno)
+            self.monitor_file_list.remove(fileno)
             os.close(fileno)
             del self.stream_dict[fileno]
 
-        if self.is_queue_accessed == True:
-            if self.modified_chunk_queue is not None:
-                self.modified_chunk_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-                self.modified_chunk_queue = None
-        else:
-            # no one accessed. Dump the data
-            while self.modified_chunk_queue.empty() == False:
-                self.modified_chunk_queue.get()
+        if self.modified_disk_queue is not None:
+            self.modified_disk_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
+            self.modified_disk_queue = None
 
         self._running = False
         LOG.info("close Stream monitoring thread")
 
-    def _handle(self, fd, event):
-        #print("%d, %s" % (fd, self.stream_dict[fd]['path']))
-        if event & select.EPOLLIN:
-            try:
-                buf = os.read(fd, 1024*1024)
-            except OSError as e:
-                if e.errno == errno.EAGAIN or e.errno == errno.EWOULDBLOCK:
-                    time.sleep(0.1)
-                else:
-                    # TODO: handle this case
-                    pass
-                return
+    def _handle(self, fd):
+        filepath = self.stream_dict[fd]['path']
+        try:
+            buf = os.read(fd, 1024*1024)
+        except OSError as e:
+            if e.errno == errno.EAGAIN or e.errno == errno.EWOULDBLOCK:
+                #print("error in reading errno.EAGAIN %s" % filepath)
+                time.sleep(0.1)
+            else:
+                #print("error in reading %s" % filepath)
+                pass
+            return
 
-            # We got some output
-            lines = (self.stream_dict[fd]['buf']+ buf).split('\n')
-            # Save partial last line, if any
-            self.stream_dict[fd]['buf'] = lines.pop()
-            for line in lines:
-                stream_name = self.stream_dict[fd]['name']
-                if stream_name == StreamMonitor.DISK_MODIFY:
-                    self._handle_chunks_modification(line)
-                elif stream_name == StreamMonitor.DISK_ACCESS:
-                    self._handle_disk_access(line)
-                elif stream_name == StreamMonitor.MEMORY_ACCESS:
-                    self._handle_memory_access(line)
-                else:
-                    raise IOError("Error, invalid stream")
-                    break
-        elif event & select.EPOLLOUT:
-            pass
-        elif event & select.EPOLLPRI:
-            LOG.debug("error?")
-
-    def get_modified_chunk_queue(self):
-        self.is_queue_accessed = True
-        return self.modified_chunk_queue
+        # We got some output
+        lines = (self.stream_dict[fd]['buf']+ buf).split('\n')
+        # Save partial last line, if any
+        self.stream_dict[fd]['buf'] = lines.pop()
+        for line in lines:
+            stream_name = self.stream_dict[fd]['name']
+            if stream_name == StreamMonitor.DISK_MODIFY:
+                self._handle_chunks_modification(line)
+            elif stream_name == StreamMonitor.DISK_ACCESS:
+                self._handle_disk_access(line)
+            elif stream_name == StreamMonitor.MEMORY_ACCESS:
+                self._handle_memory_access(line)
+            else:
+                raise IOError("Error, invalid stream")
+                break
+        # Yield to other thread (Eventlet) after reading data from file. 
+        time.sleep(0.1)
 
     def _handle_chunks_modification(self, line):
         try:
@@ -298,8 +280,8 @@ class StreamMonitor(threading.Thread):
                 ctime = time.time()
                 chunk = int(values[0])
             self.modified_chunk_dict[chunk] = ctime
-            if self.modified_chunk_queue is not None:
-                self.modified_chunk_queue.put((chunk, ctime))
+            if self.modified_disk_queue is not None:
+                self.modified_disk_queue.put((chunk, ctime))
             #LOG.debug("%s: %f, %d" % ("modification", ctime, chunk))
         except ValueError as e:
             LOG.debug("warning failed to handle modified chunks: %s" % str(e))

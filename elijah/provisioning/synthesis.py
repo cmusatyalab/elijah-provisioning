@@ -213,8 +213,8 @@ class VM_Overlay(threading.Thread):
                                                           qemu_args=self.qemu_args,
                                                           qmp_channel=self.qmp_channel,
                                                           nova_xml=self.nova_xml)
-        self.machine = run_snapshot(self.conn, self.modified_disk, 
-                self.base_mem_fuse, self.new_xml_str)
+        self.machine = run_snapshot(self.conn, self.modified_disk,
+                                    self.base_mem_fuse, self.new_xml_str)
         return self.machine
 
     @wrap_vm_fault
@@ -1749,15 +1749,15 @@ def synthesis(base_disk, overlay_path, **kwargs):
             **kwargs)
     # resume VM
     LOG.info("Resume the launch VM")
-    synthesized_VM = SynthesizedVM(launch_disk, launch_mem, fuse,
-            disk_only=disk_only, qemu_args=qemu_args, nova_xml=nova_xml)
-
+    synthesized_VM = SynthesizedVM(
+        launch_disk, launch_mem, fuse, disk_only=disk_only,
+        qemu_args=qemu_args, nova_xml=nova_xml
+    )
     # no-pipelining
     delta_proc.start()
     fuse_thread.start()
-    #delta_proc.join()
+    delta_proc.join()
     fuse_thread.join()
-
     synthesized_VM.resume()
     if handoff_url is not None:
         # preload basevm hash dictionary for creating residue
@@ -1770,12 +1770,6 @@ def synthesis(base_disk, overlay_path, **kwargs):
     if is_profiling_test == False:
         connect_vnc(synthesized_VM.machine)
 
-    # statistics
-    #mem_access_list = synthesized_VM.monitor.mem_access_chunk_list
-    #disk_access_list = synthesized_VM.monitor.disk_access_chunk_list
-    #synthesis_statistics(meta_info, overlay_filename.name, \
-    #        mem_access_list, disk_access_list)
-
     if handoff_url is not None:
         options = Options()
         options.TRIM_SUPPORT = True
@@ -1785,7 +1779,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
         (base_diskmeta, base_mem, base_memmeta) = \
                 Const.get_basepath(base_disk, check_exist=False)
         base_vm_paths = [base_disk, base_mem, base_diskmeta, base_memmeta]
-
+        # prepare data structure for VM handoff
         residue_zipfile = None
         dest_handoff_url = handoff_url
         parsed_handoff_url = urlsplit(handoff_url)
@@ -1812,7 +1806,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
             except handoff.HandoffError as e:
                 LOG.error("Cannot perform VM handoff: %s" % (str(e)))
         else:
-            # Testing Handoff Data structure using subprocess example
+            # using subprocess
             temp_dir = mkdtemp(prefix="cloudlet-handoffdata-")
             handoff_datafile = os.path.join(temp_dir, "handoff_datafile")
             handoff_ds.to_file(handoff_datafile)

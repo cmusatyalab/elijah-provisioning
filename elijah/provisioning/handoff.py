@@ -101,7 +101,7 @@ class VMMonitor(object):
         self.conn = handoff_data._conn
         self.machine = handoff_data._vm_instance
         self.options = handoff_data.options
-        self.fuse_stream_monitor = handoff_data._monitor
+        self.modified_disk_queue = handoff_data.modified_disk_queue
         self.modified_disk = handoff_data._resumed_disk
         self.qemu_logfile = handoff_data.qemu_logpath
         self.dirty_disk_chunks = handoff_data.dirty_disk_chunks
@@ -147,13 +147,12 @@ class VMMonitor(object):
         info_dict[_MonitoringInfo.DISK_FREE_BLOCKS] = trim_dict
         info_dict[_MonitoringInfo.MEMORY_FREE_BLOCKS] = free_memory_dict
 
-        modified_chunk_queue = self.fuse_stream_monitor.get_modified_chunk_queue()
         time4 = time.time()
         # mark the modifid disk area in the original VM overlay as modified area
         if self.dirty_disk_chunks is not None:
             for dirty_chunk in self.dirty_disk_chunks:
-                modified_chunk_queue.put((dirty_chunk, 1.0))
-        info_dict[_MonitoringInfo.DISK_MODIFIED_BLOCKS] = modified_chunk_queue
+                self.modified_disk_queue.put((dirty_chunk, 1.0))
+        info_dict[_MonitoringInfo.DISK_MODIFIED_BLOCKS] = self.modified_disk_queue
         time5 = time.time()
 
         LOG.debug("consumed time %f, %f, %f, %f" % ((time5-time4), (time4-time3), (time3-time2), (time2-time1)))
@@ -763,7 +762,7 @@ class HandoffDataSend(object):
 
     def save_data(self, base_vm_paths, basevm_sha256_hash,  # base VM
                   basedisk_hashdict, basemem_hashdict,      # base VM
-                  options, handoff_addr, overlay_mode,    # handoff configuration
+                  options, handoff_addr, overlay_mode,      # handoff configuration
                   fuse_mountpoint, qemu_logpath,            # running VM instance
                   qmp_channel_path, vm_id,                  # running VM instance
                   dirty_disk_chunks, libvirt_conn_addr):    # running VM instance
@@ -826,7 +825,10 @@ class HandoffDataSend(object):
         self._resumed_disk = os.path.join(self.fuse_mountpoint, 'disk', 'image')
         self._resumed_mem = os.path.join(self.fuse_mountpoint, 'memory', 'image')
         self._stream_modified = os.path.join(self.fuse_mountpoint, 'disk', 'streams', 'chunks_modified')
-        self._monitor = cloudletfs.StreamMonitor()
+        self.modified_disk_queue = multiprocessing.Queue()
+        self._monitor = cloudletfs.StreamMonitor(
+            modified_disk_queue=self.modified_disk_queue
+        )
         self._monitor.add_path(self._stream_modified, cloudletfs.StreamMonitor.DISK_MODIFY)
         self._monitor.start()
 

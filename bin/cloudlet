@@ -47,7 +47,7 @@ def print_usage(commands):
     MAX_SPACE = 20
     for (comm, desc) in commands.iteritems():
         space = ""
-        if len(comm) < MAX_SPACE: 
+        if len(comm) < MAX_SPACE:
             space = " " * (20-len(comm))
         usage += "  %s%s : %s\n" % (comm, space, desc)
     return usage
