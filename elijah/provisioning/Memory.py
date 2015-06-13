@@ -251,10 +251,10 @@ class Memory(object):
         # get memory meta data from snapshot
         fin.seek(libvirt_header_len)
         hash_list = []
-        ram_end_offset, ram_info = Memory._seek_to_end_of_ram(fin)
-        if ram_end_offset == Memory.RAM_PAGE_SIZE:
-            LOG.debug("end offset: %ld" % (ram_end_offset))
-            raise MemoryError("ram header+data is not aligned with page size")
+        #ram_end_offset, ram_info = Memory._seek_to_end_of_ram(fin)
+        #if ram_end_offset == Memory.RAM_PAGE_SIZE:
+        #    LOG.debug("end offset: %ld" % (ram_end_offset))
+        #    raise MemoryError("ram header+data is not aligned with page size")
 
         if diff:
             # case for getting modified memory list

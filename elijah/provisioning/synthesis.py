@@ -695,19 +695,26 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
         qemu_element = Element("{%s}commandline" % qemu_xmlns)
         xml.append(qemu_element)
 
-    # remove previous logging argument, if it exists
+    # remove previous custom argument, if it exists
     argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
     remove_list = list()
     for argument_item in argument_list:
         arg_value = argument_item.get('value').strip()
-        if arg_value.startswith('-cloudlet') or arg_value.startswith('logfile='):
+        if arg_value.startswith('-cloudlet') or\
+                arg_value.startswith('logfile=') or\
+                arg_value.startswith('raw='):
             remove_list.append(argument_item)
     for item in remove_list:
         qemu_element.remove(item)
-    # append qemu logfile
-    if qemu_logfile is not None:
-        qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':'-cloudlet'}))
-        qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':"logfile=%s" % qemu_logfile}))
+    # append custom qemu argument
+    key_str = '-cloudlet'
+    value_str = "raw=live" # [off|suspend|live]
+    if qemu_logfile is None:
+        value_str = "raw=live" # [off|suspend|live]
+    else:
+        value_str = "raw=live,logfile=%s" % qemu_logfile
+    qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':key_str}))
+    qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':value_str}))
 
     # remove previous qmp argument, if it exists
     argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
