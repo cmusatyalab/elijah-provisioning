@@ -221,6 +221,12 @@ def main(argv):
         if is_zip_contained is True:
             overlay_meta = url_path
         try:
+            if settings.handoff_url is not None:
+                ret = synthesis.validate_handoffurl(settings.handoff_url)
+                if ret == False:
+                    msg = "(%s) is invalid handoff URL" % settings.handoff_url
+                    raise synthesis.CloudletGenerationError(msg)
+
             synthesis.synthesis(disk_image_path, overlay_meta, \
                                 disk_only=settings.disk_only, \
                                 handoff_url=settings.handoff_url, \

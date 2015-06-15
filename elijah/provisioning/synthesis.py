@@ -1607,6 +1607,16 @@ def validate_congifuration():
     return True
 
 
+def validate_handoffurl(handoff_url):
+    parsed_handoff_url = urlsplit(handoff_url)
+    if parsed_handoff_url.scheme != "file" and parsed_handoff_url.scheme != "tcp":
+        return False
+    if parsed_handoff_url.scheme == "tcp":
+        # expect to have destination address for network transmission case
+        if len(parsed_handoff_url.netloc) == 0:
+            return False
+
+
 # share with OpenStack
 def _create_baseVM(conn, domain, base_diskpath, base_mempath, base_diskmeta, base_memmeta, **kwargs):
     """ generate base vm given base_diskpath
