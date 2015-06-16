@@ -411,16 +411,23 @@ class SynthesizedVM(threading.Thread):
         # convert xml
         if self.disk_only:
             xml = ElementTree.fromstring(open(Const.TEMPLATE_XML, "r").read())
-            self.old_xml_str, self.new_xml_str = _convert_xml(self.resumed_disk,
-                    xml=xml, qemu_logfile=self.qemu_logfile,
-                    qemu_args=self.qemu_args)
+            self.old_xml_str, self.new_xml_str = _convert_xml(
+                self.resumed_disk,
+                xml=xml,
+                qemu_logfile=self.qemu_logfile,
+                qemu_args=self.qemu_args,
+            )
         else:
-            self.old_xml_str, self.new_xml_str = _convert_xml(self.resumed_disk,
-                    mem_snapshot=self.resumed_mem,
-                    qemu_logfile=self.qemu_logfile,
-                    qmp_channel=self.qmp_channel,
-                    qemu_args=self.qemu_args,
-                    nova_xml=self.nova_xml)
+            self.old_xml_str, self.new_xml_str = _convert_xml(
+                self.resumed_disk,
+                mem_snapshot=self.resumed_mem,
+                qemu_logfile=self.qemu_logfile,
+                qmp_channel=self.qmp_channel,
+                qemu_args=self.qemu_args,
+                nova_xml=self.nova_xml,
+                memory_snapshot_mode="live"
+            )
+
 
     def resume(self):
         #resume VM
