@@ -169,15 +169,12 @@ class VM_Overlay(threading.Thread):
         # filename for overlay VM
         temp_qemu_dir = mkdtemp(prefix="cloudlet-qemu-")
         self.qemu_logfile = os.path.join(temp_qemu_dir, "qemu-trim-log")
-        self.qmp_channel = os.path.abspath(os.path.join(temp_qemu_dir, "qmp-channel"))
         # change permission of the file
-        for qemu_file in [self.qemu_logfile, self.qmp_channel]:
+        for qemu_file in [self.qemu_logfile]:
             open(qemu_file, "w+").close()
             os.chmod(os.path.dirname(qemu_file), 0o777)
             os.chmod(qemu_file, 0o666)
             LOG.info("QEMU access file : %s" % qemu_file)
-        if os.path.exists(self.qmp_channel) == True:
-            os.remove(self.qmp_channel)
 
         # option for data-intensive application
         self.cache_manager = None
@@ -211,7 +208,6 @@ class VM_Overlay(threading.Thread):
                                                           mem_snapshot=self.base_mem_fuse,
                                                           qemu_logfile=self.qemu_logfile,
                                                           qemu_args=self.qemu_args,
-                                                          qmp_channel=self.qmp_channel,
                                                           nova_xml=self.nova_xml)
         self.machine = run_snapshot(self.conn, self.modified_disk,
                                     self.base_mem_fuse, self.new_xml_str)
@@ -219,14 +215,6 @@ class VM_Overlay(threading.Thread):
 
     @wrap_vm_fault
     def create_overlay(self):
-        # handle inconsistency between OpenStack execution user and libvirt-qemu user
-        if self.nova_util:
-            self.nova_util.execute('chmod', 775, self.qmp_channel, run_as_root=True)
-
-        qmp_thread = QmpThreadSerial(self.qmp_channel, self.fuse_stream_monitor)
-        qmp_thread.daemon = True
-        qmp_thread.start()
-
         # get montoring info
         monitoring_info = _get_overlay_monitoring_info(self.conn, self.machine,
                                                        self.options,
@@ -235,7 +223,6 @@ class VM_Overlay(threading.Thread):
                                                        self.base_disk, self.base_mem,
                                                        self.modified_disk, self.modified_mem.name,
                                                        self.qemu_logfile,
-                                                       self.qmp_channel,
                                                        nova_util=self.nova_util)
 
         # get overlay VM
@@ -562,10 +549,13 @@ def _test_dma_accuracy(dma_dict, disk_deltalist, mem_deltalist):
             (dma_write_base_dedup, 100.0*dma_write_base_dedup/dma_write_counter))
 
 
-def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
-        qemu_logfile=None, qmp_channel=None, qemu_args=None, nova_xml=None):
-    # we need either input xml or memory snapshot path
-    # if we have mem_snapshot, we update new xml to the memory snapshot
+def _convert_xml(disk_path, xml=None, mem_snapshot=None,
+                 qemu_logfile=None, qmp_channel=None,
+                 qemu_args=None, nova_xml=None,
+                 memory_snapshot_mode="suspend"):
+    """process libvirt xml header before launching the VM
+    @param memory_snapshot_mode : behavior of libvrt memory snapshotting, [off|suspend|live]
+    """
 
     if xml == None and mem_snapshot == None:
         raise CloudletGenerationError("we need either input xml or memory snapshot path")
@@ -708,11 +698,9 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None, \
         qemu_element.remove(item)
     # append custom qemu argument
     key_str = '-cloudlet'
-    value_str = "raw=live" # [off|suspend|live]
-    if qemu_logfile is None:
-        value_str = "raw=live" # [off|suspend|live]
-    else:
-        value_str = "raw=live,logfile=%s" % qemu_logfile
+    value_str = "raw=%s" % memory_snapshot_mode
+    if qemu_logfile:
+        value_str += ",logfile=%s" % qemu_logfile
     qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':key_str}))
     qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value':value_str}))
 
@@ -775,17 +763,16 @@ def _get_overlay_monitoring_info(conn, machine, options,
                                  fuse_stream_monitor,
                                  base_disk, base_mem,
                                  modified_disk, modified_mem,
-                                 qemu_logfile, qmp_channel, nova_util=None):
+                                 qemu_logfile, nova_util=None):
     ''' return montioring information including
         1) base vm hash list
         2) used/freed disk block list
         3) freed memory page
     '''
 
-    # TODO: support stream of modified memory rather than tmp file
     if not options.DISK_ONLY:
         save_mem_snapshot(conn, machine, modified_mem, nova_util=nova_util,
-                fuse_stream_monitor=fuse_stream_monitor, qmp_channel=qmp_channel)
+                          fuse_stream_monitor=fuse_stream_monitor)
 
     # 1-3. get hashlist of base memory and disk
     basemem_hashlist = Memory.base_hashlist(base_memmeta)
@@ -1148,112 +1135,70 @@ class QmpThreadSerial(native_threading.Thread):
     def terminate(self):
         self.stop.set()
 
-class MemoryReadProcessSerial(multiprocessing.Process):
-#class MemoryReadProcessSerial(threading.Thread):
+
+class MemoryReadProcess(threading.Thread):
     RET_SUCCESS = 1
     RET_ERRROR = 2
 
     def __init__(self, input_path, output_path, 
-                 machine_memory_size, result_queue, qmp_path):
+            machine_memory_size, output_queue):
         self.input_path = input_path
         self.output_path = output_path
-        self.result_queue = result_queue
+        self.output_queue = output_queue
         self.machine_memory_size = machine_memory_size*1024
-        self.memory_snapshot_size = 0
-        self.header_chunk_size = Memory.Memory.CHUNK_HEADER_SIZE + Memory.Memory.RAM_PAGE_SIZE
-        self.aligned_libvirt_header_size = Memory.Memory.RAM_PAGE_SIZE*2
-        self.temp_memory_dict = dict()
-
-        multiprocessing.Process.__init__(self, target=self.read_mem_snapshot)
-        #threading.Thread.__init__(self, target=self.read_mem_snapshot)
-
-    def chunking(self, data):
-        for index in range(0, len(data), self.header_chunk_size):
-            chunked_data = data[index:index+self.header_chunk_size]
-            chunked_data_size = len(chunked_data)
-            header = chunked_data[0:Memory.Memory.CHUNK_HEADER_SIZE]
-            blob_offset, = struct.unpack(Memory.Memory.CHUNK_HEADER_FMT, header)
-            blob_offset = (blob_offset & Memory.Memory.CHUNK_POS_MASK) + self.aligned_libvirt_header_size
-            self.temp_memory_dict[blob_offset] = chunked_data[Memory.Memory.CHUNK_HEADER_SIZE:]
+        threading.Thread.__init__(self, target=self.read_mem_snapshot)
 
     def read_mem_snapshot(self):
-        time_start = time()
         retry_counter = 0
-
-        for repeat in xrange(100):
-            if os.path.exists(self.input_path) == False:
-                LOG.debug("waiting for qemu memory pipe, %s" % self.input_path)
-                time.sleep(0.1)
-            else:
-                break
+        while os.path.exists(self.input_path) == False:
+            retry_counter += 1
+            sleep(1)
+            if retry_counter > 10:
+                self.output_queue.put(self.RET_ERRROR)
+                self.output_queue.put("Cannot open named pipe")
+                return
 
         # create memory snapshot aligned with 4KB
         try:
             self.in_fd = open(self.input_path, 'rb')
             self.out_fd = open(self.output_path, 'wb')
 
-            total_write_size = 0
+            total_read_size = 0
             # read first 40KB and aligen header with 4KB
-            select.select([self.in_fd], [], [])
             data = self.in_fd.read(Memory.Memory.RAM_PAGE_SIZE*10)
             libvirt_header = memory_util._QemuMemoryHeaderData(data)
             original_header = libvirt_header.get_header()
-            new_header = libvirt_header.get_aligned_header(self.aligned_libvirt_header_size)
-            self.temp_memory_dict[0] = new_header
-            total_write_size += len(new_header)
-
-            # get memory snapshot size
-            original_header_len = len(original_header)
-            memory_size_data = data[original_header_len:original_header_len+Memory.Memory.CHUNK_HEADER_SIZE]
-            mem_snapshot_size, = struct.unpack(Memory.Memory.CHUNK_HEADER_FMT, memory_size_data)
-            self.memory_snapshot_size = long(mem_snapshot_size + len(new_header))
-
-            # get memory snapshot aligned with chunk size
-            new_data = data[original_header_len+Memory.Memory.CHUNK_HEADER_SIZE:]
-            chunk_aligned_size = self.header_chunk_size - (len(new_data) % self.header_chunk_size)
-            select.select([self.in_fd], [], [])
-            new_data += self.in_fd.read(chunk_aligned_size)
-            self.chunking(new_data)
-            total_write_size += len(new_data)
-            LOG.info("Memory snapshot size: %ld, header size: %ld at %f" % \
-                     (self.memory_snapshot_size, len(new_header), time()))
+            align_size = Memory.Memory.RAM_PAGE_SIZE*2
+            new_header = libvirt_header.get_aligned_header(align_size)
+            self.out_fd.write(new_header)
+            total_read_size += len(new_header)
+            self.out_fd.write(data[len(original_header):])
+            total_read_size += len(data[len(original_header):])
+            LOG.info("Header size of memory snapshot is %s" % len(new_header))
 
             # write rest of the memory data
             prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
-                select.select([self.in_fd], [], [])
-                data = self.in_fd.read(self.header_chunk_size*250)
+                data = self.in_fd.read(1024 * 10)
                 if data == None or len(data) <= 0:
                     break
-                self.chunking(data)
-                total_write_size += len(data)
-                prog_bar.set_percent(100.0*total_write_size/self.memory_snapshot_size)
-                prog_bar.show_progress()
-            prog_bar.finish()
-            time_end = time()
-            LOG.debug("memory snapshotting time: %f" % (time_end-time_start))
-
-            prev_data_offset = 0
-            for (offset, data) in iter(sorted(self.temp_memory_dict.iteritems())): 
-                if len(data) < Memory.Memory.RAM_PAGE_SIZE:
-                    # Libvirt generate garbage at the end of the stream
-                    continue
-                if (offset != prev_data_offset):
-                    msg = "Received memory is not aligned at %ld" % offset
-                    raise CloudletGenerationError(msg)
                 self.out_fd.write(data)
-                prev_data_offset = offset + len(data)
-            self.temp_memory_dict.clear()
-            self.temp_memory_dict = None
+                total_read_size += len(data)
+                prog_bar.set_percent(100.0*total_read_size/self.machine_memory_size)
+                prog_bar.show_progress()
+            self.out_fd.flush()
+            prog_bar.finish()
+            if total_read_size != self.out_fd.tell():
+                raise Exception("output file size is different from stream size")
         except Exception, e:
             LOG.error(str(e))
-            self.result_queue.put(self.RET_ERRROR)
-            self.result_queue.put(str(e))
+            self.output_queue.put(self.RET_ERRROR)
+            self.output_queue.put(str(e))
         else:
-            self.result_queue.put(self.RET_SUCCESS)
+            self.output_queue.put(self.RET_SUCCESS)
 
 
-def save_mem_snapshot(conn, machine, fout_path, qmp_channel, **kwargs):
+def save_mem_snapshot(conn, machine, fout_path, **kwargs):
     #Set migration speed
     nova_util = kwargs.get('nova_util', None)
     fuse_stream_monitor = kwargs.get('fuse_stream_monitor', None)
@@ -1290,11 +1235,10 @@ def save_mem_snapshot(conn, machine, fout_path, qmp_channel, **kwargs):
             # OpenStack runs VM with nova account and snapshot 
             # is generated from system connection
             nova_util.chown(named_pipe_output, os.getuid())
-        memory_read_proc = MemoryReadProcessSerial(named_pipe_output,
-                                                   fout_path,
-                                                   machine_memory_size,
-                                                   result_queue,
-                                                   qmp_channel)
+        memory_read_proc = MemoryReadProcess(named_pipe_output,
+                                             fout_path,
+                                             machine_memory_size,
+                                             result_queue)
         memory_read_proc.start()
         # machine.save() is blocked libvirt command, which blocks entire
         # process in evenetlet case. So we use original thread, instead.
@@ -1314,7 +1258,7 @@ def save_mem_snapshot(conn, machine, fout_path, qmp_channel, **kwargs):
 
     try:
         proc_ret = result_queue.get()
-        if proc_ret != MemoryReadProcessSerial.RET_SUCCESS:
+        if proc_ret != MemoryReadProcess.RET_SUCCESS:
             error_reason = result_queue.get()
             msg = "Failed to create memory snapshot : %s" % str(error_reason)
             LOG.error(msg)
