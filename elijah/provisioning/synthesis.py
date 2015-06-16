@@ -31,7 +31,6 @@ import delta
 import hashlib
 import libvirt
 import shutil
-import multiprocessing
 import struct
 import json
 from operator import itemgetter
@@ -1143,15 +1142,14 @@ class QmpThreadSerial(native_threading.Thread):
         self.stop.set()
 
 
-class MemoryReadProcess(native_threading.Thread):
+class MemoryReadThread(native_threading.Thread):
     RET_SUCCESS = 1
-    RET_ERRROR = 2
+    RET_ERROR = 2
 
-    def __init__(self, input_path, output_path, 
-            machine_memory_size, output_queue):
+    def __init__(self, input_path, output_path, machine_memory_size):
         self.input_path = input_path
         self.output_path = output_path
-        self.output_queue = output_queue
+        self.ret = self.RET_ERROR
         self.machine_memory_size = machine_memory_size*1024
         native_threading.Thread.__init__(self, target=self.read_mem_snapshot)
 
@@ -1161,8 +1159,7 @@ class MemoryReadProcess(native_threading.Thread):
             retry_counter += 1
             sleep(1)
             if retry_counter > 10:
-                self.output_queue.put(self.RET_ERRROR)
-                self.output_queue.put("Cannot open named pipe")
+                self.ret = self.RET_ERROR
                 return
 
         # create memory snapshot aligned with 4KB
@@ -1197,12 +1194,18 @@ class MemoryReadProcess(native_threading.Thread):
             prog_bar.finish()
             if total_read_size != self.out_fd.tell():
                 raise Exception("output file size is different from stream size")
+
+            # re-open the named pipe to receive remaining data from the libvirt
+            self.in_fd = open(self.input_path, 'rb')
+            while True:
+                data = self.in_fd.read(1024)
+                if not data:
+                    break
         except Exception, e:
             LOG.error(str(e))
-            self.output_queue.put(self.RET_ERRROR)
-            self.output_queue.put(str(e))
+            self.ret = self.RET_ERROR
         else:
-            self.output_queue.put(self.RET_SUCCESS)
+            self.ret = self.RET_SUCCESS
 
 
 def save_mem_snapshot(conn, machine, fout_path, **kwargs):
@@ -1231,7 +1234,6 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
     #Save memory state
     LOG.info("save VM memory state")
     try:
-        result_queue = multiprocessing.Queue()
         fifo_path = NamedTemporaryFile(prefix="cloudlet-memory-snapshot-",
                                        delete=True)
         named_pipe_output = fifo_path.name + ".fifo"
@@ -1242,18 +1244,17 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
             # OpenStack runs VM with nova account and snapshot 
             # is generated from system connection
             nova_util.chown(named_pipe_output, os.getuid())
-        memory_read_proc = MemoryReadProcess(named_pipe_output,
-                                             fout_path,
-                                             machine_memory_size,
-                                             result_queue)
-        memory_read_proc.start()
+        memory_read_thread = MemoryReadThread(named_pipe_output,
+                                            fout_path,
+                                            machine_memory_size)
+        memory_read_thread.start()
         # machine.save() is blocked libvirt command, which blocks entire
         # process in evenetlet case. So we use original thread, instead.
         libvirt_thread = native_threading.Thread(target=handoff.save_mem_thread,
                                                  args=(machine, named_pipe_output))
         libvirt_thread.setDaemon(True)
         libvirt_thread.start()
-        memory_read_proc.join()
+        memory_read_thread.join()
     except libvirt.libvirtError, e:
         # we intentionally ignore seek error from libvirt since we have cause
         # that by using named pipe
@@ -1264,10 +1265,9 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
             os.remove(named_pipe_output)
 
     try:
-        proc_ret = result_queue.get()
-        if proc_ret != MemoryReadProcess.RET_SUCCESS:
-            error_reason = result_queue.get()
-            msg = "Failed to create memory snapshot : %s" % str(error_reason)
+        ret = memory_read_thread.ret
+        if ret != MemoryReadThread.RET_SUCCESS:
+            msg = "Failed to create memory snapshot"
             LOG.error(msg)
             raise CloudletGenerationError(msg)
         if nova_util != None:
