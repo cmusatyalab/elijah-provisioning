@@ -119,7 +119,7 @@ def libvirt_err_callback(ctxt, err):
 libvirt.registerErrorHandler(f=libvirt_err_callback, ctx=None)
 
 
-class VM_Overlay(threading.Thread):
+class VM_Overlay(native_threading.Thread):
     def __init__(self, base_disk, options, qemu_args=None,
             base_mem=None, base_diskmeta=None,
             base_memmeta=None, base_hashvalue=None,
@@ -159,7 +159,7 @@ class VM_Overlay(threading.Thread):
 
         self.log_path = os.path.join(os.path.dirname(self.base_disk), \
                                 os.path.basename(self.base_disk) + Const.OVERLAY_LOG)
-        threading.Thread.__init__(self, target=self.create_overlay)
+        native_threading.Thread.__init__(self, target=self.create_overlay)
 
     @wrap_vm_fault
     def resume_basevm(self):
@@ -359,7 +359,7 @@ class OverlayMonitoringInfo(object):
         return self.__dict__[item]
 
 
-class SynthesizedVM(threading.Thread):
+class SynthesizedVM(native_threading.Thread):
     def __init__(self, launch_disk, launch_mem, fuse, disk_only=False, qemu_args=None, **kwargs):
         # kwargs
         self.nova_xml= kwargs.get("nova_xml", None)
@@ -405,7 +405,7 @@ class SynthesizedVM(threading.Thread):
         self.qemu_monitor = cloudletfs.FileMonitor(self.qemu_logfile, cloudletfs.FileMonitor.QEMU_LOG)
         self.qemu_monitor.start()
 
-        threading.Thread.__init__(self, target=self.resume)
+        native_threading.Thread.__init__(self, target=self.resume)
 
     def _generate_xml(self):
         # convert xml
@@ -1117,7 +1117,7 @@ def run_vm(conn, domain_xml, **kwargs):
 class QmpThreadSerial(native_threading.Thread):
     def __init__(self, qmp_path, fuse_stream_monitor):
         self.qmp_path = qmp_path
-        self.stop = threading.Event()
+        self.stop = native_threading.Event()
         self.qmp = qmp_af_unix.QmpAfUnix(self.qmp_path)
         self.fuse_stream_monitor = fuse_stream_monitor
         native_threading.Thread.__init__(self, target=self.stop_migration)
@@ -1143,7 +1143,7 @@ class QmpThreadSerial(native_threading.Thread):
         self.stop.set()
 
 
-class MemoryReadProcess(threading.Thread):
+class MemoryReadProcess(native_threading.Thread):
     RET_SUCCESS = 1
     RET_ERRROR = 2
 
@@ -1153,7 +1153,7 @@ class MemoryReadProcess(threading.Thread):
         self.output_path = output_path
         self.output_queue = output_queue
         self.machine_memory_size = machine_memory_size*1024
-        threading.Thread.__init__(self, target=self.read_mem_snapshot)
+        native_threading.Thread.__init__(self, target=self.read_mem_snapshot)
 
     def read_mem_snapshot(self):
         retry_counter = 0

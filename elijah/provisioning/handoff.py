@@ -81,13 +81,13 @@ _handoff_start_time = [sys.maxint]
 class HandoffError(Exception):
     pass
 
-class PreloadResidueData(threading.Thread):
+class PreloadResidueData(native_threading.Thread):
     def __init__(self, base_diskmeta, base_memmeta):
         self.base_diskmeta = base_diskmeta
         self.base_memmeta = base_memmeta
         self.basedisk_hashdict = None
         self.basmem_hashdict = None
-        threading.Thread.__init__(self, target=self.preloading)
+        native_threading.Thread.__init__(self, target=self.preloading)
 
     def preloading(self):
         self.basedisk_hashdict = delta.DeltaDedup.disk_import_hashdict(self.base_diskmeta)
@@ -301,7 +301,7 @@ class QmpThread(native_threading.Thread):
         self.memory_snapshot_queue = memory_snapshot_queue
         self.compdata_queue = compdata_queue
         self.overlay_mode = overlay_mode
-        self.stop = threading.Event()
+        self.stop = native_threading.Event()
         self.qmp = qmp_af_unix.QmpAfUnix(self.qmp_path)
         self.fuse_stream_monitor = fuse_stream_monitor
         self.migration_stop_time = 0
@@ -439,7 +439,7 @@ class _MonitoringInfo(object):
 
 
 
-class StreamSynthesisFile(threading.Thread):
+class StreamSynthesisFile(native_threading.Thread):
 #class StreamSynthesisFile(multiprocessing.Process):
     def __init__(self, basevm_uuid, compdata_queue, temp_compfile_dir):
         self.basevm_uuid = basevm_uuid
@@ -451,7 +451,7 @@ class StreamSynthesisFile(threading.Thread):
         self.overlay_info_path = os.path.join(self.temp_compfile_dir, "overlay-info")
         self.overlay_filenames = os.path.join(self.temp_compfile_dir, "overlay-names")
         #super(StreamSynthesisFile, self).__init__(target=self.save_to_file)
-        threading.Thread.__init__(self, target=self.save_to_file)
+        native_threading.Thread.__init__(self, target=self.save_to_file)
 
     def get_overlay_info(self):
         overlay_info_list = list()
@@ -712,11 +712,11 @@ def _generate_overlaymeta(overlay_metapath, overlay_info, base_hashvalue,
     return overlay_metapath
 
 
-class CPUMonitor(threading.Thread):
+class CPUMonitor(native_threading.Thread):
     def __init__(self):
         self.cpu_percent_list = list()
-        self.stop = threading.Event()
-        threading.Thread.__init__(self, target=self.monitor_cpu)
+        self.stop = native_threading.Event()
+        native_threading.Thread.__init__(self, target=self.monitor_cpu)
 
     def getCPUUsage(self):
         return self.core_cpus
