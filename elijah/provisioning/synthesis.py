@@ -1217,7 +1217,8 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
         raise CloudletGenerationError("Cannot set migration speed : %s", machine.name())
 
     # Stop monitoring for memory access (snapshot will create a lot of access)
-    fuse_stream_monitor.del_path(cloudletfs.StreamMonitor.MEMORY_ACCESS)
+    if fuse_stream_monitor:
+        fuse_stream_monitor.del_path(cloudletfs.StreamMonitor.MEMORY_ACCESS)
     #if fuse_stream_monitor is not None:
     #    fuse_stream_monitor.terminate()
     #    fuse_stream_monitor.join()

@@ -361,7 +361,7 @@ def hashing(filepath):
     # Contstuct KVM Base Memory DS from KVM migrated memory
     # filepath  : input KVM Memory Snapshot file path
     memory = Memory()
-    hash_list =  memory._load_file(open(filepath, 'rb'))
+    hash_list =  memory._load_file(filepath)
     memory.hash_list = hash_list
     return memory
 
