@@ -80,9 +80,6 @@ def process_command_line(argv, commands):
             '-z', '--zip', action='store_true', dest='zip_container', default=True,
             help='[overlay_creation] encapsulate vm overlay files into a single zip file')
     parser.add_option(
-            '-s', '--samba-mount', action='store', dest='source_uri', default=None,
-            help='[overlay_creation] mount samba for data-intensive application')
-    parser.add_option(
             '-r', '--residue', action='store', dest='handoff_url', default=None,
             help='[synthesis] specify handoff destination url')
     settings, args = parser.parse_args(argv)
@@ -98,11 +95,6 @@ def process_command_line(argv, commands):
     valid_residue_condition = (mode == "synthesis") or (settings.handoff_url != 0)
     if valid_residue_condition == False:
         parser.error("-r (return residue) should be used only with synthesis command")
-
-    # option for samba mount
-    valid_samba_mount = (mode == "overlay") or (settings.source_uri == None) 
-    if valid_samba_mount == False:
-        parser.error("-s (mount samba) should be used only with overlay command")
 
     return mode, args[1:], settings
 
@@ -166,7 +158,6 @@ def main(argv):
         options.FREE_SUPPORT = settings.enable_free_support
         options.DISK_ONLY = settings.disk_only
         options.ZIP_CONTAINER = settings.zip_container
-        options.DATA_SOURCE_URI = settings.source_uri
 
         try:
             # resume base vm for creating vm overlay
@@ -202,10 +193,6 @@ def main(argv):
                         (os.path.getsize(vm_overlay.overlay_zipfile)-filesize_count))
                 sys.stdout.write("overlay file at : %s\n" % vm_overlay.overlay_zipfile)
 
-            # option for data-intensive application
-            if options.DATA_SOURCE_URI != None and hasattr(vm_overlay, "overlay_uri_meta"):
-                sys.stdout.write("[INFO] overlay URIs : %s\n" % \
-                        vm_overlay.overlay_uri_meta)
         except Exception, e:
             LOG.error("%s\nFailed to create overlay" % str(traceback.format_exc()))
             return 1

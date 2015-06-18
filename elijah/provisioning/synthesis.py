@@ -40,7 +40,6 @@ from .db import api as db_api
 from .db import table_def as db_table
 from .Configuration import Const
 from .Configuration import Options
-from .Configuration import Caching_Const
 from .delta import DeltaList
 from .delta import DeltaItem
 import msgpack
@@ -179,12 +178,6 @@ class VM_Overlay(native_threading.Thread):
             os.chmod(qemu_file, 0o666)
             LOG.info("QEMU access file : %s" % qemu_file)
 
-        # option for data-intensive application
-        self.cache_manager = None
-        self.mount_point = None
-        if self.options.DATA_SOURCE_URI is not None:
-            cache_manager, mount_point = self._start_emulate_cache_fs()
-
         # make FUSE disk & memory
         self.fuse = run_fuse(Const.CLOUDLETFS_PATH, Const.CHUNK_SIZE,
                              self.base_disk, os.path.getsize(self.base_disk),
@@ -291,11 +284,6 @@ class VM_Overlay(native_threading.Thread):
                     os.remove(overlay_file)
 
         # terminate
-        # option for data-intensive application
-        if self.options.DATA_SOURCE_URI is not None:
-            overlay_uri_meta = os.path.join(temp_dir, Const.OVERLAY_URIs)
-            self.overlay_uri_meta = self._terminate_emulate_cache_fs(
-                overlay_uri_meta)
         self.terminate()
 
     def terminate(self):
@@ -309,17 +297,6 @@ class VM_Overlay(native_threading.Thread):
         if hasattr(self, 'qemu_monitor') and self.qemu_monitor is not None:
             self.qemu_monitor.terminate()
             self.qemu_monitor.join()
-        if hasattr(self, "cache_manager") and self.cache_manager is not None:
-            self.cache_manager.terminate()
-            self.cache_manager.join()
-        if hasattr(self, "mount_point") and (self.mount_point is not None) and\
-                os.path.lexists(self.mount_point):
-            os.unlink(self.mount_point)
-        if self.options.MEMORY_SAVE_PATH:
-            msg = "moving memory sansphost to %s" %\
-                self.options.MEMORY_SAVE_PATH
-            LOG.debug(msg)
-            shutil.move(self.modified_mem.name, self.options.MEMORY_SAVE_PATH)
         else:
             os.unlink(self.modified_mem.name)
 
@@ -333,51 +310,6 @@ class VM_Overlay(native_threading.Thread):
         if hasattr(self, 'machine'):
             _terminate_vm(self.conn, self.machine)
             self.machine = None
-
-    def _start_emulate_cache_fs(self):
-        # check samba
-        if os.path.exists(Caching_Const.HOST_SAMBA_DIR) == False:
-            msg = "Cloudlet does not have samba directory at %s\n" % \
-                Caching_Const.HOST_SAMBA_DIR
-            msg += "You can change samba path at Configuration.py\n"
-            raise CloudletGenerationError(msg)
-        # fetch URI to cache
-        try:
-            cache_manager = cache.CacheManager(
-                Caching_Const.CACHE_ROOT,
-                Caching_Const.REDIS_ADDR,
-                Caching_Const.CACHE_FUSE_BINPATH)
-            cache_manager.start()
-            self.compiled_list = cache.Util.get_compiled_URIs(
-                cache_manager.cache_dir, self.options.DATA_SOURCE_URI)
-            # cache_manager.fetch_compiled_URIs(compiled_list)
-            cache_fuse = cache_manager.launch_fuse(self.compiled_list)
-            LOG.debug("cache fuse mount : %s, %s\n" %
-                      (cache_fuse.url_root, cache_fuse.mountpoint))
-        except cache.CachingError as e:
-            msg = "Cannot retrieve data from URI: %s" % str(e)
-            raise CloudletGenerationError(msg)
-        # create symbolic link to samba dir
-        mount_point = os.path.join(Caching_Const.HOST_SAMBA_DIR,
-                                   cache_fuse.url_root)
-        if os.path.lexists(mount_point):
-            os.unlink(mount_point)
-        os.symlink(cache_fuse.mountpoint, mount_point)
-        LOG.debug("create symbolic link to %s" % mount_point)
-        return cache_manager, cache_fuse.mountpoint
-
-    def _terminate_emulate_cache_fs(self, overlay_uri_meta):
-        uri_list = []
-        for each_info in self.compiled_list:
-            uri_list.append(each_info.get_uri())
-        uri_data = {
-            'source_URI': self.options.DATA_SOURCE_URI,
-            'compiled_URIs': uri_list,
-            }
-        with open(overlay_uri_meta, "w+b") as f:
-            import json
-            f.write(json.dumps(uri_data))
-        return overlay_uri_meta
 
 
 class OverlayMonitoringInfo(object):
