@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #
 # Cloudlet Infrastructure for Mobile Computing
 #
@@ -73,7 +73,7 @@ def wrap_process_fault(function):
     def decorated_function(self, *args, **kwargs):
         try:
             return function(self, *args, **kwargs)
-        except Exception, e:
+        except Exception as e:
             if hasattr(self, 'exception_handler'):
                 self.exception_handler()
             kwargs.update(dict(zip(function.func_code.co_varnames[2:], args)))
@@ -86,7 +86,7 @@ def try_except(fn):
     def wrapped(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except Exception, e:
+        except Exception as e:
             et, ei, tb = sys.exc_info()
             raise MyError, MyError(e), tb
     return wrapped
@@ -97,6 +97,7 @@ class StreamSynthesisError(Exception):
 
 
 class AckThread(threading.Thread):
+
     def __init__(self, request):
         self.request = request
         self.ack_queue = Queue.Queue()
@@ -105,7 +106,7 @@ class AckThread(threading.Thread):
     def start_sending_ack(self):
         while True:
             data = self.ack_queue.get()
-            bytes_recved= self.ack_queue.get()
+            bytes_recved = self.ack_queue.get()
             # send ack
             ack_data = struct.pack("!Q", bytes_recved)
             self.request.sendall(ack_data)
@@ -114,7 +115,6 @@ class AckThread(threading.Thread):
         self.ack_queue.put(bytes_recved)
 
 
-#class RecoverDeltaProc(threading.Thread):
 class RecoverDeltaProc(multiprocessing.Process):
     FUSE_INDEX_DISK = 1
     FUSE_INDEX_MEMORY = 2
@@ -123,7 +123,7 @@ class RecoverDeltaProc(multiprocessing.Process):
                  decomp_delta_queue, output_mem_path,
                  output_disk_path, chunk_size,
                  fuse_info_queue):
-        if base_disk == None and base_mem == None:
+        if base_disk is None and base_mem is None:
             raise StreamSynthesisError("Need either base_disk or base_memory")
 
         self.decomp_delta_queue = decomp_delta_queue
@@ -146,7 +146,6 @@ class RecoverDeltaProc(multiprocessing.Process):
         self.live_migration_iteration_dict = dict()
 
         multiprocessing.Process.__init__(self, target=self.recover_deltaitem)
-        #threading.Thread.__init__(self, target=self.recover_deltaitem)
 
     def recover_deltaitem(self):
         time_start = time.time()
@@ -154,9 +153,13 @@ class RecoverDeltaProc(multiprocessing.Process):
         # initialize reference data to use mmap
         count = 0
         self.base_disk_fd = open(self.base_disk, "rb")
-        self.raw_disk = mmap.mmap(self.base_disk_fd.fileno(), 0, prot=mmap.PROT_READ)
+        self.raw_disk = mmap.mmap(
+            self.base_disk_fd.fileno(),
+            0, prot=mmap.PROT_READ)
         self.base_mem_fd = open(self.base_mem, "rb")
-        self.raw_mem = mmap.mmap(self.base_mem_fd.fileno(), 0, prot=mmap.PROT_READ)
+        self.raw_mem = mmap.mmap(
+            self.base_mem_fd.fileno(),
+            0, prot=mmap.PROT_READ)
         self.recover_mem_fd = open(self.output_mem_path, "wrb")
         self.recover_disk_fd = open(self.output_disk_path, "wrb")
 
@@ -172,7 +175,7 @@ class RecoverDeltaProc(multiprocessing.Process):
             delta_item_list = RecoverDeltaProc.from_buffer(recv_data)
             for delta_item in delta_item_list:
                 ret = self.recover_item(delta_item)
-                if ret == None:
+                if ret is None:
                     # cannot find self reference point due to the parallel
                     # compression. Save this and do it later
                     unresolved_deltaitem_list.append(delta_item)
@@ -182,15 +185,16 @@ class RecoverDeltaProc(multiprocessing.Process):
 
             self.recover_mem_fd.flush()
             self.recover_disk_fd.flush()
-            #self.fuse_info_queue.put(overlay_chunk_ids)
 
-        LOG.info("[Delta] Handle dangling DeltaItem (%d)" % len(unresolved_deltaitem_list))
+        LOG.info(
+            "[Delta] Handle dangling DeltaItem (%d)" %
+            len(unresolved_deltaitem_list))
         overlay_chunk_ids = list()
         for delta_item in unresolved_deltaitem_list:
             ret = self.recover_item(delta_item)
-            if ret == None:
-                msg = "Cannot find self reference: type(%ld), offset(%ld), index(%ld)" % \
-                        (delta_item.delta_type, delta_item.offset, delta_item.index)
+            if ret is None:
+                msg = "Cannot find self reference: type(%ld), offset(%ld), index(%ld)" % (
+                    delta_item.delta_type, delta_item.offset, delta_item.index)
                 raise StreamSynthesisError(msg)
             self.process_deltaitem(delta_item, overlay_chunk_ids)
             count += 1
@@ -199,16 +203,14 @@ class RecoverDeltaProc(multiprocessing.Process):
         self.recover_mem_fd = None
         self.recover_disk_fd.close()
         self.recover_disk_fd = None
-        #self.fuse_info_queue.put(overlay_chunk_ids)
-        #self.fuse_info_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
         time_end = time.time()
 
-        LOG.info("[time] Delta delta %ld chunks, (%s~%s): %s" % \
+        LOG.info("[time] Delta delta %ld chunks, (%s~%s): %s" %
                 (count, time_start, time_end, (time_end-time_start)))
         LOG.info("Finish VM handoff")
 
     def recover_item(self, delta_item):
-        if type(delta_item) != DeltaItem:
+        if not isinstance(delta_item, DeltaItem):
             raise StreamSynthesisError("Need list of DeltaItem")
 
         if (delta_item.ref_id == DeltaItem.REF_RAW):
@@ -223,17 +225,16 @@ class RecoverDeltaProc(multiprocessing.Process):
             recover_data = self.raw_disk[offset:offset+self.chunk_size]
         elif delta_item.ref_id == DeltaItem.REF_SELF:
             ref_index = delta_item.data
-            self_ref_delta_item = self.recovered_delta_dict.get(ref_index, None)
-            if self_ref_delta_item == None:
-                #msg = "Cannot find self reference: type(%ld), offset(%ld), index(%ld), ref_index(%ld)" % \
-                #        (delta_item.delta_type, delta_item.offset, delta_item.index, ref_index)
-                #raise StreamSynthesisError(msg)
+            self_ref_delta_item = self.recovered_delta_dict.get(
+                ref_index, None)
+            if self_ref_delta_item is None:
                 return None
             recover_data = self_ref_delta_item.data
         elif delta_item.ref_id == DeltaItem.REF_SELF_HASH:
             ref_hashvalue = delta_item.data
-            self_ref_delta_item = self.recovered_hash_dict.get(ref_hashvalue, None)
-            if self_ref_delta_item == None:
+            self_ref_delta_item = self.recovered_hash_dict.get(
+                ref_hashvalue, None)
+            if self_ref_delta_item is None:
                 return None
             recover_data = self_ref_delta_item.data
             delta_item.hash_value = ref_hashvalue
@@ -242,22 +243,29 @@ class RecoverDeltaProc(multiprocessing.Process):
             patch_original_size = delta_item.offset_len
             if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
                     delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
-                base_data = self.raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
+                base_data = self.raw_mem[
+                    delta_item.offset:delta_item.offset + patch_original_size]
             elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
-                delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
-                base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
+                    delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+                base_data = self.raw_disk[
+                    delta_item.offset:delta_item.offset + patch_original_size]
             else:
-                raise StreamSynthesisError("Delta type should be either disk or memory")
-            recover_data = tool.merge_data(base_data, patch_data, len(base_data)*5)
+                raise StreamSynthesisError(
+                    "Delta type should be either disk or memory")
+            recover_data = tool.merge_data(
+                base_data, patch_data,
+                len(base_data) * 5)
         elif delta_item.ref_id == DeltaItem.REF_BSDIFF:
             patch_data = delta_item.data
             patch_original_size = delta_item.offset_len
             if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
                     delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
-                base_data = self.raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
+                base_data = self.raw_mem[
+                    delta_item.offset:delta_item.offset + patch_original_size]
             elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
-                delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
-                base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
+                    delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+                base_data = self.raw_disk[
+                    delta_item.offset:delta_item.offset + patch_original_size]
             else:
                 raise DeltaError("Delta type should be either disk or memory")
             recover_data = tool.merge_data_bsdiff(base_data, patch_data)
@@ -266,27 +274,31 @@ class RecoverDeltaProc(multiprocessing.Process):
             patch_original_size = delta_item.offset_len
             if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
                     delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
-                base_data = self.raw_mem[delta_item.offset:delta_item.offset+patch_original_size]
+                base_data = self.raw_mem[
+                    delta_item.offset:delta_item.offset + patch_original_size]
             elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
-                delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
-                base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
+                    delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+                base_data = self.raw_disk[
+                    delta_item.offset:delta_item.offset + patch_original_size]
             else:
                 raise DeltaError("Delta type should be either disk or memory")
             recover_data = tool.cython_xor(base_data, patch_data)
         else:
-            raise StreamSynthesisError("Cannot recover: invalid referce id %d" % delta_item.ref_id)
+            raise StreamSynthesisError(
+                "Cannot recover: invalid referce id %d" %
+                delta_item.ref_id)
 
         if len(recover_data) != delta_item.offset_len:
             msg = "Error, Recovered Size Error: %d, %d, ref_id: %s, data_len: %ld, offset: %ld, offset_len: %ld" % \
-                    (delta_item.delta_type, len(recover_data), delta_item.ref_id, \
-                    delta_item.data_len, delta_item.offset, delta_item.offset_len)
+                (delta_item.delta_type, len(recover_data), delta_item.ref_id,
+                 delta_item.data_len, delta_item.offset, delta_item.offset_len)
             print msg
             raise StreamSynthesisError(msg)
 
         # recover
         delta_item.ref_id = DeltaItem.REF_RAW
         delta_item.data = recover_data
-        if delta_item.hash_value == None or len(delta_item.hash_value) == 0:
+        if delta_item.hash_value is None or len(delta_item.hash_value) == 0:
             delta_item.hash_value = sha256(recover_data).digest()
 
         return delta_item
@@ -294,16 +306,17 @@ class RecoverDeltaProc(multiprocessing.Process):
     @staticmethod
     def from_buffer(data):
         #import yappi
-        #yappi.start()
+        # yappi.start()
         cur_offset = 0
         deltaitem_list = list()
         while True:
-            new_item, offset = RecoverDeltaProc.unpack_stream(data[cur_offset:])
+            new_item, offset = RecoverDeltaProc.unpack_stream(
+                data[cur_offset:])
             cur_offset += offset
             if len(data) < cur_offset:
                 break
             deltaitem_list.append(new_item)
-        #yappi.get_func_stats().print_all()
+        # yappi.get_func_stats().print_all()
         return deltaitem_list
 
     @staticmethod
@@ -335,7 +348,7 @@ class RecoverDeltaProc(multiprocessing.Process):
             data = struct.unpack("!Q", stream[offset:offset+8])[0]
             offset += 8
         elif ref_id == DeltaItem.REF_SELF_HASH:
-            #print "unpacking ref_self_hash"
+            # print "unpacking ref_self_hash"
             data = struct.unpack("!32s", stream[offset:offset+32])[0]
             offset += 32
 
@@ -344,20 +357,25 @@ class RecoverDeltaProc(multiprocessing.Process):
             live_seq = struct.unpack("!H", stream[offset:offset+2])[0]
             offset += 2
 
-        # hash_value typically does not exist when recovered becuase we don't need it
+        # hash_value typically does not exist when recovered becuase we don't
+        # need it
         if with_hashvalue:
             # hash_value is only needed for residue case
             hash_value = struct.unpack("!32s", stream[offset:offset+32])[0]
             offset += 32
-            item = DeltaItem(delta_type, ram_offset, offset_len, hash_value, ref_id, data_len, live_seq=live_seq)
+            item = DeltaItem(delta_type, ram_offset, offset_len,
+                             hash_value, ref_id, data_len,
+                             live_seq=live_seq)
         else:
-            item = DeltaItem(delta_type, ram_offset, offset_len, None, ref_id, data_len, data, live_seq=live_seq)
+            item = DeltaItem(delta_type, ram_offset, offset_len,
+                             None, ref_id, data_len, data,
+                             live_seq=live_seq)
         return item, offset
 
     def process_deltaitem(self, delta_item, overlay_chunk_ids):
         if len(delta_item.data) != delta_item.offset_len:
             msg = "recovered size is not same as page size, %ld != %ld" % \
-                    (len(delta_item.data), delta_item.offset_len)
+                (len(delta_item.data), delta_item.offset_len)
             raise StreamSynthesisError(msg)
 
         # save it to dictionary to find self_reference easily
@@ -365,33 +383,36 @@ class RecoverDeltaProc(multiprocessing.Process):
         self.recovered_hash_dict[delta_item.hash_value] = delta_item
 
         # do nothing if the latest memory or disk are already process
-        prev_iter_item = self.live_migration_iteration_dict.get(delta_item.index)
+        prev_iter_item = self.live_migration_iteration_dict.get(
+            delta_item.index)
         if (prev_iter_item is not None):
             prev_seq = getattr(prev_iter_item, 'live_seq', 0)
             item_seq = getattr(delta_item, 'live_seq', 0)
             if prev_seq > item_seq:
-                msg = "Latest version is already synthesized at %d (%d)" % (delta_item.offset, delta_item.delta_type)
+                msg = "Latest version is already synthesized at %d (%d)" % (
+                    delta_item.offset, delta_item.delta_type)
                 LOG.debug(msg)
                 return
 
-        # write to output file 
+        # write to output file
         overlay_chunk_id = long(delta_item.offset/self.chunk_size)
         if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
                 delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
             self.recover_mem_fd.seek(delta_item.offset)
             self.recover_mem_fd.write(delta_item.data)
-            overlay_chunk_ids.append("%d:%ld" %
-                    (RecoverDeltaProc.FUSE_INDEX_MEMORY, overlay_chunk_id))
+            overlay_chunk_ids.append(
+                "%d:%ld" %
+                (RecoverDeltaProc.FUSE_INDEX_MEMORY, overlay_chunk_id))
         elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
-            delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+                delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
             self.recover_disk_fd.seek(delta_item.offset)
             self.recover_disk_fd.write(delta_item.data)
-            overlay_chunk_ids.append("%d:%ld" %
-                    (RecoverDeltaProc.FUSE_INDEX_DISK, overlay_chunk_id))
+            overlay_chunk_ids.append(
+                "%d:%ld" %
+                (RecoverDeltaProc.FUSE_INDEX_DISK, overlay_chunk_id))
 
         # update the latest item for each memory page or disk block
         self.live_migration_iteration_dict[delta_item.index] = delta_item
-
 
     def finish(self):
         self.recovered_delta_dict.clear()
@@ -419,16 +440,16 @@ class RecoverDeltaProc(multiprocessing.Process):
 
 class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
     synthesis_option = {
-            Protocol.SYNTHESIS_OPTION_DISPLAY_VNC : False,
-            Protocol.SYNTHESIS_OPTION_EARLY_START : False,
-            Protocol.SYNTHESIS_OPTION_SHOW_STATISTICS : False
-            }
+        Protocol.SYNTHESIS_OPTION_DISPLAY_VNC: False,
+        Protocol.SYNTHESIS_OPTION_EARLY_START: False,
+        Protocol.SYNTHESIS_OPTION_SHOW_STATISTICS: False
+        }
 
     def ret_fail(self, message):
         LOG.error("%s" % str(message))
         message = NetworkUtil.encoding({
-            Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_FAIELD,
-            Protocol.KEY_FAILED_REASON : message
+            Protocol.KEY_COMMAND: Protocol.MESSAGE_COMMAND_FAIELD,
+            Protocol.KEY_FAILED_REASON: message
             })
         message_size = struct.pack("!I", len(message))
         self.request.send(message_size)
@@ -436,8 +457,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
 
     def ret_success(self, req_command, payload=None):
         send_message = {
-            Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_SUCCESS,
-            Protocol.KEY_REQUESTED_COMMAND : req_command,
+            Protocol.KEY_COMMAND: Protocol.MESSAGE_COMMAND_SUCCESS,
+            Protocol.KEY_REQUESTED_COMMAND: req_command,
             }
         if payload:
             send_message.update(payload)
@@ -449,7 +470,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
 
     def send_synthesis_done(self):
         message = NetworkUtil.encoding({
-            Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_SYNTHESIS_DONE,
+            Protocol.KEY_COMMAND: Protocol.MESSAGE_COMMAND_SYNTHESIS_DONE,
             })
         LOG.info("SUCCESS to launch VM")
         try:
@@ -459,13 +480,14 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         except socket.error as e:
             pass
 
-    def _recv_all(self, recv_size, ack_size=sys.maxint):
+    def _recv_all(self, recv_size, ack_size=sys.maxsize):
         prev_ack_sent_size = 0
         data = ''
         while len(data) < recv_size:
             tmp_data = self.request.recv(recv_size-len(data))
-            if tmp_data == None:
-                raise StreamSynthesisError("Cannot recv data at %s" % str(self))
+            if tmp_data is None:
+                msg = "Cannot recv data at %s" % str(self)
+                raise StreamSynthesisError(msg)
             if len(tmp_data) == 0:
                 raise StreamSynthesisError("Recv 0 data at %s" % str(self))
             data += tmp_data
@@ -473,7 +495,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             # to send ack for every PERIODIC_ACK_BYTES bytes
             cur_recv_size = len(data)
             data_diff = cur_recv_size-prev_ack_sent_size
-            if  data_diff > ack_size:
+            if data_diff > ack_size:
                 ack_data = struct.pack("!Q", data_diff)
                 self.request.sendall(ack_data)
                 if (cur_recv_size-prev_ack_sent_size) >= ack_size*2:
@@ -492,7 +514,9 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         # check base VM
         for each_basevm in self.server.basevm_list:
             if base_hashvalue == each_basevm['hash_value']:
-                LOG.info("New client request %s VM" % (each_basevm['diskpath']))
+                LOG.info(
+                    "New client request %s VM" %
+                    (each_basevm['diskpath']))
                 requested_base = each_basevm['diskpath']
         return [synthesis_option, requested_base]
 
@@ -509,8 +533,9 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
 
         # get header
         data = self._recv_all(4)
-        if data == None or len(data) != 4:
-            raise StreamSynthesisError("Failed to receive first byte of header")
+        if data is None or len(data) != 4:
+            raise StreamSynthesisError(
+                "Failed to receive first byte of header")
         message_size = struct.unpack("!I", data)[0]
         msgpack_data = self._recv_all(message_size)
         metadata = NetworkUtil.decoding(msgpack_data)
@@ -518,7 +543,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         launch_memory_size = metadata[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
 
         synthesis_option, base_diskpath = self._check_validity(metadata)
-        if base_diskpath == None:
+        if base_diskpath is None:
             raise StreamSynthesisError("No matching base VM")
         base_diskpath, base_mempath, base_diskmeta, base_memmeta =\
             self.server.handoff_data.base_vm_paths
@@ -551,21 +576,25 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         recv_blob_counter = 0
         while True:
             data = self._recv_all(4)
-            if data == None or len(data) != 4:
-                raise StreamSynthesisError("Failed to receive first byte of header")
+            if data is None or len(data) != 4:
+                msg = "Failed to receive first byte of header"
+                raise StreamSynthesisError(msg)
                 break
             blob_header_size = struct.unpack("!I", data)[0]
             blob_header_raw = self._recv_all(blob_header_size)
             blob_header = NetworkUtil.decoding(blob_header_raw)
             blob_size = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_SIZE)
-            if blob_size == None:
+            if blob_size is None:
                 raise StreamSynthesisError("Failed to receive blob")
             if blob_size == 0:
                 LOG.debug("%f\tend of stream" % (time.time()))
                 break
-            blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
-            blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
-            blob_memory_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
+            blob_comp_type = blob_header.get(
+                Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
+            blob_disk_chunk = blob_header.get(
+                Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
+            blob_memory_chunk = blob_header.get(
+                Cloudlet_Const.META_OVERLAY_FILE_MEMORY_CHUNKS)
 
             # send ack right before getting the blob
             ack_data = struct.pack("!Q", 0x01)
@@ -576,7 +605,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             self.request.send(ack_data)
 
             network_out_queue.put((blob_comp_type, compressed_blob))
-            memory_chunk_set = set(["%ld:1" % item for item in blob_memory_chunk])
+            memory_chunk_set = set(
+                ["%ld:1" % item for item in blob_memory_chunk])
             disk_chunk_set = set(["%ld:1" % item for item in blob_disk_chunk])
             memory_chunk_all.update(memory_chunk_set)
             disk_chunk_all.update(disk_chunk_set)
@@ -603,7 +633,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
     def terminate(self):
         # force terminate when something wrong in handling request
         # do not wait for joinining
-        if hasattr(self, 'delta_proc') and self.delta_proc != None:
+        if hasattr(self, 'delta_proc') and self.delta_proc is not None:
             self.delta_proc.finish()
             if self.delta_proc.is_alive():
                 self.delta_proc.terminate()
@@ -616,7 +646,8 @@ class StreamSynthesisConst(object):
 
 
 class StreamSynthesisServer(SocketServer.TCPServer):
-    def __init__(self, handoff_datafile, 
+
+    def __init__(self, handoff_datafile,
                  port_number=StreamSynthesisConst.SERVER_PORT_NUMBER,
                  timeout=120):
         self._handoff_datafile = handoff_datafile
@@ -630,7 +661,10 @@ class StreamSynthesisServer(SocketServer.TCPServer):
         server_address = ("0.0.0.0", self.port_number)
         self.allow_reuse_address = True
         try:
-            SocketServer.TCPServer.__init__(self, server_address, StreamSynthesisHandler)
+            SocketServer.TCPServer.__init__(
+                self,
+                server_address,
+                StreamSynthesisHandler)
         except socket.error as e:
             LOG.error(str(e))
             LOG.error("Check IP/Port : %s\n" % (str(server_address)))
@@ -640,14 +674,15 @@ class StreamSynthesisServer(SocketServer.TCPServer):
         LOG.info("* Server configuration")
         LOG.info(" - Open TCP Server at %s" % (str(server_address)))
         LOG.info(" - Time out for waiting: %d" % (self.timeout))
-        LOG.info(" - Disable Nagle(No TCP delay)  : %s" \
-                % str(self.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY)))
+        LOG.info(" - Disable Nagle(No TCP delay)  : %s" %
+                 str(self.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY)))
         LOG.info("-"*50)
 
     def _load_handoff_data(self, filepath):
         handoff_data = HandoffDataRecv.from_file(filepath)
-        if handoff_data == None:
-            raise StreamSynthesisError("Invalid handoff recv data at %s" % filepath)
+        if handoff_data is None:
+            raise StreamSynthesisError(
+                "Invalid handoff recv data at %s" % filepath)
         LOG.info("Load handoff data file at %s" % filepath)
         return handoff_data
 
@@ -670,7 +705,8 @@ class StreamSynthesisServer(SocketServer.TCPServer):
             try:
                 resource.deallocate()
             except Exception as e:
-                msg = "Failed to deallocate resources for Session : %s" % str(session_id)
+                msg = "Failed to deallocate resources for Session : %s" % str(
+                    session_id)
                 LOG.warning(msg)
 
     def check_basevm(self, base_vm_paths, hash_value):
@@ -678,7 +714,10 @@ class StreamSynthesisServer(SocketServer.TCPServer):
         LOG.info("-"*50)
         LOG.info("* Base VM Configuration")
         # check file location
-        (base_diskpath, base_mempath, base_diskmeta, base_memmeta) = base_vm_paths
+        (base_diskpath,
+         base_mempath,
+         base_diskmeta,
+         base_memmeta) = base_vm_paths
         if not os.path.exists(base_diskpath):
             LOG.warning("base disk is not available at %s" % base_diskpath)
         if not os.path.exists(base_mempath):
@@ -686,20 +725,22 @@ class StreamSynthesisServer(SocketServer.TCPServer):
         if not os.path.exists(base_diskmeta):
             LOG.warning("disk hashlist is not available at %s" % base_diskmeta)
         if not os.path.exists(base_memmeta):
-            LOG.warning("memory hashlist is not available at %s" % base_memmeta)
-        basevm_item = {'hash_value':hash_value, 'diskpath':base_diskpath}
+            LOG.warning(
+                "memory hashlist is not available at %s" %
+                base_memmeta)
+        basevm_item = {'hash_value': hash_value, 'diskpath': base_diskpath}
         ret_list.append(basevm_item)
 
-        LOG.info("  %s (Disk %d MB, Memory %d MB)" % \
-                (base_diskpath, os.path.getsize(base_diskpath)/1024/1024, \
-                os.path.getsize(base_mempath)/1024/1024))
+        LOG.info("  %s (Disk %d MB, Memory %d MB)" %
+                (base_diskpath, os.path.getsize(base_diskpath)/1024/1024,
+                 os.path.getsize(base_mempath)/1024/1024))
         LOG.info("-"*50)
         return ret_list
 
 
 def sigint_handler(signum, frame):
     sys.stdout.write("Exit by user\n")
-    if server != None:
+    if server is not None:
         server.terminate()
     sys.exit(0)
 
@@ -717,7 +758,7 @@ def main(argv=sys.argv):
                       dest="handoff_datafile", default=None,
                       help="specify datafile for handoff destination")
     settings, args = parser.parse_args(argv)
-    if settings.handoff_datafile == None:
+    if settings.handoff_datafile is None:
         sys.stderr.write("Need to specify path to the handoff datafile\n")
         sys.exit(1)
     settings.handoff_datafile = os.path.abspath(settings.handoff_datafile)
@@ -729,7 +770,7 @@ def main(argv=sys.argv):
     try:
         server.handle_request()
     except Exception as e:
-        #sys.stderr.write(str(e))
+        # sys.stderr.write(str(e))
         server.terminate()
         sys.exit(1)
     except KeyboardInterrupt as e:

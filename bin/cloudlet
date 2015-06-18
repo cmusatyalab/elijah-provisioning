@@ -27,7 +27,9 @@ import traceback
 import zipfile
 from optparse import OptionParser
 
-sys.path.insert(0, "../")   # for local debugging
+# for local debugging
+if os.path.exists("../elijah") is True:
+    sys.path.insert(0, "../")
 from elijah.provisioning import synthesis as synthesis
 from elijah.provisioning.Configuration import Const as Const
 from elijah.provisioning.Configuration import Options
