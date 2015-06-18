@@ -22,27 +22,23 @@ import threading
 import time
 import ctypes
 import sys
-import math
 import traceback
 import Queue
-from Configuration import Const
-from Configuration import VMOverlayCreationMode
 
-from migration_profile import MigrationMode
-from migration_profile import ModeProfileError
-from migration_profile import ModeProfile
-import log as logging
+from .Configuration import VMOverlayCreationMode
+from .migration_profile import MigrationMode
+from .migration_profile import ModeProfile
+from . import log as logging
 
 
 LOG = logging.getLogger(__name__)
 _process_controller = None
 
 
-
 def get_instance():
     global _process_controller
 
-    if _process_controller == None:
+    if _process_controller is None:
         _process_controller = ProcessManager()
         _process_controller.daemon = True
         _process_controller.start()
@@ -62,6 +58,7 @@ class ProcessManagerError(Exception):
 
 
 class ProcessManager(threading.Thread):
+
     def __init__(self):
         self.overlay_creation_mode = None
         self.process_list = dict()
@@ -73,8 +70,9 @@ class ProcessManager(threading.Thread):
         # load profiling information
         profile_path = os.path.abspath(VMOverlayCreationMode.PROFILE_DATAPATH)
         LOG.info("Load adaptation profile at: %s" % profile_path)
-        if os.path.exists(profile_path) == False:
-            raise ProcessManagerError("Cannot load profile at : %s" % profile_path)
+        if os.path.exists(profile_path) is False:
+            raise ProcessManagerError(
+                "Cannot load profile at : %s" % profile_path)
         self.mode_profile = ModeProfile.load_from_file(profile_path)
         super(ProcessManager, self).__init__(target=self.start_managing)
 
@@ -87,15 +85,13 @@ class ProcessManager(threading.Thread):
         for worker_name in worker_names:
             control_queue, response_queue = self.process_control[worker_name]
             worker_info = self.process_infos[worker_name]
-            if worker_info['is_processing_alive'].value == True:
+            if worker_info['is_processing_alive'].value:
                 control_queue.put(query)
                 if data is not None:
                     control_queue.put(data)
                 sent_worker_name.append(worker_name)
             else:
                 pass
-                #sys.stdout.write("not sending query to %s since it's over\n" %\
-                #                 worker_name)
         return sent_worker_name
 
     def _recv_response(self, query, worker_names):
@@ -105,56 +101,55 @@ class ProcessManager(threading.Thread):
             control_queue, response_queue = self.process_control[worker_name]
             response_dict[worker_name] = (None, 0)
             worker_info = self.process_infos[worker_name]
-            if worker_info['is_processing_alive'].value == True:
+            if worker_info['is_processing_alive'].value:
                 try:
                     if worker.is_alive():
                         response = response_queue.get(timeout=1)
                         response_dict[worker_name] = (response, 0)
                 except Queue.Empty as e:
-                    msg = "Error, Cannot receive response from: %s process\n"%\
+                    msg = "Error, Cannot receive response from: %s process\n" %\
                         (str(worker_name))
                     sys.stderr.write(msg)
         return response_dict
 
     def _change_num_cores(self, new_num_cores):
         worker_names = self.process_list.keys()
-        for worker_name in ["CreateMemoryDeltalist", "CreateDiskDeltalist", "CompressProc", "DeltaDedup"]:
+        for worker_name in ["CreateMemoryDeltalist", "CreateDiskDeltalist",
+                            "CompressProc", "DeltaDedup"]:
             if worker_name in worker_names:
                 self._send_query("change_cores",
-                                [worker_name],
-                                data={"num_cores":new_num_cores})
+                                 [worker_name],
+                                 data={"num_cores": new_num_cores})
 
     def _change_comp_mode(self, comp_type, comp_level):
         worker_names = self.process_list.keys()
         if "CompressProc" in worker_names:
-            self._send_query("change_mode",
-                             ["CompressProc"],
-                             data={
-                                 "comp_type":comp_type,
-                                 "comp_level":comp_level
-                             }
+            self._send_query("change_mode", ["CompressProc"],
+                             data={"comp_type": comp_type,
+                                   "comp_level": comp_level
+                                   }
                              )
 
     def _change_disk_diff_mode(self, diff_algorithm):
         worker_names = self.process_list.keys()
         if "CreateDiskDeltalist" in worker_names:
-            self._send_query("change_mode",
-                            ["CreateDiskDeltalist"],
-                            data={"diff_algorithm":diff_algorithm})
+            self._send_query("change_mode", ["CreateDiskDeltalist"],
+                             data={"diff_algorithm": diff_algorithm})
 
     def _change_memory_diff_mode(self, diff_algorithm):
         worker_names = self.process_list.keys()
         if "CreateMemoryDeltalist" in worker_names:
-            self._send_query("change_mode",
-                            ["CreateMemoryDeltalist"],
-                            data={"diff_algorithm":diff_algorithm})
+            self._send_query("change_mode", ["CreateMemoryDeltalist"],
+                             data={"diff_algorithm": diff_algorithm})
 
     def _get_queue_length(self):
         worker_names = self.process_list.keys()
         responses = dict()
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
-            response = (worker.monitor_current_inqueue_length.value, worker.monitor_current_outqueue_length.value)
+            response = (
+                worker.monitor_current_inqueue_length.value,
+                worker.monitor_current_outqueue_length.value)
             responses[worker_name] = response
         return responses
 
@@ -164,7 +159,8 @@ class ProcessManager(threading.Thread):
         responses = dict()
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
-            response = (worker.monitor_current_get_time.value, worker.monitor_current_put_time.value)
+            response = (worker.monitor_current_get_time.value,
+                        worker.monitor_current_put_time.value)
             responses[worker_name] = response
 
         sys.stdout.write("[manager]\t")
@@ -174,7 +170,9 @@ class ProcessManager(threading.Thread):
         return result
 
     @staticmethod
-    def _averaged_value(measure_hist, cur_time, avg_time=VMOverlayCreationMode.MEASURE_AVERAGE_TIME):
+    def _averaged_value(measure_hist,
+                        cur_time,
+                        avg_time=VMOverlayCreationMode.MEASURE_AVERAGE_TIME):
         avg_value = float(0)
         counter = 0
         for (measured_time, value) in reversed(measure_hist):
@@ -182,9 +180,7 @@ class ProcessManager(threading.Thread):
                 break
             avg_value += value
             counter += 1
-        #LOG.debug("coutning for avg : %d" % counter)
         return float(avg_value)/counter
-
 
     def get_system_speed(self):
         worker_names = ["DeltaDedup", "CreateMemoryDeltalist",
@@ -193,7 +189,6 @@ class ProcessManager(threading.Thread):
         total_size_dict_out = dict()
         cur_size_dict_in = dict()
         cur_size_dict_out = dict()
-        compression_first_input_time = 0
         p_dict = dict()
         r_dict = dict()
         p_dict_cur = dict()
@@ -201,18 +196,18 @@ class ProcessManager(threading.Thread):
 
         for worker_name in worker_names:
             worker = self.process_list.get(worker_name, None)
-            if worker == None:
+            if worker is None:
                 #LOG.debug("%f\t%s is not available" % (time.time(), worker_name))
                 return None
             worker_info = self.process_infos[worker_name]
-            if worker_info['finish_processing_input'].value == True:
+            if worker_info['finish_processing_input'].value:
                 #LOG.debug("%f\t%s is finished" % (time.time(), worker_name))
                 return None
             time_block = worker.monitor_total_time_block.value
             ratio_block = worker.monitor_total_ratio_block.value
             time_block_cur = worker.monitor_total_time_block_cur.value
             ratio_block_cur = worker.monitor_total_ratio_block_cur.value
-            if time_block <= 0 or ratio_block <=0:
+            if time_block <= 0 or ratio_block <= 0:
                 #LOG.debug("%s has wrong data" % worker_name)
                 return None
             p_dict[worker_name] = time_block
@@ -223,8 +218,6 @@ class ProcessManager(threading.Thread):
             total_size_dict_out[worker_name] = worker.monitor_total_output_size.value
             cur_size_dict_in[worker_name] = worker.monitor_total_input_size_cur.value
             cur_size_dict_out[worker_name] = worker.monitor_total_output_size_cur.value
-            if worker_name == "CompressProc":
-                compression_first_input_time = worker.monitor_time_first_input_recved.value
 
         # Get total average P and total R
         memory_in_size = (total_size_dict_in['CreateMemoryDeltalist'])
@@ -234,21 +227,17 @@ class ProcessManager(threading.Thread):
         total_r = MigrationMode.get_total_R(r_dict, alpha)
 
         # Get total instant P and total R
-        memory_in_size_cur = (cur_size_dict_in['CreateMemoryDeltalist'])
-        disk_in_size_cur = (cur_size_dict_in['CreateDiskDeltalist'])
         alpha_cur = float(memory_in_size)/(memory_in_size+disk_in_size)
         total_p_cur = MigrationMode.get_total_P(p_dict_cur, alpha_cur)
         total_r_cur = MigrationMode.get_total_R(r_dict_cur, alpha_cur)
         num_cores = VMOverlayCreationMode.get_num_cores()
-        system_block_per_sec, system_in_bw_est, system_out_bw_est = MigrationMode.get_system_throughput(num_cores,
-                                                                                                    total_p,
-                                                                                                    total_r)
-        system_block_per_sec_cur, system_in_bw_cur_est, system_out_bw_cur_est = MigrationMode.get_system_throughput(num_cores,
-                                                                     total_p_cur,
-                                                                     total_r_cur)
+        system_block_per_sec, system_in_bw_est, system_out_bw_est =\
+            MigrationMode.get_system_throughput(num_cores, total_p, total_r)
+        system_block_per_sec_cur, system_in_bw_cur_est, system_out_bw_cur_est =\
+            MigrationMode.get_system_throughput(num_cores, total_p_cur, total_r_cur)
         #LOG.debug("p tot\t%s\t%f --> %f" % (str(p_dict), alpha, total_p))
         #LOG.debug("p cur\t%s\t%f --> %f" % (str(p_dict_cur), alpha, total_p_cur))
-        #sys.stdout.write("P: %f, %f \tR:%f, %f, BW: %f, %f mbps\t(%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f)\n" % \
+        # sys.stdout.write("P: %f, %f \tR:%f, %f, BW: %f, %f mbps\t(%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f), (%f,%f,%f,%f)\n" % \
         #                 (total_p, total_p_cur,
         #                  total_r, total_r_cur,
         #                  system_out_bw_mbps, system_out_bw_mbps_cur,
@@ -272,16 +261,18 @@ class ProcessManager(threading.Thread):
 
         # get actual system throughput using in out size
         system_output_size = total_size_dict_out['CompressProc']
-        system_in_size = total_size_dict_in['CreateDiskDeltalist'] + total_size_dict_in['CreateMemoryDeltalist']
+        system_in_size = total_size_dict_in[
+            'CreateDiskDeltalist'] + total_size_dict_in['CreateMemoryDeltalist']
         cur_time = time.time()
         duration = cur_time - self.prev_measured_time
         system_in_bw_actual = self.prev_system_in_bw
         system_out_bw_actual = self.prev_system_out_bw
         if (system_in_size > self.prev_system_in_size) and\
                 (system_output_size > self.prev_system_out_size):
-            system_in_bw_instant = 8.0*(system_in_size-self.prev_system_in_size)/duration/1024/1024
-            system_out_bw_instant = 8.0*(system_output_size-self.prev_system_out_size)/duration/1024/1024
-            #LOG.debug("compress size: %s %s %s %s" % (system_out_bw_instant, system_output_size, self.prev_system_out_size, duration))
+            system_in_bw_instant = 8.0 * \
+                (system_in_size-self.prev_system_in_size)/duration/1024/1024
+            system_out_bw_instant = 8.0 * \
+                (system_output_size-self.prev_system_out_size)/duration/1024/1024
 
             self.prev_system_out_size = system_output_size
             self.prev_system_in_size = system_in_size
@@ -290,7 +281,8 @@ class ProcessManager(threading.Thread):
             self.prev_system_in_bw = system_in_bw_instant
 
             self.cur_system_in_bw_list.append((cur_time, system_in_bw_instant))
-            self.cur_system_out_bw_list.append((cur_time, system_out_bw_instant))
+            self.cur_system_out_bw_list.append(
+                (cur_time, system_out_bw_instant))
             #system_in_bw_actual = self._averaged_value(self.cur_system_in_bw_list, cur_time, 1)
             #system_out_bw_actual = self._averaged_value(self.cur_system_out_bw_list, cur_time, 1)
             system_in_bw_actual = system_in_bw_instant
@@ -303,22 +295,21 @@ class ProcessManager(threading.Thread):
             system_out_bw_actual, system_in_bw_actual
 
     def get_migration_iteration_count(self):
-            worker = self.process_list.get("CreateMemoryDeltalist", None)
-            if worker == None:
-                return None
-            iteration_num = worker.monitor_current_iteration.value
-            return iteration_num
+        worker = self.process_list.get("CreateMemoryDeltalist", None)
+        if worker is None:
+            return None
+        iteration_num = worker.monitor_current_iteration.value
+        return iteration_num
 
     def get_network_speed(self):
         if self.migration_dest.startswith("network"):
-            # only used for experiement. 
-            # If it's bigger than 0, adaptation use this value to transmit over the network
+            # Only used for experiement.  If it's bigger than 0, adaptation use 
+            # this value to transmit over the network
             if VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH > 0:
-                #LOG.debug("returning from STATIC network bw: %d Mbps" % (VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH))
                 return VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH
             else:
                 worker = self.process_list.get("StreamSynthesisClient", None)
-                if worker == None:
+                if worker is None:
                     return None
                 worker_info = self.process_infos["StreamSynthesisClient"]
                 if worker_info['is_processing_alive'].value == False:
@@ -326,7 +317,7 @@ class ProcessManager(threading.Thread):
                 network_bw = worker.monitor_network_bw.value
                 if network_bw <= 0:
                     return None
-                return network_bw # mbps
+                return network_bw  # mbps
         else:
             return VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps
 
@@ -341,7 +332,6 @@ class ProcessManager(threading.Thread):
         self.cur_system_out_bw_list = list()
         #LOG.debug("adaptation start time: %f" % self.time_start)
         time_first_measurement = 0
-        measured_throughput = 0
         mode_change_history = list()
         time_prev_mode_change = self.time_start
         while (not self.stop.wait(0.1)):
@@ -349,16 +339,15 @@ class ProcessManager(threading.Thread):
                 network_bw = self.get_network_speed()  # mega bit/s
                 system_speed = self.get_system_speed()
                 time_current_iter = time.time()
-                if system_speed == None:
+                if system_speed is None:
                     #LOG.debug("system speed is not measured")
                     continue
-                if network_bw == None:
+                if network_bw is None:
                     #LOG.debug("network speed is not measured")
                     continue
                 if time_first_measurement == 0:
                     time_first_measurement = time.time()
                 time_from_start = time_current_iter-time_first_measurement
-
 
                 p_dict, r_dict, p_dict_cur, r_dict_cur,\
                     total_p, total_r, total_p_cur, total_r_cur,\
@@ -378,31 +367,28 @@ class ProcessManager(threading.Thread):
                 LOG.debug(msg)
 
                 # first predict at 2 seconds and then for every 5 seconds
-                if time_from_start > 5 and (time_current_iter - time_prev_mode_change) > 5:
-                    # use current throughput
-                    #LOG.debug("mode-test\t%f\t%0.2f\t%f\t%f" % \
-                    #          (time_current_iter,
-                    #           time_from_start,
-                    #           system_out_bw_actual,
-                    #           network_bw,
-                    #           ))
-                    item = self.mode_profile.predict_new_mode(self.overlay_creation_mode,
-                                                              p_dict_cur, r_dict_cur,
-                                                              total_size_dict_in,
-                                                              network_bw)
+                if time_from_start > 5 and (time_current_iter-time_prev_mode_change) > 5:
+                    item = self.mode_profile.predict_new_mode(
+                        self.overlay_creation_mode,
+                        p_dict_cur,
+                        r_dict_cur,
+                        total_size_dict_in,
+                        network_bw)
                     diff_mode = None
                     if item is not None:
                         (new_mode_obj, actual_block_per_sec, misc) = item
-                        (bottleneck, system_block_per_sec, new_system_in_mbps, new_system_out_mbps, network_block_per_sec, network_bw) = misc
-                        diff_str = MigrationMode.mode_diff_str(self.overlay_creation_mode.__dict__, new_mode_obj.mode)
-                        diff = MigrationMode.mode_diff(self.overlay_creation_mode.__dict__, new_mode_obj.mode)
-                        #LOG.debug("adaptation\t%f\tChange in output bps:%f,%f" % \
-                        #          (time_from_start, system_out_mbps, new_system_out_mbps))
-                        #LOG.debug("adaptation\t%f\tChange in block/sec:%f,%f" % \
-                        #          (time_from_start, system_block_per_sec, new_block_per_sec))
-                        #LOG.debug("adaptation\t%f\tChange in block/sec:%f,%f" % \
-                        #          (time_from_start, network_block_per_sec, new_block_per_sec))
-                        diff_mode = MigrationMode.mode_diff(self.overlay_creation_mode.__dict__, new_mode_obj.mode)
+                        (bottleneck,
+                         system_block_per_sec,
+                         new_system_in_mbps,
+                         new_system_out_mbps,
+                         network_block_per_sec,
+                         network_bw) = misc
+                        diff_str = MigrationMode.mode_diff_str(
+                            self.overlay_creation_mode.__dict__,
+                            new_mode_obj.mode)
+                        diff_mode = MigrationMode.mode_diff(
+                            self.overlay_creation_mode.__dict__,
+                            new_mode_obj.mode)
 
                     # change mode
                     time_prev_mode_change = time_current_iter
@@ -412,29 +398,38 @@ class ProcessManager(threading.Thread):
                         new_disk_diff = None
                         new_memory_diff = None
                         if "COMPRESSION_ALGORITHM_SPEED" in diff_mode.keys():
-                            new_comp_level = diff_mode["COMPRESSION_ALGORITHM_SPEED"]
+                            new_comp_level = diff_mode[
+                                "COMPRESSION_ALGORITHM_SPEED"]
                         if "COMPRESSION_ALGORITHM_TYPE" in diff_mode.keys():
-                            new_comp_type = diff_mode["COMPRESSION_ALGORITHM_TYPE"]
+                            new_comp_type = diff_mode[
+                                "COMPRESSION_ALGORITHM_TYPE"]
                         if "DISK_DIFF_ALGORITHM" in diff_mode.keys():
                             new_disk_diff = diff_mode["DISK_DIFF_ALGORITHM"]
                         if "MEMORY_DIFF_ALGORITHM" in diff_mode.keys():
-                            new_memory_diff = diff_mode["MEMORY_DIFF_ALGORITHM"]
+                            new_memory_diff = diff_mode[
+                                "MEMORY_DIFF_ALGORITHM"]
 
                         # apply change
                         if new_comp_type is not None or new_comp_level is not None:
-                            self._change_comp_mode(new_comp_type, new_comp_level)
+                            self._change_comp_mode(new_comp_type,
+                                                   new_comp_level)
                         if new_disk_diff is not None:
                             self._change_disk_diff_mode(new_disk_diff)
                         if new_memory_diff is not None:
                             self._change_memory_diff_mode(new_memory_diff)
 
                         old_mode_dict = self.overlay_creation_mode.__dict__.copy()
-                        self.overlay_creation_mode.update_mode(new_mode_obj.mode)
-                        mode_change_history.append((time_current_iter, old_mode_dict, new_mode_obj.mode))
+                        self.overlay_creation_mode.update_mode(
+                            new_mode_obj.mode)
+                        mode_change_history.append(
+                            (time_current_iter, old_mode_dict, new_mode_obj.mode)
+                        )
 
                         # print log
-                        diff_str = MigrationMode.mode_diff_str(old_mode_dict, self.overlay_creation_mode.__dict__)
-                        LOG.debug("mode-change\t%f\t%0.2f\t%s\t%s\t%s\t%s" % \
+                        diff_str = MigrationMode.mode_diff_str(
+                            old_mode_dict,
+                            self.overlay_creation_mode.__dict__)
+                        LOG.debug("mode-change\t%f\t%0.2f\t%s\t%s\t%s\t%s" %
                                   (time_current_iter,
                                    time_from_start,
                                    diff_str,
@@ -442,9 +437,9 @@ class ProcessManager(threading.Thread):
                                    r_dict_cur,
                                    total_size_dict_in))
                     else:
-                        LOG.debug("mode-change\t%f\t%0.2f\tcurrent mode is the best" % (
-                            time_current_iter,
-                            time_from_start))
+                        LOG.debug(
+                            "mode-change\t%f\t%0.2f\tcurrent mode is the best" %
+                            (time_current_iter, time_from_start))
             except Exception as e:
                 sys.stdout.write("[manager] Exception\n")
                 sys.stderr.write(traceback.format_exc())
@@ -458,7 +453,7 @@ class ProcessManager(threading.Thread):
         worker_info['finish_processing_input'] = worker.finish_processing_input
         control_queue = multiprocessing.Queue()
         response_queue = multiprocessing.Queue()
-        #print "[manager] register new process: %s" % worker_name
+        # print "[manager] register new process: %s" % worker_name
 
         self.process_list[worker_name] = worker
         self.process_infos[worker_name] = (worker_info)
@@ -470,16 +465,25 @@ class ProcessManager(threading.Thread):
 
 
 class ProcWorker(multiprocessing.Process):
+
     def __init__(self, *args, **kwargs):
         # measurement
-        self.monitor_total_time_block = multiprocessing.RawValue(ctypes.c_double, 0)
-        self.monitor_total_ratio_block = multiprocessing.RawValue(ctypes.c_double, 0)
-        self.monitor_total_time_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
-        self.monitor_total_ratio_block_cur = multiprocessing.RawValue(ctypes.c_double, 0)
-        self.monitor_total_input_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
-        self.monitor_total_output_size = multiprocessing.RawValue(ctypes.c_ulong, 0)
-        self.monitor_total_input_size_cur = multiprocessing.RawValue(ctypes.c_ulong, 0)
-        self.monitor_total_output_size_cur = multiprocessing.RawValue(ctypes.c_ulong, 0)
+        self.monitor_total_time_block = multiprocessing.RawValue(
+            ctypes.c_double, 0)
+        self.monitor_total_ratio_block = multiprocessing.RawValue(
+            ctypes.c_double, 0)
+        self.monitor_total_time_block_cur = multiprocessing.RawValue(
+            ctypes.c_double, 0)
+        self.monitor_total_ratio_block_cur = multiprocessing.RawValue(
+            ctypes.c_double, 0)
+        self.monitor_total_input_size = multiprocessing.RawValue(
+            ctypes.c_ulong, 0)
+        self.monitor_total_output_size = multiprocessing.RawValue(
+            ctypes.c_ulong, 0)
+        self.monitor_total_input_size_cur = multiprocessing.RawValue(
+            ctypes.c_ulong, 0)
+        self.monitor_total_output_size_cur = multiprocessing.RawValue(
+            ctypes.c_ulong, 0)
         self.in_size = 0
         self.out_size = 0
         self.is_processing_alive = multiprocessing.RawValue(ctypes.c_bool)
@@ -487,12 +491,12 @@ class ProcWorker(multiprocessing.Process):
         self.is_processing_alive.value = True
         self.finish_processing_input.value = False
 
-        self.worker_name = str(kwargs.pop('worker_name', self.__class__.__name__))
+        self.worker_name = str(
+            kwargs.pop('worker_name',
+                       self.__class__.__name__))
         process_manager = get_instance()
         (self.control_queue, self.response_queue) = \
             process_manager.register(self)  # shared dictionary
-
-
 
         # not used
         self.monitor_current_bw = float(0)
@@ -504,7 +508,7 @@ class ProcWorker(multiprocessing.Process):
 
     def change_affinity_child(self, new_num_cores):
         for (proc, c_queue, m_queue) in self.proc_list:
-            if proc.is_alive() == True:
+            if proc.is_alive():
                 m_queue.put(("new_num_cores", new_num_cores))
 
     def _handle_control_msg(self, control_msg):
@@ -512,23 +516,26 @@ class ProcWorker(multiprocessing.Process):
             self.response_queue.put(self.monitor_current_bw)
             return True
         elif control_msg == "queue_length":
-            return (self.monitor_current_inqueue_length, self.monitor_current_outqueue_length)
+            return (
+                self.monitor_current_inqueue_length,
+                self.monitor_current_outqueue_length)
         elif control_msg == "change_cores":
             new_num_cores = self.control_queue.get()
             num_cores = new_num_cores.get("num_cores", None)
             if num_cores is not None:
-                #print "[%s] itself receives new num cores: %s" % (self, num_cores)
+                # print "[%s] itself receives new num cores: %s" % (self,
+                # num_cores)
                 VMOverlayCreationMode.set_num_cores(num_cores)
                 if getattr(self, "proc_list", None):
                     self.change_affinity_child(num_cores)
             return True
         else:
-            #sys.stdout.write("Cannot be handled in super class\n")
+            # sys.stdout.write("Cannot be handled in super class\n")
             return False
 
 
-
 class TestProc(ProcWorker):
+
     def __init__(self, worker_name):
         super(TestProc, self).__init__(target=self.read_mem_snapshot)
 
@@ -541,4 +548,3 @@ if __name__ == "__main__":
     test.start()
     test.join()
     print "end"
-

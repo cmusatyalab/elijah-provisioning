@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #
 # Cloudlet Infrastructure for Mobile Computing
 #
@@ -21,33 +21,32 @@
 import os
 import logging
 import sys
-import stat
-import grp
-from Configuration import Const as Const
+from .Configuration import Const as Const
 
 loggers = dict()
 DEFAULT_FORMATTER = '%(asctime)s %(name)s %(levelname)s %(message)s'
 
+
 def getLogger(name='unknown'):
-    if loggers.get(name, None) == None:
+    if loggers.get(name, None) is None:
         # default file logging
         log_filepath = "/var/tmp/cloudlet/log-synthesis"
-        if hasattr(Const, "LOG_PATH") == True:
+        if hasattr(Const, "LOG_PATH"):
             log_filepath = Const.LOG_PATH
-        if os.path.exists(os.path.dirname(log_filepath)) == False:
+        if os.path.exists(os.path.dirname(log_filepath)) is False:
             os.makedirs(os.path.dirname(log_filepath))
             os.chmod(os.path.dirname(log_filepath), 0o777)
-        if os.path.exists(log_filepath) == False:
+        if os.path.exists(log_filepath) is False:
             # make this log file can be access by anyone
             # because it will be shared by nova and primary user
             open(log_filepath, "w+").close()
-            gid = grp.getgrnam("nogroup").gr_gid
             os.chmod(log_filepath, 0o666)
-        logging.basicConfig(level=logging.DEBUG,
-                format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                datefmt='%m-%d %H:%M',
-                filename=log_filepath,
-                filemode='a')
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+            datefmt='%m-%d %H:%M',
+            filename=log_filepath,
+            filemode='a')
         logger = logging.getLogger(name)
         hdlr = logging.FileHandler(log_filepath)
         hdlr.setLevel(logging.DEBUG)
@@ -64,5 +63,3 @@ def getLogger(name='unknown'):
         loggers[name] = logger
 
     return loggers.get(name)
-
-
