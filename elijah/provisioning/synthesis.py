@@ -60,7 +60,6 @@ import threading
 import traceback
 from optparse import OptionParser
 from .tool import comp_lzma
-from .tool import diff_files
 from . import compression
 from . import log as logging
 
@@ -987,37 +986,6 @@ def generate_overlayfile(overlay_deltalist,
     overlay_files = [os.path.join(dirpath, item) for item in overlay_files]
 
     return overlay_metapath, overlay_files
-
-
-def run_delta_compression(output_list, **kwargs):
-    log = kwargs.get('log', None)
-    nova_util = kwargs.get('nova_util', None)
-    custom_delta = kwargs.get('custom_delta', False)
-
-    # xdelta and compression
-    ret_files = []
-    for (base, modified, overlay) in output_list:
-        start_time = time()
-
-        # xdelta
-        if custom_delta:
-            diff_files(base, modified, overlay, nova_util=nova_util)
-        else:
-            diff_files(base, modified, overlay, nova_util=nova_util)
-        LOG.info('[TIME] time for creating overlay : ', str(time()-start_time))
-        LOG.info('[TIME](%d)-(%d)=(%d): ' %
-            (os.path.getsize(base), os.path.getsize(modified), os.path.getsize(overlay)))
-
-        # compression
-        comp = overlay + '.lzma'
-        comp, time1 = comp_lzma(overlay, comp, nova_util=nova_util)
-        ret_files.append(comp)
-
-        # remove temporary files
-        os.remove(modified)
-        os.remove(overlay)
-
-    return ret_files
 
 
 def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):

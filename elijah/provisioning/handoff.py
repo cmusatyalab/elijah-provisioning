@@ -50,7 +50,6 @@ from . import delta
 from .delta import DeltaList
 from .delta import DeltaItem
 from .tool import comp_lzma
-from .tool import diff_files
 from .progressbar import AnimatedProgressBar
 from .package import VMOverlayPackage
 from . import compression
