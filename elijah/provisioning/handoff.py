@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #
 # cloudlet infrastructure for mobile computing
 #
@@ -37,29 +37,29 @@ from tempfile import mkdtemp
 from xml.etree import ElementTree
 from urlparse import urlsplit
 
-import Memory
-import Disk
-import cloudletfs
-import memory_util
-from Configuration import Const
-from Configuration import VMOverlayCreationMode
-from Configuration import Options
-from progressbar import AnimatedProgressBar
-from package import VMOverlayPackage
-import delta
-from delta import DeltaList
-from delta import DeltaItem
-from tool import comp_lzma
-from tool import diff_files
-from progressbar import AnimatedProgressBar
-from package import VMOverlayPackage
-import compression
-import process_manager
-import qmp_af_unix
-import log as logging
+from . import Memory
+from . import Disk
+from . import cloudletfs
+from . import memory_util
+from .Configuration import Const
+from .Configuration import VMOverlayCreationMode
+from .Configuration import Options
+from .progressbar import AnimatedProgressBar
+from .package import VMOverlayPackage
+from . import delta
+from .delta import DeltaList
+from .delta import DeltaItem
+from .tool import comp_lzma
+from .tool import diff_files
+from .progressbar import AnimatedProgressBar
+from .package import VMOverlayPackage
+from . import compression
+from . import process_manager
+from . import qmp_af_unix
+from . import log as logging
 
 
-# to work with OpenStack's eventlet 
+# to work with OpenStack's eventlet
 try:
     from eventlet import patcher
     if patcher.is_monkey_patched("thread"):
@@ -76,12 +76,15 @@ LOG = logging.getLogger(__name__)
 # This is only for experiemental purpose.
 # It is used to measure the time for changing network BW or CPU cores at the
 # right time.
-_handoff_start_time = [sys.maxint]
+_handoff_start_time = [sys.maxsize]
+
 
 class HandoffError(Exception):
     pass
 
+
 class PreloadResidueData(native_threading.Thread):
+
     def __init__(self, base_diskmeta, base_memmeta):
         self.base_diskmeta = base_diskmeta
         self.base_memmeta = base_memmeta
@@ -90,11 +93,14 @@ class PreloadResidueData(native_threading.Thread):
         native_threading.Thread.__init__(self, target=self.preloading)
 
     def preloading(self):
-        self.basedisk_hashdict = delta.DeltaDedup.disk_import_hashdict(self.base_diskmeta)
-        self.basemem_hashdict = delta.DeltaDedup.memory_import_hashdict(self.base_memmeta)
+        self.basedisk_hashdict = delta.DeltaDedup.disk_import_hashdict(
+            self.base_diskmeta)
+        self.basemem_hashdict = delta.DeltaDedup.memory_import_hashdict(
+            self.base_memmeta)
 
 
 class VMMonitor(object):
+
     def __init__(self, handoff_data,
                  base_disk, base_mem,
                  nova_util=None):
@@ -110,18 +116,17 @@ class VMMonitor(object):
         self.base_mem = base_mem
         self.nova_util = nova_util
         self.memory_snapshot_size = -1
-        #threading.Thread.__init__(self, target=self.load_monitoring_info)
 
     def get_monitoring_info(self):
-        ''' return montioring information including
-            1) base vm hash list
-            2) used/freed disk block list
-            3) freed memory page
-        '''
+        """return montioring information including
+        1) base vm hash list
+        2) used/freed disk block list
+        3) freed memory page
+        """
         time1 = time.time()
         # do not pause VM since we're doing semi-live migration
         # this will be done by qmp
-        #if self.machine is not None:
+        # if self.machine is not None:
         #    vm_state, reason = self.machine.state(0)
         #    if vm_state != libvirt.VIR_DOMAIN_PAUSED:
         #        self.machine.suspend()
@@ -129,7 +134,8 @@ class VMMonitor(object):
         time2 = time.time()
         # 2. get dma & discard information
         if self.options.TRIM_SUPPORT:
-            dma_dict, trim_dict = Disk.parse_qemu_log(self.qemu_logfile, Const.CHUNK_SIZE)
+            dma_dict, trim_dict = Disk.parse_qemu_log(
+                self.qemu_logfile, Const.CHUNK_SIZE)
             if len(trim_dict) == 0:
                 LOG.warning("No TRIM Discard, Check /etc/fstab configuration")
         else:
@@ -148,20 +154,24 @@ class VMMonitor(object):
         info_dict[_MonitoringInfo.MEMORY_FREE_BLOCKS] = free_memory_dict
 
         time4 = time.time()
-        # mark the modifid disk area in the original VM overlay as modified area
+        # mark the modifid disk area at original VM overlay as modified
         if self.dirty_disk_chunks is not None:
             for dirty_chunk in self.dirty_disk_chunks:
                 self.modified_disk_queue.put((dirty_chunk, 1.0))
-        info_dict[_MonitoringInfo.DISK_MODIFIED_BLOCKS] = self.modified_disk_queue
+        info_dict[
+            _MonitoringInfo.DISK_MODIFIED_BLOCKS] = self.modified_disk_queue
         time5 = time.time()
 
-        LOG.debug("consumed time %f, %f, %f, %f" % ((time5-time4), (time4-time3), (time3-time2), (time2-time1)))
+        LOG.debug(
+            "consumed time %f, %f, %f, %f" %
+            ((time5-time4), (time4-time3), (time3-time2), (time2-time1)))
 
         self.monitoring_info = _MonitoringInfo(info_dict)
         return self.monitoring_info
 
 
 class MemoryReadProcess(process_manager.ProcWorker):
+
     def __init__(self, input_path, machine_memory_size,
                  conn, machine, result_queue):
         self.input_path = input_path
@@ -181,7 +191,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
         time_s = time.time()
         is_first_recv = False
         time_first_recv = 0
-        UPDATE_SIZE  = 1024*1024*10 # 10MB
+        UPDATE_SIZE = 1024*1024*10  # 10MB
         prev_processed_size = 0
         prev_processed_time = time.time()
         cur_processed_size = 0
@@ -199,7 +209,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             # read first 40KB and aligen header with 4KB
             select.select([self.in_fd], [], [])
             data = self.in_fd.read(Memory.Memory.RAM_PAGE_SIZE*10)
-            if is_first_recv == False:
+            if not is_first_recv:
                 is_first_recv = True
                 time_first_recv = time.time()
 
@@ -212,41 +222,46 @@ class MemoryReadProcess(process_manager.ProcWorker):
 
             # get memory snapshot size
             original_header_len = len(original_header)
-            memory_size_data = data[original_header_len:original_header_len+Memory.Memory.CHUNK_HEADER_SIZE]
-            new_data = data[original_header_len+Memory.Memory.CHUNK_HEADER_SIZE:]
-            mem_snapshot_size, = struct.unpack(Memory.Memory.CHUNK_HEADER_FMT, memory_size_data)
-            self.memory_snapshot_size.value = long(mem_snapshot_size + len(new_header))
+            memory_size_data = data[
+                original_header_len:original_header_len+Memory.Memory.CHUNK_HEADER_SIZE]
+            new_data = data[ original_header_len + Memory.Memory.CHUNK_HEADER_SIZE:]
+            mem_snapshot_size, = struct.unpack(
+                Memory.Memory.CHUNK_HEADER_FMT, memory_size_data)
+            self.memory_snapshot_size.value = long(mem_snapshot_size+len(new_header))
             self.result_queue.put(new_data)
             self.total_write_size += len(new_data)
-            LOG.info("Memory snapshot size: %ld, header size: %ld at %f" % \
+            LOG.info("Memory snapshot size: %ld, header size: %ld at %f" %
                      (mem_snapshot_size, len(new_header), time.time()))
 
             # write rest of the memory data
             #prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
                 input_fd = [self.control_queue._reader.fileno(), self.in_fd]
-                input_ready, out_ready, err_ready = select.select(input_fd, [], [])
+                input_ready, out_ready, err_ready = select.select(
+                    input_fd, [], [])
                 if self.control_queue._reader.fileno() in input_ready:
                     control_msg = self.control_queue.get()
                     self._handle_control_msg(control_msg)
                 if self.in_fd in input_ready:
-                    data = self.in_fd.read(VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE)
-                    if data == None or len(data) <= 0:
+                    data = self.in_fd.read(
+                        VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE)
+                    if data is None or len(data) <= 0:
                         break
                     current_size = len(data)
                     self.result_queue.put(data)
                     self.total_write_size += current_size
-                    #prog_bar.set_percent(100.0*self.total_write_size/mem_snapshot_size)
-                    #prog_bar.show_progress()
+                    # prog_bar.set_percent(100.0*self.total_write_size/mem_snapshot_size)
+                    # prog_bar.show_progress()
 
                     if self.total_read_size - prev_processed_size >= UPDATE_SIZE:
                         cur_time = time.time()
-                        throughput = float((self.total_read_size-prev_processed_size)/(cur_time-prev_processed_time))
+                        throughput = float(
+                            (self.total_read_size-prev_processed_size)/(cur_time-prev_processed_time))
                         prev_processed_size = self.total_read_size
                         prev_processed_time = cur_time
                         self.monitor_current_bw = (throughput/Const.CHUNK_SIZE)
-            #prog_bar.finish()
-        except Exception, e:
+            # prog_bar.finish()
+        except Exception as e:
             sys.stdout.write("[MemorySnapshotting] Exception1n")
             sys.stderr.write(traceback.format_exc())
             sys.stderr.write("%s\n" % str(e))
@@ -256,10 +271,16 @@ class MemoryReadProcess(process_manager.ProcWorker):
 
         time_e = time.time()
         self.is_processing_alive.value = False
-        LOG.debug("[time] Memory snapshotting first input at : %f" % (time_first_recv))
-        LOG.debug("profiling\t%s\tsize\t%ld\t%ld\t%f" % \
-                  (self.__class__.__name__, self.total_write_size, self.total_write_size, 1))
-        LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" % \
+        LOG.debug(
+            "[time] Memory snapshotting first input at : %f" %
+            (time_first_recv))
+        LOG.debug(
+            "profiling\t%s\tsize\t%ld\t%ld\t%f" %
+            (self.__class__.__name__,
+             self.total_write_size,
+             self.total_write_size,
+             1))
+        LOG.debug("profiling\t%s\ttime\t%f\t%f\t%f" %
                   (self.__class__.__name__, time_s, time_e, (time_e-time_s)))
 
     def get_memory_snapshot_size(self):
@@ -276,11 +297,11 @@ class MemoryReadProcess(process_manager.ProcWorker):
                     vm_state, reason = each_machine.state(0)
                     if vm_state != libvirt.VIR_DOMAIN_SHUTOFF:
                         each_machine.destroy()
-        except libvirt.libvirtError, e:
+        except libvirt.libvirtError as e:
             pass
 
     def finish(self):
-        if os.path.exists(self.input_path) == True:
+        if os.path.exists(self.input_path):
             os.remove(self.input_path)
         if self.machine is not None:
             self._terminate_vm(self.conn, self.machine)
@@ -289,11 +310,12 @@ class MemoryReadProcess(process_manager.ProcWorker):
 
 def save_mem_thread(machine, outputpath):
     LOG.debug("start machine save")
-    machine.save(outputpath) # green thread blocked in here
+    machine.save(outputpath)  # green thread blocked in here
     LOG.debug("finish machine save")
 
 
 class QmpThread(native_threading.Thread):
+
     def __init__(self, qmp_path, process_controller, memory_snapshot_queue,
                  compdata_queue, overlay_mode, fuse_stream_monitor):
         self.qmp_path = qmp_path
@@ -316,7 +338,9 @@ class QmpThread(native_threading.Thread):
         ret = self.qmp.randomize_raw_live()  # randomize page output order
         if not ret:
             raise HandoffError("failed to randomize memory order")
-        LOG.debug("%f\trandomization\tmemory randomization success" % (time.time()))
+        LOG.debug(
+            "%f\trandomization\tmemory randomization success" %
+            (time.time()))
         self.done_configuration = True
 
     def control_migration(self):
@@ -339,32 +363,41 @@ class QmpThread(native_threading.Thread):
                 unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
                     VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
                 if loop_counter % 100 == 0:
-                    LOG.debug("qemu_control\tdata check: %s" % (unprocessed_memory_snapshot_size))
+                    LOG.debug(
+                        "qemu_control\tdata check: %s" %
+                        (unprocessed_memory_snapshot_size))
                 loop_counter += 1
-                if unprocessed_memory_snapshot_size > 1024*1024*1: # 10 MB
+                if unprocessed_memory_snapshot_size > 1024*1024*1:  # 10 MB
                     time.sleep(1)
                     break
-            LOG.debug("qemu_control\tfinish data checking: %s" % (unprocessed_memory_snapshot_size))
+            LOG.debug(
+                "qemu_control\tfinish data checking: %s" %
+                (unprocessed_memory_snapshot_size))
 
             loop_counter = 0
             while(not self.stop.wait(loopping_period)):
-                iter_num = self.process_controller.get_migration_iteration_count()
+                iter_num = self.process_controller.get_migration_iteration_count(
+                    )
                 unprocessed_memory_snapshot_size = self.memory_snapshot_queue.qsize() *\
                     VMOverlayCreationMode.PIPE_ONE_ELEMENT_SIZE
 
                 # issue new iteration
                 is_new_request_issued = False
                 if loop_counter % 100 == 0:
-                    LOG.debug("qemu_control\tdata left: %s" % (unprocessed_memory_snapshot_size))
+                    LOG.debug(
+                        "qemu_control\tdata left: %s" %
+                        (unprocessed_memory_snapshot_size))
                 loop_counter += 1
-                if unprocessed_memory_snapshot_size < 1024*1024*10: # 10 MB
-                    LOG.debug("qemu_control\t%f\tready to request new iteration %d (data: %d)" % \
-                              (time.time(), (iter_num+1), unprocessed_memory_snapshot_size))
+                if unprocessed_memory_snapshot_size < 1024*1024*10:  # 10 MB
+                    LOG.debug(
+                        "qemu_control\t%f\tready to request new iteration %d (data: %d)" %
+                        (time.time(), (iter_num+1), unprocessed_memory_snapshot_size))
                     is_iter_requested = iteration_issued.get(iter_num, False)
                     if is_iter_requested is False:
                         # request new iteration
-                        LOG.debug("qemu_control\t%f\trequest new iteration %d\t" % \
-                                  (time.time(), iter_num+1))
+                        LOG.debug(
+                            "qemu_control\t%f\trequest new iteration %d\t" %
+                            (time.time(), iter_num+1))
                         ret = self.qmp.iterate_raw_live()
                         iteration_issued[iter_num] = True
                         iteration_issue_time_list.append(time.time())
@@ -372,8 +405,9 @@ class QmpThread(native_threading.Thread):
                         is_new_request_issued = True
                     else:
                         # already requested, but no more data to process
-                        LOG.debug("qemu_control\t%f\trequest overlapped iteration %d\t" % \
-                                  (time.time(), iter_num+1))
+                        LOG.debug(
+                            "qemu_control\t%f\trequest overlapped iteration %d\t" %
+                            (time.time(), iter_num+1))
                         iteration_issue_time_list.append(time.time())
                         time.sleep(sleep_between_iteration)
                         is_new_request_issued = True
@@ -382,15 +416,20 @@ class QmpThread(native_threading.Thread):
                     continue
 
                 # check end condition
-                lastest_time_diff = iteration_issue_time_list[-1] - iteration_issue_time_list[-2]
+                lastest_time_diff = iteration_issue_time_list[-1] - \
+                    iteration_issue_time_list[-2]
                 threshold = (loopping_period + sleep_between_iteration)*1.5
-                LOG.debug("qemu_control\t%f\tin_data_size:%d\ttime_between_iter:%f (<%f)" % \
-                          (time.time(), unprocessed_memory_snapshot_size,
-                           lastest_time_diff, threshold))
+                LOG.debug(
+                    "qemu_control\t%f\tin_data_size:%d\ttime_between_iter:%f (<%f)" %
+                    (time.time(),
+                     unprocessed_memory_snapshot_size,
+                     lastest_time_diff,
+                     threshold))
                 if lastest_time_diff < threshold:
-                    LOG.debug("qemu_control\t%f\toutput_queue_size:%d\titer_count:%d" %\
-                              (time.time(),
-                               self.compdata_queue.qsize(), len(iteration_issue_time_list)))
+                    LOG.debug(
+                        "qemu_control\t%f\toutput_queue_size:%d\titer_count:%d" %
+                        (time.time(), self.compdata_queue.qsize(),
+                         len(iteration_issue_time_list)))
                     if self.compdata_queue.qsize() == 0:
                         # stop after transmitting everything
                         self.migration_stop_time = self._stop_migration()
@@ -402,7 +441,9 @@ class QmpThread(native_threading.Thread):
         self.qmp.disconnect()
 
     def _stop_migration(self):
-        LOG.debug("qemu_control\tsent stop_raw_live signal at %f" % time.time())
+        LOG.debug(
+            "qemu_control\tsent stop_raw_live signal at %f" %
+            time.time())
         stop_time = self.qmp.stop_raw_live()
         LOG.debug("qemu_control\tstop migration at %f" % stop_time)
         self.fuse_stream_monitor.terminate()
@@ -418,11 +459,11 @@ class QmpThread(native_threading.Thread):
 
 
 class _MonitoringInfo(object):
-    BASEMEM_HASHDICT        = "basemem_hash_dict"
-    DISK_MODIFIED_BLOCKS    = "disk_modified_block" # from fuse monitoring
-    DISK_USED_BLOCKS        = "disk_used_block" # from xray support
-    DISK_FREE_BLOCKS        = "disk_free_block"
-    MEMORY_FREE_BLOCKS      = "memory_free_block"
+    BASEMEM_HASHDICT = "basemem_hash_dict"
+    DISK_MODIFIED_BLOCKS = "disk_modified_block"  # from fuse monitoring
+    DISK_USED_BLOCKS = "disk_used_block"  # from xray support
+    DISK_FREE_BLOCKS = "disk_free_block"
+    MEMORY_FREE_BLOCKS = "memory_free_block"
 
     def __init__(self, properties):
         for k, v in properties.iteritems():
@@ -438,9 +479,8 @@ class _MonitoringInfo(object):
         return self.__dict__[item]
 
 
-
 class StreamSynthesisFile(native_threading.Thread):
-#class StreamSynthesisFile(multiprocessing.Process):
+
     def __init__(self, basevm_uuid, compdata_queue, temp_compfile_dir):
         self.basevm_uuid = basevm_uuid
         self.compdata_queue = compdata_queue
@@ -448,9 +488,10 @@ class StreamSynthesisFile(native_threading.Thread):
         self.manager = multiprocessing.Manager()
         self.overlay_info = list()
         self.overlay_files = list()
-        self.overlay_info_path = os.path.join(self.temp_compfile_dir, "overlay-info")
-        self.overlay_filenames = os.path.join(self.temp_compfile_dir, "overlay-names")
-        #super(StreamSynthesisFile, self).__init__(target=self.save_to_file)
+        self.overlay_info_path = os.path.join(
+            self.temp_compfile_dir, "overlay-info")
+        self.overlay_filenames = os.path.join(
+            self.temp_compfile_dir, "overlay-names")
         native_threading.Thread.__init__(self, target=self.save_to_file)
 
     def get_overlay_info(self):
@@ -462,34 +503,7 @@ class StreamSynthesisFile(native_threading.Thread):
             overlay_info_list.append(item_dict)
         return overlay_info_list, self.overlay_files
 
-        # read overlay info from file and return it
-        # should be called after finishing process
-        #import json
-        #overlay_info_list = list()
-        #oerlay_files_list = list()
-        #with open(self.overlay_info_path, "r") as f:
-        #    overlay_info_list = json.loads(f.read())
-        #with open(self.overlay_filenames, "r") as f:
-        #    overlay_files_list = json.loads(f.read())
-        #return overlay_info_list, overlay_files_list
-
-    def _save_overlay_info_tofile(self):
-        pass
-        #overlay_info_list = list()
-        #for overlay_item_dict in self.overlay_info:
-        #    item_dict = dict()
-        #    for key, value in overlay_item_dict.iteritems():
-        #        item_dict[key] = value
-        #    overlay_info_list.append(item_dict)
-
-        #with open(self.overlay_info_path, "w") as f:
-        #    f.write(json.dump(overlay_info_list))
-        #with open(self.overlay_files_list, "w") as f:
-        #    f.write(json.dump(overlay_files))
-
     def save_to_file(self):
-        #is_first_recv_disk = False
-        #is_first_recv_memory = False
         comp_file_counter = 0
         input_fd = [self.compdata_queue._reader.fileno()]
         while True:
@@ -502,32 +516,23 @@ class StreamSynthesisFile(native_threading.Thread):
                 if comp_task == Const.QUEUE_FAILED_MESSAGE:
                     LOG.error("Failed to get compressed data")
                     break
-                (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
-                blob_filename = os.path.join(self.temp_compfile_dir, "%s-stream-%d" %\
-                                            (Const.OVERLAY_FILE_PREFIX,
-                                            comp_file_counter))
-                #if is_first_recv_disk == False and len(disk_chunks) > 0:
-                #    is_first_recv_disk = True
-                #    LOG.debug("[time] Transfer first disk input at : %f (disk:%d, memory:%d)" % \
-                #              (time_process_start, len(disk_chunks), len(memory_chunks)))
-                #if is_first_recv_memory == False and len(memory_chunks) > 0:
-                #    is_first_recv_memory = True
-                #    LOG.debug("[time] Transfer first memory input at : %f (disk:%d, memory:%d)" % \
-                #              (time_process_start, len(disk_chunks), len(memory_chunks)))
-                #LOG.debug("%s --> %d" % (blob_filename, blob_comp_type))
-                #LOG.debug("%s: # of delta memory: %d\t# of delta disk: %d" %\
-                #          (blob_filename, len(memory_chunks), len(disk_chunks)))
+                (blob_comp_type,
+                 compdata,
+                 disk_chunks,
+                 memory_chunks) = comp_task
+                blob_filename = os.path.join(
+                    self.temp_compfile_dir, "%s-stream-%d" %
+                    (Const.OVERLAY_FILE_PREFIX, comp_file_counter))
                 comp_file_counter += 1
                 output_fd = open(blob_filename, "wb+")
                 output_fd.write(compdata)
                 output_fd.close()
                 blob_dict = {
-                    Const.META_OVERLAY_FILE_NAME:os.path.basename(blob_filename),
+                    Const.META_OVERLAY_FILE_NAME: os.path.basename(blob_filename),
                     Const.META_OVERLAY_FILE_COMPRESSION: blob_comp_type,
-                    Const.META_OVERLAY_FILE_SIZE:os.path.getsize(blob_filename),
+                    Const.META_OVERLAY_FILE_SIZE: os.path.getsize(blob_filename),
                     Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
-                    Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
-                    }
+                    Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks}
                 self.overlay_files.append(blob_filename)
                 self.overlay_info.append(blob_dict)
                 time_process_end = time.time()
@@ -535,25 +540,18 @@ class StreamSynthesisFile(native_threading.Thread):
                 # wait to emulate network badwidth
                 processed_time = time_process_end-time_process_start
                 processed_size = os.path.getsize(blob_filename)
-                emulated_time = (processed_size*8) / (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
+                emulated_time = (
+                    processed_size*8) / (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps*1024.0*1024)
                 if emulated_time > processed_time:
                     sleep_time = (emulated_time-processed_time)
-                    #LOG.debug("Emulating BW of %d Mbps, so wait %f s" %\ (VMOverlayCreationMode.EMULATED_BANDWIDTH_Mbps, sleep_time))
                     time.sleep(sleep_time)
 
 
-def create_delta_proc(monitoring_info, options,
-                      overlay_mode,
-                      base_image, base_mem, 
-                      base_memmeta, 
-                      basedisk_hashdict, 
-                      basemem_hashdict,
-                      modified_disk,
-                      modified_mem_queue,
-                      merged_deltalist_queue,
-                      process_controller):
-    '''
-    '''
+def create_delta_proc(monitoring_info, options, overlay_mode,
+                      base_image, base_mem, base_memmeta,
+                      basedisk_hashdict, basemem_hashdict,
+                      modified_disk, modified_mem_queue,
+                      merged_deltalist_queue, process_controller):
 
     INFO = _MonitoringInfo
     free_memory_dict = getattr(monitoring_info, INFO.MEMORY_FREE_BLOCKS, None)
@@ -568,20 +566,24 @@ def create_delta_proc(monitoring_info, options,
 
     # memory hashdict is needed at memory delta and dedup
     if not options.DISK_ONLY:
-        memory_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_MEMORY_DELTA_LIST)
-        memory_deltalist_proc = Memory.CreateMemoryDeltalist(modified_mem_queue,
-                                                             memory_deltalist_queue,
-                                                             base_memmeta, base_mem,
-                                                             overlay_mode,
-                                                             options.FREE_SUPPORT,
-                                                             free_memory_dict)
+        memory_deltalist_queue = multiprocessing.Queue(
+            maxsize=overlay_mode.QUEUE_SIZE_MEMORY_DELTA_LIST)
+        memory_deltalist_proc = Memory.CreateMemoryDeltalist(
+            modified_mem_queue,
+            memory_deltalist_queue,
+            base_memmeta,
+            base_mem,
+            overlay_mode,
+            options.FREE_SUPPORT,
+            free_memory_dict)
         memory_deltalist_proc.start()
         if overlay_mode.PROCESS_PIPELINED == False:
             _waiting_to_finish(process_controller, "CreateMemoryDeltalist")
         time_mem_delta = time.time()
 
     LOG.info("Get disk delta")
-    disk_deltalist_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_DISK_DELTA_LIST)
+    disk_deltalist_queue = multiprocessing.Queue(
+        maxsize=overlay_mode.QUEUE_SIZE_DISK_DELTA_LIST)
     disk_deltalist_proc = Disk.CreateDiskDeltalist(modified_disk,
                                                    m_chunk_queue,
                                                    Const.CHUNK_SIZE,
@@ -598,22 +600,25 @@ def create_delta_proc(monitoring_info, options,
     time_disk_delta = time.time()
 
     LOG.info("Generate VM overlay using deduplication")
-    dedup_proc = delta.DeltaDedup(memory_deltalist_queue, Memory.Memory.RAM_PAGE_SIZE,
-                                  disk_deltalist_queue, Const.CHUNK_SIZE,
-                                  merged_deltalist_queue,
-                                  overlay_mode,
-                                  basedisk_hashdict=basedisk_hashdict,
-                                  basemem_hashdict=basemem_hashdict)
+    dedup_proc = delta.DeltaDedup(
+        memory_deltalist_queue,
+        Memory.Memory.RAM_PAGE_SIZE,
+        disk_deltalist_queue,
+        Const.CHUNK_SIZE,
+        merged_deltalist_queue,
+        overlay_mode,
+        basedisk_hashdict=basedisk_hashdict,
+        basemem_hashdict=basemem_hashdict)
     dedup_proc.start()
     time_merge_delta = time.time()
 
     #LOG.info("Print statistics")
-    #disk_deltalist_proc.join()   # to fill out disk_statistics
+    # disk_deltalist_proc.join()   # to fill out disk_statistics
     #disk_statistics = disk_deltalist_proc.ret_statistics
     #free_memory_dict = getattr(monitoring_info, _MonitoringInfo.MEMORY_FREE_BLOCKS, None)
     #free_pfn_counter = long(free_memory_dict.get("freed_counter", 0))
     #disk_discarded_count = disk_statistics.get('trimed', 0)
-    #DeltaList.statistics(merged_deltalist,
+    # DeltaList.statistics(merged_deltalist,
     #        mem_discarded=free_pfn_counter,
     #        disk_discarded=disk_discarded_count)
     time_e = time.time()
@@ -624,9 +629,8 @@ def create_delta_proc(monitoring_info, options,
     return dedup_proc
 
 
-
 def save_mem_snapshot(conn, machine, output_queue, **kwargs):
-    #Set migration speed
+    # Set migration speed
     nova_util = kwargs.get('nova_util', None)
     fuse_stream_monitor = kwargs.get('fuse_stream_monitor', None)
     ret = machine.migrateSetMaxSpeed(1000000, 0)   # 1000 Gbps, unlimited
@@ -635,20 +639,19 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
 
     # Stop monitoring for memory access (snapshot will create a lot of access)
     fuse_stream_monitor.del_path(cloudletfs.StreamMonitor.MEMORY_ACCESS)
-    #if fuse_stream_monitor is not None:
-    #    fuse_stream_monitor.terminate()
-    #    fuse_stream_monitor.join()
 
     # get VM information
     machine_memory_size = machine.memoryStats().get('actual', None)
     if machine_memory_size is None:
         # libvirt <= 0.9.3
-        xml = ElementTree.fromstring(machine.XMLDesc(libvirt.VIR_DOMAIN_XML_SECURE))
+        xml = ElementTree.fromstring(
+            machine.XMLDesc(
+                libvirt.VIR_DOMAIN_XML_SECURE))
         memory_element = xml.find('memory')
         if memory_element is not None:
             machine_memory_size = long(memory_element.text)
 
-    #Save memory state
+    # Save memory state
     LOG.info("save VM memory state")
     try:
         fifo_path = NamedTemporaryFile(prefix="cloudlet-memory-snapshot-",
@@ -665,11 +668,12 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
         memory_read_proc.start()
         # machine.save() is blocked libvirt command, which blocks entire
         # process in evenetlet case. So we use original thread, instead.
-        libvirt_thread = native_threading.Thread(target=save_mem_thread,
-                                                 args=(machine, named_pipe_output))
+        libvirt_thread = native_threading.Thread(
+            target=save_mem_thread,
+            args=( machine, named_pipe_output))
         libvirt_thread.setDaemon(True)
         libvirt_thread.start()
-    except libvirt.libvirtError, e:
+    except libvirt.libvirtError as e:
         # we intentionally ignore seek error from libvirt since we have cause
         # that by using named pipe
         if str(e).startswith('unable to seek') == False:
@@ -686,7 +690,7 @@ def save_mem_snapshot(conn, machine, output_queue, **kwargs):
 def _waiting_to_finish(process_controller, worker_name):
     while True:
         worker_info = process_controller.process_infos.get(worker_name, None)
-        if worker_info == None:
+        if worker_info is None:
             raise HandoffError("Failed to access %s worker" % worker_name)
         if worker_info['is_processing_alive'].value == False:
             break
@@ -713,6 +717,7 @@ def _generate_overlaymeta(overlay_metapath, overlay_info, base_hashvalue,
 
 
 class CPUMonitor(native_threading.Thread):
+
     def __init__(self):
         self.cpu_percent_list = list()
         self.stop = native_threading.Event()
@@ -757,6 +762,7 @@ class CPUMonitor(native_threading.Thread):
 
 
 class HandoffDataSend(object):
+
     def __init__(self):
         pass
 
@@ -822,23 +828,29 @@ class HandoffDataSend(object):
                 self._vm_instance = self._conn.lookupByID(self.vm_id)
                 break
 
-        self._resumed_disk = os.path.join(self.fuse_mountpoint, 'disk', 'image')
-        self._resumed_mem = os.path.join(self.fuse_mountpoint, 'memory', 'image')
-        self._stream_modified = os.path.join(self.fuse_mountpoint, 'disk', 'streams', 'chunks_modified')
+        self._resumed_disk = os.path.join(
+            self.fuse_mountpoint, 'disk', 'image')
+        self._resumed_mem = os.path.join(
+            self.fuse_mountpoint, 'memory', 'image')
+        self._stream_modified = os.path.join(
+            self.fuse_mountpoint, 'disk', 'streams', 'chunks_modified')
         self.modified_disk_queue = multiprocessing.Queue()
         self._monitor = cloudletfs.StreamMonitor(
             modified_disk_queue=self.modified_disk_queue
         )
-        self._monitor.add_path(self._stream_modified, cloudletfs.StreamMonitor.DISK_MODIFY)
+        self._monitor.add_path(
+            self._stream_modified,
+            cloudletfs.StreamMonitor.DISK_MODIFY)
         self._monitor.start()
 
 
 class HandoffDataRecv(object):
+
     def __init__(self):
         pass
 
     def save_data(self, base_vm_paths, basevm_sha256_hash,  # base VM
-                  launch_diskpath, launch_memorypath):          # vm instance
+                  launch_diskpath, launch_memorypath):      # vm instance
         self.base_vm_paths = base_vm_paths
         self.basevm_sha256_hash = basevm_sha256_hash
         self.launch_diskpath = launch_diskpath
@@ -867,6 +879,7 @@ class HandoffDataRecv(object):
 
 
 class MockLibvirtUtil(object):
+
     def execute(self, *args, **kwargs):
         pass
 
@@ -883,13 +896,14 @@ def perform_handoff(handoff_data):
 
     CPU_MONITORING = False
     if CPU_MONITORING:
-        cpu_stat_start = psutil.cpu_times(percpu = True)
+        cpu_stat_start = psutil.cpu_times(percpu=True)
     process_controller = process_manager.get_instance()
     overlay_mode = handoff_data.overlay_mode
-    if overlay_mode == None:
+    if overlay_mode is None:
         NUM_CPU_CORES = 2   # set CPU affinity
         VMOverlayCreationMode.LIVE_MIGRATION_STOP = VMOverlayCreationMode.LIVE_MIGRATION_FINISH_USE_SNAPSHOT_SIZE
-        overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(num_cores=NUM_CPU_CORES)
+        overlay_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(
+            num_cores=NUM_CPU_CORES)
         overlay_mode.COMPRESSION_ALGORITHM_TYPE = Const.COMPRESSION_GZIP
         overlay_mode.COMPRESSION_ALGORITHM_SPEED = 1
         overlay_mode.MEMORY_DIFF_ALGORITHM = "none"
@@ -899,22 +913,26 @@ def perform_handoff(handoff_data):
     #p = psutil.Process()
     #assigned_core_list = p.cpu_affinity()
     #excluded_core_list = list(set(range(psutil.cpu_count())) - set(assigned_core_list))
-    #for proc in psutil.process_iter():
+    # for proc in psutil.process_iter():
     #    if proc.name().lower().startswith("cloudlet_"):
     #        proc.cpu_affinity(excluded_core_list)
     #        LOG.debug("affinity\tset affinity of %s to %s" % (proc.name, excluded_core_list))
 
     process_controller.set_mode(overlay_mode, handoff_data.handoff_addr)
-    LOG.info("* LIVE MIGRATION STRATEGY: %d" % VMOverlayCreationMode.LIVE_MIGRATION_STOP)
+    LOG.info(
+        "* LIVE MIGRATION STRATEGY: %d" %
+        VMOverlayCreationMode.LIVE_MIGRATION_STOP)
     LOG.info("* Overlay creation configuration")
     LOG.info("  - %s" % str(handoff_data.options))
     LOG.debug("* Overlay creation mode start\n%s" % str(overlay_mode))
     LOG.debug("* Overlay creation mode end")
 
     # sanity check
-    if (handoff_data.options == None) or (isinstance(handoff_data.options, Options) == False):
-        raise HandoffError("Given option is invalid: %s" % str(handoff_data.options))
-    (base_disk, base_mem, base_diskmeta, base_memmeta) = handoff_data.base_vm_paths
+    if (handoff_data.options is None) or (isinstance(handoff_data.options, Options) == False):
+        msg = "Given option is invalid: %s" % str( handoff_data.options)
+        raise HandoffError(msg)
+    (base_disk, base_mem, base_diskmeta, base_memmeta) =\
+        handoff_data.base_vm_paths
 
     # start CPU Monitor
     if CPU_MONITORING:
@@ -925,28 +943,27 @@ def perform_handoff(handoff_data):
         overlay_mode.QUEUE_SIZE_MEMORY_SNAPSHOT)
     residue_deltalist_queue = multiprocessing.Queue(
         maxsize=overlay_mode.QUEUE_SIZE_OPTIMIZATION)
-    compdata_queue = multiprocessing.Queue(maxsize=overlay_mode.QUEUE_SIZE_COMPRESSION)
+    compdata_queue = multiprocessing.Queue(
+        maxsize=overlay_mode.QUEUE_SIZE_COMPRESSION)
     vm_monitor = VMMonitor(handoff_data, base_disk, base_mem)
     monitoring_info = vm_monitor.get_monitoring_info()
     time_ss = time.time()
     LOG.debug("[time] serialized step (%f ~ %f): %f" % (time_start,
                                                         time_ss,
                                                         (time_ss-time_start)))
-    if (time_ss-time_start) > 5:
-        raise HandoffError("Time for serialized step takes too long. Check get_monitoring_info()")
 
     # QEMU control thread
     qmp_thread = QmpThread(handoff_data.qmp_channel_path, process_controller,
                            memory_snapshot_queue, compdata_queue,
                            overlay_mode, handoff_data._monitor)
     qmp_thread.daemon = True
-    #qmp_thread.config_migration()
 
     # memory snapshotting thread
-    memory_read_proc = save_mem_snapshot(handoff_data._conn,
-                                         handoff_data._vm_instance,
-                                         memory_snapshot_queue,
-                                         fuse_stream_monitor=handoff_data._monitor)
+    memory_read_proc = save_mem_snapshot(
+        handoff_data._conn,
+        handoff_data._vm_instance,
+        memory_snapshot_queue,
+        fuse_stream_monitor=handoff_data._monitor)
     if overlay_mode.PROCESS_PIPELINED == False:
         if overlay_mode.LIVE_MIGRATION_STOP is not VMOverlayCreationMode.LIVE_MIGRATION_FINISH_ASAP:
             msg = "Use ASAP VM stop for pipelined approach for serialized processing.\n"
@@ -983,7 +1000,7 @@ def perform_handoff(handoff_data):
 
     migration_url = urlsplit(handoff_data.handoff_addr)
     if migration_url.scheme == "tcp":
-        from stream_client import StreamSynthesisClient
+        from .stream_client import StreamSynthesisClient
         url_value = migration_url.netloc.split(":")
         if len(url_value) == 1:
             migration_dest_ip = url_value[0]
@@ -999,10 +1016,10 @@ def perform_handoff(handoff_data):
         while resume_memory_size < 0:
             resume_memory_size = memory_read_proc.get_memory_snapshot_size()
         time_memory_snapshot_size = time.time()
-        LOG.debug("[time] Getting memory snapshot size (%f~%f):%f" % (time_start,
-                                                                        time_memory_snapshot_size,
-                                                                        (time_memory_snapshot_size-time_start)))
-        if overlay_mode.PROCESS_PIPELINED == True:
+        LOG.debug(
+            "[time] Getting memory snapshot size (%f~%f):%f" %
+            (time_start, time_memory_snapshot_size, (time_memory_snapshot_size-time_start)))
+        if overlay_mode.PROCESS_PIPELINED:
             qmp_thread.start()
 
         metadata = dict()
@@ -1016,35 +1033,47 @@ def perform_handoff(handoff_data):
         client.join()
         cpu_stat_end = psutil.cpu_times(percpu=True)
         time_network_end = time.time()
-        LOG.debug("[time] Network transmission (%f~%f):%f" % (time_network_start,
-                                                              time_network_end,
-                                                              (time_network_end-time_network_start)))
+        LOG.debug(
+            "[time] Network transmission (%f~%f):%f" %
+            (time_network_start, time_network_end, (time_network_end-time_network_start)))
         process_manager.kill_instance()
 
         # 7. terminting
         if handoff_data._monitor is not None:
             handoff_data._monitor.terminate()
             handoff_data._monitor.join()
-        handoff_data._vm_instance = None   # protecting malaccess to machine 
+        handoff_data._vm_instance = None   # protecting malaccess to machine
         time_end = time.time()
 
         qmp_thread.join()
         migration_stop_command_time = qmp_thread.migration_stop_time
         vm_resume_time_at_dest = client.vm_resume_time_at_dest.value
         time_finish_transmission = client.time_finish_transmission.value
-        LOG.debug("[time] migration stop time: %f" % migration_stop_command_time)
+        LOG.debug(
+            "[time] migration stop time: %f" % migration_stop_command_time)
         LOG.debug("[time] VM resume time at dest: %f" % vm_resume_time_at_dest)
-        LOG.debug("[time] migration downtime: %f" % (vm_resume_time_at_dest-migration_stop_command_time))
-        LOG.debug("[time] Start ~ Finish tranmission (%f ~ %f): %f" % (time_start, time_finish_transmission,
-                                                                (time_finish_transmission-time_start)))
-        LOG.debug("[time] Start ~ Finish migration (%f ~ %f): %f" % (time_start, vm_resume_time_at_dest,
-                                                                (vm_resume_time_at_dest-time_start)))
+        LOG.debug(
+            "[time] migration downtime: %f" %
+            (vm_resume_time_at_dest-migration_stop_command_time))
+        LOG.debug(
+            "[time] Start ~ Finish tranmission (%f ~ %f): %f" %
+            (time_start, time_finish_transmission,
+             (time_finish_transmission-time_start)))
+        LOG.debug(
+            "[time] Start ~ Finish migration (%f ~ %f): %f" %
+            (time_start, vm_resume_time_at_dest,
+             (vm_resume_time_at_dest-time_start)))
         if CPU_MONITORING:
             # measure CPU usage
             cpu_monitor.terminate()
             cpu_monitor.join()
-            avg_cpu_usage = cpu_monitor.average_cpu_time(time_start, time_finish_transmission, assigned_core_list)
-            LOG.debug("cpu_usage\t%f\taverage\t%s" % (time.time(), avg_cpu_usage))
+            avg_cpu_usage = cpu_monitor.average_cpu_time(
+                time_start,
+                time_finish_transmission,
+                assigned_core_list)
+            LOG.debug(
+                "cpu_usage\t%f\taverage\t%s" %
+                (time.time(), avg_cpu_usage))
             # measrue CPU time
             cpu_user_time = 0.0
             cpu_sys_time = 0.0
@@ -1056,15 +1085,18 @@ def perform_handoff(handoff_data):
                 cpu_sys_time += (cpu_time_end[2] - cpu_time_start[2])
                 cpu_idle_time += (cpu_time_end[3] - cpu_time_start[3])
             cpu_total_time = cpu_user_time+cpu_sys_time
-            LOG.debug("cpu_usage\t%f\tostime\t%s\t%f\t%f %%(not accurate)" %\
-                    (time.time(), assigned_core_list,
-                    cpu_total_time, 100.0*cpu_total_time/(cpu_total_time+cpu_idle_time)))
-
-        _handoff_start_time[0] = sys.maxint
+            LOG.debug(
+                "cpu_usage\t%f\tostime\t%s\t%f\t%f %%(not accurate)" %
+                (time.time(), assigned_core_list, cpu_total_time,
+                 100.0 * cpu_total_time / (cpu_total_time + cpu_idle_time)))
+        _handoff_start_time[0] = sys.maxsize
     elif migration_url.scheme == "file":
         residue_zipfile = str(migration_url.path)
         temp_compfile_dir = mkdtemp(prefix="cloudlet-comp-")
-        synthesis_file = StreamSynthesisFile(handoff_data.basevm_sha256_hash, compdata_queue, temp_compfile_dir)
+        synthesis_file = StreamSynthesisFile(
+            handoff_data.basevm_sha256_hash,
+            compdata_queue,
+            temp_compfile_dir)
         synthesis_file.start()
 
         # wait until getting the memory snapshot size
@@ -1074,29 +1106,34 @@ def perform_handoff(handoff_data):
             resume_memory_size = memory_read_proc.get_memory_snapshot_size()
             time.sleep(0.001)
         time_memory_snapshot_size = time.time()
-        LOG.debug("[time] Getting memory snapshot size (%f~%f):%f" % (time_start,
-                                                                        time_memory_snapshot_size,
-                                                                        (time_memory_snapshot_size-time_start)))
-        if overlay_mode.PROCESS_PIPELINED == True:
+        LOG.debug(
+            "[time] Getting memory snapshot size (%f~%f):%f" %
+            (time_start, time_memory_snapshot_size, (time_memory_snapshot_size-time_start)))
+        if overlay_mode.PROCESS_PIPELINED:
             qmp_thread.start()
 
         # wait to finish creating files
         synthesis_file.join()
         time_end_transfer = time.time()
-        LOG.debug("[time] Time for finishing transferring (%f ~ %f): %f" % (time_start,
-                                                                            time_end_transfer,
-                                                                            (time_end_transfer-time_start)))
+        LOG.debug(
+            "[time] Time for finishing transferring (%f ~ %f): %f" %
+            (time_start, time_end_transfer, (time_end_transfer-time_start)))
 
         overlay_info, overlay_files = synthesis_file.get_overlay_info()
         overlay_metapath = os.path.join(os.getcwd(), Const.OVERLAY_META)
-        overlay_metafile = _generate_overlaymeta(overlay_metapath,
-                                                overlay_info,
-                                                handoff_data.basevm_sha256_hash,
-                                                os.path.getsize(handoff_data._resumed_disk),
-                                                resume_memory_size)
+        overlay_metafile = _generate_overlaymeta(
+            overlay_metapath,
+            overlay_info,
+            handoff_data.basevm_sha256_hash,
+            os.path.getsize(
+                handoff_data._resumed_disk),
+            resume_memory_size)
 
         # packaging VM overlay into a single zip file
-        VMOverlayPackage.create(residue_zipfile, overlay_metafile, overlay_files)
+        VMOverlayPackage.create(
+            residue_zipfile,
+            overlay_metafile,
+            overlay_files)
 
         # terminting
         qmp_thread.join()
@@ -1106,21 +1143,25 @@ def perform_handoff(handoff_data):
         if handoff_data._monitor is not None:
             handoff_data._monitor.terminate()
             handoff_data._monitor.join()
-        handoff_data._vm_instance = None   # protecting malaccess to machine 
-        if os.path.exists(overlay_metafile) == True:
+        handoff_data._vm_instance = None   # protecting malaccess to machine
+        if os.path.exists(overlay_metafile):
             os.remove(overlay_metafile)
-        if os.path.exists(temp_compfile_dir) == True:
+        if os.path.exists(temp_compfile_dir):
             shutil.rmtree(temp_compfile_dir)
         time_end = time.time()
-        LOG.debug("[time] Total residue creation time (%f ~ %f): %f" % (time_start, time_end,
-                                                                (time_end-time_start)))
+        LOG.debug(
+            "[time] Total residue creation time (%f ~ %f): %f" %
+            (time_start, time_end, (time_end-time_start)))
 
         if CPU_MONITORING:
             cpu_monitor.terminate()
             cpu_monitor.join()
-            avg_cpu_usage = cpu_monitor.average_cpu_time(time_start, time_end_transfer, assigned_core_list)
-            LOG.debug("cpu_usage\t%f\taverage\t%s" % (time.time(), avg_cpu_usage))
-        _handoff_start_time[0] = sys.maxint
+            avg_cpu_usage = cpu_monitor.average_cpu_time(
+                time_start,
+                time_end_transfer,
+                assigned_core_list)
+            LOG.debug(
+                "cpu_usage\t%f\taverage\t%s" %
+                (time.time(), avg_cpu_usage))
+        _handoff_start_time[0] = sys.maxsize
     return None
-
-
