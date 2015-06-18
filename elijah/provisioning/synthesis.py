@@ -1564,6 +1564,7 @@ def validate_handoffurl(handoff_url):
         # expect to have destination address for network transmission case
         if len(parsed_handoff_url.netloc) == 0:
             return False
+    return True
 
 
 def create_baseVM(disk_image_path):

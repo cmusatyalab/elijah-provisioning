@@ -36,18 +36,16 @@ from lxml.builder import ElementMaker
 import sys
 import subprocess
 
-from Configuration import Const
-import log as logging
-from db.api import DBConnector
-from db.table_def import BaseVM
+from .Configuration import Const
+from . import log as logging
+from .db.api import DBConnector
+from .db.table_def import BaseVM
 
 LOG = logging.getLogger(__name__)
 
 
-# We want this to be a public attribute
-# pylint: disable=C0103
-# pylint: enable=C0103
 class DetailException(Exception):
+
     def __init__(self, msg, detail=None):
         Exception.__init__(self, msg)
         if detail:
@@ -59,6 +57,7 @@ class BadPackageError(DetailException):
 
 
 class NeedAuthentication(Exception):
+
     def __init__(self, host, realm, scheme):
         Exception.__init__(self, 'Authentication required')
         self.host = host
@@ -67,18 +66,21 @@ class NeedAuthentication(Exception):
 
 
 class _HttpError(Exception):
+
     '''_HttpFile would like to raise IOError on errors, but ZipFile swallows
     the error message.  So it raises this instead.'''
     pass
 
 
 class _HttpFile(object):
+
     '''A read-only file-like object backed by HTTP Range requests.'''
 
     # pylint doesn't understand named tuples
     # pylint: disable=E1103
+
     def __init__(self, url, scheme=None, username=None, password=None,
-            buffer_size=64 << 10):
+                 buffer_size=64 << 10):
         if scheme == 'Basic':
             self._auth = (username, password)
         elif scheme == 'Digest':
@@ -97,11 +99,11 @@ class _HttpFile(object):
         self._session = requests.Session()
         if hasattr(requests.utils, 'default_user_agent'):
             self._session.headers['User-Agent'] = 'cloudlet/%s %s' % (
-                    Const.VERSION, requests.utils.default_user_agent())
+                Const.VERSION, requests.utils.default_user_agent())
         else:
             # requests < 0.13.3
             self._session.headers['User-Agent'] = \
-                    'cloudleti-provisioning/%s python-requests/%s' % (
+                'cloudleti-provisioning/%s python-requests/%s' % (
                     Const.VERSION, requests.__version__)
 
         # Debugging
@@ -116,10 +118,10 @@ class _HttpFile(object):
             if resp.status_code == 401:
                 # Assumes a single challenge.
                 scheme, parameters = resp.headers['WWW-Authenticate'].split(
-                        None, 1)
+                    None, 1)
                 if scheme != 'Basic' and scheme != 'Digest':
                     raise _HttpError('Server requested unknown ' +
-                            'authentication scheme: %s' % scheme)
+                                     'authentication scheme: %s' % scheme)
                 host = urlsplit(self.url).netloc
                 for param in parameters.split(', '):
                     match = re.match('^realm=\"([^"]*)\"$', param)
@@ -132,7 +134,7 @@ class _HttpFile(object):
             # 2xx codes other than 200 are unexpected
             if resp.status_code != 200:
                 raise _HttpError('Unexpected status code %d' %
-                        resp.status_code)
+                                 resp.status_code)
 
             # Store object length
             try:
@@ -151,16 +153,17 @@ class _HttpFile(object):
             else:
                 # dict (requests < 0.12.0)
                 parsed = urlsplit(self.url)
-                self.cookies = tuple(Cookie(version=0,
-                        name=name, value='"%s"' % value,
-                        port=None, port_specified=False,
-                        domain=parsed.netloc, domain_specified=False,
-                        domain_initial_dot=False,
-                        path=parsed.path, path_specified=True,
-                        secure=False, expires=None, discard=True,
-                        comment=None, comment_url=None, rest={})
-                        for name, value in self._session.cookies.iteritems())
-        except requests.exceptions.RequestException, e:
+                self.cookies = tuple(
+                    Cookie(version=0, name=name, value='"%s"' %
+                           value, port=None, port_specified=False,
+                           domain=parsed.netloc,
+                           domain_specified=False,
+                           domain_initial_dot=False,
+                           path=parsed.path, path_specified=True,
+                           secure=False, expires=None, discard=True,
+                           comment=None, comment_url=None, rest={})
+                    for name, value in self._session.cookies.iteritems())
+        except requests.exceptions.RequestException as e:
             raise _HttpError(str(e))
     # pylint: enable=E1103
 
@@ -205,7 +208,7 @@ class _HttpFile(object):
                     self._get_last_modified(resp) != self.last_modified):
                 raise _HttpError('Resource changed on server')
             return resp.content
-        except requests.exceptions.RequestException, e:
+        except requests.exceptions.RequestException as e:
             raise _HttpError(str(e))
 
     def read(self, size=None):
@@ -227,7 +230,7 @@ class _HttpFile(object):
             ret = self._buffer[self._offset - buf_start:]
             remaining = size - len(ret)
             data = self._get(self._offset + len(ret), remaining +
-                    self._buffer_size)
+                             self._buffer_size)
             ret += data[:remaining]
             self._buffer = data[remaining:]
             self._buffer_offset = self._offset + size
@@ -253,7 +256,7 @@ class _HttpFile(object):
                 self._last_case = 'E'
                 start = max(self._offset - self._buffer_size, 0)
                 self._buffer = self._get(start,
-                        self._offset + size - start)
+                                         self._offset + size - start)
                 self._buffer_offset = start
                 ret = self._buffer[self._offset - start:]
             else:
@@ -287,7 +290,7 @@ class _HttpFile(object):
                 raise _HttpError('Resource changed on server')
             return resp.content
             '''
-        except requests.exceptions.RequestException, e:
+        except requests.exceptions.RequestException as e:
             raise _HttpError(str(e))
 
     def seek(self, offset, whence=0):
@@ -317,10 +320,12 @@ class _HttpFile(object):
 
 
 class _FileFile(file):
+
     '''An _HttpFile-compatible file-like object for local files.'''
 
     # pylint doesn't understand named tuples
     # pylint: disable=E1103
+
     def __init__(self, url):
         # Process URL
         parsed = urlsplit(url)
@@ -339,7 +344,7 @@ class _FileFile(file):
         # Set validators.
         self.etag = None
         self.last_modified = datetime.fromtimestamp(
-                int(os.fstat(self.fileno()).st_mtime), tzutc())
+            int(os.fstat(self.fileno()).st_mtime), tzutc())
     # pylint: enable=E1103
 
     def iter_content(self, offset, size, chunk_size):
@@ -354,6 +359,7 @@ class _FileFile(file):
 
 
 class _PackageObject(object):
+
     def __init__(self, zip, path):
         self._fh = zip.fp
         self.url = self._fh.url
@@ -374,7 +380,7 @@ class _PackageObject(object):
         header_len = struct.calcsize(header_fmt)
         self._fh.seek(info.header_offset)
         magic, _, flags, compression, _, _, _, _, _, name_len, extra_len = \
-                struct.unpack(header_fmt, self._fh.read(header_len))
+            struct.unpack(header_fmt, self._fh.read(header_len))
         if magic != zipfile.stringFileHeader:
             raise BadPackageError('Member "%s" has invalid header' % path)
         if compression != zipfile.ZIP_STORED:
@@ -384,7 +390,6 @@ class _PackageObject(object):
         self.offset = info.header_offset + header_len + name_len + extra_len
         self.size = info.file_size
 
-
     def iter_content(self, chunk_size):
         return self._fh.iter_content(self.offset, self.size, chunk_size)
 
@@ -392,6 +397,7 @@ class _PackageObject(object):
 class VMOverlayPackage(object):
     # pylint doesn't understand named tuples
     # pylint: disable=E1103
+
     def __init__(self, url, scheme=None, username=None, password=None):
         self.url = url
 
@@ -399,7 +405,7 @@ class VMOverlayPackage(object):
         parsed = urlsplit(url)
         if parsed.scheme == 'http' or parsed.scheme == 'https':
             fh = _HttpFile(url, scheme=scheme, username=username,
-                    password=password)
+                           password=password)
         elif parsed.scheme == 'file':
             fh = _FileFile(url)
         else:
@@ -411,15 +417,15 @@ class VMOverlayPackage(object):
 
             if Const.OVERLAY_META not in self.zip_overlay.namelist():
                 msg = "Does not have meta file named %s" % Const.OVERLAY_META
-                raise DetailException(msg)
-            
+                raise BadPackageError(msg)
+
             self.metafile = Const.OVERLAY_META
             self.blobfiles = list()
             for each_file in self.zip_overlay.namelist():
                 if (each_file != Const.OVERLAY_META):
                     self.blobfiles.append(each_file)
-            
-        except (zipfile.BadZipfile, _HttpError), e:
+
+        except (zipfile.BadZipfile, _HttpError) as e:
             raise BadPackageError(str(e))
     # pylint: enable=E1103
 
@@ -462,7 +468,7 @@ class BaseVMPackage(object):
         parsed = urlsplit(url)
         if parsed.scheme == 'http' or parsed.scheme == 'https':
             fh = _HttpFile(url, scheme=scheme, username=username,
-                    password=password)
+                           password=password)
         elif parsed.scheme == 'file':
             fh = _FileFile(url)
         else:
@@ -480,17 +486,17 @@ class BaseVMPackage(object):
 
             # Create attributes
             self.base_hashvalue = tree.get('hash_value')
-            self.disk = _PackageObject(zip,
-                    tree.find(self.NSP + 'disk').get('path'))
-            self.memory = _PackageObject(zip,
-                    tree.find(self.NSP + 'memory').get('path'))
-            self.disk_hash = _PackageObject(zip,
-                    tree.find(self.NSP + 'disk_hash').get('path'))
-            self.memory_hash = _PackageObject(zip,
-                    tree.find(self.NSP + 'memory_hash').get('path'))
-        except etree.XMLSyntaxError, e:
+            self.disk = _PackageObject(
+                zip, tree.find(self.NSP + 'disk').get('path'))
+            self.memory = _PackageObject(
+                zip, tree.find(self.NSP + 'memory').get('path'))
+            self.disk_hash = _PackageObject(
+                zip, tree.find(self.NSP + 'disk_hash').get('path'))
+            self.memory_hash = _PackageObject(
+                zip, tree.find(self.NSP + 'memory_hash').get('path'))
+        except etree.XMLSyntaxError as e:
             raise BadPackageError('Manifest XML does not validate', str(e))
-        except (zipfile.BadZipfile, _HttpError), e:
+        except (zipfile.BadZipfile, _HttpError) as e:
             raise BadPackageError(str(e))
     # pylint: enable=E1103
 
@@ -500,7 +506,7 @@ class BaseVMPackage(object):
 
     @classmethod
     def create(cls, outfile, basevm_hashvalue,
-            base_disk, base_memory, disk_hash, memory_hash):
+               base_disk, base_memory, disk_hash, memory_hash):
         # Generate manifest XML
         e = ElementMaker(namespace=cls.NS, nsmap={None: cls.NS})
         tree = e.image(
@@ -512,7 +518,7 @@ class BaseVMPackage(object):
         )
         cls.schema.assertValid(tree)
         xml = etree.tostring(tree, encoding='UTF-8', pretty_print=True,
-                xml_declaration=True)
+                             xml_declaration=True)
         zip = zipfile.ZipFile(outfile, 'w', zipfile.ZIP_DEFLATED, True)
         zip.comment = 'Cloudlet package for base VM'
         zip.writestr(cls.MANIFEST_FILENAME, xml)
@@ -522,18 +528,18 @@ class BaseVMPackage(object):
         # see more at http://bugs.python.org/issue9720
 
         #filelist = [base_disk, base_memory, disk_hash, memory_hash]
-        #for filepath in filelist:
+        # for filepath in filelist:
         #    basename = os.path.basename(filepath)
         #    filesize = os.path.getsize(filepath)
         #    LOG.info("Zipping %s (%ld bytes) into %s" % (basename, filesize, outfile))
         #    zip.write(filepath, basename)
-        #zip.close()
+        # zip.close()
 
         cmd = ['zip', '-j', '-9']
         cmd += ["%s" % outfile]
         cmd += [base_disk, base_memory, disk_hash, memory_hash]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, \
-                stderr=subprocess.PIPE, close_fds=True)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, close_fds=True)
         LOG.info("Start compressing")
         LOG.info("%s" % ' '.join(cmd))
         for line in iter(proc.stdout.readline, ''):
@@ -543,6 +549,7 @@ class BaseVMPackage(object):
 
 
 class PackagingUtil(object):
+
     @staticmethod
     def _get_matching_basevm(basedisk_path):
         dbconn = DBConnector()
@@ -550,7 +557,7 @@ class PackagingUtil(object):
         basevm_list = dbconn.list_item(BaseVM)
         ret_basevm = None
         for item in basevm_list:
-            if basedisk_path == item.disk_path: 
+            if basedisk_path == item.disk_path:
                 ret_basevm = item
                 break
         return dbconn, ret_basevm
@@ -558,16 +565,24 @@ class PackagingUtil(object):
     @staticmethod
     def export_basevm(name, basevm_path, basevm_hashvalue):
         (base_diskmeta, base_mempath, base_memmeta) = \
-                Const.get_basepath(basevm_path)
+            Const.get_basepath(basevm_path)
         output_path = os.path.join(os.curdir, name)
         if output_path.endswith(".zip") == False:
             output_path += ".zip"
-        if os.path.exists(output_path) == True:
-            is_overwrite = raw_input("%s exists. Overwirte it? (y/N) " % output_path)
+        if os.path.exists(output_path):
+            is_overwrite = raw_input(
+                "%s exists. Overwirte it? (y/N) " %
+                output_path)
             if is_overwrite != 'y':
                 return None
 
-        BaseVMPackage.create(output_path, basevm_hashvalue, basevm_path, base_mempath, base_diskmeta, base_memmeta)
+        BaseVMPackage.create(
+            output_path,
+            basevm_hashvalue,
+            basevm_path,
+            base_mempath,
+            base_diskmeta,
+            base_memmeta)
         #BaseVMPackage.create(output_path, name, base_diskmeta, base_memmeta, base_diskmeta, base_memmeta)
         return output_path
 
@@ -579,14 +594,17 @@ class PackagingUtil(object):
         if BaseVMPackage.MANIFEST_FILENAME not in zip.namelist():
             raise BadPackageError('Package does not contain manifest')
         xml = zip.read(BaseVMPackage.MANIFEST_FILENAME)
-        tree = etree.fromstring(xml, etree.XMLParser(schema=BaseVMPackage.schema))
+        tree = etree.fromstring(
+            xml, etree.XMLParser(schema=BaseVMPackage.schema)
+        )
 
         # Create attributes
         base_hashvalue = tree.get('hash_value')
         disk_name = tree.find(BaseVMPackage.NSP + 'disk').get('path')
         memory_name = tree.find(BaseVMPackage.NSP + 'memory').get('path')
         diskhash_name = tree.find(BaseVMPackage.NSP + 'disk_hash').get('path')
-        memoryhash_name = tree.find(BaseVMPackage.NSP + 'memory_hash').get('path')
+        memoryhash_name = tree.find(
+            BaseVMPackage.NSP + 'memory_hash').get('path')
         zip.close()
 
         return base_hashvalue, disk_name, memory_name, diskhash_name, memoryhash_name
@@ -595,15 +613,17 @@ class PackagingUtil(object):
     def import_basevm(filename):
         filename = os.path.abspath(filename)
         (base_hashvalue, disk_name, memory_name, diskhash_name, memoryhash_name) = \
-                PackagingUtil._get_basevm_attribute(filename)
+            PackagingUtil._get_basevm_attribute(filename)
 
         # check directory
-        base_vm_dir = os.path.join(os.path.dirname(Const.BASE_VM_DIR), base_hashvalue)
+        base_vm_dir = os.path.join(
+            os.path.dirname(Const.BASE_VM_DIR), base_hashvalue)
         temp_dir = mkdtemp(prefix="cloudlet-base-")
         disk_tmp_path = os.path.join(temp_dir, disk_name)
         disk_target_path = os.path.join(base_vm_dir, disk_name)
-        dbconn, matching_basevm = PackagingUtil._get_matching_basevm(disk_target_path)
-        if matching_basevm != None:
+        dbconn, matching_basevm = PackagingUtil._get_matching_basevm(
+            disk_target_path)
+        if matching_basevm is not None:
             LOG.info("Base VM is already exists")
             LOG.info("Delete existing Base VM using command")
             LOG.info("See more 'cloudlet --help'")
@@ -618,12 +638,12 @@ class PackagingUtil(object):
         zipbase.extractall(temp_dir)
         shutil.move(disk_tmp_path, disk_target_path)
         (target_diskhash, target_memory, target_memoryhash) = \
-                Const.get_basepath(disk_target_path, check_exist=False)
+            Const.get_basepath(disk_target_path, check_exist=False)
         path_list = {
-                os.path.join(temp_dir, memory_name): target_memory,
-                os.path.join(temp_dir, diskhash_name): target_diskhash,
-                os.path.join(temp_dir, memoryhash_name): target_memoryhash,
-                }
+            os.path.join(temp_dir, memory_name): target_memory,
+            os.path.join(temp_dir, diskhash_name): target_diskhash,
+            os.path.join(temp_dir, memoryhash_name): target_memoryhash,
+            }
 
         LOG.info("Place base VM to the right directory")
         for (src, dest) in path_list.iteritems():
@@ -649,7 +669,5 @@ class PackagingUtil(object):
         try:
             overlay = VMOverlayPackage(urlpath)
             return True, urlpath
-        except Exception, e:
+        except Exception as e:
             return False, None
-
-
