@@ -437,7 +437,8 @@ class SynthesizedVM(native_threading.Thread):
     def terminate(self):
         try:
             if hasattr(self, 'machine') and self.machine is not None:
-                self.machine.destroy()
+                _terminate_vm(self.conn, self.machine)
+                self.machine = None
         except libvirt.libvirtError as e:
             pass
 
