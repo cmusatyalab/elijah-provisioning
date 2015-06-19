@@ -8,12 +8,12 @@ from datetime import datetime
 import json
 import time
 
-from elijah.provisioning.Configuration import Const
+from elijah.provisioning.configuration import Const
 Const.LOG_PATH = os.path.join(os.path.abspath(os.curdir), "log-%s" % str(datetime.now()))
 from elijah.provisioning import log as logging
 LOG = logging.getLogger(__name__)
 
-from elijah.provisioning.Configuration import VMOverlayCreationMode
+from elijah.provisioning.configuration import VMOverlayCreationMode
 from elijah.provisioning import synthesis as synthesis
 from elijah.provisioning.package import PackagingUtil
 

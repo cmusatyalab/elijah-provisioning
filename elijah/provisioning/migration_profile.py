@@ -8,7 +8,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from pprint import pprint
 from collections import defaultdict
-from Configuration import VMOverlayCreationMode
+from configuration import VMOverlayCreationMode
 from operator import itemgetter, attrgetter, methodcaller
 import log as logging
 

@@ -33,8 +33,8 @@ from hashlib import sha256
 
 from . import tool
 from . import memory_util
-from .Configuration import Const
-from .Configuration import VMOverlayCreationMode
+from .configuration import Const
+from .configuration import VMOverlayCreationMode
 from .progressbar import AnimatedProgressBar
 from .delta import DeltaItem
 from .delta import DeltaList

@@ -37,7 +37,7 @@ pyximport.install()
 from cython_xor import cython_xor
 
 import msgpack
-from .Configuration import Const
+from .configuration import Const
 from . import log as logging
 
 LOG = logging.getLogger(__name__)

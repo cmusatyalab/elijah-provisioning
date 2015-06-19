@@ -13,8 +13,8 @@ from .delta import DeltaItem
 import lzma
 import bz2
 import zlib
-from .Configuration import Const
-from .Configuration import VMOverlayCreationMode
+from .configuration import Const
+from .configuration import VMOverlayCreationMode
 from .package import VMOverlayPackage
 from . import process_manager
 from . import log as logging

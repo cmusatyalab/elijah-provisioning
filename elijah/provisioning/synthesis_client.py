@@ -145,7 +145,7 @@ class Client(object):
         # check validity of the zip file
         zip_overlay = zipfile.ZipFile(abspath, 'r')
         if "overlay-meta" not in zip_overlay.namelist():
-            # 'overlay-meta' is defined in Configuration.py 
+            # 'overlay-meta' is defined in configuration.py 
             # but use magic string to make this client independent
             return False
         return True
@@ -333,7 +333,7 @@ class Client(object):
     def _read_overlay_meta(self, filepath, is_zipped):
         if is_zipped is True:
             zz = zipfile.ZipFile(filepath, "r")
-            # 'overlay-meta' is defined in Configuration.py 
+            # 'overlay-meta' is defined in configuration.py 
             # but use magic string to make this client independent
             return zz.read("overlay-meta")
         else:

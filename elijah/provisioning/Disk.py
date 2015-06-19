@@ -39,8 +39,8 @@ from .delta import DeltaItem
 from .delta import DeltaList
 from .delta import Recovered_delta
 from .progressbar import AnimatedProgressBar
-from .Configuration import Const
-from .Configuration import VMOverlayCreationMode
+from .configuration import Const
+from .configuration import VMOverlayCreationMode
 from . import log as logging
 
 

@@ -38,8 +38,8 @@ from urlparse import urlsplit
 
 from .db import api as db_api
 from .db import table_def as db_table
-from .Configuration import Const
-from .Configuration import Options
+from .configuration import Const
+from .configuration import Options
 from .delta import DeltaList
 from .delta import DeltaItem
 import msgpack

@@ -31,8 +31,8 @@ from optparse import OptionParser
 if os.path.exists("../elijah") is True:
     sys.path.insert(0, "../")
 from elijah.provisioning import synthesis as synthesis
-from elijah.provisioning.Configuration import Const as Const
-from elijah.provisioning.Configuration import Options
+from elijah.provisioning.configuration import Const as Const
+from elijah.provisioning.configuration import Options
 from elijah.provisioning import log as logging
 from elijah.provisioning.db.table_def import BaseVM
 from elijah.provisioning.db.table_def import Session

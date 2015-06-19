@@ -25,7 +25,7 @@ DB wrapper for cloudlet
 import os
 import sqlalchemy
 import sys
-from ..Configuration import Const
+from ..configuration import Const
 from sqlalchemy.orm import sessionmaker
 
 from table_def import create_db

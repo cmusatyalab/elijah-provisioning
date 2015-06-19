@@ -51,7 +51,7 @@ from elijah.provisioning.handoff import HandoffDataRecv
 #from package import VMOverlayPackage
 from elijah.provisioning.db.api import DBConnector
 from elijah.provisioning.db.table_def import BaseVM
-from elijah.provisioning.Configuration import Const as Cloudlet_Const
+from elijah.provisioning.configuration import Const as Cloudlet_Const
 from elijah.provisioning.compression import DecompProc
 from elijah.provisioning import tool
 from elijah.provisioning import log as logging

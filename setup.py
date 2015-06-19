@@ -24,7 +24,7 @@ sys.path.insert(0, "./elijah/")
 
 import urllib
 from pwd import getpwnam
-from provisioning.Configuration import Const
+from provisioning.configuration import Const
 
 #from setuptools import setup, find_packages
 from distutils.core import setup

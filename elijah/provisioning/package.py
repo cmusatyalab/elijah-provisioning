@@ -36,7 +36,7 @@ from lxml.builder import ElementMaker
 import sys
 import subprocess
 
-from .Configuration import Const
+from .configuration import Const
 from . import log as logging
 from .db.api import DBConnector
 from .db.table_def import BaseVM

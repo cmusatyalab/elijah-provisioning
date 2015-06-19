@@ -21,7 +21,7 @@
 import os
 import logging
 import sys
-from .Configuration import Const as Const
+from .configuration import Const as Const
 
 loggers = dict()
 DEFAULT_FORMATTER = '%(asctime)s %(name)s %(levelname)s %(message)s'

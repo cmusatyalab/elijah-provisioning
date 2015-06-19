@@ -32,15 +32,15 @@ import ctypes
 #    sys.path.insert(0, "../../")
 #try:
 #    from elijah.provisioning.server import NetworkUtil
-#    from elijah.provisioning.Configuration import Const
+#    from elijah.provisioning.configuration import Const
 #    from elijah.provisioning.package import VMOverlayPackage
 #    from elijah.provisioning.synthesis_protocol import Protocol
 #except ImportError as e:
 #    sys.stderr.write("%s\n" % str(e))
 #    sys.exit(1)
 from server import NetworkUtil
-from Configuration import Const
-from Configuration import VMOverlayCreationMode
+from configuration import Const
+from configuration import VMOverlayCreationMode
 from synthesis_protocol import Protocol
 import process_manager
 import log as logging

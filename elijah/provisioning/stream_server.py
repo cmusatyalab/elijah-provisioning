@@ -46,7 +46,7 @@ from handoff import HandoffDataRecv
 #from package import VMOverlayPackage
 from db.api import DBConnector
 from db.table_def import BaseVM
-from Configuration import Const as Cloudlet_Const
+from configuration import Const as Cloudlet_Const
 from compression import DecompProc
 from pprint import pformat
 import log as logging

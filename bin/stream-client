@@ -29,7 +29,7 @@ if os.path.exists("../elijah") is True:
 from elijah.provisioning.stream_client import StreamSynthesisClient
 from elijah.provisioning.synthesis import validate_congifuration
 from elijah.provisioning.package import VMOverlayPackage
-from elijah.provisioning.Configuration import Const
+from elijah.provisioning.configuration import Const
 
 
 def synthesize_data(overlay_path, comp_queue):

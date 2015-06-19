@@ -25,7 +25,7 @@ import sys
 import traceback
 import Queue
 
-from .Configuration import VMOverlayCreationMode
+from .configuration import VMOverlayCreationMode
 from .migration_profile import MigrationMode
 from .migration_profile import ModeProfile
 from . import log as logging

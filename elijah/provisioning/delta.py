@@ -26,7 +26,7 @@ from hashlib import sha256
 from lzma import LZMACompressor
 
 import process_manager
-from Configuration import Const
+from configuration import Const
 import log as logging
 
 

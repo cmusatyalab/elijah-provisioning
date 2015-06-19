@@ -32,7 +32,7 @@ from multiprocessing import JoinableQueue, Queue, Manager
 
 from cloudlet import synthesis as synthesis
 from cloudlet import server as synthesis_server
-from cloudlet.Configuration import Const
+from cloudlet.configuration import Const
 try:
     from elijah.provisioning import msgpack
 except ImportError as e:

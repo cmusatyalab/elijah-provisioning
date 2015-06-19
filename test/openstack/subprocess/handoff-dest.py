@@ -10,7 +10,7 @@ import StringIO
 sys.path.insert(0, "../../../")
 from elijah.provisioning import synthesis
 from elijah.provisioning import handoff
-from elijah.provisioning.Configuration import Const as Cloudlet_Const
+from elijah.provisioning.configuration import Const as Cloudlet_Const
 
 
 def wait_for_proc(proc, print_log=True):

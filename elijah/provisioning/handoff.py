@@ -41,9 +41,9 @@ from . import Memory
 from . import Disk
 from . import cloudletfs
 from . import memory_util
-from .Configuration import Const
-from .Configuration import VMOverlayCreationMode
-from .Configuration import Options
+from .configuration import Const
+from .configuration import VMOverlayCreationMode
+from .configuration import Options
 from .progressbar import AnimatedProgressBar
 from .package import VMOverlayPackage
 from . import delta

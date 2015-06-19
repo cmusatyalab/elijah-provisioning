@@ -27,7 +27,7 @@ import multiprocessing
 import time
 import sys
 from . import log as logging
-from .Configuration import Const
+from .configuration import Const
 
 LOG = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class CloudletFS(threading.Thread):
         if (self.meta_info is not None) and (self.demanding_queue is not None):
             memory_overlay_dict = dict()
             disk_overlay_dict = dict()
-            from .Configuration import Const
+            from .configuration import Const
             for blob in self.meta_info[Const.META_OVERLAY_FILES]:
                 overlay_url = blob[Const.META_OVERLAY_FILE_NAME]
                 memory_chunks = blob[Const.META_OVERLAY_FILE_MEMORY_CHUNKS]
