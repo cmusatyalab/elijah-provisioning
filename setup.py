@@ -33,7 +33,7 @@ from Cython.Build import cythonize
 
 
 def download_dependency(download_dir):
-    URL_MODIFIED_QEMU = "https://github.com/cmusatyalab/elijah-qemu/releases/download/cloudlet-v0.9.2/qemu-system-x86_64"
+    URL_MODIFIED_QEMU = "https://github.com/cmusatyalab/elijah-qemu/releases/download/cloudlet-v0.9.3/qemu-system-x86_64"
 
     msg = "  " + "-"*70+ "\n"
     msg += "  Download modified QEMU from %s\n" % URL_MODIFIED_QEMU

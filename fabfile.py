@@ -1,5 +1,9 @@
 from __future__ import with_statement
 
+import os
+import sys
+import platform
+
 from fabric.api import env
 from fabric.api import hide
 from fabric.api import run
@@ -10,10 +14,6 @@ from fabric.api import abort
 from fabric.api import puts
 from fabric.context_managers import cd
 from fabric.context_managers import settings
-
-import os
-import sys
-import platform
 from distutils.version import LooseVersion
 
 
@@ -35,7 +35,7 @@ def check_system_support():
     WORKING_KERNEL_VERSION = "3.13.0"
     kernel_version = platform.platform().split("-")[1]
     if LooseVersion(kernel_version) < LooseVersion(WORKING_KERNEL_VERSION):
-        msg = "Linux Kernel lower than %s has serious bug in using FUSE + mmap"\
+        msg = "Linux Kernel lower than %s has a bug when using FUSE + mmap"\
             % WORKING_KERNEL_VERSION
         abort(msg)
 

@@ -23,31 +23,17 @@ import os
 import select
 import functools
 import subprocess
-from . import memory
-from . import disk
-from . import cloudletfs
-from . import memory_util
-from . import delta
 import hashlib
 import libvirt
 import shutil
 import struct
 import json
+import msgpack
+import threading
+import traceback
 from operator import itemgetter
 from urlparse import urlsplit
-
-from .db import api as db_api
-from .db import table_def as db_table
-from .configuration import Const
-from .configuration import Options
-from .delta import DeltaList
-from .delta import DeltaItem
-import msgpack
-from .progressbar import AnimatedProgressBar
-from .package import VMOverlayPackage
-from . import handoff
-from . import qmp_af_unix
-
+from distutils.version import LooseVersion
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
 from uuid import uuid4
@@ -55,9 +41,23 @@ from tempfile import NamedTemporaryFile
 from tempfile import mkdtemp
 from time import time
 from time import sleep
-import threading
-import traceback
 from optparse import OptionParser
+
+from . import memory
+from . import disk
+from . import cloudletfs
+from . import memory_util
+from . import delta
+from .db import api as db_api
+from .db import table_def as db_table
+from .configuration import Const
+from .configuration import Options
+from .delta import DeltaList
+from .delta import DeltaItem
+from .progressbar import AnimatedProgressBar
+from .package import VMOverlayPackage
+from . import handoff
+from . import qmp_af_unix
 from .tool import comp_lzma
 from . import compression
 from . import log as logging
@@ -1545,14 +1545,12 @@ def validate_congifuration():
     if out.find("Cloudlet") < 0:
         LOG.error("KVM validation Error, Need custom KVM")
         return False
-    version = out.split("Cloudlet Edition")[-1].strip()
-    if version is None or len(version) == 0:
-        LOG.error("KVM validation Error, Upgrade QEMU to latest version")
-        return False
-    version = float(version)
-    if version < 0.9:
-        LOG.error(
-            "KVM validation Error, Upgrade QEMU to latest version:\n%s" % (out))
+    current_version = out.split("Cloudlet Edition")[-1].strip()
+    supporting_version = "0.9.3"
+    if LooseVersion(current_version) < LooseVersion(supporting_version):
+        msg = "Need KVM Cloudlet Edition later than %s\n" % supporting_version
+        msg += "Upgrade QEMU to the latest version at %s" % Const.CLOUDLET_KVM_RELEASE
+        LOG.error(msg)
         return False
     return True
 
