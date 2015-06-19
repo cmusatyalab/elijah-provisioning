@@ -4,24 +4,25 @@ import os
 import ast
 import json
 import math
-from collections import defaultdict
 from collections import OrderedDict
-from pprint import pprint
-from collections import defaultdict
-from configuration import VMOverlayCreationMode
-from operator import itemgetter, attrgetter, methodcaller
-import log as logging
+from .configuration import VMOverlayCreationMode
+from operator import itemgetter
+from . import log as logging
 
 
 LOG = logging.getLogger(__name__)
 _process_controller = None
 
 
-stage_names = ["CreateMemoryDeltalist", "CreateDiskDeltalist", "DeltaDedup", "CompressProc"]
+stage_names = ["CreateMemoryDeltalist",
+               "CreateDiskDeltalist",
+               "DeltaDedup",
+               "CompressProc"]
 BIT_PER_BLOCK = (4096+11)*8
 
 
 class MigrationMode(object):
+
     def __init__(self):
         self.workload = ''
         self.mode = dict()
@@ -36,8 +37,7 @@ class MigrationMode(object):
         self.block_time = dict()
 
     def get_mode_id(self):
-        sorted_key = self.mode.keys()
-        sorted_key.sort()
+        sorted_key = sorted(self.mode.keys())
         mode_str = list()
         for key in sorted_key:
             # ignore numer of process for each stage since this is a maximum
@@ -55,19 +55,19 @@ class MigrationMode(object):
     def get_total_P(p_dict, alpha):
         # calculate using p of all stages --> use alpha
         # calculate using time at all stage --> do not use alpha
-        total_P_from_each_stage = (p_dict['CreateMemoryDeltalist']*alpha +\
-                                   p_dict['CreateDiskDeltalist']*(1-alpha)) +\
-            p_dict['DeltaDedup'] +\
-            p_dict['CompressProc']
+        total_P_from_each_stage = \
+            (p_dict['CreateMemoryDeltalist']*alpha + p_dict['CreateDiskDeltalist']*(1-alpha))\
+            + p_dict['DeltaDedup']\
+            + p_dict['CompressProc']
         return total_P_from_each_stage
 
     @staticmethod
     def get_total_R(r_dict, alpha):
         # weight using input size
-        total_R_from_each_stage = (r_dict['CreateMemoryDeltalist']*alpha +\
-                                   r_dict['CreateDiskDeltalist']*(1-alpha))\
-                                * r_dict['DeltaDedup']\
-                                * r_dict['CompressProc']
+        total_R_from_each_stage = \
+            (r_dict['CreateMemoryDeltalist']*alpha + r_dict['CreateDiskDeltalist']*(1-alpha))\
+            * r_dict['DeltaDedup']\
+            * r_dict['CompressProc']
         return total_R_from_each_stage
 
     @staticmethod
@@ -75,14 +75,16 @@ class MigrationMode(object):
         #LOG.debug("num_core\t%d" % num_cores)
         system_block_per_sec = (1/total_p*1000) * num_cores*0.7
         system_in_mbps = system_block_per_sec*BIT_PER_BLOCK/1024.0/1024
-        system_out_mbps = system_in_mbps * total_r# mbps
+        system_out_mbps = system_in_mbps * total_r  # mbps
         return system_block_per_sec, system_in_mbps, system_out_mbps
 
     @staticmethod
     def mode_diff(mode1, mode2):
         set_mode1, set_mode2 = set(mode1.keys()), set(mode2.keys())
-        set_mode1 = set_mode1.intersection(set(VMOverlayCreationMode.VARYING_PARAMETERS))
-        set_mode2 = set_mode2.intersection(set(VMOverlayCreationMode.VARYING_PARAMETERS))
+        set_mode1 = set_mode1.intersection(
+            set(VMOverlayCreationMode.VARYING_PARAMETERS))
+        set_mode2 = set_mode2.intersection(
+            set(VMOverlayCreationMode.VARYING_PARAMETERS))
 
         intersect = set_mode1.intersection(set_mode2)
         changed_keys = [o for o in intersect if mode1[o] != mode2[o]]
@@ -95,9 +97,11 @@ class MigrationMode(object):
 
     @staticmethod
     def mode_diff_str(mode1, mode2):
-        set_mode1, set_mode2= set(mode1.keys()), set(mode2.keys())
-        set_mode1 = set_mode1.intersection(set(VMOverlayCreationMode.VARYING_PARAMETERS))
-        set_mode2 = set_mode2.intersection(set(VMOverlayCreationMode.VARYING_PARAMETERS))
+        set_mode1, set_mode2 = set(mode1.keys()), set(mode2.keys())
+        set_mode1 = set_mode1.intersection(
+            set(VMOverlayCreationMode.VARYING_PARAMETERS))
+        set_mode2 = set_mode2.intersection(
+            set(VMOverlayCreationMode.VARYING_PARAMETERS))
 
         intersect = set_mode1.intersection(set_mode2)
         changed_keys = [o for o in intersect if mode1[o] != mode2[o]]
@@ -159,11 +163,14 @@ class ModeProfile(object):
     def __init__(self, overlay_mode_list):
         self.overlay_mode_list = overlay_mode_list
 
-
-    def predict_new_mode(self, cur_mode, cur_p, cur_r, cur_block_size, network_bw):
-        overlay_mode = ModeProfile.find_same_mode(self.overlay_mode_list, cur_mode)
-        if overlay_mode == None:
-            msg = "Cannot find matching mode : %s" % str(cur_mode.get_mode_id())
+    def predict_new_mode(self, cur_mode, cur_p, cur_r,
+                         cur_block_size, network_bw):
+        overlay_mode = ModeProfile.find_same_mode(
+            self.overlay_mode_list,
+            cur_mode)
+        if overlay_mode is None:
+            msg = "Cannot find matching mode : %s" % str(
+                cur_mode.get_mode_id())
             raise ModeProfileError(msg)
         item = self.find_matching_mode(overlay_mode,
                                        cur_mode,
@@ -180,10 +187,13 @@ class ModeProfile(object):
                 return overlay_mode
             else:
                 pass
-                #print "not identical: %s" % MigrationMode.mode_diff_str(in_mode.__dict__, overlay_mode.mode)
+                # print "not identical: %s" %
+                # MigrationMode.mode_diff_str(in_mode.__dict__,
+                # overlay_mode.mode)
         return None
 
-    def find_matching_mode(self, profiled_mode_obj, cur_mode, cur_p, cur_r, cur_block_size, network_bw):
+    def find_matching_mode(self, profiled_mode_obj, cur_mode, cur_p,
+                           cur_r, cur_block_size, network_bw):
         # get scaling factor between current workload and profiled data
         profiled_mode_total_p = profiled_mode_obj.total_p
         profiled_mode_total_r = profiled_mode_obj.total_r
@@ -196,27 +206,15 @@ class ModeProfile(object):
         scale_p = cur_total_p/profiled_mode_total_p
         scale_r = cur_total_r/profiled_mode_total_r
 
-        #LOG.debug("mode-predict\tcur_p:%f\tcur_r:%f\tprofile_p:%f\tprofile_r:%f\tscaling_p:%f\tscaling_r:%f" % \
-        #          (cur_total_p, cur_total_r, profiled_mode_total_p, profiled_mode_total_r, scale_p, scale_r))
-        scaled_mode_list, current_block_per_sec = self.list_scaled_modes(cur_mode, scale_p, scale_r, network_bw)
+        scaled_mode_list, current_block_per_sec = self.list_scaled_modes(
+            cur_mode, scale_p, scale_r, network_bw)
 
-        sorted_mode_list = sorted(scaled_mode_list, key=itemgetter(1), reverse=True)
+        sorted_mode_list = sorted(scaled_mode_list, key=itemgetter(1),
+                                  reverse=True)
         selected_item = sorted_mode_list[0]
         selected_mode_obj = selected_item[0]
         selected_block_per_sec = selected_item[1]
 
-        #for sorted_item in sorted_mode_list:
-        #    (each_mode, actual_block_per_sec,\
-        #    (bottleneck, system_block_per_sec, system_in_mbps, system_out_mbps,\
-        #    network_block_per_sec, network_bw)) = sorted_item
-        #    diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, each_mode.mode)
-        #    LOG.debug("mode-predict\t(%s) %f %f %s --> %f %f, %f" % (each_mode.mode,
-        #                                                             network_bw,
-        #                                                             system_out_mbps,
-        #                                                             bottleneck,
-        #                                                             network_block_per_sec,
-        #                                                             system_block_per_sec,
-        #                                                             actual_block_per_sec))
 
         if selected_block_per_sec <= current_block_per_sec:
             return None
@@ -232,10 +230,12 @@ class ModeProfile(object):
             scaled_each_r = each_r * scale_r
 
             num_cores = VMOverlayCreationMode.get_num_cores()
-            system_block_per_sec, system_in_mbps, system_out_mbps = MigrationMode.get_system_throughput(num_cores, scaled_each_p, scaled_each_r)
+            system_block_per_sec, system_in_mbps, system_out_mbps = MigrationMode.get_system_throughput(
+                num_cores, scaled_each_p, scaled_each_r)
 
             # find the bottleneck
-            network_block_per_sec = network_bw*1024*1024/(scaled_each_r*BIT_PER_BLOCK)
+            network_block_per_sec = network_bw*1024 * \
+                1024/(scaled_each_r*BIT_PER_BLOCK)
             bottleneck = None
             if network_bw < system_out_mbps:
                 bottleneck = "network"
@@ -248,19 +248,17 @@ class ModeProfile(object):
             if id1 == id2:
                 current_block_per_sec = actual_block_per_sec
 
-            data = (each_mode, actual_block_per_sec,
-                    (bottleneck, system_block_per_sec, system_in_mbps, system_out_mbps,
-                     network_block_per_sec, network_bw))
+            data = (
+                each_mode,
+                actual_block_per_sec,
+                (bottleneck,
+                 system_block_per_sec,
+                 system_in_mbps,
+                 system_out_mbps,
+                 network_block_per_sec,
+                 network_bw))
             scaled_mode_list.append(data)
-            #LOG.debug("mode-predict\t(%s) %f %f %s --> %f %f, %f" % (each_mode.mode,
-            #                                                         network_bw,
-            #                                                         system_out_mbps,
-            #                                                         bottleneck,
-            #                                                         network_block_per_sec,
-            #                                                         system_block_per_sec,
-            #                                                         actual_block_per_sec))
         return scaled_mode_list, current_block_per_sec
-
 
     def show_relative_ratio(self, input_mode):
         pivot_mode = self.find_same_mode(self.overlay_mode_list, input_mode)
@@ -273,13 +271,14 @@ class ModeProfile(object):
             other_r = MigrationMode.get_total_R(other_mode.block_size_ratio)
             ratio_p = round(other_p/pivot_p, 4)
             ratio_r = round(other_r/pivot_r, 4)
-            mode_diff_str = MigrationMode.mode_diff_str(pivot_mode.mode, other_mode.mode)
+            mode_diff_str = MigrationMode.mode_diff_str(
+                pivot_mode.mode,
+                other_mode.mode)
             if len(mode_diff_str) == 0:
                 mode_diff_str = "original"
             comp_list[other_mode.get_mode_id()] = (ratio_p, ratio_r)
             print "%d: %s\t(%s %s)/(%s %s) --> (%s, %s)" % (index, mode_diff_str[:],  pivot_p, pivot_r, other_p, other_r, ratio_p, ratio_r)
         return comp_list
-
 
     @staticmethod
     def load_from_file(profile_path):
@@ -309,7 +308,7 @@ def parse_each_experiement(lines):
         if line.find("* Overlay creation mode start") != -1:
             is_start_config_line = True
             continue
-        if is_start_config_line == True:
+        if is_start_config_line:
             config_lines += line
             if line.find("}") != -1:
                 break
@@ -413,42 +412,39 @@ def _split_experiment(test_ret_list):
     face_exps = list()
     mar_exps = list()
     for each_exp in test_ret_list:
-        if each_exp.workload.find("moped") !=  -1:
+        if each_exp.workload.find("moped") != -1:
             moped_exps.append(each_exp)
-        elif each_exp.workload.find("fluid") !=  -1:
+        elif each_exp.workload.find("fluid") != -1:
             fluid_exps.append(each_exp)
-        elif each_exp.workload.find("face") !=  -1:
+        elif each_exp.workload.find("face") != -1:
             face_exps.append(each_exp)
-        elif each_exp.workload.find("mar") !=  -1:
+        elif each_exp.workload.find("mar") != -1:
             mar_exps.append(each_exp)
-        elif each_exp.workload.find("speech") !=  -1:
+        elif each_exp.workload.find("speech") != -1:
             speech_exps.append(each_exp)
         else:
             msg = "Invalid workload %s" % each_exp.workload
             print msg
             sys.exit(1)
             raise ModeProfileError(msg)
-    #if (len(moped_exps) == len(fluid_exps) == len(face_exps) == len(mar_exps)) == False:
-    #    msg = "workloads have different experiement size"
-    #    print msg
-    #    sys.exit(1)
-    #    raise ModeProfileError(msg)
     return moped_exps, fluid_exps, face_exps, mar_exps, speech_exps
 
 
 def select_mediam_exp(exps):
     # sort by compression algorithm gzip 1, .., gzip9, .., lzma1, .., lzma9
     def compare_comp_algorithm(a):
-        d = {"xdelta3":3,
-             "bsdiff":4,
-             "xor":2,
-             "none":1}
-        return (d[a.mode['DISK_DIFF_ALGORITHM']], -a.mode['COMPRESSION_ALGORITHM_TYPE'], a.mode['COMPRESSION_ALGORITHM_SPEED'])
+        d = {"xdelta3": 3,
+             "bsdiff": 4,
+             "xor": 2,
+             "none": 1}
+        return (d[a.mode['DISK_DIFF_ALGORITHM']], -
+                a.mode['COMPRESSION_ALGORITHM_TYPE'], a.mode['COMPRESSION_ALGORITHM_SPEED'])
     selected_exp_list = list()
     exps.sort(key=compare_comp_algorithm)
     result_dict = OrderedDict()
     for each_exp in exps:
-        in_data_size = each_exp.stage_size_in['CreateMemoryDeltalist'] + each_exp.stage_size_in['CreateDiskDeltalist']
+        in_data_size = each_exp.stage_size_in[
+            'CreateMemoryDeltalist'] + each_exp.stage_size_in['CreateDiskDeltalist']
         in_data_disk = each_exp.stage_size_in['CreateDiskDeltalist']
         in_data_mem = each_exp.stage_size_in['CreateMemoryDeltalist']
         alpha = float(in_data_mem)/in_data_size
@@ -456,20 +452,27 @@ def select_mediam_exp(exps):
         total_r = MigrationMode.get_total_R(each_exp.block_size_ratio, alpha)
         out_data_size = each_exp.stage_size_out['CompressProc']
         duration = each_exp.migration_total_time
-        est_duration1 = each_exp.stage_time['CreateMemoryDeltalist'] + each_exp.stage_time['CreateDiskDeltalist']+\
-            each_exp.stage_time['DeltaDedup'] + each_exp.stage_time['CompressProc']
-        key = "%s,%d,%d" % (each_exp.mode['DISK_DIFF_ALGORITHM'], each_exp.mode['COMPRESSION_ALGORITHM_TYPE'],each_exp.mode['COMPRESSION_ALGORITHM_SPEED'])
-        value = (in_data_size, out_data_size, duration, 8*float(out_data_size)/1024.0/1024/duration, total_p, total_r, each_exp)
+        est_duration1 = each_exp.stage_time['CreateMemoryDeltalist'] + each_exp.stage_time[
+            'CreateDiskDeltalist'] + each_exp.stage_time['DeltaDedup'] + each_exp.stage_time['CompressProc']
+        key = "%s,%d,%d" % (
+            each_exp.mode['DISK_DIFF_ALGORITHM'], each_exp.mode
+            ['COMPRESSION_ALGORITHM_TYPE'], each_exp.mode
+            ['COMPRESSION_ALGORITHM_SPEED'])
+        value = (
+            in_data_size,
+            out_data_size,
+            duration,
+            8 *
+            float(out_data_size) /
+            1024.0 /
+            1024 /
+            duration,
+            total_p,
+            total_r,
+            each_exp)
         item_list = result_dict.get(key, list())
         item_list.append(value)
         result_dict[key] = item_list
-
-        #print "%s,%d,%d\t%ld\t%ld\t%f,%f,%f\t%f" %\
-        #    (each_exp.mode['DISK_DIFF_ALGORITHM'],\
-        #    each_exp.mode['COMPRESSION_ALGORITHM_TYPE'],\
-        #     each_exp.mode['COMPRESSION_ALGORITHM_SPEED'],\
-        #     in_data_size, out_data_size, duration, est_duration1, float(duration)/est_duration1,
-        #     8*float(out_data_size)/1024.0/1024/duration) 
 
     # chose the median throughput value
     for (key, value_list) in result_dict.iteritems():
@@ -484,7 +487,8 @@ def select_mediam_exp(exps):
 
 def profiling(test_ret_list):
     # how change in mode will affect system performance?
-    moped_exps, fluid_exps, face_exps, mar_exps, speech_exps = _split_experiment(test_ret_list)
+    moped_exps, fluid_exps, face_exps, mar_exps, speech_exps = _split_experiment(
+        test_ret_list)
     comp_list = list()
     if moped_exps:
         filename = "moped-profile.json"
@@ -507,7 +511,6 @@ def profiling(test_ret_list):
     print "saved at %s" % filename
 
 
-
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         sys.stderr.write("%prog [parse|test] filename\n")
@@ -522,33 +525,58 @@ if __name__ == "__main__":
         mode_profile = ModeProfile.load_from_file(inputfile)
 
         # measured information
-        cur_p = {'CreateMemoryDeltalist': 0.5540335827711419, 'CreateDiskDeltalist': 0.5118202023133814, 'DeltaDedup': 0.0024018974990242282, 'CompressProc': 0.45448795749054516}
-        cur_r = {'CreateMemoryDeltalist': 0.48741149800555605, 'CreateDiskDeltalist': 0.3919707506873821, 'DeltaDedup': 0.6054054544199231, 'CompressProc': 0.7024070026179592}
+        cur_p = {
+            'CreateMemoryDeltalist': 0.5540335827711419,
+            'CreateDiskDeltalist': 0.5118202023133814,
+            'DeltaDedup': 0.0024018974990242282,
+            'CompressProc': 0.45448795749054516}
+        cur_r = {
+            'CreateMemoryDeltalist': 0.48741149800555605,
+            'CreateDiskDeltalist': 0.3919707506873821,
+            'DeltaDedup': 0.6054054544199231,
+            'CompressProc': 0.7024070026179592}
         cur_block_size = {'CreateMemoryDeltalist': 1, 'CreateDiskDeltalist': 1}
-        cur_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+        cur_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(
+            )
 
-        network_bw = 15# mbps
+        network_bw = 15  # mbps
 
         # get new mode
-        item = mode_profile.predict_new_mode(cur_mode, cur_p, cur_r, cur_block_size, network_bw)
+        item = mode_profile.predict_new_mode(
+            cur_mode,
+            cur_p,
+            cur_r,
+            cur_block_size,
+            network_bw)
         if item is not None:
             (new_mode_obj, actual_block_per_sec, misc) = item
-            (bottleneck, system_block_per_sec, system_in_mbps, system_out_mbps, network_block_per_sec, network_bw) = misc
+            (bottleneck,
+             system_block_per_sec,
+             system_in_mbps,
+             system_out_mbps,
+             network_block_per_sec,
+             network_bw) = misc
             # print result
-            diff_str = MigrationMode.mode_diff_str(cur_mode.__dict__, new_mode_obj.mode)
-            diff = MigrationMode.mode_diff(cur_mode.__dict__, new_mode_obj.mode)
+            diff_str = MigrationMode.mode_diff_str(
+                cur_mode.__dict__,
+                new_mode_obj.mode)
+            diff = MigrationMode.mode_diff(
+                cur_mode.__dict__,
+                new_mode_obj.mode)
             print "change conf: %s\toutput bandwidth(%f, %f), block_per_sec:(%f, %f)" % (diff_str, system_out_mbps, network_bw, actual_block_per_sec, network_block_per_sec)
         else:
             print "do not change"
     elif command == "show":
         mode_profile = ModeProfile.load_from_file(inputfile)
-        pivot_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+        pivot_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(
+            )
         mode_profile.show_relative_ratio(pivot_mode)
     elif command == "compare":
         another_inputfile = sys.argv[3]
         mode_profile1 = ModeProfile.load_from_file(inputfile)
         mode_profile2 = ModeProfile.load_from_file(another_inputfile)
-        pivot_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue()
+        pivot_mode = VMOverlayCreationMode.get_pipelined_multi_process_finite_queue(
+            )
 
         mode_ratio_dict1 = mode_profile1.show_relative_ratio(pivot_mode)
         mode_ratio_dict2 = mode_profile2.show_relative_ratio(pivot_mode)
@@ -558,7 +586,9 @@ if __name__ == "__main__":
         for mode_id, (ratio_p1, ratio_r1) in mode_ratio_dict1.iteritems():
             item = mode_ratio_dict2.get(mode_id, None)
             if item is None:
-                sys.stderr.write("Failed to find matching mode with %s\n" % mode)
+                sys.stderr.write(
+                    "Failed to find matching mode with %s\n" %
+                    mode)
             (ratio_p2, ratio_r2) = item
             p_diff = math.fabs(ratio_p1 - ratio_p2)
             r_diff = math.fabs(ratio_r1 - ratio_r2)
