@@ -37,8 +37,8 @@ from tempfile import mkdtemp
 from xml.etree import ElementTree
 from urlparse import urlsplit
 
-from . import Memory
-from . import Disk
+from . import memory
+from . import disk
 from . import cloudletfs
 from . import memory_util
 from .configuration import Const
@@ -133,7 +133,7 @@ class VMMonitor(object):
         time2 = time.time()
         # 2. get dma & discard information
         if self.options.TRIM_SUPPORT:
-            dma_dict, trim_dict = Disk.parse_qemu_log(
+            dma_dict, trim_dict = disk.parse_qemu_log(
                 self.qemu_logfile, Const.CHUNK_SIZE)
             if len(trim_dict) == 0:
                 LOG.warning("No TRIM Discard, Check /etc/fstab configuration")
@@ -207,7 +207,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
             self.total_write_size = 0
             # read first 40KB and aligen header with 4KB
             select.select([self.in_fd], [], [])
-            data = self.in_fd.read(Memory.Memory.RAM_PAGE_SIZE*10)
+            data = self.in_fd.read(memory.Memory.RAM_PAGE_SIZE*10)
             if not is_first_recv:
                 is_first_recv = True
                 time_first_recv = time.time()
@@ -222,10 +222,10 @@ class MemoryReadProcess(process_manager.ProcWorker):
             # get memory snapshot size
             original_header_len = len(original_header)
             memory_size_data = data[
-                original_header_len:original_header_len+Memory.Memory.CHUNK_HEADER_SIZE]
-            new_data = data[ original_header_len + Memory.Memory.CHUNK_HEADER_SIZE:]
+                original_header_len:original_header_len+memory.Memory.CHUNK_HEADER_SIZE]
+            new_data = data[ original_header_len + memory.Memory.CHUNK_HEADER_SIZE:]
             mem_snapshot_size, = struct.unpack(
-                Memory.Memory.CHUNK_HEADER_FMT, memory_size_data)
+                memory.Memory.CHUNK_HEADER_FMT, memory_size_data)
             self.memory_snapshot_size.value = long(mem_snapshot_size+len(new_header))
             self.result_queue.put(new_data)
             self.total_write_size += len(new_data)
@@ -567,7 +567,7 @@ def create_delta_proc(monitoring_info, options, overlay_mode,
     if not options.DISK_ONLY:
         memory_deltalist_queue = multiprocessing.Queue(
             maxsize=overlay_mode.QUEUE_SIZE_MEMORY_DELTA_LIST)
-        memory_deltalist_proc = Memory.CreateMemoryDeltalist(
+        memory_deltalist_proc = memory.CreateMemoryDeltalist(
             modified_mem_queue,
             memory_deltalist_queue,
             base_memmeta,
@@ -583,7 +583,7 @@ def create_delta_proc(monitoring_info, options, overlay_mode,
     LOG.info("Get disk delta")
     disk_deltalist_queue = multiprocessing.Queue(
         maxsize=overlay_mode.QUEUE_SIZE_DISK_DELTA_LIST)
-    disk_deltalist_proc = Disk.CreateDiskDeltalist(modified_disk,
+    disk_deltalist_proc = disk.CreateDiskDeltalist(modified_disk,
                                                    m_chunk_queue,
                                                    Const.CHUNK_SIZE,
                                                    disk_deltalist_queue,
@@ -601,7 +601,7 @@ def create_delta_proc(monitoring_info, options, overlay_mode,
     LOG.info("Generate VM overlay using deduplication")
     dedup_proc = delta.DeltaDedup(
         memory_deltalist_queue,
-        Memory.Memory.RAM_PAGE_SIZE,
+        memory.Memory.RAM_PAGE_SIZE,
         disk_deltalist_queue,
         Const.CHUNK_SIZE,
         merged_deltalist_queue,

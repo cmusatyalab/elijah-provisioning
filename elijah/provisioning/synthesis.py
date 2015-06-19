@@ -23,8 +23,8 @@ import os
 import select
 import functools
 import subprocess
-from . import Memory
-from . import Disk
+from . import memory
+from . import disk
 from . import cloudletfs
 from . import memory_util
 from . import delta
@@ -759,12 +759,12 @@ def _get_overlay_monitoring_info(conn, machine, options,
                           fuse_stream_monitor=fuse_stream_monitor)
 
     # get hashlist of base memory and disk
-    basemem_hashlist = Memory.base_hashlist(base_memmeta)
-    basedisk_hashlist = Disk.base_hashlist(base_diskmeta)
+    basemem_hashlist = memory.base_hashlist(base_memmeta)
+    basedisk_hashlist = disk.base_hashlist(base_diskmeta)
 
     # get dma & discard information
     if options.TRIM_SUPPORT:
-        dma_dict, trim_dict = Disk.parse_qemu_log(
+        dma_dict, trim_dict = disk.parse_qemu_log(
             qemu_logfile, Const.CHUNK_SIZE)
         if len(trim_dict) == 0:
             LOG.warning("No TRIM Discard, Check /etc/fstab configuration")
@@ -826,7 +826,7 @@ def get_overlay_deltalist(monitoring_info, options,
     if options.DISK_ONLY:
         mem_deltalist = list()
     else:
-        mem_deltalist = Memory.create_memory_deltalist(
+        mem_deltalist = memory.create_memory_deltalist(
             modified_mem,
             basemem_meta=base_memmeta,
             basemem_path=base_mem,
@@ -839,7 +839,7 @@ def get_overlay_deltalist(monitoring_info, options,
 
     LOG.info("Get disk delta")
     disk_statistics = dict()
-    disk_deltalist = Disk.create_disk_deltalist(
+    disk_deltalist = disk.create_disk_deltalist(
         modified_disk,
         m_chunk_dict,
         Const.CHUNK_SIZE,
@@ -852,7 +852,7 @@ def get_overlay_deltalist(monitoring_info, options,
         ret_statistics=disk_statistics)
     LOG.info("Generate VM overlay using deduplication")
     merged_deltalist = delta.create_overlay(
-        mem_deltalist, Memory.Memory.RAM_PAGE_SIZE,
+        mem_deltalist, memory.Memory.RAM_PAGE_SIZE,
         disk_deltalist, Const.CHUNK_SIZE,
         basedisk_hashlist=basedisk_hashlist,
         basemem_hashlist=basemem_hashlist)
@@ -903,7 +903,7 @@ def generate_overlayfile(overlay_deltalist,
         overlayfile_prefix,
         Const.OVERLAY_BLOB_SIZE_KB,
         Const.CHUNK_SIZE,
-        Memory.Memory.RAM_PAGE_SIZE)
+        memory.Memory.RAM_PAGE_SIZE)
 
     # create metadata
     if not options.DISK_ONLY:
@@ -1119,10 +1119,10 @@ class MemoryReadThread(native_threading.Thread):
 
             total_read_size = 0
             # read first 40KB and aligen header with 4KB
-            data = self.in_fd.read(Memory.Memory.RAM_PAGE_SIZE*10)
+            data = self.in_fd.read(memory.Memory.RAM_PAGE_SIZE*10)
             libvirt_header = memory_util._QemuMemoryHeaderData(data)
             original_header = libvirt_header.get_header()
-            align_size = Memory.Memory.RAM_PAGE_SIZE*2
+            align_size = memory.Memory.RAM_PAGE_SIZE*2
             new_header = libvirt_header.get_aligned_header(align_size)
             self.out_fd.write(new_header)
             total_read_size += len(new_header)
@@ -1381,7 +1381,7 @@ def synthesis_statistics(meta_info, decomp_overlay_file,
         blob_name = each_file[Const.META_OVERLAY_FILE_NAME]
         for mem_chunk in memory_chunks:
             index = DeltaItem.get_index(
-                DeltaItem.DELTA_MEMORY, mem_chunk * Memory.Memory.RAM_PAGE_SIZE)
+                DeltaItem.DELTA_MEMORY, mem_chunk * memory.Memory.RAM_PAGE_SIZE)
             chunk_size = len(delta_dic[index].get_serialized())
             overlay_mem_chunks[mem_chunk] = {
                 "blob_name": blob_name, 'chunk_size': chunk_size}
@@ -1413,7 +1413,7 @@ def synthesis_statistics(meta_info, decomp_overlay_file,
             index = DeltaItem.get_index(
                 DeltaItem.DELTA_MEMORY,
                 access_chunk *
-                Memory.Memory.RAM_PAGE_SIZE)
+                memory.Memory.RAM_PAGE_SIZE)
             chunk_size = len(delta_dic[index].get_serialized())
             blob_name = overlay_mem_chunks.get(access_chunk)['blob_name']
             chunk_size = overlay_mem_chunks.get(access_chunk)['chunk_size']
@@ -1513,14 +1513,14 @@ def _create_baseVM(conn, domain,
     # VM has to be paused first to perform stable disk hashing
     save_mem_snapshot(conn, domain, base_mempath, **kwargs)
     LOG.info("Start Base VM Memory hashing")
-    base_mem = Memory.hashing(base_mempath)
+    base_mem = memory.hashing(base_mempath)
     base_mem.export_to_file(base_memmeta)
     LOG.info("Finish Base VM Memory hashing")
 
     # generate disk hashing
     # TODO: need more efficient implementation, e.g. bisect
     LOG.info("Start Base VM Disk hashing")
-    base_hashvalue = Disk.hashing(base_diskpath, base_diskmeta)
+    base_hashvalue = disk.hashing(base_diskpath, base_diskmeta)
     LOG.info("Finish Base VM Disk hashing")
     return base_hashvalue
 
