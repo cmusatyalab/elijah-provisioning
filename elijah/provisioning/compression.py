@@ -498,7 +498,9 @@ class DecompChildProc(multiprocessing.Process):
                     decompressor = bz2.BZ2Decompressor()
                     decomp_data = decompressor.decompress(comp_data)
                 elif comp_type == Const.COMPRESSION_GZIP:
-                    decomp_data = zlib.decompress(comp_data, zlib.MAX_WBITS | 16)
+                    decomp_data = zlib.decompress(
+                        comp_data,
+                        zlib.MAX_WBITS | 16)
                 else:
                     raise CompressionError("Not valid compression option")
                 LOG.debug("%f\tdecompress one blob" % (time.time()))

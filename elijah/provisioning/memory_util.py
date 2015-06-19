@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #
 # Cloudlet Infrastructure for Mobile Computing
 #
@@ -19,10 +19,8 @@
 #
 
 from __future__ import division
-import os
-import io
 import struct
-import log as logging
+from . import log as logging
 
 LOG = logging.getLogger(__name__)
 import subprocess
@@ -65,7 +63,7 @@ class _QemuMemoryHeader(object):
             raise MachineGenerationError('Invalid memory image magic')
         if version != self.HEADER_VERSION:
             raise MachineGenerationError('Unknown memory image version %d' %
-                    version)
+                                         version)
         if header != [0] * self.HEADER_UNUSED_VALUES:
             raise MachineGenerationError('Unused header values not 0')
 
@@ -84,10 +82,10 @@ class _QemuMemoryHeader(object):
     def write(self, f):
         # Calculate header
         header = [self.HEADER_MAGIC,
-                self.HEADER_VERSION,
-                self._xml_len,
-                self.was_running,
-                self.compressed]
+                  self.HEADER_VERSION,
+                  self._xml_len,
+                  self.was_running,
+                  self.compressed]
         header.extend([0] * self.HEADER_UNUSED_VALUES)
 
         # Write data
@@ -103,10 +101,10 @@ class _QemuMemoryHeader(object):
             # though this must be page-aligned.
             raise MachineGenerationError('self.xml is too large')
         header = [self.HEADER_MAGIC,
-                self.HEADER_VERSION,
-                self._xml_len,
-                self.was_running,
-                self.compressed]
+                  self.HEADER_VERSION,
+                  self._xml_len,
+                  self.was_running,
+                  self.compressed]
         header.extend([0] * self.HEADER_UNUSED_VALUES)
 
         # Write data
@@ -154,7 +152,7 @@ class _QemuMemoryHeaderData(_QemuMemoryHeader):
         padding_size = expected_header_size - current_size
         if padding_size < 0:
             msg = "WE FIXED LIBVIRT HEADER SIZE TO 2*4096\n" + \
-                    "But given xml size is bigger than 2*4096"
+                "But given xml size is bigger than 2*4096"
             raise MachineGenerationError(msg)
         elif padding_size > 0:
             new_xml = self.xml + ("\0" * padding_size)
@@ -165,10 +163,10 @@ class _QemuMemoryHeaderData(_QemuMemoryHeader):
     def get_header(self):
         # Calculate header
         header = [self.HEADER_MAGIC,
-                self.HEADER_VERSION,
-                self._xml_len,
-                self.was_running,
-                self.compressed]
+                  self.HEADER_VERSION,
+                  self._xml_len,
+                  self.was_running,
+                  self.compressed]
         header.extend([0] * self.HEADER_UNUSED_VALUES)
 
         # Write data
@@ -204,6 +202,5 @@ def copy_memory(in_path, out_path, xml):
 def copy_disk(in_path, out_path):
     print 'Copying and compressing disk image...'
     if subprocess.call(['qemu-img', 'convert', '-cp', '-O', 'qcow2',
-            in_path, out_path]) != 0:
+                        in_path, out_path]) != 0:
         raise MachineGenerationError('qemu-img failed')
-
