@@ -389,5 +389,12 @@ class FuseFeedingProc(multiprocessing.Process):
                 (start_time, end_time, (end_time-start_time)))
         self.fuse.fuse_write("END_OF_TRANSMISSION")
 
+        # deallocate resource
+        if hasattr(self, "input_pipe") and self.input_pipe is not None:
+            self.input_pipe.close()
+        if hasattr(self, "input_pipename") and os.path.exists(self.input_pipename):
+            os.remove(self.input_pipename)
+            self.input_pipename = None
+
     def terminate(self):
         self.stop.set()

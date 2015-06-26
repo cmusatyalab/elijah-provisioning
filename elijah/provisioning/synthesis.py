@@ -297,7 +297,7 @@ class VM_Overlay(native_threading.Thread):
         if hasattr(self, 'qemu_monitor') and self.qemu_monitor is not None:
             self.qemu_monitor.terminate()
             self.qemu_monitor.join()
-        else:
+        if os.path.exists(self.modified_mem.name):
             os.unlink(self.modified_mem.name)
 
         # delete cloudlet-qemu-log directory
@@ -801,7 +801,7 @@ def copy_disk(in_path, out_path):
 
 
 def get_libvirt_connection():
-    conn = libvirt.open("qemu:///session")
+    conn = libvirt.open("qemu:///system")
     return conn
 
 
@@ -1676,11 +1676,11 @@ def synthesis(base_disk, overlay_path, **kwargs):
             msg = "VM overlay does not exist at %s" % overlay_path
             raise CloudletGenerationError(msg)
         LOG.info("Decompressing VM overlay")
-        meta_info = compression.decomp_overlay(
-            overlay_path, overlay_filename.name)
+        meta_info = compression.decomp_overlay(overlay_path,
+                                               overlay_filename.name)
     else:
-        meta_info = compression.decomp_overlayzip(
-            overlay_path, overlay_filename.name)
+        meta_info = compression.decomp_overlayzip(overlay_path,
+                                                  overlay_filename.name)
 
     LOG.info("Decompression time : %f (s)" % (time()-decompe_time_s))
     LOG.info("Recovering launch VM")
