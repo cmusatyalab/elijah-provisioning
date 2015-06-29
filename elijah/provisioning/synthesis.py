@@ -734,6 +734,10 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None,
     security_element = xml.find("seclabel")
     if security_element is not None:
         xml.remove(security_element)
+    new_security_label = Element("seclabel")
+    new_security_label.set("type", "dynamic")
+    new_security_label.set("relabel", "yes")
+    xml.append(new_security_label)
 
     new_xml_str = ElementTree.tostring(xml)
     new_xml_str = new_xml_str.replace(old_uuid, str(uuid))
@@ -801,7 +805,7 @@ def copy_disk(in_path, out_path):
 
 
 def get_libvirt_connection():
-    conn = libvirt.open("qemu:///system")
+    conn = libvirt.open("qemu:///session")
     return conn
 
 
