@@ -1,6 +1,6 @@
 python-dateutil>=1.5
 requests>=1.1.0
-msgpack-python==0.1.13  # Use this version for OpenStack(Grizzly) compatibility
+msgpack-python>=0.4.6
 SQLAlchemy==0.9.7       # Use this version for OpenStack(Icehouse) compatibility
 bsdiff4==1.1.4
 Cython==0.21.2
