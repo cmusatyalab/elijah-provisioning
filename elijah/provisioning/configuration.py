@@ -217,13 +217,23 @@ class VMOverlayCreationMode(object):
     @staticmethod
     def set_num_cores(num_cores):
         import psutil
-        cpu_count = psutil.cpu_count()
-        num_cores = min(cpu_count, num_cores)
-
-        p = psutil.Process()
-        desired_cpus = list(range(num_cores))
-        p.cpu_affinity(desired_cpus)
-        updated_cpu = p.cpu_affinity()
+        version = psutil.version_info
+        # Installation of OpenStack Kilo uses pstuil version 1.2.1
+        if version >= (2, 0):
+            cpu_count = psutil.cpu_count()
+            num_cores = min(cpu_count, num_cores)
+            p = psutil.Process()
+            desired_cpus = list(range(num_cores))
+            p.cpu_affinity(desired_cpus)
+            updated_cpu = p.cpu_affinity()
+        else:
+            # version below 2.0
+            cpu_count = psutil.NUM_CPUS
+            num_cores = min(cpu_count, num_cores)
+            p = psutil.Process()
+            desired_cpus = list(range(num_cores))
+            p.set_cpu_affinity(desired_cpus)
+            updated_cpu = p.get_cpu_affinity()
         if desired_cpus != updated_cpu:
             raise Exception(
                 "Cannot not set affinity mask: from %s to %s" %
@@ -232,8 +242,13 @@ class VMOverlayCreationMode(object):
     @staticmethod
     def get_num_cores():
         import psutil
+        version = psutil.version_info
+        # Installation of OpenStack Kilo uses pstuil version 1.2.1
         p = psutil.Process()
-        return len(p.cpu_affinity())
+        if version >= (2, 0):
+            return len(p.cpu_affinity())
+        else:
+            return len(p.get_cpu_affinity())
 
     def get_mode_id(self):
         sorted_key = sorted(self.__dict__.keys())
