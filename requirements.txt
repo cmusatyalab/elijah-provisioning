@@ -5,3 +5,4 @@ SQLAlchemy==0.9.7       # Use this version for OpenStack(Icehouse) compatibility
 bsdiff4==1.1.4
 Cython==0.21.2
 psutil>=2.2.1
+testtools>=1.8.0

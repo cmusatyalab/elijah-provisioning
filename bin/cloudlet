@@ -302,7 +302,7 @@ def main(argv):
                     Ex) ./cloudlet del_base /path/to/base_disk.img \n")
             return 1
         dbconn, deleting_base = PackagingUtil._get_matching_basevm(
-            left_args[0])
+            disk_path=left_args[0])
         if deleting_base is not None:
             dbconn.del_item(deleting_base)
         else:
@@ -332,7 +332,7 @@ def main(argv):
             return 1
         basedisk_path = left_args[0]
         dbconn, matching_basevm = PackagingUtil._get_matching_basevm(
-            basedisk_path)
+            disk_path=basedisk_path)
         name = str(left_args[1])
         if matching_basevm is not None:
             PackagingUtil.export_basevm(

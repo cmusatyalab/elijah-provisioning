@@ -56,6 +56,10 @@ class BadPackageError(DetailException):
     pass
 
 
+class ImportBaseError(DetailException):
+    pass
+
+
 class NeedAuthentication(Exception):
 
     def __init__(self, host, realm, scheme):
@@ -551,13 +555,17 @@ class BaseVMPackage(object):
 class PackagingUtil(object):
 
     @staticmethod
-    def _get_matching_basevm(basedisk_path):
+    def _get_matching_basevm(disk_path=None, hash_value=None):
         dbconn = DBConnector()
-        basedisk_path = os.path.abspath(basedisk_path)
+        if disk_path:
+            disk_path = os.path.abspath(disk_path)
         basevm_list = dbconn.list_item(BaseVM)
         ret_basevm = None
         for item in basevm_list:
-            if basedisk_path == item.disk_path:
+            if (disk_path is not None) and (disk_path == item.disk_path):
+                ret_basevm = item
+                break
+            if (hash_value is not None) and (hash_value == item.hash_value):
                 ret_basevm = item
                 break
         return dbconn, ret_basevm
@@ -615,19 +623,19 @@ class PackagingUtil(object):
         (base_hashvalue, disk_name, memory_name, diskhash_name, memoryhash_name) = \
             PackagingUtil._get_basevm_attribute(filename)
 
-        # check directory
+        # check duplica
         base_vm_dir = os.path.join(
             os.path.dirname(Const.BASE_VM_DIR), base_hashvalue)
         temp_dir = mkdtemp(prefix="cloudlet-base-")
         disk_tmp_path = os.path.join(temp_dir, disk_name)
         disk_target_path = os.path.join(base_vm_dir, disk_name)
         dbconn, matching_basevm = PackagingUtil._get_matching_basevm(
-            disk_target_path)
+            disk_path=disk_target_path, hash_value=base_hashvalue)
         if matching_basevm is not None:
-            LOG.info("Base VM is already exists")
-            LOG.info("Delete existing Base VM using command")
-            LOG.info("See more 'cloudlet --help'")
-            return None
+            msg = ("Base VM is already exists. "
+                   "Delete existing Base VM using command. "
+                   "See more 'cloudlet --help'")
+            raise ImportBaseError(msg)
         if not os.path.exists(base_vm_dir):
             LOG.info("create directory for base VM")
             os.makedirs(base_vm_dir)
@@ -645,12 +653,11 @@ class PackagingUtil(object):
             os.path.join(temp_dir, memoryhash_name): target_memoryhash,
             }
 
-        LOG.info("Place base VM to the right directory")
+        LOG.info("Place base VM to a right directory")
         for (src, dest) in path_list.iteritems():
             shutil.move(src, dest)
 
         # add to DB
-        dbconn = DBConnector()
         LOG.info("Register New Base to DB")
         LOG.info("ID for the new Base VM: %s" % base_hashvalue)
         new_basevm = BaseVM(disk_target_path, base_hashvalue)
