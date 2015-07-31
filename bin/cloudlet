@@ -333,10 +333,10 @@ def main(argv):
         basedisk_path = left_args[0]
         dbconn, matching_basevm = PackagingUtil._get_matching_basevm(
             disk_path=basedisk_path)
-        name = str(left_args[1])
+        output_path = os.path.join(os.curdir, str(left_args[1])) + ".zip"
         if matching_basevm is not None:
             PackagingUtil.export_basevm(
-                name,
+                output_path,
                 basedisk_path,
                 matching_basevm.hash_value)
         else:

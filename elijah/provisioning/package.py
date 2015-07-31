@@ -571,19 +571,9 @@ class PackagingUtil(object):
         return dbconn, ret_basevm
 
     @staticmethod
-    def export_basevm(name, basevm_path, basevm_hashvalue):
+    def export_basevm(output_path, basevm_path, basevm_hashvalue):
         (base_diskmeta, base_mempath, base_memmeta) = \
             Const.get_basepath(basevm_path)
-        output_path = os.path.join(os.curdir, name)
-        if output_path.endswith(".zip") == False:
-            output_path += ".zip"
-        if os.path.exists(output_path):
-            is_overwrite = raw_input(
-                "%s exists. Overwirte it? (y/N) " %
-                output_path)
-            if is_overwrite != 'y':
-                return None
-
         BaseVMPackage.create(
             output_path,
             basevm_hashvalue,
@@ -591,8 +581,6 @@ class PackagingUtil(object):
             base_mempath,
             base_diskmeta,
             base_memmeta)
-        #BaseVMPackage.create(output_path, name, base_diskmeta, base_memmeta, base_diskmeta, base_memmeta)
-        return output_path
 
     @staticmethod
     def _get_basevm_attribute(zipped_file):
@@ -656,6 +644,8 @@ class PackagingUtil(object):
         LOG.info("Place base VM to a right directory")
         for (src, dest) in path_list.iteritems():
             shutil.move(src, dest)
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
 
         # add to DB
         LOG.info("Register New Base to DB")
