@@ -26,14 +26,13 @@ class TestSynthesis(unittest.TestCase):
     def setUp(self):
         super(TestSynthesis, self).setUp()
         # check parameters
-        self.assertTrue(os.path.exists(Const.disk_image_path),
-                        "invalid disk path: %s" % Const.disk_image_path)
+        self.overlay_url = Const.overlay_url_cirros
         try:
-            urllib2.urlopen(Const.overlay_url)
+            urllib2.urlopen(self.overlay_url)
         except Exception as e:
             self.assertTrue(
                 False,
-                "Inlid overlay URL: %s\n%s" % (Const.overlay_url, str(e))
+                "Inlid overlay URL: %s\n%s" % (self.overlay_url, str(e))
             )
 
         # import base VM
@@ -44,7 +43,6 @@ class TestSynthesis(unittest.TestCase):
                                   self.base_vm_cirros_filepath)
         self.base_vm_path, self.base_hashvalue = PackagingUtil.import_basevm(
             self.base_vm_cirros_filepath)
-        self.overlay_url = Const.overlay_url
 
     def tearDown(self):
         super(TestSynthesis, self).tearDown()
@@ -55,14 +53,14 @@ class TestSynthesis(unittest.TestCase):
     def test_synthesis_step_by_step(self):
         # decompress VM overlay
         overlay_filename = NamedTemporaryFile(prefix="cloudlet-test-overlay-file-")
-        meta_info = compression.decomp_overlayzip(Const.overlay_url,
+        meta_info = compression.decomp_overlayzip(self.overlay_url,
                                                   overlay_filename.name)
         self.assertIsInstance(meta_info, dict)
         self.assertTrue(meta_info.has_key(Cloudlet_Const.META_OVERLAY_FILES))
 
         # recover launch VM
         launch_disk, launch_mem, fuse, delta_proc, fuse_thread = \
-            synthesis.recover_launchVM(Const.disk_image_path, meta_info, overlay_filename.name)
+            synthesis.recover_launchVM(self.base_vm_path, meta_info, overlay_filename.name)
         self.assertTrue(os.path.exists(launch_disk))
         self.assertTrue(os.path.exists(launch_mem))
         self.assertIsInstance(fuse, CloudletFS)
@@ -89,8 +87,8 @@ class TestSynthesis(unittest.TestCase):
     def test_synthesis(self):
         try:
             synthesis.synthesis(
-                Const.disk_image_path,
-                Const.overlay_url,
+                self.base_vm_path,
+                self.overlay_url,
                 disk_only=False,
                 zip_container=True,
                 handoff_url=None,           # No handoff

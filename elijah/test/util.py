@@ -8,10 +8,10 @@ from elijah.provisioning.package import PackagingUtil
 
 class Const(object):
 
-    disk_image_path = "/home/krha/.cloudlet/abda52a61692094b3b7d45c9647d022f5e297d1b788679eb93735374007576b8/precise.raw"
-    overlay_url = "http://128.2.213.110/overlay/temp-overlay"
     base_vm_cirros_url =\
         "https://storage.cmusatyalab.org/cloudlet-vm/cirros-0.3.4-x86_64-base.zip"
+    overlay_url_cirros =\
+        "https://storage.cmusatyalab.org/cloudlet-vm/cirros-overlay.zip"
 
 
 class VMUtility(object):
