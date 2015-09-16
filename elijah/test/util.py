@@ -41,8 +41,9 @@ class VMUtility(object):
     @staticmethod
     def delete_basevm(base_path, base_hashvalue):
         if base_path is not None and base_hashvalue is not None:
-            dbconn, matching_basevm = PackagingUtil._get_matching_basevm(
-                disk_path=base_path, hash_value=base_hashvalue)
+            disk_path=base_path
+            hash_value=base_hashvalue
+            dbconn, matching_basevm = PackagingUtil._get_matching_basevm(disk_path)
             if matching_basevm:
                 dbconn.del_item(matching_basevm)
             if matching_basevm:
