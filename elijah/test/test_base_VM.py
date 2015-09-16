@@ -63,8 +63,8 @@ class TestBaseExport(unittest.TestCase):
             shutil.rmtree(self.temp_dir)
 
     def test_export_base(self):
-        dbconn, matching_basevm = PackagingUtil._get_matching_basevm(
-            disk_path=self.base_vm_path)
+        disk_path=self.base_vm_path
+        dbconn, matching_basevm = PackagingUtil._get_matching_basevm(disk_path)
         self.assertTrue(matching_basevm is not None,
                         "Cannot find the requested base VM")
         try:
