@@ -38,9 +38,8 @@ class TestCreatingVMOverlay(unittest.TestCase):
             os.remove(self.overlay_filepath)
 
     def test_create_vm_overlay(self):
-        dbconn, matching_basevm = PackagingUtil._get_matching_basevm(
-            disk_path=self.base_vm_path)
-
+        disk_path=self.base_vm_path
+        dbconn, matching_basevm = PackagingUtil._get_matching_basevm(disk_path)
         base_diskpath = matching_basevm.disk_path
         options = Options()
         options.TRIM_SUPPORT = True
