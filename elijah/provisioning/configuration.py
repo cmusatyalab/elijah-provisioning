@@ -233,7 +233,13 @@ class VMOverlayCreationMode(object):
             p = psutil.Process()
             desired_cpus = list(range(num_cores))
             p.set_cpu_affinity(desired_cpus)
-            updated_cpu = p.get_cpu_affinity()
+            try:
+                # psutil 1.2.1 has issue with large number of cores
+                # https://github.com/giampaolo/psutil/issues/522
+                updated_cpu = p.get_cpu_affinity()
+            except OSError as e:
+                updated_cpu = desired_cpus
+                pass
         if desired_cpus != updated_cpu:
             raise Exception(
                 "Cannot not set affinity mask: from %s to %s" %
@@ -248,7 +254,14 @@ class VMOverlayCreationMode(object):
         if version >= (2, 0):
             return len(p.cpu_affinity())
         else:
-            return len(p.get_cpu_affinity())
+            try:
+                # psutil 1.2.1 has issue with large number of cores
+                # https://github.com/giampaolo/psutil/issues/522
+                cores = len(p.get_cpu_affinity())
+            except OSError as e:
+                import affinity
+                cores = len(affinity.sched_getaffinity(p.pid))
+            return cores
 
     def get_mode_id(self):
         sorted_key = sorted(self.__dict__.keys())
