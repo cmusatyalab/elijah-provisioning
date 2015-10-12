@@ -1728,9 +1728,13 @@ def synthesis(base_disk, overlay_path, **kwargs):
         dest_handoff_url = handoff_url
         parsed_handoff_url = urlsplit(handoff_url)
         if parsed_handoff_url.scheme == "file":
-            temp_dir = mkdtemp(prefix="cloudlet-residue-")
-            residue_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
-            dest_handoff_url = "file://%s" % os.path.abspath(residue_zipfile)
+            dest_path = parsed_handoff_url.path
+            if os.path.exists(os.path.dirname(dest_path)):
+                dest_handoff_url = "file://%s" % os.path.abspath(parsed_handoff_url.path)
+            else:
+                temp_dir = mkdtemp(prefix="cloudlet-residue-")
+                residue_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
+                dest_handoff_url = "file://%s" % os.path.abspath(residue_zipfile)
         handoff_ds = handoff.HandoffDataSend()
         LOG.debug("save data to file")
         handoff_ds.save_data(

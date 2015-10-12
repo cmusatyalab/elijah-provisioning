@@ -199,16 +199,15 @@ How to use
     > INFO      - Open TCP Server at ('0.0.0.0', 8021)  
     > INFO      - Disable Nagle(No TCP delay)  : 1  
     > INFO     --------------------------------------------------  
-    > INFO     [INFO] Start UPnP Server  
 
-  Then, you can test VM synthesis using a sample **VM overlay URL** for Fluid
-  simulation's back-end server. The demo video of this application is at
-  [YouTube](https://www.youtube.com/watch?v=f9MN-kvG_ko).
-  ~~The URL for the Fluid VM overlay is~~
-  ~~[https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip](https://storage.cmusatyalab.org/cloudlet-vm/overlay-fluid-portable.zip)~~
-  Sample VM overlay of Fluid application is temporarily unavailable. Instead,
-  you can create your own VM overlay following [How To Create VM
-  Overlay](#how-to-create-vm-overlay).
+  Then, you can test VM synthesis using a sample **VM overlay URL** of Top
+  command. This process will resume a backend VM that is running a top
+  command. VM overlay URL http://128.2.213.110/overlay/overlay-top
+
+  Demo for the Fluid simulation's back-end server
+  ([YouTube](https://www.youtube.com/watch?v=f9MN-kvG_ko))  is temporarily
+  unavailable. Instead, you can create your own VM overlay following [How To
+  Create VM Overlay](#how-to-create-vm-overlay).
   
   You can perform VM synthesis like
 
