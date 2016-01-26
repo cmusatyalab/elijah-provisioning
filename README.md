@@ -159,9 +159,9 @@ How to use
 
   You can perform VM synthesis using sample VM overlay
 
-    > $ synthesis_client -s localhost -u http://128.2.213.110/overlay/overlay-htop.zip -d
+    > $ synthesis_client -s localhost -u http://128.2.213.110/overlay/overlay-htop.zip
 
-  For more details, check out help command _synthesi_client -h_
+  For more details, check out help command **synthesis_client -h**
 
   If VM synthesis is successful, you will see a screen-shot like
 
@@ -214,8 +214,8 @@ How to use
     launch associated mobile application after finishing ``VM synthesis``. 
 
 
-  Please recall that this VM synthesis client is for **provisioning custom
-  back-end server VM at arbitrary 	computer** and you need to launch your
+  Please recall that the VM synthesis client is designed for **provisioning a custom
+  back-end server program at cloudlet** and you need to launch your
   mobile application after finishing VM synthesis. This client application will
   communicate with the back-end server you just provisioned. To launch mobile
   application after VM synthesis, we use Android Activity launcher and the
@@ -347,7 +347,6 @@ Troubleshooing
     > Failed to create overlay
 
   Please logout your session and re-login.
-
 
 2. Fuse permission error at the first run
 
