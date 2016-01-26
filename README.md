@@ -76,65 +76,25 @@ You will need:
 * python libraries at requirements.txt
 
 
-To install, you either 
+To install
 
 * run a installation script
   
   > $ sudo apt-get install fabric openssh-server  
   > $ fab install
-  > *(Type your account password when it is asked)*
-
-* install manually
-
-  - install required package  (Ubuntu 12.04)
-
-          > $ sudo apt-get install qemu-kvm libvirt-bin gvncviewer python-libvirt python-xdelta3 python-lzma python-dev liblzma-dev apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev python-xdelta3
-  
-      At Ubuntu 14.04 python-xdelta3 package is no longer supported. But, old
-      version of 13.10 still works without issue. Therefore, at Ubuntu 14.04
-
-          > $ wget http://mirrors.kernel.org/ubuntu/pool/universe/x/xdelta3/python-xdelta3_3.0.0.dfsg-1build1_amd64.deb
-          > $ sudo dpkg -i python-xdelta3_3.0.0.dfsg-1build1_amd64.deb
-
-  - install python libraries
-
-          > $ sudo pip install -r requirements.txt
-
-  - Disable security module. This is for allowing custom KVM. Example at Ubuntu 12  
-    
-          > $ sudo aa-complain /usr/sbin/libvirtd  
-
-  - Add current user to kvm, libvirtd group.  
-
-          > $ sudo adduser [your_account_name] kvm  
-          > $ sudo adduser [your_account_name] libvirtd  
-
-  - Make sure the current user to have fuse permission. The qemu-kvm library
-  changes fuse access permission while it's being installed, and the permission
-  is recovered if you reboot the host.  This is a known bug in qemu-kvm
-  installation script
-  (https://bugs.launchpad.net/ubuntu/+source/udev/+bug/1152718), so you can
-  either reboot the machine to have valid fuse permission of just revert the
-  permission manually as bellow.
-
-          > $ sudo chmod 644 /etc/fuse.conf  
-          > $ sod sed -i 's/#user_allow_other/user_allow_other/g' /etc/fuse.conf  
-	
-  - Finally, install cloudlet package using python setup tool
-
-          > $ sudo python setup.py install
+  > *(Type your Ubuntu account password when it is asked)*
 
 
 
 Tested platforms
 ---------------------
 
-We have tested at __Ubuntu 12.04 LTS 64-bit__ and __Ubuntu 14.04 LTS 64-bit__
+We have tested at __Ubuntu 14.04 LTS 64-bit__
 (as well as their derivatives such as Kubuntu).
 
 This version of Cloudlet has several dependencies on other projects for further
 optimization, and currently we include this dependency as a binary.  Therefore,
-we recommend you to use __Ubuntu 12.04 LTS 64-bit__. 
+we recommend you to use __Ubuntu 14.04 LTS 64-bit__. 
 
 
 
@@ -149,31 +109,19 @@ How to use
   base VM__ of Ubuntu 12.04 32-bit server for easy	bootstrapping.  Download
   sample ``base VM`` at:
 
-  For Ubuntu 12.04:
-  [Base VM for Ubuntu-12.04.01-i386-Server](https://storage.cmusatyalab.org/cloudlet-vm/ubuntu-12.04-32bit.zip)  
-  (Ubuntu account: cloudlet, password: cloudlet)
-
   For Ubuntu 14.04:
-  [Base VM for Ubuntu-12.04.01-i386-Server](https://storage.cmusatyalab.org/cloudlet-vm/precise-baseVM.zip)  
-  (Ubuntu account: cloudlet, password: cloudlet)
+  [Base VM for Ubuntu-12.04.01-i386-Server](https://storage.cmusatyalab.org/cloudlet-vm/precise-hotplug.zip)
+(Ubuntu account for VM : cloudlet, password: cloudlet)
 
-        Note: We have been carefully updated code to maintain compatibility of
-        Base VM across different physical machine as well as different version
-        of hypervisor. However, there were significant changes at QEMU between
-        1.x (Ubuntu 12.04) and 2.x (Ubuntu 14.04). In short, QEMU has updated
-        firmware of some of emulated HW, which causes inconsistency in memory
-        snapshot. To handle that we can ship out custom QEMU with firmwares,
-        but we haven't implemented yet.
-        
 
   Then, you can import this ``base VM`` using command line tool, _cloudlet_.
 
-    > $ cloudlet import-base ./ubuntu-12.04-32bit.zip  
+    > $ cloudlet import-base ./precise-hotplug.zip
     > INFO     create directory for base VM  
     > INFO     Decompressing Base VM to temp directory at /tmp/cloudlet-base-k7ANqB  
     > INFO     Place base VM to the right directory  
     > INFO     Register New Base to DB  
-    > INFO     ID for the new Base VM:   406ed612a6a8b8a03fbbc5f45cceb0408a1c1d947f09d3b8a5352973d77d01f5  
+    > INFO     ID for the new Base VM: abda52a61692094b3b7d45c9647d022f5e297d1b788679eb93735374007576b8
     > INFO     Success
 
   You can check the imported ``base VM`` by
@@ -181,7 +129,7 @@ How to use
     > $ cloudlet list-base  
     > hash value<code>&nbsp;&nbsp;&nbsp;&nbsp;</code>path  
     > \------------------------------------------------------------------------------------------  
-    > 406ed6<code>&nbsp;&nbsp;&nbsp;&nbsp;</code>/home/krha/.cloudlet/406ed6/precise.raw  
+    > abda52a<code>&nbsp;&nbsp;&nbsp;&nbsp;</code>/home/krha/.cloudlet/abda52a/precise.raw  
     > \------------------------------------------------------------------------------------------
 
 
@@ -190,38 +138,38 @@ How to use
   First, launch the VM synthesis server at Cloudlet.
 
     > $ synthesis_server  
-    > INFO     --------------------------------------------------  
-    > INFO     * Base VM Configuration  
-    > INFO      0 : /home/krha/cloudlet/image/ubuntu-12.04.1-server-i386/precise.raw (Disk 8192 MB, Memory 1040 MB)  
-    > INFO      1 : /home/krha/.cloudlet/406ed612a6a8b8a03fbbc5f45cceb0408a1c1d947f09d3b8a5352973d77d01f5/precise.raw (Disk 8192 MB, Memory 1040 MB)  
-    > INFO     --------------------------------------------------  
-    > INFO     * Server configuration  
-    > INFO      - Open TCP Server at ('0.0.0.0', 8021)  
-    > INFO      - Disable Nagle(No TCP delay)  : 1  
-    > INFO     --------------------------------------------------  
+    > INFO     --------------------------------------------------
+    > INFO     * Base VM Configuration
+    > INFO      0 : /home/krha/.cloudlet/abda52a61692094b3b7d45c9647d022f5e297d1b788679eb93735374007576b8/precise.raw (Disk 8192 MB, Memory 1040 MB)
+    > INFO     --------------------------------------------------
+    > INFO     * Server configuration
+    > INFO      - Open TCP Server at ('0.0.0.0', 8021)
+    > INFO      - Disable Nagle(No TCP delay)  : 1
+    > INFO     --------------------------------------------------
 
-  Then, you can test VM synthesis using a sample **VM overlay URL** of Top
-  command. This process will resume a backend VM that is running a top
-  command. VM overlay URL http://128.2.213.110/overlay/overlay-top
+
+  Then, you can test VM synthesis using a sample **VM overlay URL** of htop
+  command. This process will resume a backend VM that is running a htop
+  command. VM overlay URL http://128.2.213.110/overlay/overlay-htop.zip
 
   Demo for the Fluid simulation's back-end server
   ([YouTube](https://www.youtube.com/watch?v=f9MN-kvG_ko))  is temporarily
   unavailable. Instead, you can create your own VM overlay following [How To
   Create VM Overlay](#how-to-create-vm-overlay).
-  
-  You can perform VM synthesis like
 
-    > $ synthesis_client -s localhost -o [path to your VM overlay file]  
-    > OR  
-    > $ synthesis_client -s localhost -u [URL to your VM overlay]
+  You can perform VM synthesis using sample VM overlay
+
+    > $ synthesis_client -s localhost -u http://128.2.213.110/overlay/overlay-htop.zip -d
+
+  For more details, check out help command _synthesi_client -h_
 
   If VM synthesis is successful, you will see a screen-shot like
 
-  <img src="https://raw.github.com/cmusatyalab/elijah-provisioning/master/doc/screenshot-synthesis-success.png" align=middle width=480>
+  <img src="https://raw.github.com/cmusatyalab/elijah-provisioning/master/doc/screenshot-synthesis-success-htop.png" align=middle width=480>
 
-  The custom VM of Fluid simulation back-end server is running and ready to
-  receive client connection. Note that it is a TCP client, so you can execute
-  synthesis_client program at a different machine.
+  The synthesized VM shows a running htop command that was saved in the VM 
+  overlay.  Note that synthesis_client is a TCP client, so you can execute
+  it at a different machine.
 
   If the VM synthesis is failed showing a screen-shot like below, it is due to
   the memory snapshot compatibility of the ``base VM``.
@@ -235,7 +183,7 @@ How to use
   VM](#How-to-create-your-own-Base-VM))
 
 
-3. VM synthesis  in different ways
+3. VM synthesis in different ways
 
   In addition to using a synthesis server and a client, you can perform VM
   synthesis 1) using command line tool and 2) using an Android client.  
@@ -279,7 +227,7 @@ How to use
 
 Sample application: Fluid Simulation
 ---------------------------
-* __Backend-server is temporarily unavailable__
+* __Backend-server program is temporarily unavailable__
 * Fluid Simulation is an interactive fluid dynamics simulation, that renders a liquid sloshing in a container on the screen of a phone based on accelerometer inputs.  The application back-end runs on Linux and performs a [smoothed particle hydrodynamics](http://dl.acm.org/citation.cfm?id=1531346) physics simulation using 2218 particles, generating up to 50 frames per second.  The structure of this application is representative of real-time (i.e., not turn-based) games.
 * [Doyub Kim](http://www.doyub.com/) is a primary contributor of this application.
 * Video demo
@@ -365,6 +313,7 @@ Directories
   ├── bin: executable binaries such as command line tool, VM synthesis server and client
   │   
   ├── elijah: Cloudlet provisioning code using VM synthesis
+  │     └─ test: unittest
   │   
   ├── cloudletfs: FUSE file system for creating VM overlay and performing early start 
   │               optimization at VM Synthesis
@@ -399,3 +348,17 @@ Troubleshooing
 
   Please logout your session and re-login.
 
+
+2. Fuse permission error at the first run
+
+  Make sure the current user to have fuse permission. The qemu-kvm library
+  changes fuse access permission while it's being installed, and the permission
+  is recovered if you reboot the host.  This is a known bug in qemu-kvm
+  installation script
+  (https://bugs.launchpad.net/ubuntu/+source/udev/+bug/1152718), so you can
+  either reboot the machine to have valid fuse permission of just revert the
+  permission manually as bellow.
+
+          > $ sudo chmod 644 /etc/fuse.conf  
+          > $ sod sed -i 's/#user_allow_other/user_allow_other/g' /etc/fuse.conf  
+	
