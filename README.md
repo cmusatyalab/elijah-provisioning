@@ -138,14 +138,14 @@ How to use
   First, launch the VM synthesis server at Cloudlet.
 
     > $ synthesis_server  
-    > INFO     --------------------------------------------------
-    > INFO     * Base VM Configuration
-    > INFO      0 : /home/krha/.cloudlet/abda52a61692094b3b7d45c9647d022f5e297d1b788679eb93735374007576b8/precise.raw (Disk 8192 MB, Memory 1040 MB)
-    > INFO     --------------------------------------------------
-    > INFO     * Server configuration
-    > INFO      - Open TCP Server at ('0.0.0.0', 8021)
-    > INFO      - Disable Nagle(No TCP delay)  : 1
-    > INFO     --------------------------------------------------
+    > INFO     --------------------------------------------------  
+    > INFO     * Base VM Configuration  
+    > INFO      0 : /home/krha/.cloudlet/abda52a61692094b3b7d45c9647d022f5e297d1b788679eb93735374007576b8/precise.raw (Disk 8192 MB, Memory 1040 MB)  
+    > INFO     --------------------------------------------------  
+    > INFO     * Server configuration  
+    > INFO      - Open TCP Server at ('0.0.0.0', 8021)  
+    > INFO      - Disable Nagle(No TCP delay)  : 1  
+    > INFO     --------------------------------------------------  
 
 
   Then, you can test VM synthesis using a sample **VM overlay URL** of htop
@@ -227,7 +227,6 @@ How to use
 
 Sample application: Fluid Simulation
 ---------------------------
-* __Backend-server program is temporarily unavailable__
 * Fluid Simulation is an interactive fluid dynamics simulation, that renders a liquid sloshing in a container on the screen of a phone based on accelerometer inputs.  The application back-end runs on Linux and performs a [smoothed particle hydrodynamics](http://dl.acm.org/citation.cfm?id=1531346) physics simulation using 2218 particles, generating up to 50 frames per second.  The structure of this application is representative of real-time (i.e., not turn-based) games.
 * [Doyub Kim](http://www.doyub.com/) is a primary contributor of this application.
 * Video demo
@@ -235,7 +234,7 @@ Sample application: Fluid Simulation
   - <a href=https://www.youtube.com/watch?v=hWc2fpejfiw target="_blank">Using Amazon EC2 West</a>
   - <a href=https://www.youtube.com/watch?v=aSjQnfkUoU8 target="_blank">Using Amazon EC2 Asia</a>
 
-* ~~Code~~
+* ~~Code (temporarily unavailable)~~
   - ~~Binary back-end server: $ HOME/test/app-server/fluid-bin32/~~
   - Android client source code: $HOME/android/android_fluid/
   - Python client source code: $HOME/test/app-client/scripts/graphics_client.py
