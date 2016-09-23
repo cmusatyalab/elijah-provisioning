@@ -23,7 +23,7 @@ which is distributed under GPLv2.
 - The binary of this modified-QEMU will be automatically downloaded at 
 installation script upon your agreement.
   * [Repository for modified-QEMU](https://github.com/cmusatyalab/elijah-qemu)
-  * [Download link for the binary](http://github.com/cmusatyalab/elijah-qemu/releases/download/cloudlet-v0.8.6/qemu-system-x86_64)
+  * [Download link for the binary](https://github.com/cmusatyalab/elijah-qemu/releases/download/cloudlet-v0.9.4/qemu-system-x86_64)
 
 A copy of this license is reproduced in the [LICENSE](LICENSE) file.
 
@@ -89,12 +89,12 @@ To install
 Tested platforms
 ---------------------
 
-We have tested at __Ubuntu 14.04 LTS 64-bit__
+We have tested at __Ubuntu 16.04 LTS 64-bit__
 (as well as their derivatives such as Kubuntu).
 
 This version of Cloudlet has several dependencies on other projects for further
 optimization, and currently we include this dependency as a binary.  Therefore,
-we recommend you to use __Ubuntu 14.04 LTS 64-bit__. 
+we recommend you to use __Ubuntu 16.04 LTS 64-bit__. 
 
 
 
@@ -106,17 +106,17 @@ How to use
   First thing you need is a ``Base VM``. ``Base VM`` is a pre-loaded element
   and you can think it as a golden image similar to [Amazon
   AMI](http://en.wikipedia.org/wiki/Amazon_Machine_Image).  We provide __sample
-  base VM__ of Ubuntu 12.04 32-bit server for easy	bootstrapping.  Download
+  base VM__ of Ubuntu 12.04 32-bit server for easybootstrapping.  Download
   sample ``base VM`` at:
 
   For Ubuntu 14.04:
-  [Base VM for Ubuntu-12.04.01-i386-Server](https://storage.cmusatyalab.org/cloudlet-vm/precise-hotplug.zip)
+  [Base VM for Ubuntu-12.04.01-i386-Server](https://storage.cmusatyalab.org/cloudlet-vm/precise-hotplug-new.zip)
 (Ubuntu account for VM : cloudlet, password: cloudlet)
 
 
   Then, you can import this ``base VM`` using command line tool, _cloudlet_.
 
-    > $ cloudlet import-base ./precise-hotplug.zip
+    > $ cloudlet import-base ./precise-hotplug-new.zip
     > INFO     create directory for base VM  
     > INFO     Decompressing Base VM to temp directory at /tmp/cloudlet-base-k7ANqB  
     > INFO     Place base VM to the right directory  
@@ -159,7 +159,7 @@ How to use
 
   You can perform VM synthesis using sample VM overlay
 
-    > $ synthesis_client -s localhost -u http://128.2.213.110/overlay/overlay-htop.zip
+    > $ synthesis_client -s localhost -u https://storage.cmusatyalab.org/cloudlet-vm/overlay-htop.zip
 
   For more details, check out help command **synthesis_client -h**
 

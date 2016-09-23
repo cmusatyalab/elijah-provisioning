@@ -43,8 +43,8 @@ def check_system_support():
     cmd = "cat /etc/lsb-release | grep DISTRIB_CODENAME | awk -F'=' '{print $2}'"
     with settings(hide('everything'), warn_only=True):
         os_dist = run(cmd)
-        if os_dist != 'precise' and os_dist != "trusty":
-            msg = "Support only Ubuntu Precise (12.04) or Ubuntu Trusty (14.04)"
+        if os_dist != 'trusty' and os_dist != "xenial":
+            msg = "Support only Ubuntu Precise (14.04) or Ubuntu Trusty (16.04)"
             abort(msg)
         return os_dist
     return None
@@ -76,14 +76,14 @@ def install():
         cmd = "sudo apt-get update"
         sudo(cmd)
     with settings(hide('running'), warn_only=True):
-        cmd = "apt-get install --force-yes -y qemu-kvm libvirt-bin gvncviewer "
-        cmd += "python-dev python-libvirt python-lxml python-lzma "
+        cmd = "apt-get install --force-yes -y qemu-kvm libvirt-bin libglu1-mesa "
+        cmd += "gvncviewer python-dev python-libvirt python-lxml python-lzma "
         cmd += "apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev"
         if dist == "precise":
             cmd += " python-xdelta3"
             if sudo(cmd).failed:
                 abort("Failed to install libraries")
-        elif dist == "trusty":
+        else:
             if sudo(cmd).failed:
                 abort("Failed to install libraries")
             # Python-xdelta3 is no longer supported in Ubuntu 14.04 LTS.
@@ -112,8 +112,6 @@ def install():
         abort("Cannot add user to kvm group")
     if sudo("adduser %s libvirtd" % username).failed:
         abort("Cannot add user to libvirtd group")
-    if sudo("adduser %s fuse" % username).failed:
-        abort("Cannot add user to fuse group")
 
     # Check fuse support:
     #   qemu-kvm changes the permission of /dev/fuse, so we revert back the

@@ -1152,12 +1152,6 @@ class MemoryReadThread(native_threading.Thread):
                 msg = "output file size is different from stream size"
                 raise Exception(msg)
 
-            # re-open the named pipe to receive remaining data from the libvirt
-            self.in_fd = open(self.input_path, 'rb')
-            while True:
-                data = self.in_fd.read(1024)
-                if not data:
-                    break
         except Exception as e:
             LOG.error(str(e))
             self.ret = self.RET_ERROR
@@ -1205,18 +1199,15 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
                                               fout_path,
                                               machine_memory_size)
         memory_read_thread.start()
-        # machine.save() is blocked libvirt command, which blocks entire
-        # process in evenetlet case. So we use original thread, instead.
-        libvirt_thread = native_threading.Thread(
-            target=handoff.save_mem_thread,
-            args=(machine, named_pipe_output))
-        libvirt_thread.setDaemon(True)
-        libvirt_thread.start()
-        memory_read_thread.join()
+        LOG.debug("start machine save")
+        machine.save(named_pipe_output)  # green thread blocked in here
+        LOG.debug("finish machine save")
     except libvirt.libvirtError as e:
-        # we intentionally ignore seek error from libvirt since we have cause
-        # that by using named pipe
-        if str(e).startswith('unable to seek') == False:
+        # we intentionally ignore a couple of libvirt exceptions
+        if str(e).startswith('unable to seek') or \
+                str(e).startswith('internal error: migration was active, but no RAM info was set'):
+            pass
+        else:
             raise CloudletGenerationError("libvirt memory save : " + str(e))
     finally:
         if os.path.exists(named_pipe_output):
