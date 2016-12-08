@@ -102,6 +102,14 @@ def install():
         if sudo("pip install -r requirements.txt").failed:
             abort("Failed to install python libraries")
 
+    # check bios.bin file
+    bios_files = ["/usr/share/qemu/bios.bin",
+                  "/usr/share/qemu/vgabios-cirrus.bin"]
+    for bios_file in bios_files:
+        if not os.path.exists(bios_file):
+            filename = os.path.basename(bios_file)
+            sudo("ln -s /usr/share/seabios/%s %s" % (filename, bios_file))
+
     # disable libvirtd from appArmor to enable custom KVM
     if sudo("aa-complain /usr/sbin/libvirtd").failed:
         abort("Failed to disable AppArmor for custom KVM")

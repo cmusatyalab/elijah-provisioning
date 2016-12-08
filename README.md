@@ -109,14 +109,14 @@ How to use
   base VM__ of Ubuntu 12.04 32-bit server for easybootstrapping.  Download
   sample ``base VM`` at:
 
-  For Ubuntu 14.04:
+  For Ubuntu 16.04:
   [Base VM for Ubuntu-12.04.01-i386-Server](https://storage.cmusatyalab.org/cloudlet-vm/precise-hotplug-new.zip)
 (Ubuntu account for VM : cloudlet, password: cloudlet)
 
 
   Then, you can import this ``base VM`` using command line tool, _cloudlet_.
 
-    > $ cloudlet import-base ./precise-hotplug-new.zip
+    > $ cloudlet import-base ./precise-hotplug-new.zip  
     > INFO     create directory for base VM  
     > INFO     Decompressing Base VM to temp directory at /tmp/cloudlet-base-k7ANqB  
     > INFO     Place base VM to the right directory  
@@ -150,7 +150,7 @@ How to use
 
   Then, you can test VM synthesis using a sample **VM overlay URL** of htop
   command. This process will resume a backend VM that is running a htop
-  command. VM overlay URL http://128.2.213.110/overlay/overlay-htop.zip
+  command. VM overlay URL synthesis_client -s localhost -u https://storage.cmusatyalab.org/cloudlet-vm/overlay-htop.zip
 
   Demo for the Fluid simulation's back-end server
   ([YouTube](https://www.youtube.com/watch?v=f9MN-kvG_ko))  is temporarily
