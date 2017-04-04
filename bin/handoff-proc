@@ -33,7 +33,7 @@ if __name__ == "__main__":
         sys.stdout.write("usage: %prog handoff_data_file\n")
         sys.exit(1)
     handoff_data = HandoffDataSend.from_file(sys.argv[1])
-    if handoff_data == None:
+    if handoff_data is None:
         sys.stdout.write("Malformatted file: %s\n" % sys.argv[1])
         sys.exit(1)
     perform_handoff(handoff_data)
