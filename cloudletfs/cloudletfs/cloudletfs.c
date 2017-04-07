@@ -60,9 +60,9 @@ static void image_free(struct cloudletfs_image *img)
     _image_free(img);
 }
 
-static uint64_t parse_uint(const char *str, GError **err)
+static uint64_t parse_uint(const gchar *str, GError **err)
 {
-    char *endptr;
+    gchar *endptr;
     uint64_t ret;
 
     ret = g_ascii_strtoull(str, &endptr, 10);
@@ -75,35 +75,41 @@ static uint64_t parse_uint(const char *str, GError **err)
     return ret;
 }
 
-static char *read_line(GIOChannel *chan, GError **err)
+static gchar *read_line(GIOChannel *chan, GError **err)
 {
-    char *buf;
+    GString *buf;
     gsize terminator;
 
-    switch (g_io_channel_read_line(chan, &buf, NULL, &terminator, err)) {
-    case G_IO_STATUS_ERROR:
-        return NULL;
+    /* preallocate a 4MB buffer to read the line*/
+    buf = g_string_sized_new(4<<20);
+
+    switch (g_io_channel_read_line_string(chan, buf, &terminator, err)) {
     case G_IO_STATUS_NORMAL:
-        buf[terminator] = 0;
-        return buf;
+        buf->str[terminator] = 0;
+        return g_string_free(buf, FALSE);
+
+    case G_IO_STATUS_ERROR:
+        break;
     case G_IO_STATUS_EOF:
         g_set_error(err, G_IO_CHANNEL_ERROR, G_IO_CHANNEL_ERROR_IO,
                 "Unexpected EOF");
-        return NULL;
+        break;
     case G_IO_STATUS_AGAIN:
         g_set_error(err, G_IO_CHANNEL_ERROR, G_IO_CHANNEL_ERROR_IO,
                 "Unexpected EAGAIN");
-        return NULL;
+        break;
     default:
         g_assert_not_reached();
     }
+    g_string_free(buf, TRUE);
+    return NULL;
 }
 
 static char **get_arguments(GIOChannel *chan, GError **err)
 {
     uint64_t n;
     uint64_t count;
-    char *str;
+    gchar *str;
     GPtrArray *args;
     GError *my_err = NULL;
 
@@ -113,6 +119,7 @@ static char **get_arguments(GIOChannel *chan, GError **err)
         return NULL;
     }
     count = parse_uint(str, &my_err);
+    g_free(str);
     if (my_err) {
         g_propagate_error(err, my_err);
         return NULL;
@@ -348,36 +355,40 @@ static bool handle_stdin(struct cloudletfs *fs, const char *oneline, GError **er
 static gboolean read_stdin(GIOChannel *source, GIOCondition cond G_GNUC_UNUSED,
         void *data) {
     struct cloudletfs *fs = data;
-    char *buf;
+    GString *buf;
     gsize terminator;
     bool success_stdin;
     GError *err = NULL;
 
+    /* preallocate a 4MB read buffer */
+    buf = g_string_sized_new(4<<20);
+
     /* See if stdin has been closed. */
     while (1) {
-        switch (g_io_channel_read_line(source, &buf, NULL, &terminator, &err)) {
-        case G_IO_STATUS_ERROR:
-            return TRUE;
+        switch (g_io_channel_read_line_string(source, buf, &terminator, &err)) {
         case G_IO_STATUS_NORMAL:
-            buf[terminator] = 0;
+            buf->str[terminator] = 0;
             break;
+
         case G_IO_STATUS_EOF:
             goto out;
+
+        case G_IO_STATUS_ERROR:
         case G_IO_STATUS_AGAIN:
+            g_string_free(buf, TRUE);
             return TRUE;
         default:
             g_assert_not_reached();
-            break;
         }
 
-        success_stdin = handle_stdin(fs, buf, &err);
-        g_free(buf);
+        success_stdin = handle_stdin(fs, buf->str, &err);
         if (!success_stdin) {
             CPRINTF("FUSE TERMINATED: Invalid stdin format\n");
             goto out;
         }
     }
 out:
+    g_string_free(buf, TRUE);
     /* Stop allowing blocking reads on streams (to prevent unmount from
      blocking forever) and lazy-unmount the filesystem.  For complete
      correctness, this should disallow new image opens, wait for existing
