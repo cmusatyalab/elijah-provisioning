@@ -48,9 +48,7 @@ class CloudletFS(threading.Thread):
             modified_memory_chunks=None,
             **kwargs):
         self.cloudletfs_path = bin_path
-        self._args = '%d\n%s\n' % (
-            len(args),
-            '\n'.join(a.replace('\n', '') for a in args))
+        self._args = args
         self._pipe = None
         self.mountpoint = None
         self.stop = threading.Event()
@@ -144,7 +142,10 @@ class CloudletFS(threading.Thread):
                 [self.cloudletfs_path], stdin=read, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, close_fds=True)
             self._pipe = os.fdopen(write, 'w')
-            self._pipe.write(self._args)
+            self._pipe.write("%d\n" % len(self._args))
+            for arg in self._args:
+                self._pipe.write(arg)
+                self._pipe.write('\n')
             self._pipe.flush()
             out = self.proc.stdout.readline()
             self.mountpoint = out.strip()
