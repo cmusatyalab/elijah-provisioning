@@ -992,38 +992,44 @@ def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
             "FUSE memory size should be bigger than 0")
 
     # run fuse file system
+    original_disk = os.path.abspath(original_disk)
+    original_memory = os.path.abspath(original_memory)
     resumed_disk = os.path.abspath(resumed_disk) if resumed_disk else ""
     resumed_memory = os.path.abspath(resumed_memory) if resumed_memory else ""
-    if disk_chunks:
-        disk_chunk_str = ["%ld:%d" % (item, valid_bit) for item in disk_chunks]
-        disk_overlay_map = ','.join(disk_chunk_str)
-    if memory_chunks:
-        memory_chunk_str = ["%ld:%d" % (item, valid_bit) for item in memory_chunks]
-        memory_overlay_map = ','.join(memory_chunk_str)
+
+    disk_overlay_map = ','.join("%ld:%d" % (item, valid_bit)
+                                for item in disk_chunks or [])
+    memory_overlay_map = ','.join("%ld:%d" % (item, valid_bit)
+                                  for item in memory_chunks or [])
 
     # launch fuse
     execute_args = [
         # disk parameter
-        os.path.abspath(original_disk).replace('\n', ''),   # base path
-        resumed_disk.replace('\n', ''),                     # overlay path
-        disk_overlay_map,                                   # overlay map
-        '%d' % fuse_disk_size,                              # size of base
+        original_disk.replace('\n', ''),    # base path
+        resumed_disk.replace('\n', ''),     # overlay path
+        disk_overlay_map,                   # overlay map
+        '%d' % fuse_disk_size,              # size of base
         "%d" % chunk_size,
     ]
     if original_memory:
         execute_args.extend([
             # memory parameter
-            os.path.abspath(original_memory).replace('\n', ''),
+            original_memory.replace('\n', ''),
             resumed_memory.replace('\n', ''),
             memory_overlay_map,
             '%d' % fuse_memory_size,
             "%d" % chunk_size,
         ])
 
+    # if the overlay is already populated we don't have to pass the list of
+    # locally missing chunks to cloudletfs.
+    if valid_bit == 1:
+        disk_chunks = memory_chunks = None
+
     fuse_process = cloudletfs.CloudletFS(
         bin_path, execute_args,
-        modified_disk_chunks=disk_chunks if valid_bit == 0 else None,
-        modified_memory_chunks=memory_chunks if valid_bit == 0 else None,
+        modified_disk_chunks=disk_chunks,
+        modified_memory_chunks=memory_chunks,
         **kwargs)
     fuse_process.launch()
     fuse_process.start()
