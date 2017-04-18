@@ -298,7 +298,7 @@ class RecoverDeltaProc(multiprocessing.Process):
         return delta_item
 
     @staticmethod
-    def from_buffer(data):
+    def from_buffer(data, delta_counter, delta_times):
         #import yappi
         #yappi.start()
         cur_offset = 0
