@@ -760,6 +760,7 @@ class Recovered_delta(multiprocessing.Process):
             self.recover_disk_fd.flush()
 
             self.out_pipe.write(",".join(overlay_chunk_ids) + '\n')
+            self.out_pipe.flush()
             overlay_chunk_ids[:] = []
             delta_times['flush'] += (time.time() - start_time)
 

@@ -629,10 +629,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             self.request.send(ack_data)
 
             network_out_queue.put((blob_comp_type, compressed_blob))
-            memory_chunk_set = set(["%ld:1" % item for item in blob_memory_chunk])
-            disk_chunk_set = set(["%ld:1" % item for item in blob_disk_chunk])
-            memory_chunk_all.update(memory_chunk_set)
-            disk_chunk_all.update(disk_chunk_set)
+            memory_chunk_all.update(blob_memory_chunk)
+            disk_chunk_all.update(blob_disk_chunk)
             LOG.debug("%f\treceive one blob" % (time.time()))
             recv_blob_counter += 1
 
@@ -644,12 +642,11 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         # until delta_proc fininshes. we cannot start VM before delta_proc
         # finishes, because we don't know what will be modified in the future
         time_fuse_start = time.time()
-        disk_overlay_map = ','.join(disk_chunk_all)
-        memory_overlay_map = ','.join(memory_chunk_all)
         fuse = run_fuse(Cloudlet_Const.CLOUDLETFS_PATH, Cloudlet_Const.CHUNK_SIZE,
                 base_diskpath, launch_disk_size, base_mempath, launch_memory_size,
-                resumed_disk=launch_disk,  disk_overlay_map=disk_overlay_map,
-                resumed_memory=launch_mem, memory_overlay_map=memory_overlay_map)
+                resumed_disk=launch_disk,  disk_chunks=disk_chunk_all,
+                resumed_memory=launch_mem, memory_chunks=memory_chunk_all,
+                valid_bit=1)
         time_fuse_end = time.time()
         memory_path = os.path.join(fuse.mountpoint, 'memory', 'image')
 

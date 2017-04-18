@@ -47,11 +47,17 @@ def handoff_launch_vm(base_diskpath, base_mempath,
                       launch_disk, launch_memory,
                       launch_disk_size, launch_memory_size,
                       disk_overlay_map, memory_overlay_map):
+    # pull chunks out of the map
+    disk_chunks = [int(chunk.split(':')[0]) for chunk in disk_overlay_map.split(',')]
+    mem_chunks = [int(chunk.split(':')[0]) for chunk in memory_overlay_map.split(',')]
+    valid_bit = int(disk_overlay_map.split(',', 1)[0].split(':')[1])
+
     fuse = synthesis.run_fuse(
         Cloudlet_Const.CLOUDLETFS_PATH, Cloudlet_Const.CHUNK_SIZE,
         base_diskpath, launch_disk_size, base_mempath, launch_memory_size,
-        resumed_disk=launch_disk,  disk_overlay_map=disk_overlay_map,
-        resumed_memory=launch_memory, memory_overlay_map=memory_overlay_map
+        resumed_disk=launch_disk, disk_chunks=disk_chunks,
+        resumed_memory=launch_memory, memory_chunks=mem_chunks,
+        valid_bit=valid_bit
     )
     synthesized_vm = synthesis.SynthesizedVM(
         launch_disk, launch_memory, fuse,
