@@ -28,7 +28,7 @@ import Queue
 import SocketServer
 import socket
 import subprocess
-
+import collections
 import tempfile
 import multiprocessing
 import threading
@@ -153,7 +153,8 @@ class RecoverDeltaProc(multiprocessing.Process):
         self.raw_mem = mmap.mmap(self.base_mem_fd.fileno(), 0, prot=mmap.PROT_READ)
         self.recover_mem_fd = open(self.output_mem_path, "wrb")
         self.recover_disk_fd = open(self.output_disk_path, "wrb")
-
+        delta_counter = collections.Counter()
+        delta_times = collections.Counter()
         unresolved_deltaitem_list = []
         while True:
             recv_data = self.decomp_delta_queue.get()
@@ -163,30 +164,32 @@ class RecoverDeltaProc(multiprocessing.Process):
             overlay_chunk_ids = list()
             # recv_data is a single blob so that it contains whole DeltaItem
             LOG.debug("%f\trecover one blob" % (time.time()))
-            delta_item_list = RecoverDeltaProc.from_buffer(recv_data)
+
+            delta_item_list = RecoverDeltaProc.from_buffer(recv_data,delta_counter,delta_times)
             for delta_item in delta_item_list:
-                ret = self.recover_item(delta_item)
+                ret = self.recover_item(delta_item,delta_counter,delta_times)
                 if ret == None:
                     # cannot find self reference point due to the parallel
                     # compression. Save this and do it later
                     unresolved_deltaitem_list.append(delta_item)
                     continue
-                self.process_deltaitem(delta_item, overlay_chunk_ids)
+                self.process_deltaitem(delta_item, delta_counter,delta_times)
                 count += 1
-
+            start_time = time.time()
             self.recover_mem_fd.flush()
             self.recover_disk_fd.flush()
+            delta_times['flush'] += (time.time() - start_time)
             #self.fuse_info_queue.put(overlay_chunk_ids)
 
         LOG.info("[Delta] Handle dangling DeltaItem (%d)" % len(unresolved_deltaitem_list))
         overlay_chunk_ids = list()
         for delta_item in unresolved_deltaitem_list:
-            ret = self.recover_item(delta_item)
+            ret = self.recover_item(delta_item,delta_counter,delta_times)
             if ret == None:
                 msg = "Cannot find self reference: type(%ld), offset(%ld), index(%ld)" % \
                         (delta_item.delta_type, delta_item.offset, delta_item.index)
                 raise StreamSynthesisError(msg)
-            self.process_deltaitem(delta_item, overlay_chunk_ids)
+            self.process_deltaitem(delta_item, delta_counter,delta_times)
             count += 1
 
         self.recover_mem_fd.close()
@@ -196,15 +199,21 @@ class RecoverDeltaProc(multiprocessing.Process):
         #self.fuse_info_queue.put(overlay_chunk_ids)
         #self.fuse_info_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
         time_end = time.time()
-
+        LOG.debug("Delta metrics:")
+        LOG.debug("="*50)
+        LOG.debug(delta_counter)
+        LOG.debug(delta_times)
+        LOG.debug(sum(delta_times.values()))
         LOG.info("[time] Delta delta %ld chunks, (%s~%s): %s" % \
                 (count, time_start, time_end, (time_end-time_start)))
         LOG.info("Finish VM handoff")
 
-    def recover_item(self, delta_item):
+    def recover_item(self, delta_item, delta_counter, delta_times):
         if type(delta_item) != DeltaItem:
             raise StreamSynthesisError("Need list of DeltaItem")
 
+        delta_counter[delta_item.ref_id] += 1
+        start_time = time.time()
         if (delta_item.ref_id == DeltaItem.REF_RAW):
             recover_data = delta_item.data
         elif (delta_item.ref_id == DeltaItem.REF_ZEROS):
@@ -276,12 +285,15 @@ class RecoverDeltaProc(multiprocessing.Process):
                     delta_item.data_len, delta_item.offset, delta_item.offset_len)
             print msg
             raise StreamSynthesisError(msg)
-
+        delta_times[delta_item.ref_id] += (time.time() - start_time)
         # recover
         delta_item.ref_id = DeltaItem.REF_RAW
         delta_item.data = recover_data
         if delta_item.hash_value == None or len(delta_item.hash_value) == 0:
+            delta_counter['sha'] += 1
+            start_time = time.time()
             delta_item.hash_value = sha256(recover_data).digest()
+            delta_times['sha'] += (time.time() - start_time)
 
         return delta_item
 
@@ -292,7 +304,9 @@ class RecoverDeltaProc(multiprocessing.Process):
         cur_offset = 0
         deltaitem_list = list()
         while True:
+            start_time = time.time()
             new_item, offset = RecoverDeltaProc.unpack_stream(data[cur_offset:])
+            delta_times['unpack'] += (time.time() - start_time)
             cur_offset += offset
             if len(data) < cur_offset:
                 break
@@ -348,16 +362,16 @@ class RecoverDeltaProc(multiprocessing.Process):
             item = DeltaItem(delta_type, ram_offset, offset_len, None, ref_id, data_len, data, live_seq=live_seq)
         return item, offset
 
-    def process_deltaitem(self, delta_item, overlay_chunk_ids):
+    def process_deltaitem(self, delta_item, delta_counter, delta_times):
         if len(delta_item.data) != delta_item.offset_len:
             msg = "recovered size is not same as page size, %ld != %ld" % \
                     (len(delta_item.data), delta_item.offset_len)
             raise StreamSynthesisError(msg)
-
+        start_time = time.time()
         # save it to dictionary to find self_reference easily
         self.recovered_delta_dict[delta_item.index] = delta_item
         self.recovered_hash_dict[delta_item.hash_value] = delta_item
-
+        delta_times['dict'] += (time.time() - start_time)
         # do nothing if the latest memory or disk are already process
         prev_iter_item = self.live_migration_iteration_dict.get(delta_item.index)
         if (prev_iter_item is not None):
@@ -368,7 +382,8 @@ class RecoverDeltaProc(multiprocessing.Process):
                 LOG.debug(msg)
                 return
 
-        # write to output file 
+        # write to output file
+        start_time = time.time()
         overlay_chunk_id = long(delta_item.offset/self.chunk_size)
         if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
                 delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
@@ -382,6 +397,7 @@ class RecoverDeltaProc(multiprocessing.Process):
             self.recover_disk_fd.write(delta_item.data)
             overlay_chunk_ids.append("%d:%ld" %
                     (RecoverDeltaProc.FUSE_INDEX_DISK, overlay_chunk_id))
+        delta_times['seekwrite'] += (time.time() - start_time)
 
         # update the latest item for each memory page or disk block
         self.live_migration_iteration_dict[delta_item.index] = delta_item
