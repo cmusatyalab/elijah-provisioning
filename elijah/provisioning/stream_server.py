@@ -301,65 +301,66 @@ class RecoverDeltaProc(multiprocessing.Process):
     def from_buffer(data, delta_counter, delta_times):
         #import yappi
         #yappi.start()
-        cur_offset = 0
+        offset = 0
         deltaitem_list = list()
         while True:
             start_time = time.time()
-            new_item, offset = RecoverDeltaProc.unpack_stream(data[cur_offset:])
-            delta_times['unpack'] += (time.time() - start_time)
-            cur_offset += offset
-            if len(data) < cur_offset:
+            new_item, offset = RecoverDeltaProc.unpack_stream(data, offset=offset)
+            if offset is None:
                 break
+            delta_times['unpack'] += (time.time() - start_time)
             deltaitem_list.append(new_item)
         #yappi.get_func_stats().print_all()
         return deltaitem_list
 
     @staticmethod
-    def unpack_stream(stream, with_hashvalue=False):
-        if len(stream) == 0:
-            return None, 999999
-        offset = 0
-        live_seq = None
-        data = stream[0:8+2+1]
+    def unpack_stream(stream, with_hashvalue=False, offset=0):
+        if len(stream) <= offset:
+            return None, None
+
+        (ram_offset, offset_len, ref_info) = struct.unpack_from("!QHc", stream, offset)
+        offset += struct.calcsize("!QHc")
+
+        ref_id, delta_type = divmod(ord(ref_info), 16)
+
+        data = ''
         data_len = 0
-        offset += (8+2+1)
-        (ram_offset, offset_len, ref_info) = struct.unpack("!QHc", data)
-        ref_id = ord(ref_info) & 0xF0
-        delta_type = ord(ref_info) & 0x0F
+        live_seq = None
 
         if ref_id == DeltaItem.REF_RAW or \
                 ref_id == DeltaItem.REF_XDELTA or \
                 ref_id == DeltaItem.REF_XOR or \
                 ref_id == DeltaItem.REF_BSDIFF:
-            data_len = struct.unpack("!Q", stream[offset:offset+8])[0]
-            offset += 8
+            data_len = struct.unpack_from("!Q", stream, offset)[0]
+            offset += struct.calcsize("!Q")
             data = stream[offset:offset+data_len]
             offset += data_len
-        elif ref_id == DeltaItem.REF_SELF:
-            data = struct.unpack("!Q", stream[offset:offset+8])[0]
-            offset += 8
-        elif ref_id == DeltaItem.REF_BASE_DISK or \
+
+        elif ref_id == DeltaItem.REF_SELF or \
+                ref_id == DeltaItem.REF_BASE_DISK or \
                 ref_id == DeltaItem.REF_BASE_MEM:
-            data = struct.unpack("!Q", stream[offset:offset+8])[0]
-            offset += 8
+            data = struct.unpack_from("!Q", stream, offset)[0]
+            offset += struct.calcsize("!Q")
+
         elif ref_id == DeltaItem.REF_SELF_HASH:
             #print "unpacking ref_self_hash"
-            data = struct.unpack("!32s", stream[offset:offset+32])[0]
-            offset += 32
+            data = struct.unpack_from("!32s", stream, offset)[0]
+            offset += struct.calcsize("!32s")
 
         if delta_type == DeltaItem.DELTA_DISK_LIVE or\
                 delta_type == DeltaItem.DELTA_MEMORY_LIVE:
-            live_seq = struct.unpack("!H", stream[offset:offset+2])[0]
-            offset += 2
+            live_seq = struct.unpack_from("!H", stream, offset)[0]
+            offset += struct.calcsize("!H")
 
         # hash_value typically does not exist when recovered becuase we don't need it
         if with_hashvalue:
             # hash_value is only needed for residue case
-            hash_value = struct.unpack("!32s", stream[offset:offset+32])[0]
-            offset += 32
+            hash_value = struct.unpack_from("!32s", stream, offset)[0]
+            offset += struct.calcsize("!32s")
             item = DeltaItem(delta_type, ram_offset, offset_len, hash_value, ref_id, data_len, live_seq=live_seq)
         else:
             item = DeltaItem(delta_type, ram_offset, offset_len, None, ref_id, data_len, data, live_seq=live_seq)
+
         return item, offset
 
     def process_deltaitem(self, delta_item, delta_counter, delta_times):
