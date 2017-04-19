@@ -615,7 +615,7 @@ class Recovered_delta(multiprocessing.Process):
         LOG.debug("="*50)
         LOG.debug(delta_counter)
         LOG.debug(delta_times)
-	LOG.debug("Total captured time: %d" % (sum(delta_times.values())))
+        LOG.debug("Total captured time: %d" % (sum(delta_times.values())))
         self.out_pipe.write(str(Recovered_delta.END_OF_PIPE) + "\n")
         self.out_pipe.close()
         end_time = time.time()

@@ -203,7 +203,7 @@ class RecoverDeltaProc(multiprocessing.Process):
         LOG.debug("="*50)
         LOG.debug(delta_counter)
         LOG.debug(delta_times)
-        LOG.debug(sum(delta_times.values()))
+        LOG.debug("Total captured time: %d" % (sum(delta_times.values())))
         LOG.info("[time] Delta delta %ld chunks, (%s~%s): %s" % \
                 (count, time_start, time_end, (time_end-time_start)))
         LOG.info("Finish VM handoff")
@@ -385,19 +385,14 @@ class RecoverDeltaProc(multiprocessing.Process):
 
         # write to output file
         start_time = time.time()
-        overlay_chunk_id = long(delta_item.offset/self.chunk_size)
         if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
                 delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
             self.recover_mem_fd.seek(delta_item.offset)
             self.recover_mem_fd.write(delta_item.data)
-            overlay_chunk_ids.append("%d:%ld" %
-                    (RecoverDeltaProc.FUSE_INDEX_MEMORY, overlay_chunk_id))
         elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
             delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
             self.recover_disk_fd.seek(delta_item.offset)
             self.recover_disk_fd.write(delta_item.data)
-            overlay_chunk_ids.append("%d:%ld" %
-                    (RecoverDeltaProc.FUSE_INDEX_DISK, overlay_chunk_id))
         delta_times['seekwrite'] += (time.time() - start_time)
 
         # update the latest item for each memory page or disk block
