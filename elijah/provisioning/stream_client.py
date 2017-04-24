@@ -144,7 +144,6 @@ class NetworkMeasurementThread(threading.Thread):
                 print "migration resume time: %f" % (vm_resume_time)
                 break
             else:
-                print "error"
                 pass
 
 
