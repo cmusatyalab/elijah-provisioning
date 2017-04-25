@@ -680,20 +680,19 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             time_fuse_end,
             actual_resume_time,
         ))
-        if self.server.handoff_data == None:
-            # for a standalone version, terminate a VM for the next testing
-            #connect_vnc(synthesized_vm.machine)
-            LOG.debug("Finishing VM in 3 seconds")
-            time.sleep(3)
-            synthesized_vm.monitor.terminate()
-            synthesized_vm.monitor.join()
-            synthesized_vm.terminate()
 
-        # send end message
         ack_data = struct.pack("!Qd", 0x10, actual_resume_time)
         LOG.info("send ack to client: %d" % len(ack_data))
         self.request.sendall(ack_data)
         LOG.info("finished")
+
+        if self.server.handoff_data == None:
+            connect_vnc(synthesized_vm.machine)
+            synthesized_vm.monitor.terminate()
+            synthesized_vm.monitor.join()
+            synthesized_vm.terminate()
+
+
 
 
     def terminate(self):

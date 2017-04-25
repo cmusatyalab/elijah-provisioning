@@ -29,6 +29,7 @@ import shutil
 import struct
 import json
 import msgpack
+import signal
 import threading
 import traceback
 from operator import itemgetter
@@ -1632,6 +1633,8 @@ def create_baseVM(disk_image_path):
 
     return disk_image_path, base_mempath
 
+def handlesig(signum, frame):
+    LOG.info("Received signal(%d) to start handoff..." % signum)
 
 def synthesis(base_disk, overlay_path, **kwargs):
     """VM Synthesis and run recoverd VM
@@ -1702,8 +1705,12 @@ def synthesis(base_disk, overlay_path, **kwargs):
         preload_thread.daemon = True
         preload_thread.start()
 
+
     if not is_profiling_test:
-        connect_vnc(synthesized_VM.machine)
+        connect_vnc(synthesized_VM.machine, True)
+
+    signal.signal(signal.SIGUSR1, handlesig)
+    signal.pause()
 
     if handoff_url is not None:
         options = Options()
@@ -1740,6 +1747,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
         if True:
             # using in-memory data structure
             handoff_ds._load_vm_data()
+
             try:
                 handoff.perform_handoff(handoff_ds)
             except handoff.HandoffError as e:
