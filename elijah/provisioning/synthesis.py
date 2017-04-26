@@ -1705,12 +1705,11 @@ def synthesis(base_disk, overlay_path, **kwargs):
         preload_thread.daemon = True
         preload_thread.start()
 
+    connect_vnc(synthesized_VM.machine, handoff_url is not None)
 
-    if not is_profiling_test:
-        connect_vnc(synthesized_VM.machine, True)
-
-    signal.signal(signal.SIGUSR1, handlesig)
-    signal.pause()
+    if handoff_url is not None:
+        signal.signal(signal.SIGUSR1, handlesig)
+        signal.pause()
 
     if handoff_url is not None:
         options = Options()
