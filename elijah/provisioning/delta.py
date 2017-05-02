@@ -716,7 +716,7 @@ class Recovered_delta(multiprocessing.Process):
         return delta_item
 
     def process_deltaitem(self, delta_item, delta_counter, delta_times):
-        overlay_chunk_ids = []
+        overlay_chunk_id = None
         if len(delta_item.data) != delta_item.offset_len:
             msg = "recovered size is not same as page size, %ld != %ld" % \
                     (len(delta_item.data), delta_item.offset_len)
@@ -737,32 +737,33 @@ class Recovered_delta(multiprocessing.Process):
                 return
         # write to output file 
         start_time = time.time()
-        overlay_chunk_id = long(delta_item.offset/self.chunk_size)
+
         if delta_item.delta_type == DeltaItem.DELTA_MEMORY or\
                 delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
             self.recover_mem_fd.seek(delta_item.offset)
             self.recover_mem_fd.write(delta_item.data)
-            overlay_chunk_ids.append("%d:%ld" %
-                    (Recovered_delta.FUSE_INDEX_MEMORY, overlay_chunk_id))
+            overlay_chunk_id = format("%d:%ld" %
+                (Recovered_delta.FUSE_INDEX_MEMORY, long(delta_item.offset / self.chunk_size)))
+            start_time = time.time()
+            self.recover_mem_fd.flush()
+            delta_times['flush'] += (time.time() - start_time)
         elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
                 delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
             self.recover_disk_fd.seek(delta_item.offset)
             self.recover_disk_fd.write(delta_item.data)
-            overlay_chunk_ids.append("%d:%ld" %
-                    (Recovered_delta.FUSE_INDEX_DISK, overlay_chunk_id))
+            overlay_chunk_id = format("%d:%ld" %
+                (Recovered_delta.FUSE_INDEX_DISK, long(delta_item.offset / self.chunk_size)))
+            start_time = time.time()
+            self.recover_disk_fd.flush()
+            delta_times['flush'] += (time.time() - start_time)
+
         delta_times['seekwrite'] += (time.time() - start_time)
         # update the latest item for each memory page or disk block
         self.live_migration_iteration_dict[delta_item.index] = delta_item
 
-        if len(overlay_chunk_ids) % 1 == 0: # to be updated
-            start_time = time.time()
-            self.recover_mem_fd.flush()
-            self.recover_disk_fd.flush()
+        self.out_pipe.write(overlay_chunk_id + '\n')
+        self.out_pipe.flush()
 
-            self.out_pipe.write(",".join(overlay_chunk_ids) + '\n')
-            self.out_pipe.flush()
-            overlay_chunk_ids[:] = []
-            delta_times['flush'] += (time.time() - start_time)
 
     def finish(self):
         self.recovered_delta_dict.clear()
