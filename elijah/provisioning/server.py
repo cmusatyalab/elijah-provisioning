@@ -413,7 +413,7 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
     def ret_fail(self, message):
         LOG.error("%s" % str(message))
         message = NetworkUtil.encoding({
-            Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_FAIELD,
+            Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_FAILED,
             Protocol.KEY_FAILED_REASON : message
             })
         message_size = struct.pack("!I", len(message))

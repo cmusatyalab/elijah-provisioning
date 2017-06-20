@@ -19,22 +19,21 @@
 #
 
 import os
-import functools
 import traceback
 import sys
 import time
 import struct
-import Queue
 import SocketServer
 import socket
-import subprocess
+import signal
 import collections
 import tempfile
 import multiprocessing
 import threading
 from hashlib import sha256
 
-import delta
+import shutil
+
 from server import NetworkUtil
 from synthesis_protocol import Protocol as Protocol
 from synthesis import run_fuse
@@ -42,8 +41,6 @@ from synthesis import SynthesizedVM
 from synthesis import connect_vnc
 from handoff import HandoffDataRecv
 
-#import synthesis as synthesis
-#from package import VMOverlayPackage
 from db.api import DBConnector
 from db.table_def import BaseVM
 from configuration import Const as Cloudlet_Const
@@ -55,60 +52,11 @@ import mmap
 import tool
 from delta import DeltaItem
 
-
 LOG = logging.getLogger(__name__)
 session_resources = dict()   # dict[session_id] = obj(SessionResource)
 
-
-def wrap_process_fault(function):
-    """Wraps a method to catch exceptions related to instances.
-    This decorator wraps a method to catch any exceptions and
-    terminate the request gracefully.
-    """
-    @functools.wraps(function)
-    def decorated_function(self, *args, **kwargs):
-        try:
-            return function(self, *args, **kwargs)
-        except Exception, e:
-            if hasattr(self, 'exception_handler'):
-                self.exception_handler()
-            kwargs.update(dict(zip(function.func_code.co_varnames[2:], args)))
-            LOG.error("failed with : %s" % str(kwargs))
-
-    return decorated_function
-
-
-def try_except(fn):
-    def wrapped(*args, **kwargs):
-        try:
-            return fn(*args, **kwargs)
-        except Exception, e:
-            et, ei, tb = sys.exc_info()
-            raise MyError, MyError(e), tb
-    return wrapped
-
-
 class StreamSynthesisError(Exception):
     pass
-
-
-class AckThread(threading.Thread):
-    def __init__(self, request):
-        self.request = request
-        self.ack_queue = Queue.Queue()
-        threading.Thread.__init__(self, target=self.start_sending_ack)
-
-    def start_sending_ack(self):
-        while True:
-            data = self.ack_queue.get()
-            bytes_recved= self.ack_queue.get()
-            # send ack
-            ack_data = struct.pack("!Q", bytes_recved)
-            self.request.sendall(ack_data)
-
-    def signal_ack(self):
-        self.ack_queue.put(bytes_recved)
-
 
 class RecoverDeltaProc(multiprocessing.Process):
     FUSE_INDEX_DISK = 1
@@ -262,7 +210,7 @@ class RecoverDeltaProc(multiprocessing.Process):
                 delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
                 base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
             else:
-                raise DeltaError("Delta type should be either disk or memory")
+                raise StreamSynthesisError("Delta type should be either disk or memory")
             recover_data = tool.merge_data_bsdiff(base_data, patch_data)
         elif delta_item.ref_id == DeltaItem.REF_XOR:
             patch_data = delta_item.data
@@ -274,7 +222,7 @@ class RecoverDeltaProc(multiprocessing.Process):
                 delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
                 base_data = self.raw_disk[delta_item.offset:delta_item.offset+patch_original_size]
             else:
-                raise DeltaError("Delta type should be either disk or memory")
+                raise StreamSynthesisError("Delta type should be either disk or memory")
             recover_data = tool.cython_xor(base_data, patch_data)
         else:
             raise StreamSynthesisError("Cannot recover: invalid referce id %d" % delta_item.ref_id)
@@ -299,8 +247,6 @@ class RecoverDeltaProc(multiprocessing.Process):
 
     @staticmethod
     def from_buffer(data, delta_counter, delta_times):
-        #import yappi
-        #yappi.start()
         offset = 0
         deltaitem_list = list()
         while True:
@@ -310,7 +256,6 @@ class RecoverDeltaProc(multiprocessing.Process):
                 break
             delta_times['unpack'] += (time.time() - start_time)
             deltaitem_list.append(new_item)
-        #yappi.get_func_stats().print_all()
         return deltaitem_list
 
     @staticmethod
@@ -453,9 +398,8 @@ class FuseFeedingProc(multiprocessing.Process):
     def terminate(self):
         self.stop.set()
 
-    def terminate(self):
-        self.stop.set()
-
+def handlesig(signum, frame):
+    LOG.info("Received signal(%d) to terminate VM..." % signum)
 
 class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
     synthesis_option = {
@@ -467,7 +411,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
     def ret_fail(self, message):
         LOG.error("%s" % str(message))
         message = NetworkUtil.encoding({
-            Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_FAIELD,
+            Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_FAILED,
             Protocol.KEY_FAILED_REASON : message
             })
         message_size = struct.pack("!I", len(message))
@@ -600,7 +544,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             data = self._recv_all(4)
             if data == None or len(data) != 4:
                 raise StreamSynthesisError("Failed to receive first byte of header")
-                break
+
             blob_header_size = struct.unpack("!I", data)[0]
             blob_header_raw = self._recv_all(blob_header_size)
             blob_header = NetworkUtil.decoding(blob_header_raw)
@@ -687,7 +631,11 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         LOG.info("finished")
 
         if self.server.handoff_data == None:
-            connect_vnc(synthesized_vm.machine)
+            connect_vnc(synthesized_vm.machine, True)
+
+            signal.signal(signal.SIGUSR1, handlesig)
+            signal.pause()
+
             synthesized_vm.monitor.terminate()
             synthesized_vm.monitor.join()
             synthesized_vm.terminate()
@@ -771,7 +719,6 @@ class StreamSynthesisServer(SocketServer.TCPServer):
         SocketServer.TCPServer.handle_error(self, request, client_address)
         sys.stderr.write("handling error from client %s\n" % (str(client_address)))
         sys.stderr.write(traceback.format_exc())
-        sys.stderr.write("%s" % str(e))
 
     def handle_timeout(self):
         sys.stderr.write("timeout error\n")

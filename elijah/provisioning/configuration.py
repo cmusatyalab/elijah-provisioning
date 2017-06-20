@@ -44,7 +44,7 @@ def which(program):
 
 
 class Const(object):
-    VERSION = str("0.9.3")
+    VERSION = str("0.9.4")
     CLOUDLET_KVM_RELEASE = "https://github.com/cmusatyalab/elijah-qemu/releases"
     HOME_DIR = os.path.abspath(os.path.expanduser("~"))
     CONFIGURATION_DIR = os.path.join('/', 'var', 'lib', 'cloudlet', 'conf')

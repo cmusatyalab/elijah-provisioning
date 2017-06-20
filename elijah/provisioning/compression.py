@@ -510,7 +510,7 @@ class DecompChildProc(multiprocessing.Process):
 
 def decomp_overlay(meta, output_path):
     meta_dict = msgpack.unpackb(open(meta, "r").read())
-    decomp_start_time = time()
+    decomp_start_time = time.time()
     comp_overlay_files = meta_dict[Const.META_OVERLAY_FILES]
     comp_overlay_files = [item
                           [Const.META_OVERLAY_FILE_NAME]
@@ -527,7 +527,7 @@ def decomp_overlay(meta, output_path):
         overlay_file.write(decomp_data)
     sys.stdout.write(
         "Overlay decomp time for %d files: %f at %s\n" %
-        (len(comp_overlay_files), (time()-decomp_start_time), output_path))
+        (len(comp_overlay_files), (time.time()-decomp_start_time), output_path))
     overlay_file.close()
 
     return meta_dict

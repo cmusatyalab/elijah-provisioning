@@ -35,7 +35,7 @@ class Protocol(object):
     MESSAGE_COMMAND_SESSION_CLOSE = 0x16
     # server -> client as return
     MESSAGE_COMMAND_SUCCESS = 0x01
-    MESSAGE_COMMAND_FAIELD = 0x02
+    MESSAGE_COMMAND_FAILED = 0x02
     # server -> client as command
     MESSAGE_COMMAND_ON_DEMAND = 0x03
     MESSAGE_COMMAND_SYNTHESIS_DONE = 0x04

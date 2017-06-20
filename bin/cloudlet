@@ -128,7 +128,7 @@ def main(argv):
 
     CMD_BASE_CREATION = "base"
     CMD_OVERLAY_CREATION = "overlay"
-    CMD_SYNTEHSIS = "synthesis"
+    CMD_SYNTHESIS = "synthesis"
     CMD_LIST_BASE = "list-base"
     CMD_DEL_BASE = "del-base"
     CMD_ADD_BASE = "add-base"
@@ -142,7 +142,7 @@ def main(argv):
     commands = {
         CMD_BASE_CREATION: "create new base VM",
         CMD_OVERLAY_CREATION: "create new overlay VM on top of base VM",
-        CMD_SYNTEHSIS: "test created overlay using command line",
+        CMD_SYNTHESIS: "test created overlay using command line",
         CMD_LIST_BASE: "show all base VM at this machine",
         CMD_ADD_BASE: "add existing base vm to DB",
         CMD_DEL_BASE: "delete base vm at database",
@@ -225,7 +225,7 @@ def main(argv):
                 "%s\nFailed to create overlay" % str(
                     traceback.format_exc()))
             return 1
-    elif mode == CMD_SYNTEHSIS:
+    elif mode == CMD_SYNTHESIS:
         if len(left_args) < 2:
             sys.stderr.write("\nSynthesis requires path to VM disk and overlay-meta\n \
                     Ex) ./cloudlet synthesis /path/to/VM_disk /path/to/precise.overlay-meta [options]\n")
