@@ -983,8 +983,8 @@ def recover_launchVM(base_image, meta_info, overlay_file, **kwargs):
 
 def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
              original_memory, fuse_memory_size,
-             resumed_disk=None, disk_chunks=None,
-             resumed_memory=None, memory_chunks=None,
+             resumed_disk=None, disk_chunks=None, disk_overlay_map=None,
+             resumed_memory=None, memory_chunks=None, memory_overlay_map=None,
              valid_bit=0, **kwargs):
     if fuse_disk_size <= 0:
         raise CloudletGenerationError("FUSE disk size should be bigger than 0")
@@ -998,10 +998,12 @@ def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
     resumed_disk = os.path.abspath(resumed_disk) if resumed_disk else ""
     resumed_memory = os.path.abspath(resumed_memory) if resumed_memory else ""
 
-    disk_overlay_map = ','.join("%ld:%d" % (item, valid_bit)
-                                for item in disk_chunks or [])
-    memory_overlay_map = ','.join("%ld:%d" % (item, valid_bit)
-                                  for item in memory_chunks or [])
+    if disk_overlay_map is None:
+        disk_overlay_map = ','.join("%ld:%d" % (item, valid_bit)
+                                     for item in disk_chunks or [])
+    if memory_overlay_map is None:
+        memory_overlay_map = ','.join("%ld:%d" % (item, valid_bit)
+                                      for item in memory_chunks or [])
 
     # launch fuse
     execute_args = [
