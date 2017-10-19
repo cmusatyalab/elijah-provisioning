@@ -11,6 +11,20 @@ The artifacts can be downloaded from:
   * [Ubuntu 14.04 base image](https://storage.cmusatyalab.org/elijah-provisioning-lego/ubuntu-trusty-lego-base.zip)
   * [Overlay image](https://storage.cmusatyalab.org/elijah-provisioning-lego/overlay.zip)
 
+# Steps to create a synthesized VM from base image and overlay image
+  1. Import the base image
+    ````
+    cloudlet import-base ubuntu-trusty-lego-base.zip
+    ````
+  2. Find the imported base image path
+    ````
+    cloudlet list-base
+    ````
+  1. Synthesize and have fun!
+    ````
+    cloudlet synthesis <path to base image> lego-overlay.zip
+    ````
+
 # Steps to create the base and the overlay image
   1. Create the base image:
      1. Download the ubuntu [14.04 cloud image](https://cloud-images.ubuntu.com/trusty/current/trusty-server-cloudimg-amd64-disk1.img). Note the image is in qcow2 format.
@@ -38,7 +52,7 @@ The artifacts can be downloaded from:
         ````
      2. Install and run lego application. In the VNC, issue following commands.
         ````
-        wget install_and_run.sh
+        wget <link to install_and_run.sh in this repo>
         bash install_and_run.sh
         ````
      3. When the installation has finished and the lego app has booted up, close the VNC terminal. VM synthesis will will start to create the overlay image after closing the VNC terminal.
