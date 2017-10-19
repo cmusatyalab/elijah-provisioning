@@ -19,8 +19,9 @@ git clone https://github.com/cmusatyalab/gabriel.git $HOME/gabriel
 sudo pip install -r $HOME/gabriel/server/requirements.txt
 
 sudo apt-get -y install python-opencv
-wget -O $HOME/gabriel-apps-lego.tar.gz https://www.dropbox.com/s/8032yj3s867zjvx/gabriel-apps-lego.tar.gz
-tar -xf gabriel-apps-lego.tar.gz
+git clone https://github.com/cmusatyalab/gabriel-lego.git $HOME/lego
+# fix gabriel import bug
+cp -r $HOME/gabriel/server/gabriel $HOME/lego/
 
 echo "install finished! launching lego..."
 cd $HOME/gabriel/server/bin
@@ -28,5 +29,5 @@ cd $HOME/gabriel/server/bin
 sleep 2
 ./gabriel-ucomm -s 127.0.0.1:8021 &
 sleep 2
-cd $HOME/gabriel-apps/lego
+cd $HOME/lego/
 ./proxy.py -s 127.0.0.1:8021 &
