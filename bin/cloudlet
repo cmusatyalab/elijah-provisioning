@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # Cloudlet Infrastructure for Mobile Computing
 #
@@ -162,11 +162,16 @@ def main(argv):
                 "Ex) ./cloudlet %s ../image/ubuntu/precise.raw\n" %
                 (CMD_BASE_CREATION))
             return 1
-        if len(left_args) > 1:
-            sys.stderr(
+        if len(left_args) > 3:
+            sys.stderr.write(
                 "Warning, qemu argument won't be applied to creating base vm")
         disk_image_path = left_args[0]
-        disk_path, mem_path = synthesis.create_baseVM(disk_image_path)
+        data_interface, tenant_interface = None, None
+        if len(left_args) > 1:
+            data_interface = left_args[1]
+        if len(left_args) > 2:
+            tenant_interface = left_args[2]
+        disk_path, mem_path = synthesis.create_baseVM(disk_image_path, data_interface=data_interface, tenant_interface=tenant_interface)
         print "Base VM is created from %s" % disk_image_path
         print "Disk: %s" % disk_path
         print "Mem: %s" % mem_path
@@ -232,7 +237,14 @@ def main(argv):
             return 1
         disk_image_path = left_args[0]
         overlay_meta = left_args[1]
-        qemu_args = left_args[2:]
+        qemu_args = []
+        data_interface = None
+        tenant_interface = None
+        extra_args = left_args[2:]
+        if extra_args:
+            data_interface = extra_args[0]
+            tenant_interface = extra_args[1]
+            qemu_args = extra_args[2:]
         is_zip_contained, url_path = PackagingUtil.is_zip_contained(
             overlay_meta)
         if is_zip_contained is True:
@@ -244,10 +256,13 @@ def main(argv):
                     msg = "(%s) is invalid handoff URL" % settings.handoff_url
                     raise synthesis.CloudletGenerationError(msg)
 
+            import pdb; pdb.set_trace()
             synthesis.synthesis(disk_image_path, overlay_meta,
                                 disk_only=settings.disk_only,
                                 handoff_url=settings.handoff_url,
                                 zip_container=is_zip_contained,
+                                data_interface=data_interface,
+                                tenant_interface=tenant_interface,
                                 qemu_args=qemu_args)
         except Exception as e:
             LOG.warning(str(e))
