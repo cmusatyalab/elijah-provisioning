@@ -617,18 +617,18 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None,
 
     # enforce CPU model to qemu64 only if not specified
     # svm should not be added since it is not supported in x86 (QEMU bug)
-    #cpu_element = xml.find("cpu")
-    #if cpu_element is None:
-    #    cpu_element = Element("cpu")
-    #    xml.append(cpu_element)
-    #if cpu_element.find("model") is not None:
-    #    cpu_element.remove(cpu_element.find("model"))
-    #if cpu_element.find("arch") is not None:
-    #    cpu_element.remove(cpu_element.find("arch"))
-    #cpu_model_element = Element("model")
-    #cpu_model_element.text = "core2duo"
-    #cpu_model_element.set("fallback", "forbid")
-    #cpu_element.append(cpu_model_element)
+    cpu_element = xml.find("cpu")
+    if cpu_element is None:
+        cpu_element = Element("cpu")
+        xml.append(cpu_element)
+    if cpu_element.find("model") is not None:
+        cpu_element.remove(cpu_element.find("model"))
+    if cpu_element.find("arch") is not None:
+        cpu_element.remove(cpu_element.find("arch"))
+    cpu_model_element = Element("model")
+    cpu_model_element.text = "core2duo"
+    cpu_model_element.set("fallback", "forbid")
+    cpu_element.append(cpu_model_element)
 
     # update uuid
     if uuid is None:
