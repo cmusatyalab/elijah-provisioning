@@ -11,8 +11,9 @@ wget http://mirrors.kernel.org/ubuntu/pool/universe/x/xdelta3/python-xdelta3_3.0
 dpkg -i python3-xdelta3.deb
 
 git clone https://github.com/cmusatyalab/elijah-provisioning.git /home/ubuntu/elijah-provisioning
-chown -R ubuntu:ubuntu /home/ubuntu/elijah-provisioning
 cd /home/ubuntu/elijah-provisioning
+git checkout orangebox
+chown -R ubuntu:ubuntu /home/ubuntu/elijah-provisioning
 pip install -r requirements.txt
 
 chmod 1666 /dev/fuse
