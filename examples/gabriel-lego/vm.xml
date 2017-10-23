@@ -1,0 +1,30 @@
+<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
+  <name>lego-server</name>
+  <uuid>c7a5fdbd-cdaf-9455-926a-d65c16db1802</uuid>
+  <memory unit='GB'>2</memory>
+  <currentMemory unit='GB'>2</currentMemory>
+  <vcpu>2</vcpu>
+  <os>
+    <type arch='x86_64' machine='pc'>hvm</type>
+  </os>
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <source file='path to trusty-server-cloudimg-raw.img'/>
+      <target dev='hda'/>
+    </disk>
+    <interface type='user'>
+    </interface>
+    <graphics type='vnc' port='-1'/>
+  </devices>
+  <qemu:commandline>
+    <qemu:arg value='-redir'/>
+    <qemu:arg value='tcp:9098::9098' />
+    <qemu:arg value='-redir'/>
+    <qemu:arg value='tcp:9111::9111' />
+    <qemu:arg value='-redir'/>
+    <qemu:arg value='tcp:22222::22222' />
+    <qemu:arg value='-redir'/>
+    <qemu:arg value='tcp:20022::22' />
+  </qemu:commandline>
+</domain>
