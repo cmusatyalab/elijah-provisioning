@@ -126,7 +126,8 @@ class VM_Overlay(native_threading.Thread):
     def __init__(self, base_disk, options, qemu_args=None,
                  base_mem=None, base_diskmeta=None,
                  base_memmeta=None, base_hashvalue=None,
-                 nova_xml=None, nova_util=None, nova_conn=None):
+                 nova_xml=None, nova_util=None, nova_conn=None,
+                 interface=None):
         """create VM overlay from a user-customized VM.
         """
         self.base_disk = os.path.abspath(base_disk)
@@ -143,6 +144,7 @@ class VM_Overlay(native_threading.Thread):
         self.base_diskmeta = os.path.abspath(self.base_diskmeta)
         self.base_memmeta = os.path.abspath(self.base_memmeta)
         self.nova_util = nova_util
+        self.interface_xml = create_interface_xml(interface) if interface else None
         self.conn = nova_conn or get_libvirt_connection()
 
         # find base vm's hashvalue from DB
@@ -228,11 +230,19 @@ class VM_Overlay(native_threading.Thread):
             qemu_logfile=self.qemu_logfile, qemu_args=self.qemu_args,
             nova_xml=self.nova_xml)
         self.machine = run_snapshot(self.conn, self.modified_disk,
-                                    self.base_mem_fuse, self.new_xml_str)
+                                    self.base_mem_fuse, self.new_xml_str,
+                                    interface_xml=self.interface_xml)
         return self.machine
 
     @wrap_vm_fault
     def create_overlay(self):
+        # detach the interface before creating the overlay
+        if self.interface_xml is not None:
+            LOG.info("Detaching network interface... waiting 10 seconds")
+            self.machine.detachDeviceFlags(
+                self.interface_xml, libvirt.VIR_DOMAIN_AFFECT_LIVE)
+            sleep(10)
+
         # get montoring info
         monitoring_info = _get_overlay_monitoring_info(
             self.conn,
@@ -429,9 +439,13 @@ class SynthesizedVM(native_threading.Thread):
                     self.conn, self.new_xml_string, interface=self.interface,
                     vnc_disable=True)
             else:
+                interface_xml = None
+                if self.interface:
+                    interface_xml = create_interface_xml(self.interface)
                 self.machine = run_snapshot(self.conn, self.resumed_disk,
                                             self.resumed_mem, self.new_xml_str,
-                                            resume_time=self.resume_time)
+                                            resume_time=self.resume_time,
+                                            interface_xml=interface_xml)
         except Exception as e:
             sys.stdout.write(str(e)+"\n")
 
@@ -1072,11 +1086,11 @@ def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
     return fuse_process
 
 
-def create_interface_xml(interface):
+def create_interface_xml(interface_name):
     interface = Element("interface")
     interface.set("type", "bridge")
     source = Element("source")
-    source.set("bridge", interface)
+    source.set("bridge", interface_name)
     model = Element("model")
     model.set("type", "virtio")
     mac = Element("mac")
@@ -1293,7 +1307,7 @@ def save_mem_snapshot(conn, machine, fout_path, **kwargs):
 
 
 def run_snapshot(conn, disk_image, mem_snapshot,
-                 new_xml_string, resume_time=None, interface=None):
+                 new_xml_string, resume_time=None, interface_xml=None):
     if resume_time is not None:
         start_resume_time = time()
 
@@ -1314,9 +1328,7 @@ def run_snapshot(conn, disk_image, mem_snapshot,
     machine = conn.lookupByUUIDString(uuid)
 
     # attach the interface
-    if interface is not None:
-        LOG.info("[RESUME]: QEMU attach interface to bridge %s" % interface)
-        interface_xml = create_interface_xml(interface)
+    if interface_xml is not None:
         machine.attachDeviceFlags(
             interface_xml, libvirt.VIR_DOMAIN_AFFECT_LIVE)
 

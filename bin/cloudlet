@@ -182,7 +182,11 @@ def main(argv):
                 (CMD_LIST_BASE))
             return 1
         disk_image_path = left_args[0]
-        qemu_args = left_args[1:]
+        interface = None
+        qemu_args = []
+        if len(left_args) > 1:
+            interface = left_args[1]
+            qemu_args = left_args[2:]
         options = Options()
         options.TRIM_SUPPORT = not settings.disable_trim_support
         options.FREE_SUPPORT = settings.enable_free_support
@@ -192,7 +196,8 @@ def main(argv):
         try:
             # resume base vm for creating vm overlay
             vm_overlay = synthesis.VM_Overlay(disk_image_path, options,
-                                              qemu_args=qemu_args)
+                                              qemu_args=qemu_args,
+                                              interface=interface)
             machine = vm_overlay.resume_basevm()
             synthesis.connect_vnc(machine)
             vm_overlay.create_overlay()

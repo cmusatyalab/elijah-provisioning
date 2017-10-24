@@ -20,8 +20,11 @@ chmod 1666 /dev/fuse
 chmod 644 /etc/fuse.conf
 sed -i 's/#user_allow_other/user_allow_other/g' /etc/fuse.conf
 
+mkdir /usr/libexec
 ln -s /usr/share/seabios/bios.bin /usr/share/qemu/bios.bin
 ln -s /usr/share/seabios/vgabios-cirrus.bin /usr/share/qemu/vgabios-cirrus.bin
+ln -s /usr/lib/qemu/qemu-bridge-helper /usr/libexec/qemu-bridge-helper
+chmod u+s /usr/libexec/qemu-bridge-helper
 aa-complain /usr/sbin/libvirtd
 adduser ubuntu kvm
 adduser ubuntu libvirtd
