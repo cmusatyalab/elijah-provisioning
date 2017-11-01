@@ -330,6 +330,9 @@ Directories
   │     │	└─ batch_files: batch scripts to test application using VM synthesis on x86 (not Android)
   │     └─ app-server: server binary for each test application
   │
+  ├── examples: Example application for VM Synthesis
+  │     └─ gabriel-lego: Lego Wearable Cognitive Assistance
+  │
   └── fabric.py: installation script using <a href=http://docs.fabfile.org/en target="_blank">Fabric</a>
 </pre>
 
