@@ -17,10 +17,9 @@ from .configuration import Const
 from .configuration import VMOverlayCreationMode
 from .package import VMOverlayPackage
 from . import process_manager
-from . import log as logging
+import logging
 
 LOG = logging.getLogger(__name__)
-
 
 class CompressionError(Exception):
     pass
@@ -406,10 +405,11 @@ class CompChildProc(multiprocessing.Process):
 
 class DecompProc(multiprocessing.Process):
 
-    def __init__(self, input_queue, output_queue, num_proc=4):
+    def __init__(self, input_queue, output_queue, analysis_queue, num_proc=4, ):
         self.input_queue = input_queue
         self.output_queue = output_queue
         self.num_proc = num_proc
+        self.analysis_queue = analysis_queue
         self.proc_list = list()
         multiprocessing.Process.__init__(self, target=self.decompress_blobs)
 
@@ -425,7 +425,8 @@ class DecompProc(multiprocessing.Process):
             comp_proc = DecompChildProc(
                 command_queue,
                 task_queue,
-                self.output_queue)
+                self.output_queue,
+                self.analysis_queue)
             comp_proc.start()
             self.proc_list.append((comp_proc, task_queue, command_queue))
             output_fd_list.append(task_queue._writer.fileno())
@@ -465,17 +466,17 @@ class DecompProc(multiprocessing.Process):
             proc.join()
         # send end message after the next stage finishes processing
         self.output_queue.put(Const.QUEUE_SUCCESS_MESSAGE)
-        sys.stdout.write(
-            "[time] Decomp using %d proc (%s~%s): %s s\n" %
-            (self.num_proc, time_start, time_end, (time_end-time_start)))
+        self.analysis_queue.put("Decompression using %d proc took: %s seconds." %
+            (self.num_proc,  (time_end-time_start)))
 
 
 class DecompChildProc(multiprocessing.Process):
 
-    def __init__(self, command_queue, task_queue, output_queue):
+    def __init__(self, command_queue, task_queue, output_queue, analysis_queue):
         self.command_queue = command_queue
         self.task_queue = task_queue
         self.output_queue = output_queue
+        self.analysis_queue = analysis_queue
         super(DecompChildProc, self).__init__(target=self._decomp)
 
     def _decomp(self):
@@ -489,21 +490,25 @@ class DecompChildProc(multiprocessing.Process):
                     is_proc_running = False
                     break
                 (comp_type, comp_data) = input_task
-
+                start = time.time()
+                comp_string = "Unknown Compression Algorithm!"
                 if comp_type == Const.COMPRESSION_LZMA:
+                    comp_string = "lzma"
                     decompressor = lzma.LZMADecompressor()
                     decomp_data = decompressor.decompress(comp_data)
                     decomp_data += decompressor.flush()
                 elif comp_type == Const.COMPRESSION_BZIP2:
+                    comp_string = "bzip2"
                     decompressor = bz2.BZ2Decompressor()
                     decomp_data = decompressor.decompress(comp_data)
                 elif comp_type == Const.COMPRESSION_GZIP:
+                    comp_string = "gzip"
                     decomp_data = zlib.decompress(
                         comp_data,
                         zlib.MAX_WBITS | 16)
                 else:
                     raise CompressionError("Not valid compression option")
-                LOG.debug("%f\tdecompress one blob" % (time.time()))
+                self.analysis_queue.put("B,D(%s),%5.3f" % (comp_string, time.time() -start))
                 self.output_queue.put(decomp_data)
         self.command_queue.put("Compressed processed everything")
 
@@ -525,9 +530,6 @@ def decomp_overlay(meta, output_path):
         decomp_data = decompressor.decompress(comp_data)
         decomp_data += decompressor.flush()
         overlay_file.write(decomp_data)
-    sys.stdout.write(
-        "Overlay decomp time for %d files: %f at %s\n" %
-        (len(comp_overlay_files), (time.time()-decomp_start_time), output_path))
     overlay_file.close()
 
     return meta_dict
@@ -535,6 +537,7 @@ def decomp_overlay(meta, output_path):
 
 def decomp_overlayzip(overlay_path, outfilename):
     overlay_package = VMOverlayPackage(overlay_path)
+    decomp_start_time = time.time()
     meta_raw = overlay_package.read_meta()
     meta_info = msgpack.unpackb(meta_raw)
     comp_overlay_files = meta_info[Const.META_OVERLAY_FILES]
@@ -562,6 +565,5 @@ def decomp_overlayzip(overlay_path, outfilename):
             out_fd.write(decomp_data)
         else:
             raise CompressionError("Not valid compression option")
-
     out_fd.close()
     return meta_info

@@ -47,7 +47,7 @@ from configuration import Const as Cloudlet_Const
 from compression import DecompProc
 from pprint import pformat
 import log as logging
-
+import subprocess
 import mmap
 import tool
 from delta import DeltaItem
@@ -65,14 +65,15 @@ class RecoverDeltaProc(multiprocessing.Process):
     def __init__(self, base_disk, base_mem,
                  decomp_delta_queue, output_mem_path,
                  output_disk_path, chunk_size,
-                 fuse_info_queue):
-        if base_disk == None and base_mem == None:
+                 fuse_info_queue, analysis_queue):
+        if base_disk is None and base_mem is None:
             raise StreamSynthesisError("Need either base_disk or base_memory")
 
         self.decomp_delta_queue = decomp_delta_queue
         self.output_mem_path = output_mem_path
         self.output_disk_path = output_disk_path
         self.fuse_info_queue = fuse_info_queue
+        self.analysis_queue = analysis_queue
         self.base_disk = base_disk
         self.base_mem = base_mem
 
@@ -111,12 +112,13 @@ class RecoverDeltaProc(multiprocessing.Process):
 
             overlay_chunk_ids = list()
             # recv_data is a single blob so that it contains whole DeltaItem
-            LOG.debug("%f\trecover one blob" % (time.time()))
 
+            unpack_start = time.time()
             delta_item_list = RecoverDeltaProc.from_buffer(recv_data,delta_counter,delta_times)
+            self.analysis_queue.put("B,U,%5.3f" % (time.time() - unpack_start))
             for delta_item in delta_item_list:
                 ret = self.recover_item(delta_item,delta_counter,delta_times)
-                if ret == None:
+                if ret is None:
                     # cannot find self reference point due to the parallel
                     # compression. Save this and do it later
                     unresolved_deltaitem_list.append(delta_item)
@@ -129,11 +131,11 @@ class RecoverDeltaProc(multiprocessing.Process):
             delta_times['flush'] += (time.time() - start_time)
             #self.fuse_info_queue.put(overlay_chunk_ids)
 
-        LOG.info("[Delta] Handle dangling DeltaItem (%d)" % len(unresolved_deltaitem_list))
+        self.analysis_queue.put("Handling (%d) unresolved delta items." % len(unresolved_deltaitem_list))
         overlay_chunk_ids = list()
         for delta_item in unresolved_deltaitem_list:
             ret = self.recover_item(delta_item,delta_counter,delta_times)
-            if ret == None:
+            if ret is None:
                 msg = "Cannot find self reference: type(%ld), offset(%ld), index(%ld)" % \
                         (delta_item.delta_type, delta_item.offset, delta_item.index)
                 raise StreamSynthesisError(msg)
@@ -147,19 +149,19 @@ class RecoverDeltaProc(multiprocessing.Process):
         #self.fuse_info_queue.put(overlay_chunk_ids)
         #self.fuse_info_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
         time_end = time.time()
-        LOG.debug("Delta metrics:")
-        LOG.debug("="*50)
-        LOG.debug(delta_counter)
-        LOG.debug(delta_times)
-        LOG.debug("Total captured time: %d" % (sum(delta_times.values())))
-        LOG.info("[time] Delta delta %ld chunks, (%s~%s): %s" % \
-                (count, time_start, time_end, (time_end-time_start)))
-        LOG.info("Finish VM handoff")
+        self.analysis_queue.put("="*50)
+        self.analysis_queue.put("Delta metrics:")
+        self.analysis_queue.put("="*50)
+        self.analysis_queue.put("%r" % delta_counter)
+        self.analysis_queue.put("%r" % delta_times)
+        self.analysis_queue.put("Total captured time: %d" % (sum(delta_times.values())))
+        self.analysis_queue.put("="*50)
+        self.analysis_queue.put("Delta process recovered %ld chunks in %s seconds." % \
+                (count,  (time_end-time_start)))
 
     def recover_item(self, delta_item, delta_counter, delta_times):
         if type(delta_item) != DeltaItem:
             raise StreamSynthesisError("Need list of DeltaItem")
-
         delta_counter[delta_item.ref_id] += 1
         start_time = time.time()
         if (delta_item.ref_id == DeltaItem.REF_RAW):
@@ -175,7 +177,7 @@ class RecoverDeltaProc(multiprocessing.Process):
         elif delta_item.ref_id == DeltaItem.REF_SELF:
             ref_index = delta_item.data
             self_ref_delta_item = self.recovered_delta_dict.get(ref_index, None)
-            if self_ref_delta_item == None:
+            if self_ref_delta_item is None:
                 #msg = "Cannot find self reference: type(%ld), offset(%ld), index(%ld), ref_index(%ld)" % \
                 #        (delta_item.delta_type, delta_item.offset, delta_item.index, ref_index)
                 #raise StreamSynthesisError(msg)
@@ -234,10 +236,17 @@ class RecoverDeltaProc(multiprocessing.Process):
             print msg
             raise StreamSynthesisError(msg)
         delta_times[delta_item.ref_id] += (time.time() - start_time)
+
+        ref_id = delta_item.ref_id
         # recover
         delta_item.ref_id = DeltaItem.REF_RAW
         delta_item.data = recover_data
-        if delta_item.hash_value == None or len(delta_item.hash_value) == 0:
+        if delta_item.delta_type == DeltaItem.DELTA_MEMORY or delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
+            self.analysis_queue.put("M,R(%d),%d" % (ref_id, delta_item.offset / 4096))
+        elif delta_item.delta_type == DeltaItem.DELTA_DISK or delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+            self.analysis_queue.put("D,R(%d),%d" % (ref_id, delta_item.offset / 4096))
+
+        if delta_item.hash_value is None or len(delta_item.hash_value) == 0:
             delta_counter['sha'] += 1
             start_time = time.time()
             delta_item.hash_value = sha256(recover_data).digest()
@@ -325,8 +334,13 @@ class RecoverDeltaProc(multiprocessing.Process):
             prev_seq = getattr(prev_iter_item, 'live_seq', 0)
             item_seq = getattr(delta_item, 'live_seq', 0)
             if prev_seq > item_seq:
-                msg = "Latest version is already synthesized at %d (%d)" % (delta_item.offset, delta_item.delta_type)
-                LOG.debug(msg)
+                if delta_item.delta_type == DeltaItem.DELTA_MEMORY or \
+                                delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
+                    msg = "M,P(%d),%d" % (delta_item.ref_id, delta_item.offset / 4096)
+                elif delta_item.delta_type == DeltaItem.DELTA_DISK or \
+                                delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
+                    msg = "D,P(%d),%d" % (delta_item.ref_id, delta_item.offset / 4096)
+                self.analysis_queue.put(msg)
                 return
 
         # write to output file
@@ -335,10 +349,12 @@ class RecoverDeltaProc(multiprocessing.Process):
                 delta_item.delta_type == DeltaItem.DELTA_MEMORY_LIVE:
             self.recover_mem_fd.seek(delta_item.offset)
             self.recover_mem_fd.write(delta_item.data)
+            self.analysis_queue.put("M,A,%d" % (delta_item.offset / 4096))
         elif delta_item.delta_type == DeltaItem.DELTA_DISK or\
             delta_item.delta_type == DeltaItem.DELTA_DISK_LIVE:
             self.recover_disk_fd.seek(delta_item.offset)
             self.recover_disk_fd.write(delta_item.data)
+            self.analysis_queue.put("D,A,%d" % (delta_item.offset / 4096))
         delta_times['seekwrite'] += (time.time() - start_time)
 
         # update the latest item for each memory page or disk block
@@ -401,18 +417,46 @@ class FuseFeedingProc(multiprocessing.Process):
 def handlesig(signum, frame):
     LOG.info("Received signal(%d) to terminate VM..." % signum)
 
+class HandoffAnalysisProc(multiprocessing.Process):
+    def __init__(self, handoff_url, message_queue):
+        self.url = handoff_url
+        self.mq = message_queue
+        multiprocessing.Process.__init__(self, target=self.read_queue)
+        self.outfd = open(name='/var/tmp/cloudlet/handoff.log', mode='w')
+
+    def read_queue(self):
+        time_start = time.time()
+        while True:
+            self._running = True
+            try:
+                message = self.mq.get()
+                if message == "!E_O_Q!":
+                    self.outfd.flush() #flush remaining buffer
+                    self.outfd.close()
+                    filename = '/var/tmp/cloudlet/handoff_from_%s_at_%d.log' % (self.url, time.time())
+                    subprocess.call(["mv", "/var/tmp/cloudlet/handoff.log", filename])
+                    break
+                self.outfd.write('%f ' % (time.time()-time_start))
+                self.outfd.write(message)
+                self.outfd.write("\n")
+            except EOFError:
+                break
+
+    def terminate(self):
+        self.outfd.close()
+
 class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
     synthesis_option = {
-            Protocol.SYNTHESIS_OPTION_DISPLAY_VNC : False,
-            Protocol.SYNTHESIS_OPTION_EARLY_START : False,
-            Protocol.SYNTHESIS_OPTION_SHOW_STATISTICS : False
+            Protocol.SYNTHESIS_OPTION_DISPLAY_VNC: False,
+            Protocol.SYNTHESIS_OPTION_EARLY_START: False,
+            Protocol.SYNTHESIS_OPTION_SHOW_STATISTICS: False
             }
 
     def ret_fail(self, message):
         LOG.error("%s" % str(message))
         message = NetworkUtil.encoding({
-            Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_FAILED,
-            Protocol.KEY_FAILED_REASON : message
+            Protocol.KEY_COMMAND: Protocol.MESSAGE_COMMAND_FAILED,
+            Protocol.KEY_FAILED_REASON: message
             })
         message_size = struct.pack("!I", len(message))
         self.request.send(message_size)
@@ -420,8 +464,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
 
     def ret_success(self, req_command, payload=None):
         send_message = {
-            Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_SUCCESS,
-            Protocol.KEY_REQUESTED_COMMAND : req_command,
+            Protocol.KEY_COMMAND: Protocol.MESSAGE_COMMAND_SUCCESS,
+            Protocol.KEY_REQUESTED_COMMAND: req_command,
             }
         if payload:
             send_message.update(payload)
@@ -433,7 +477,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
 
     def send_synthesis_done(self):
         message = NetworkUtil.encoding({
-            Protocol.KEY_COMMAND : Protocol.MESSAGE_COMMAND_SYNTHESIS_DONE,
+            Protocol.KEY_COMMAND: Protocol.MESSAGE_COMMAND_SYNTHESIS_DONE,
             })
         LOG.info("SUCCESS to launch VM")
         try:
@@ -448,7 +492,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         data = ''
         while len(data) < recv_size:
             tmp_data = self.request.recv(recv_size-len(data))
-            if tmp_data == None:
+            if tmp_data is None:
                 raise StreamSynthesisError("Cannot recv data at %s" % str(self))
             if len(tmp_data) == 0:
                 raise StreamSynthesisError("Recv 0 data at %s" % str(self))
@@ -457,7 +501,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             # to send ack for every PERIODIC_ACK_BYTES bytes
             cur_recv_size = len(data)
             data_diff = cur_recv_size-prev_ack_sent_size
-            if  data_diff > ack_size or cur_recv_size >= recv_size:
+            if data_diff > ack_size or cur_recv_size >= recv_size:
                 ack_data = struct.pack("!Q", data_diff)
                 self.request.sendall(ack_data)
                 prev_ack_sent_size = cur_recv_size
@@ -484,10 +528,21 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         | header size | header | blob header size | blob header | blob data  |
         |  (4 bytes)  | (var)  | (4 bytes)        | (var bytes) | (var bytes)|
         '''
+
+        analysis_mq = multiprocessing.Queue()
+        analysis_proc = HandoffAnalysisProc(handoff_url=self.client_address[0],message_queue=analysis_mq)
+        analysis_proc.start()
+
+        analysis_mq.put("=" * 50)
+        analysis_mq.put("Adaptive VM Handoff Initiated")
+        analysis_mq.put("Client Connection - %s:%d" % (self.client_address[0], self.client_address[1])) #client_address is a tuple (ip, port)
+
         if self.server.handoff_data is not None:
-            LOG.debug("VM synthesis using OpenStack")
+            analysis_mq.put("Handoff via OpenStack")
+            via_openstack = True
         else:
-            LOG.debug("VM synthesis as standalone")
+            analysis_mq.put("Handoff via cloudlet CLI")
+            via_openstack = False
 
         # variable
         self.total_recved_size_cur = 0
@@ -495,7 +550,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
 
         # get header
         data = self._recv_all(4)
-        if data == None or len(data) != 4:
+        if data is None or len(data) != 4:
             raise StreamSynthesisError("Failed to receive first byte of header")
         message_size = struct.unpack("!I", data)[0]
         msgpack_data = self._recv_all(message_size)
@@ -504,21 +559,25 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         launch_memory_size = metadata[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
 
         synthesis_option, base_diskpath = self._check_validity(metadata)
-        if base_diskpath == None:
+        if base_diskpath is None:
             raise StreamSynthesisError("No matching base VM")
-        if self.server.handoff_data:
-            base_diskpath, base_diskmeta, base_mempath, base_memmeta =\
-                self.server.handoff_data.base_vm_paths
+        if via_openstack:
+            base_diskpath, base_mempath, base_diskmeta, base_memmeta = self.server.handoff_data.base_vm_paths
         else:
-            (base_diskmeta, base_mempath, base_memmeta) = \
-                    Cloudlet_Const.get_basepath(base_diskpath, check_exist=True)
-        LOG.info("  - %s" % str(pformat(self.synthesis_option)))
-        LOG.info("  - Base VM     : %s" % base_diskpath)
-
+            (base_diskmeta, base_mempath, base_memmeta) = Cloudlet_Const.get_basepath(base_diskpath, check_exist=True)
+        analysis_mq.put("Synthesis Options %s" % str(pformat(self.synthesis_option)))
+        analysis_mq.put("Base VM Path: %s" % base_diskpath)
+        analysis_mq.put("Image Disk Size: %d" % launch_disk_size)
+        analysis_mq.put("Image Memory Size: %d" % launch_memory_size)
+        analysis_mq.put("=" * 50)
         # variables for FUSE
-        temp_synthesis_dir = tempfile.mkdtemp(prefix="cloudlet-comp-")
-        launch_disk = os.path.join(temp_synthesis_dir, "launch-disk")
-        launch_mem = os.path.join(temp_synthesis_dir, "launch-mem")
+        if via_openstack:
+            launch_disk = self.server.handoff_data.launch_diskpath
+            launch_mem = self.server.handoff_data.launch_memorypath
+        else:
+            temp_synthesis_dir = tempfile.mkdtemp(prefix="cloudlet-comp-")
+            launch_disk = os.path.join(temp_synthesis_dir, "launch-disk")
+            launch_mem = os.path.join(temp_synthesis_dir, "launch-mem")
         memory_chunk_all = set()
         disk_chunk_all = set()
 
@@ -526,33 +585,34 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         network_out_queue = multiprocessing.Queue()
         decomp_queue = multiprocessing.Queue()
         fuse_info_queue = multiprocessing.Queue()
-        decomp_proc = DecompProc(network_out_queue, decomp_queue, num_proc=4)
+        decomp_proc = DecompProc(network_out_queue, decomp_queue, num_proc=4, analysis_queue=analysis_mq)
         decomp_proc.start()
-        LOG.info("Start Decompression process")
+        analysis_mq.put("Starting (%d) decompression processes..." % (decomp_proc.num_proc))
         delta_proc = RecoverDeltaProc(base_diskpath, base_mempath,
                                     decomp_queue,
                                     launch_mem,
                                     launch_disk,
                                     Cloudlet_Const.CHUNK_SIZE,
-                                    fuse_info_queue)
+                                    fuse_info_queue,
+                                    analysis_mq)
         delta_proc.start()
-        LOG.info("Start Synthesis process")
+        analysis_mq.put("Starting delta recovery process...")
 
         # get each blob
         recv_blob_counter = 0
         while True:
             data = self._recv_all(4)
-            if data == None or len(data) != 4:
+            if data is None or len(data) != 4:
                 raise StreamSynthesisError("Failed to receive first byte of header")
 
             blob_header_size = struct.unpack("!I", data)[0]
             blob_header_raw = self._recv_all(blob_header_size)
             blob_header = NetworkUtil.decoding(blob_header_raw)
             blob_size = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_SIZE)
-            if blob_size == None:
+            if blob_size is None:
                 raise StreamSynthesisError("Failed to receive blob")
             if blob_size == 0:
-                LOG.debug("%f\tend of stream" % (time.time()))
+                analysis_mq.put("End of stream received from client at %f)" % (time.time()))
                 break
             blob_comp_type = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_COMPRESSION)
             blob_disk_chunk = blob_header.get(Cloudlet_Const.META_OVERLAY_FILE_DISK_CHUNKS)
@@ -567,70 +627,81 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             self.request.send(ack_data)
 
             network_out_queue.put((blob_comp_type, compressed_blob))
-            memory_chunk_all.update(blob_memory_chunk)
-            disk_chunk_all.update(blob_disk_chunk)
-            LOG.debug("%f\treceive one blob" % (time.time()))
+            #TODO: remove the interweaving of the valid bit here
+            #TODO: and change the code path in cloudlet_driver.py so that
+            #TODO: it uses the chunk sets in favor of the tuples
+            if via_openstack:
+                memory_chunk_set = set(["%ld:1" % item for item in blob_memory_chunk])
+                disk_chunk_set = set(["%ld:1" % item for item in blob_disk_chunk])
+                memory_chunk_all.update(memory_chunk_set)
+                disk_chunk_all.update(disk_chunk_set)
+            else:
+                memory_chunk_all.update(blob_memory_chunk)
+                disk_chunk_all.update(blob_disk_chunk)
             recv_blob_counter += 1
+            analysis_mq.put("B,R,%d" % (recv_blob_counter))
 
         network_out_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
         delta_proc.join()
         LOG.debug("%f\tdeltaproc join" % (time.time()))
 
-        # We told to FUSE that we have everything ready, so we need to wait
-        # until delta_proc fininshes. we cannot start VM before delta_proc
-        # finishes, because we don't know what will be modified in the future
-        time_fuse_start = time.time()
-        fuse = run_fuse(Cloudlet_Const.CLOUDLETFS_PATH, Cloudlet_Const.CHUNK_SIZE,
-                base_diskpath, launch_disk_size, base_mempath, launch_memory_size,
-                resumed_disk=launch_disk,  disk_chunks=disk_chunk_all,
-                resumed_memory=launch_mem, memory_chunks=memory_chunk_all,
-                valid_bit=1)
-        time_fuse_end = time.time()
-        memory_path = os.path.join(fuse.mountpoint, 'memory', 'image')
 
-        if self.server.handoff_data:
-            synthesized_vm = SynthesizedVM(
-                launch_disk, launch_mem, fuse,
-                disk_only=False, qemu_args=None,
-                nova_xml=self.server.handoff_data.libvirt_xml,
-                nova_conn=self.server.handoff_data._conn,
-                nova_util=self.server.handoff_data._libvirt_utils
-            )
+        analysis_mq.put("Adaptive VM Handoff Complete!")
+        analysis_mq.put("=" * 50)
+        analysis_mq.put("!E_O_Q!")
+        analysis_proc.join()
+
+        if via_openstack:
+            ack_data = struct.pack("!Qd", 0x10, time.time())
+            LOG.info("send ack to client: %d" % len(ack_data))
+            self.request.sendall(ack_data)
+
+            disk_overlay_map = ','.join(disk_chunk_all)
+            memory_overlay_map = ','.join(memory_chunk_all)
+            # NOTE: fuse and synthesis take place in cloudlet_driver.py when launched from openstack but
+            #this data must be written to stdout so the pipe connected to cloudlet_driver.py can finish the handoff
+            #TODO: instead of sending this stdout buffer over the pipe to cloudlet_driver.py, we should probably
+            #TODO: move to multiprocessing.Pipe or Queue to avoid issues with other items being dumped to stdout
+            #TODO: and causing problems with this data being sent back; i.e. anything written via LOG
+            #TODO: after this will end up in stdout because the logger has a StreamHandler configured to use stdout
+            sys.stdout.write("openstack\t%s\t%s\t%s\t%s" % (launch_disk_size, launch_memory_size, disk_overlay_map, memory_overlay_map))
+
         else:
+            # We told to FUSE that we have everything ready, so we need to wait
+            # until delta_proc finishes. we cannot start VM before delta_proc
+            # finishes, because we don't know what will be modified in the future
+            time_fuse_start = time.time()
+            fuse = run_fuse(Cloudlet_Const.CLOUDLETFS_PATH, Cloudlet_Const.CHUNK_SIZE,
+                            base_diskpath, launch_disk_size, base_mempath, launch_memory_size,
+                            resumed_disk=launch_disk, disk_chunks=disk_chunk_all,
+                            resumed_memory=launch_mem, memory_chunks=memory_chunk_all,
+                            valid_bit=1)
+            time_fuse_end = time.time()
+
             synthesized_vm = SynthesizedVM(launch_disk, launch_mem, fuse)
 
-        synthesized_vm.start()
-        synthesized_vm.join()
+            synthesized_vm.start()
+            synthesized_vm.join()
 
-        # to be delete
-        #libvirt_xml = synthesized_vm.new_xml_str
-        #vmpaths = [base_diskpath, base_diskmeta, base_mempath, base_memmeta]
-        #base_hashvalue = metadata.get(Cloudlet_Const.META_BASE_VM_SHA256, None)
-        #ds = HandoffDataRecv()
-        #ds.save_data(vmpaths, base_hashvalue, libvirt_xml, "qemu:///session")
-        #ds.to_file("/home/stack/cloudlet/provisioning/handff_recv_data")
+            # since libvirt does not return immediately after resuming VM, we
+            # measure resume time directly from QEMU
+            actual_resume_time = 0
+            splited_log = open("/tmp/qemu_debug_messages", "r").read().split("\n")
+            for line in splited_log:
+                if line.startswith("INCOMING_FINISH"):
+                    actual_resume_time = float(line.split(" ")[-1])
 
-        # since libvirt does not return immediately after resuming VM, we
-        # measure resume time directly from QEMU
-        actual_resume_time = 0
-        splited_log = open("/tmp/qemu_debug_messages", "r").read().split("\n")
-        for line in splited_log:
-            if line.startswith("INCOMING_FINISH"):
-                actual_resume_time = float(line.split(" ")[-1])
-        time_resume_end = time.time()
-        LOG.info("[time] non-pipelined time %f (%f ~ %f ~ %f)" % (
-            actual_resume_time-time_fuse_start,
-            time_fuse_start,
-            time_fuse_end,
-            actual_resume_time,
-        ))
+            LOG.info("[time] non-pipelined time %f (%f ~ %f ~ %f)" % (
+                actual_resume_time-time_fuse_start,
+                time_fuse_start,
+                time_fuse_end,
+                actual_resume_time,
+            ))
 
-        ack_data = struct.pack("!Qd", 0x10, actual_resume_time)
-        LOG.info("send ack to client: %d" % len(ack_data))
-        self.request.sendall(ack_data)
-        LOG.info("finished")
+            ack_data = struct.pack("!Qd", 0x10, actual_resume_time)
+            LOG.info("send ack to client: %d" % len(ack_data))
+            self.request.sendall(ack_data)
 
-        if self.server.handoff_data == None:
             connect_vnc(synthesized_vm.machine, True)
 
             signal.signal(signal.SIGUSR1, handlesig)
@@ -640,21 +711,18 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             synthesized_vm.monitor.join()
             synthesized_vm.terminate()
 
-
-
-
     def terminate(self):
         # force terminate when something wrong in handling request
         # do not wait for joinining
-        if hasattr(self, 'delta_proc') and self.delta_proc != None:
+        if hasattr(self, 'delta_proc') and self.delta_proc is not None:
             self.delta_proc.finish()
             if self.delta_proc.is_alive():
                 self.delta_proc.terminate()
             self.delta_proc = None
-        if hasattr(self, 'resumed') and self.resumed_VM != None:
+        if hasattr(self, 'resumed') and self.resumed_VM is not None:
             self.resumed_VM.terminate()
             self.resumed_VM = None
-        if hasattr(self, 'fuse') and self.fuse != None:
+        if hasattr(self, 'fuse') and self.fuse is not None:
             self.fuse.terminate()
             self.fuse = None
         if hasattr(self, 'overlay_pipe') and os.path.exists(self.overlay_pipe):
@@ -662,18 +730,9 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         if hasattr(self, 'tmp_overlay_dir') and os.path.exists(self.tmp_overlay_dir):
             shutil.rmtree(self.tmp_overlay_dir)
 
-def get_local_ipaddress():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(("gmail.com",80))
-    ipaddress = (s.getsockname()[0])
-    s.close()
-    return ipaddress
-
-
 class StreamSynthesisConst(object):
     SERVER_PORT_NUMBER = 8022
     VERSION = 0.1
-
 
 class StreamSynthesisServer(SocketServer.TCPServer):
     def __init__(self, port_number=StreamSynthesisConst.SERVER_PORT_NUMBER,
@@ -710,7 +769,7 @@ class StreamSynthesisServer(SocketServer.TCPServer):
 
     def _load_handoff_data(self, filepath):
         handoff_data = HandoffDataRecv.from_file(filepath)
-        if handoff_data == None:
+        if handoff_data is None:
             raise StreamSynthesisError("Invalid handoff recv data at %s" % filepath)
         LOG.info("Load handoff data file at %s" % filepath)
         return handoff_data
@@ -737,7 +796,6 @@ class StreamSynthesisServer(SocketServer.TCPServer):
             except Exception as e:
                 msg = "Failed to deallocate resources for Session : %s" % str(session_id)
                 LOG.warning(msg)
-        LOG.info("[TERMINATE] Finish synthesis server connection")
 
     def check_basevm(self, base_vm_paths, hash_value):
         ret_list = list()
