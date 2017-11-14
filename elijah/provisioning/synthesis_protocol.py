@@ -58,3 +58,4 @@ class Protocol(object):
     SYNTHESIS_OPTION_DISPLAY_VNC = "option_display_vnc"
     SYNTHESIS_OPTION_EARLY_START = "option_early_start"
     SYNTHESIS_OPTION_SHOW_STATISTICS = "option_show_statistics"
+    SYNTHESIS_OPTION_INTERFACE = "option_interface"
