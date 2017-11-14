@@ -77,6 +77,7 @@ class Protocol(object):
     SYNTHESIS_OPTION_DISPLAY_VNC = "option_display_vnc"
     SYNTHESIS_OPTION_EARLY_START = "option_early_start"
     SYNTHESIS_OPTION_SHOW_STATISTICS = "option_show_statistics"
+    SYNTHESIS_OPTION_INTERFACE = "option_interface"
 
 
 def default_app_function():
@@ -539,6 +540,9 @@ def process_command_line(argv):
     parser.add_option('-e', '--early_start', action='store_true',
                       dest='early_start', default=False,
                       help='Turn on early start mode for faster application execution (Default False)')
+    parser.add_option('-i', '--interface',
+                      dest='interface', default=None,
+                      help='Interface to connect to the VM (Default: no interface)')
     settings, args = parser.parse_args(argv)
 
     if settings.overlay_file is None and settings.overlay_url is None:
@@ -559,6 +563,8 @@ def main(argv=None):
     synthesis_option = dict()
     synthesis_option[Protocol.SYNTHESIS_OPTION_DISPLAY_VNC] = settings.display_vnc
     synthesis_option[Protocol.SYNTHESIS_OPTION_EARLY_START] = settings.early_start
+    if settings.interface:
+        synthesis_option[Protocol.SYNTHESIS_OPTION_INTERFACE] = settings.interface
     cloudlet_ip = None
     if settings.server_ip:
         cloudlet_ip = settings.server_ip

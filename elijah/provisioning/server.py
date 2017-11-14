@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #
 # Cloudlet Infrastructure for Mobile Computing
 #
@@ -109,7 +109,7 @@ class SessionResource(object):
         if overlay_dir and os.path.exists(overlay_dir):
             shutil.rmtree(overlay_dir)
             del self.resource_dict[SessionResource.OVERLAY_DIR]
-        if overlay_db_entry: 
+        if overlay_db_entry:
             overlay_db_entry.terminate()
 
 
@@ -152,7 +152,7 @@ class NetworkUtil(object):
 class NetworkStepThread(threading.Thread):
     MAX_REQUEST_SIZE = 1024*512 # 512 KB
 
-    def __init__(self, network_handler, overlay_urls, overlay_urls_size, 
+    def __init__(self, network_handler, overlay_urls, overlay_urls_size,
             demanding_queue, out_queue, time_queue, chunk_size):
         self.network_handler = network_handler
         self.read_stream = network_handler.rfile
@@ -172,7 +172,7 @@ class NetworkStepThread(threading.Thread):
     def receive_overlay_blobs(self):
         total_read_size = 0
         counter = 0
-        index = 0 
+        index = 0
         finished_url = dict()
         requesting_list = list()
         out_of_order_count = 0
@@ -315,14 +315,14 @@ class DecompStepProc(Process):
         end_time = time.time()
         self.time_queue.put({'start_time':start_time, 'end_time':end_time})
         LOG.info("[Decomp] : (%s)-(%s)=(%s) (%d loop, %d bytes)" % \
-                (start_time, end_time, (end_time-start_time), 
+                (start_time, end_time, (end_time-start_time),
                 counter, data_size))
 
 
 class URLFetchStep(threading.Thread):
     MAX_REQUEST_SIZE = 1024*512 # 512 KB
 
-    def __init__(self, overlay_package, overlay_files, overlay_files_size, 
+    def __init__(self, overlay_package, overlay_files, overlay_files_size,
             demanding_queue, out_queue, time_queue, chunk_size):
         self.overlay_files = overlay_files
         self.overlay_files_size = overlay_files_size
@@ -407,7 +407,8 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
     synthesis_option = {
             Protocol.SYNTHESIS_OPTION_DISPLAY_VNC : False,
             Protocol.SYNTHESIS_OPTION_EARLY_START : False,
-            Protocol.SYNTHESIS_OPTION_SHOW_STATISTICS : False
+            Protocol.SYNTHESIS_OPTION_SHOW_STATISTICS : False,
+            Protocol.SYNTHESIS_OPTION_INTERFACE: None,
             }
 
     def ret_fail(self, message):
@@ -526,22 +527,25 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
         # overlay
         demanding_queue = Queue()
         download_queue = JoinableQueue()
-        download_process = NetworkStepThread(self, 
-                    overlay_urls, overlay_urls_size, demanding_queue, 
-                    download_queue, time_transfer, Synthesis_Const.TRANSFER_SIZE, 
+        download_process = NetworkStepThread(self,
+                    overlay_urls, overlay_urls_size, demanding_queue,
+                    download_queue, time_transfer, Synthesis_Const.TRANSFER_SIZE,
                     )
         decomp_process = DecompStepProc(
                 download_queue, self.overlay_pipe, time_decomp, temp_overlay_file,
                 )
         modified_img, modified_mem, self.fuse, self.delta_proc, self.fuse_proc = \
-                synthesis.recover_launchVM(base_path, meta_info, self.overlay_pipe, 
+                synthesis.recover_launchVM(base_path, meta_info, self.overlay_pipe,
                         log=sys.stdout, demanding_queue=demanding_queue)
         self.delta_proc.time_queue = time_delta # for measurement
         self.fuse_proc.time_queue = time_fuse # for measurement
 
         if self.synthesis_option.get(Protocol.SYNTHESIS_OPTION_EARLY_START, False):
             # 1. resume VM
-            self.resumed_VM = synthesis.SynthesizedVM(modified_img, modified_mem, self.fuse)
+            self.resumed_VM = synthesis.SynthesizedVM(
+                modified_img, modified_mem, self.fuse,
+                interface=self.synthesis_option.get(
+                    Protocol.SYNTHESIS_OPTION_INTERFACE))
             time_start_resume = time.time()
             self.resumed_VM.start()
             time_end_resume = time.time()
@@ -567,7 +571,10 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
             self.fuse_proc.start()
 
             # 2. resume VM
-            self.resumed_VM = synthesis.SynthesizedVM(modified_img, modified_mem, self.fuse)
+            self.resumed_VM = synthesis.SynthesizedVM(
+                modified_img, modified_mem, self.fuse,
+                interface=self.synthesis_option.get(
+                    Protocol.SYNTHESIS_OPTION_INTERFACE))
             self.resumed_VM.start()
 
             # 3. wait for fuse end
@@ -667,7 +674,7 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
             return
         if meta_info.get(Cloudlet_Const.META_OVERLAY_FILES, None) is None:
             self.ret_fail("No overlay files are listed")
-            return 
+            return
 
         # return success get overlay URL
         self.ret_success(Protocol.MESSAGE_COMMAND_SEND_META)
@@ -716,21 +723,24 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
         # overlay
         demanding_queue = Queue()
         download_queue = JoinableQueue()
-        download_process = URLFetchStep(overlay_package, overlay_urls, 
-                overlay_urls_size, demanding_queue, download_queue, 
+        download_process = URLFetchStep(overlay_package, overlay_urls,
+                overlay_urls_size, demanding_queue, download_queue,
                 time_transfer, Synthesis_Const.TRANSFER_SIZE, )
         decomp_process = DecompStepProc(
                 download_queue, self.overlay_pipe, time_decomp, temp_overlay_file,
                 )
         modified_img, modified_mem, self.fuse, self.delta_proc, self.fuse_proc = \
-                synthesis.recover_launchVM(base_path, meta_info, self.overlay_pipe, 
+                synthesis.recover_launchVM(base_path, meta_info, self.overlay_pipe,
                         log=sys.stdout, demanding_queue=demanding_queue)
         self.delta_proc.time_queue = time_delta # for measurement
         self.fuse_proc.time_queue = time_fuse # for measurement
 
         if self.synthesis_option.get(Protocol.SYNTHESIS_OPTION_EARLY_START, False):
             # 1. resume VM
-            self.resumed_VM = synthesis.SynthesizedVM(modified_img, modified_mem, self.fuse)
+            self.resumed_VM = synthesis.SynthesizedVM(
+                modified_img, modified_mem, self.fuse,
+                interface=self.synthesis_option.get(
+                    Protocol.SYNTHESIS_OPTION_INTERFACE))
             time_start_resume = time.time()
             self.resumed_VM.start()
             time_end_resume = time.time()
@@ -756,7 +766,10 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
             self.fuse_proc.start()
 
             # 2. resume VM
-            self.resumed_VM = synthesis.SynthesizedVM(modified_img, modified_mem, self.fuse)
+            self.resumed_VM = synthesis.SynthesizedVM(
+                modified_img, modified_mem, self.fuse,
+                interface=self.synthesis_option.get(
+                    Protocol.SYNTHESIS_OPTION_INTERFACE))
             self.resumed_VM.start()
 
             # 3. wait for fuse end
@@ -859,7 +872,7 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
 
     def handle(self):
         '''Handle request from the client
-        Each request follows this format: 
+        Each request follows this format:
 
         | message_pack size | message_pack data |
         |   (4 bytes)       | (variable length) |
@@ -1120,4 +1133,3 @@ class SynthesisServer(SocketServer.TCPServer):
             LOG.error("[Error] NO valid Base VM")
             sys.exit(2)
         return ret_list
-
