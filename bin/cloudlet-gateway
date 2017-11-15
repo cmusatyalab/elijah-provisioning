@@ -21,7 +21,7 @@ def main():
             "Path to store the cloudlet overlays uploaded. "
             "(Default: /var/lib/cloudlet/uploads/overlays)"))
     parser.add_argument(
-        '-h', '--host', default='0.0.0.0',
+        '-l', '--listen', default='0.0.0.0',
         help=(
             "Host IP address to listen on. (Default: 0.0.0.0)"))
     parser.add_argument(
@@ -39,7 +39,7 @@ def main():
     run_server(
         config_file=args.config,
         overlays_path=args.upload_path, debug=args.debug,
-        host=args.host, port=int(args.port))
+        host=args.listen, port=int(args.port))
 
 
 if __name__ == "__main__":
