@@ -1,0 +1,38 @@
+#!/usr/bin/python
+
+import os
+import sys
+
+from elijah.gateway import run_server
+
+
+def main():
+    """Entry point for application."""
+    parser = argparse.ArgumentParser(description='Cloudlet Gateway')
+    parser.add_argument(
+        '-c', '--config',
+        help=(
+            "Path to configuration file to load. "
+            "(Default: /etc/cloudlet/config.yaml)"))
+    parser.add_argument(
+        '-u', '--upload-path',
+        help=(
+            "Path to store the cloudlet overlays uploaded. "
+            "(Default: /var/lib/cloudlet/uploads/overlays)"))
+    parser.add_argument(
+        '-d', '--debug',
+        action="store_true", default=False, help="Enable debug mode")
+    parser.add_argument('-b', action="store", dest="b")
+    parser.add_argument('-c', action="store", dest="c", type=int)
+    args = parser.parse_args()
+
+    if os.geteuid() != 0:
+        print('%s: must be ran as root' % sys.argv[0])
+        sys.exit(1)
+    run_server(
+        config_file=args.config,
+        overlays_path=args.upload_path, debug=args.debug)
+
+
+if __name__ == "__main__":
+    main()
