@@ -232,7 +232,7 @@ def run_server(config_file=None, overlays_path=None, debug=False):
         data = stream.read().strip()
         if not data:
             raise MissingConfigError("'%s' is empty." % config_file)
-        config = yaml.load(stream.read())
+        config = yaml.load(data)
     if not os.path.exists(overlays_path):
         os.makedirs(overlays_path)
     app.config['CLOUDLET_CONFIG'] = config
