@@ -23,8 +23,6 @@ def main():
     parser.add_argument(
         '-d', '--debug',
         action="store_true", default=False, help="Enable debug mode")
-    parser.add_argument('-b', action="store", dest="b")
-    parser.add_argument('-c', action="store", dest="c", type=int)
     args = parser.parse_args()
 
     if os.geteuid() != 0:
