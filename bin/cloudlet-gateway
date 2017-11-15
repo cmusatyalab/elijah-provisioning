@@ -21,6 +21,10 @@ def main():
             "Path to store the cloudlet overlays uploaded. "
             "(Default: /var/lib/cloudlet/uploads/overlays)"))
     parser.add_argument(
+        '-p', '--port', default=80,
+        help=(
+            "Port to run the gateway on. (Default: 80)"))
+    parser.add_argument(
         '-d', '--debug',
         action="store_true", default=False, help="Enable debug mode")
     args = parser.parse_args()
@@ -30,7 +34,7 @@ def main():
         sys.exit(1)
     run_server(
         config_file=args.config,
-        overlays_path=args.upload_path, debug=args.debug)
+        overlays_path=args.upload_path, debug=args.debug, port=int(args.port))
 
 
 if __name__ == "__main__":
