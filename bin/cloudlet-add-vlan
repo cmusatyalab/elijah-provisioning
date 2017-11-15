@@ -1,0 +1,80 @@
+#!/bin/bash
+
+if [ "$(id -u)" != "0" ]; then
+    echo "This script must be run as root, and requires the following packages:"
+    echo "    bridge-utils vlan dnsmasq openvpn"
+    exit 2
+fi
+
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 <interface> <vid> [vid...]"
+    echo
+    echo "Adds the specified VLAD IDs (VIDs) to the given interface."
+    echo ""
+    echo "To make IP addressing convenient, VIDs must be nubered from"
+    echo "    1 <= vid <= 255"
+    echo "(Usage of VLAN 1 is not recommended.)"
+    echo ""
+    echo "IPv4 addresses will be allocated from the carrier-grade NAT space for"
+    echo "each VLAN, in the format:"
+    echo "    100.64.<vid>.1/24"
+    exit 1
+fi
+
+IFACE=$1
+shift
+VIDS="$@"
+
+# Ensure we're in the directory containing all the helper scripts.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "Adding VIDs to interface: $IFACE"
+echo ""
+
+# Ensure VLAN support is loaded into the kernel.
+modprobe 8021q
+
+# Use "vlanNNNN" naming, so that long interface names (such as those
+# on the Orange Box) don't overflow the 15-character limit.
+vconfig set_name_type VLAN_PLUS_VID_NO_PAD > /dev/null
+
+# Add each VID
+for VID in $VIDS; do
+    # Add the VLAN (and ensure it is set link-up).
+    TENANT=tenant$VID
+    TENANT_IFNAME=tenant$VID
+    VETH_IFNAME=veth$VID
+    NETNS_RUN="ip netns exec $TENANT"
+    ip netns add $TENANT 2> /dev/null
+    ip link add $TENANT_IFNAME type veth peer name $VETH_IFNAME
+    ip link set $VETH_IFNAME netns $TENANT
+    vconfig add $IFACE $VID 2> /dev/null
+    ip link set dev vlan$VID up 2> /dev/null
+    # Add the VLAN to a bridge, so that we can attach to it.
+    brctl addbr br-vlan$VID 2> /dev/null
+    brctl addif br-vlan$VID vlan$VID 2> /dev/null
+    brctl addif br-vlan$VID $TENANT_IFNAME 2> /dev/null
+    # Add an IP address from the CGN space (RFC 6598) for each VLAN.
+    ip addr add 100.65.$VID.1/30 dev br-vlan$VID
+    $NETNS_RUN ip addr add 100.65.$VID.2/30 dev $VETH_IFNAME 2> /dev/null
+    $NETNS_RUN ip addr add 100.64.$VID.1/24 dev $VETH_IFNAME 2> /dev/null
+    $NETNS_RUN ip link set dev lo up
+    ip link set dev $TENANT_IFNAME up
+    $NETNS_RUN ip link set dev $VETH_IFNAME up
+    ip link set dev br-vlan$VID up
+    $NETNS_RUN ip route add default via 100.65.$VID.1
+    $NETNS_RUN iptables --table nat --append POSTROUTING --out-interface $VETH_IFNAME --source 100.64.$VID.0/24 --jump SNAT --to-source 100.65.$VID.2
+    iptables --table nat --insert POSTROUTING --source 100.65.$VID.2 -j MASQUERADE
+    echo "Allocated VLAN $VID:"
+    ip addr show dev br-vlan$VID
+    echo
+done
+
+echo
+echo
+
+for VID in $VIDS; do
+    echo "Starting dnsmasq on VLAN $VID"
+    ./cloudlet-net--start-dnsmasq $VID
+done
