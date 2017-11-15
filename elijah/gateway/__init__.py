@@ -9,8 +9,6 @@ from elijah.provisioning.synthesis_client import Client, Protocol
 
 app = Flask(__name__)
 
-config = None
-networks = {}
 network_lock = threading.Lock()
 
 
@@ -45,12 +43,13 @@ def get_all_networks():
     exist on at least one cloudlet.
     """
     found_networks = set()
-    for cloudlet, data in config['cloudlets'].items():
+    for cloudlet, data in app.config['CLOUDLET_CONFIG']['cloudlets'].items():
         for network, interface in data['networks'].items():
             found_networks.add(network)
     return {
         network: interface
-        for network, interface in config['networks'].items()
+        for network, interface in (
+            app.config['CLOUDLET_CONFIG']['networks'].items()):
         if network in found_networks
     }
 
@@ -58,10 +57,9 @@ def get_all_networks():
 @synchronized(network_lock)
 def atomic_network_allocate(user_id):
     """Reserve a free network for `user_id`."""
-    global networks
     used_networks = [
         network['network']
-        for network in networks
+        for _, network in app.config['CLOUDLET_STATE'].items()
     ]
     available_networks = [
         network
@@ -75,11 +73,11 @@ def atomic_network_allocate(user_id):
     selected_network = available_networks[0]
     app.logger.info(
         "selected new network '%s' for user '%s'", selected_network, user_id)
-    networks[user_id] = {
+    app.config['CLOUDLET_STATE'][user_id] = {
         'network': selected_network,
         'apps': {},
     }
-    return networks[user_id]
+    return app.config['CLOUDLET_STATE'][user_id]
 
 
 @synchronized(network_lock)
@@ -96,13 +94,12 @@ def atomic_network_release(user_id, app_id):
         app.logger.info(
             "releasing network '%s' for user '%s', no apps running",
             network['network'], user_id)
-        del networks[user_id]
+        del app.config['CLOUDLET_STATE'][user_id]
 
 
 def get_user_network(user_id, create=False):
     """Return the tenant network for the user to use."""
-    global networks
-    network = networks.get(user_id)
+    network = app.config['CLOUDLET_STATE'].get(user_id)
     if network is None and create:
         return atomic_network_allocate(user_id)
     return network
@@ -125,7 +122,7 @@ def get_network_and_app(user_id, app_id):
 def select_cloudlet(network):
     """Select the best cloudlet to start a new VM on."""
     found_cloudlets = {}
-    for cloudlet, data in config['cloudlets'].items():
+    for cloudlet, data in app.config['CLOUDLET_CONFIG']['cloudlets'].items():
         for connected_network, interface in data['networks'].items():
             if connected_network == network:
                 found_cloudlets[cloudlet] = data
@@ -134,7 +131,7 @@ def select_cloudlet(network):
     def _cloudlet_sorter(cloudlet):
         return sum(
             len(network['apps'])
-            for _, network in networks.items()
+            for _, network in app.config['CLOUDLET_STATE'].items()
         )
     sorted_cloudlets = sorted(found_cloudlets.keys(), key=_cloudlet_sorter)
     if not sorted_cloudlets:
@@ -224,7 +221,6 @@ def index():
 
 def run_server(config_file=None, overlays_path=None, debug=False):
     """Run the flask server."""
-    global config
     if not config_file:
         config_file = os.path.join('/etc', 'cloudlet', 'config.yaml')
     if not overlays_path:
@@ -239,6 +235,8 @@ def run_server(config_file=None, overlays_path=None, debug=False):
         config = yaml.load(stream.read())
     if not os.path.exists(overlays_path):
         os.makedirs(overlays_path)
+    app.config['CLOUDLET_CONFIG'] = config
+    app.config['CLOUDLET_STATE'] = {}
     app.config['OVERLAYS_PATH'] = overlays_path
     app.run(debug=debug)
 
