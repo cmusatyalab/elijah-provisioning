@@ -2,6 +2,7 @@
 import os
 import threading
 from collections import defaultdict
+from subprocess import check_call
 
 import yaml
 from flask import Flask, abort, request
@@ -36,6 +37,11 @@ def synchronized(lock):
     return wrap
 
 
+def get_app_state():
+    """Return the state of the application."""
+    return app.config['CLOUDLET_STATE']
+
+
 def get_all_networks():
     """Return all the networks available.
 
@@ -59,7 +65,7 @@ def atomic_network_allocate(user_id):
     """Reserve a free network for `user_id`."""
     used_networks = [
         network['network']
-        for _, network in app.config['CLOUDLET_STATE'].items()
+        for _, network in get_app_state().items()
     ]
     available_networks = [
         network
@@ -73,11 +79,11 @@ def atomic_network_allocate(user_id):
     selected_network = available_networks[0]
     app.logger.info(
         "selected new network '%s' for user '%s'", selected_network, user_id)
-    app.config['CLOUDLET_STATE'][user_id] = {
+    get_app_state()[user_id] = {
         'network': selected_network,
         'apps': {},
     }
-    return app.config['CLOUDLET_STATE'][user_id]
+    return get_app_state()[user_id]
 
 
 @synchronized(network_lock)
@@ -94,12 +100,12 @@ def atomic_network_release(user_id, app_id):
         app.logger.info(
             "releasing network '%s' for user '%s', no apps running",
             network['network'], user_id)
-        del app.config['CLOUDLET_STATE'][user_id]
+        del get_app_state()[user_id]
 
 
 def get_user_network(user_id, create=False):
     """Return the tenant network for the user to use."""
-    network = app.config['CLOUDLET_STATE'].get(user_id)
+    network = get_app_state().get(user_id)
     if network is None and create:
         return atomic_network_allocate(user_id)
     return network
@@ -131,7 +137,7 @@ def select_cloudlet(network):
     def _cloudlet_sorter(cloudlet):
         return sum(
             len(network['apps'])
-            for _, network in app.config['CLOUDLET_STATE'].items()
+            for _, network in get_app_state().items()
         )
     sorted_cloudlets = sorted(found_cloudlets.keys(), key=_cloudlet_sorter)
     if not sorted_cloudlets:
@@ -139,6 +145,32 @@ def select_cloudlet(network):
     data = found_cloudlets[sorted_cloudlets[0]]
     data['name'] = sorted_cloudlets[0]
     return data
+
+
+@synchronized(network_lock)
+def start_network(network):
+    """Start the networking for the network."""
+    started = network.get('open', False)
+    if started:
+        return
+    app.logger.info("starting network '%s'", network['network'])
+    config = app.config['CLOUDLET_CONFIG']
+    net_info = config['networks'][network['network']]
+    check_call(['cloudlet-add-vlan', net_info['interface'], net_info['vid'])
+    network['open'] = True
+
+
+@synchronized(network_lock)
+def stop_network(network):
+    """Stop the networking for the network."""
+    started = network.get('open', False)
+    if not started:
+        return
+    app.logger.info("stopping network '%s'", network['network'])
+    config = app.config['CLOUDLET_CONFIG']
+    net_info = config['networks'][network['network']]
+    check_call(['cloudlet-delete-vlan', net_info['vid'])
+    del network['open']
 
 
 def launch_vm(cloudlet, network, overlay_path):
@@ -192,6 +224,9 @@ def index():
                     user_id, app_id))
             if overlay_file:
                 overlay_file.save(overlay_path)
+            else:
+                abort(400)
+            start_network(network)
             app.logger.info(
                 "starting app '%s' for user '%s' on cloudlet server '%s' "
                 "connected to network '%s'",
@@ -211,6 +246,8 @@ def index():
             network, user_app = get_network_and_app(user_id, app_id)
             user_app['client'].terminate()
             atomic_network_release(user_id, app_id)
+            if get_user_network(user_id) is None:
+                stop_network(network)
             return "Success"
         else:
             abort(400)
