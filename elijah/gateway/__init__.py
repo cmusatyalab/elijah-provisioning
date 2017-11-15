@@ -156,7 +156,8 @@ def start_network(network):
     app.logger.info("starting network '%s'", network['network'])
     config = app.config['CLOUDLET_CONFIG']
     net_info = config['networks'][network['network']]
-    check_call(['cloudlet-add-vlan', net_info['interface'], net_info['vid']])
+    check_call(
+        ['cloudlet-add-vlan', net_info['interface'], str(net_info['vid'])])
     network['open'] = True
 
 
@@ -169,7 +170,7 @@ def stop_network(network):
     app.logger.info("stopping network '%s'", network['network'])
     config = app.config['CLOUDLET_CONFIG']
     net_info = config['networks'][network['network']]
-    check_call(['cloudlet-delete-vlan', net_info['vid']])
+    check_call(['cloudlet-delete-vlan', str(net_info['vid'])])
     del network['open']
 
 
