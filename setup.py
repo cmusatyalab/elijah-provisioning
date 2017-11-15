@@ -89,6 +89,7 @@ setup(
     scripts=script_files+executable_files,
     packages=[
         'elijah',
+        'elijah.gateway',
         'elijah.provisioning',
         'elijah.provisioning.db',
     ],
@@ -97,7 +98,7 @@ setup(
     ],
     requires=[
         'pyliblzma(>=0.5.3)',
-        # due to openstack. OpenStack Grizzly is not 
+        # due to openstack. OpenStack Grizzly is not
         # compatible with latest version of sqlalchemy
         'sqlalchemy(==0.7.2)',
     ],
