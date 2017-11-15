@@ -49,7 +49,7 @@ def get_all_networks():
     return {
         network: interface
         for network, interface in (
-            app.config['CLOUDLET_CONFIG']['networks'].items()):
+            app.config['CLOUDLET_CONFIG']['networks'].items())
         if network in found_networks
     }
 
