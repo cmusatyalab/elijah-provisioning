@@ -1,0 +1,38 @@
+#!/bin/bash
+
+if [ "$(id -u)" != "0" ]; then
+    echo "This script must be run as root, and requires the following packages:"
+    echo "    bridge-utils vlan dnsmasq openvpn"
+    exit 2
+fi
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <vid> [vid...]"
+    echo
+    echo "Deletes the specified cloudlet VLAN(s)."
+    exit 1
+fi
+
+VIDS="$@"
+
+# Ensure we're in the directory containing all the helper scripts.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+for VID in $VIDS; do
+    echo "Stopping dnsmasq on VLAN $VID"
+    ./cloudlet-net--stop-dnsmasq $VID
+done
+
+# Add each VID
+for VID in $VIDS; do
+    TENANT=tenant$VID
+    TENANT_IFNAME=tenant$VID
+    VETH_IFNAME=veth$VID
+    NETNS_RUN="ip netns exec $TENANT"
+    ip netns delete $TENANT
+    ip link delete $TENANT_IFNAME
+    ip link delete br-vlan$VID
+    iptables --table nat --delete POSTROUTING --source 100.65.$VID.2 -j MASQUERADE
+    echo "Deleted VLAN $VID."
+done

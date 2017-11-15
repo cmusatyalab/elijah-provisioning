@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ "$(id -u)" != "0" ]; then
+    echo "This script must be run as root."
+    exit 2
+fi
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <vid>"
+    echo
+    echo "Stops dnsmasq on the specified cloudlet VID."
+    exit 1
+fi
+
+VID=$1
+
+STATE_DIR="/var/lib/maas-cloudlet/dnsmasq"
+PID_FILE=$STATE_DIR/dnsmasq-vlan-$VID.pid
+
+if [ -f "$PID_FILE" ]; then
+    kill "$(cat $PID_FILE)" 2> /dev/null
+fi
