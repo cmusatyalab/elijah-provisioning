@@ -256,7 +256,9 @@ def index():
         return "Found"
 
 
-def run_server(config_file=None, overlays_path=None, debug=False, port=None):
+def run_server(
+        config_file=None, overlays_path=None, debug=False,
+        host=None, port=None):
     """Run the flask server."""
     if not config_file:
         config_file = os.path.join('/etc', 'cloudlet', 'config.yaml')
@@ -275,7 +277,7 @@ def run_server(config_file=None, overlays_path=None, debug=False, port=None):
     app.config['CLOUDLET_CONFIG'] = config
     app.config['CLOUDLET_STATE'] = {}
     app.config['OVERLAYS_PATH'] = overlays_path
-    app.run(debug=debug, port=port)
+    app.run(debug=debug, host=host, port=port)
 
 
 if __name__ == '__main__':
