@@ -1,6 +1,7 @@
 
 
 class LeaseEntry(object):
+    """Single lease entry."""
 
     def __init__(self, line=None):
         self.line = line
@@ -8,13 +9,14 @@ class LeaseEntry(object):
         self.ip = ''
         self.parse(line)
 
-        def parse(self, line):
-            fields = map(str.strip, line.split(' '))
-            self.mac = fields[1]
-            self.ip = fields[2]
+    def parse(self, line):
+        fields = map(str.strip, line.split(' '))
+        self.mac = fields[1]
+        self.ip = fields[2]
 
 
 class Leases(object):
+    """Parse dnsmasq lease file."""
 
     def __init__(self, filepath):
         self.filepath = filepath
