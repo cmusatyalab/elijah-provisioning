@@ -6,8 +6,8 @@ if [ "$(id -u)" != "0" ]; then
     exit 2
 fi
 
-if [ $# -lt 2 ]; then
-    echo "Usage: $0 <interface> <vid> [vid...]"
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 [interface] <vid> [vid...]"
     echo
     echo "Adds the specified VLAD IDs (VIDs) to the given interface."
     echo ""
@@ -18,16 +18,30 @@ if [ $# -lt 2 ]; then
     echo "IPv4 addresses will be allocated from the carrier-grade NAT space for"
     echo "each VLAN, in the format:"
     echo "    100.64.<vid>.1/24"
+    echo ""
+    echo "If the first argument is non-numeric, it will be interpreted as an"
+    echo "interface name. Otherwise, the interface for the default route will"
+    echo "be used."
     exit 1
 fi
-
-IFACE=$1
-shift
-VIDS="$@"
 
 # Ensure we're in the directory containing all the helper scripts.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+case "$1" in
+    # If $1 is all-numbers, it's a VID, not an interface name.
+    [0-9]*)
+        IFACE=$(./cloudlet-net--get-default-interface)
+        ;;
+    *)
+        IFACE=$1
+        shift
+        ;;
+esac
+
+VIDS="$@"
+
 
 echo "Adding VIDs to interface: $IFACE"
 echo ""
