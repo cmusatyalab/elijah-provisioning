@@ -6,7 +6,8 @@ from collections import defaultdict
 from subprocess import check_call
 
 import yaml
-from flask import Flask, abort, request
+from flask import Flask, abort, jsonify, request
+from elijah.gateway.lease_parser import Leases
 from elijah.provisioning.synthesis_client import Client, Protocol
 
 app = Flask(__name__)
@@ -203,6 +204,21 @@ def launch_vm(cloudlet, network, mac, overlay_path):
     return cloudlet_client
 
 
+def wait_for_ip(network, mac):
+    """Wait for the IP address for `mac` on `network`."""
+    config = app.config['CLOUDLET_CONFIG']
+    net_info = config['networks'][network]
+    leases_path = os.path.join(
+        '/var/lib/cloudlet/dnsmasq/vlan-%d.leases' % net_info['vid'])
+    for _ in range(4 * 30):  # 30 seconds.
+        leases = Leases(leases_path)
+        for entry in leases.entries():
+            if entry.mac.lower() == mac.lower():
+                return entry.ip
+        time.sleep(0.25)
+    return None
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     """Endpoint to get app information and to start a new application."""
@@ -253,10 +269,29 @@ def index():
                 "connected to network '%s' with MAC '%s'",
                 app_id, user_id, selected_cloudlet['name'], network['network'],
                 interface_mac)
+            app.logger.info(
+                "waiting for app '%s' for user '%s' on cloudlet server '%s' "
+                "connected to network '%s' with MAC '%s' to get an IP address",
+                app_id, user_id, selected_cloudlet['name'], network['network'],
+                interface_mac)
+            vm_ip = wait_for_ip(network['network'], interface_mac)
+            if not vm_ip:
+                # Never got an IP address, so lets stop the client.
+                app.logger.error(
+                    "failed waiting for IP address for app '%s' for user '%s' "
+                    "on cloudlet server '%s' connected to network '%s' "
+                    "with MAC '%s'",
+                    app_id, user_id, selected_cloudlet['name'],
+                    network['network'], interface_mac)
+                cloudlet_client.terminate()
+                if get_user_network(user_id) is None:
+                    stop_network(network)
+                abort(400)
             network['apps'][app_id] = {
                 'cloudlet': selected_cloudlet,
                 'client': cloudlet_client,
                 'mac': interface_mac,
+                'ip': vm_ip,
             }
             return "Success"
         elif action == "delete":
@@ -270,7 +305,10 @@ def index():
             abort(400)
     else:
         network, user_app = get_network_and_app(user_id, app_id)
-        return "Found"
+        return jsonify({
+            'mac': user_app['mac'],
+            'ip': vm_ip,
+        })
 
 
 def run_server(
