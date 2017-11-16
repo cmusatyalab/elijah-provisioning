@@ -1,0 +1,3 @@
+#!/bin/bash
+
+ip r g 8.8.8.8 | grep -o 'src .*' | head -1 | awk '{print $2}'

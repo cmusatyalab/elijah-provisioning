@@ -42,6 +42,10 @@ esac
 
 VIDS="$@"
 
+# The IP address that will listen for VPN connections.
+# This is done indirectly, via an iptables rule.
+LISTEN_IP=${LISTEN_IP:-$(./cloudlet-net--get-default-source-ip)}
+CLOUDLET_VPN_PORT_OFFSET=${CLOUDLET_VPN_PORT_OFFSET:-2000}
 
 echo "Adding VIDs to interface: $IFACE"
 echo ""
@@ -60,6 +64,7 @@ for VID in $VIDS; do
     TENANT_IFNAME=tenant$VID
     VETH_IFNAME=veth$VID
     NETNS_RUN="ip netns exec $TENANT"
+    VPN_PORT=$(($CLOUDLET_VPN_PORT_OFFSET+$VID))
     ip netns add $TENANT 2> /dev/null
     ip link add $TENANT_IFNAME type veth peer name $VETH_IFNAME
     ip link set $VETH_IFNAME netns $TENANT
@@ -78,8 +83,12 @@ for VID in $VIDS; do
     $NETNS_RUN ip link set dev $VETH_IFNAME up
     ip link set dev br-vlan$VID up
     $NETNS_RUN ip route add default via 100.65.$VID.1
+    # Rules to allow traffic from the VMs to access the internet.
     $NETNS_RUN iptables --table nat --append POSTROUTING --out-interface $VETH_IFNAME --source 100.64.$VID.0/24 --jump SNAT --to-source 100.65.$VID.2
     iptables --table nat --insert POSTROUTING --source 100.65.$VID.2 -j MASQUERADE
+    # Rules to allow VPN clients to connect.
+    iptables -t nat -I PREROUTING -p udp -d $LISTEN_IP --dport $VPN_PORT -j DNAT --to-destination 100.65.$VID.2:$VPN_PORT
+    iptables -I FORWARD -p udp -d $LISTEN_IP --dport $VPN_PORT -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
     echo "Allocated VLAN $VID:"
     ip addr show dev br-vlan$VID
     echo
@@ -91,4 +100,12 @@ echo
 for VID in $VIDS; do
     echo "Starting dnsmasq on VLAN $VID"
     ./cloudlet-net--start-dnsmasq $VID
+    VPN_STATE_DIR=/var/lib/cloudlet/vpn
+    mkdir -p $VPN_STATE_DIR
+    if [ ! -f $VPN_STATE_DIR/static.key ]; then
+        openvpn --genkey --secret $VPN_STATE_DIR/static.key
+    fi
+    ./cloudlet-net--get-openvpn-config --server $VID > $VPN_STATE_DIR/tenant$VID-server.ovpn
+    ./cloudlet-net--get-openvpn-config --client $VID > $VPN_STATE_DIR/tenant$VID-client.ovpn
+    ip netns exec tenant$VID openvpn --config $VPN_STATE_DIR/tenant$VID-server.ovpn
 done

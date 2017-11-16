@@ -1,0 +1,79 @@
+#!/bin/bash
+
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 [--client|--server] <vid>"
+    echo
+    echo "Sets up openvpn on the specified cloudlet VID."
+    echo
+    exit 1
+fi
+
+
+MODE=""
+
+for arg in $@; do
+    if [ "$arg" = "--client" ]; then
+        MODE="client"
+        shift
+    elif [ "$arg" = "--server" ]; then
+        MODE="server"
+        shift
+    fi
+done
+
+if [ "$MODE" = "" ]; then
+    echo "Required argument: --client or --server."
+    exit 2
+fi
+
+# Ensure we're in the directory containing all the helper scripts.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+VPN_STATE_DIR=/var/lib/cloudlet/vpn
+SECRET_FILE=$VPN_STATE_DIR/static.key
+if [ ! -r $SECRET_FILE ]; then
+    echo "Shared secret not found: $SECRET_FILE"
+    echo "To continue, execute:"
+    echo
+    echo "    sudo openvpn --genkey --secret $SECRET_FILE"
+    echo
+    exit 3
+fi
+
+VID=$1
+CLOUDLET_VPN_PORT_OFFSET=${CLOUDLET_VPN_PORT_OFFSET:-2000}
+VPN_PORT=$(($CLOUDLET_VPN_PORT_OFFSET+$VID))
+OUTSIDE_IP=${OUTSIDE_IP:-$(./cloudlet-net--get-default-source-ip)}
+
+if [ "$MODE" = "client" ]; then
+    # Configuration specific to the client.
+    echo "remote $OUTSIDE_IP"
+    echo "ifconfig 100.65.$VID.5 100.65.$VID.4"
+    echo "route 100.64.$VID.0 255.255.255.0"
+else
+    # Configuration specific to the server.
+    echo "ifconfig 100.65.$VID.4 100.65.$VID.5"
+    echo "push \"route 100.64.$VID.0 255.255.255.0\""
+    echo "writepid $VPN_STATE_DIR/tenant$VID.pid"
+    echo "log-append $VPN_STATE_DIR/tenant$VID.log"
+    echo "user nobody"
+    echo "group nogroup"
+    echo "daemon"
+fi
+
+
+cat << EOF
+dev tun
+port $VPN_PORT
+topology p2p
+comp-lzo
+keepalive 10 60
+ping-timer-rem
+persist-tun
+persist-key
+cipher AES-256-CBC
+<secret>
+EOF
+cat $SECRET_FILE
+echo "</secret>"
