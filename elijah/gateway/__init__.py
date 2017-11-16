@@ -304,8 +304,8 @@ def index():
         }
         return make_response(
             jsonify({
-                'mac': user_app['mac'],
-                'ip': user_app['ip'],
+                'mac': interface_mac,
+                'ip': vm_ip,
             }), 201)
     elif request.method == 'DELETE':
         network, user_app = get_network_and_app(user_id, app_id)
