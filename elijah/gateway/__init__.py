@@ -8,7 +8,7 @@ from collections import defaultdict
 from subprocess import check_call
 
 import yaml
-from flask import Flask, abort, jsonify, request
+from flask import Flask, abort, jsonify, make_response, request
 from elijah.gateway.lease_parser import Leases
 from elijah.provisioning.synthesis_client import Client, Protocol
 
@@ -221,99 +221,99 @@ def wait_for_ip(network, mac):
     return None
 
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/', methods=['GET', 'POST', 'DELETE'])
 def index():
     """Endpoint to get app information and to start a new application."""
     user_id = request.values.get("user_id")
     app_id = request.values.get("app_id")
     if request.method == 'POST':
-        action = request.values.get("action")
-        if action == "create":
-            try:
-                network = get_user_network(user_id, create=True)
-            except OutOfNetworksError:
-                abort(400)
-            user_app = network['apps'].get(app_id)
-            if user_app:
-                app.logger.error(
-                    "app '%s' for user '%s' is already running in cloudlet",
-                    app_id, user_id)
-                abort(400)
-            # Starting a new application on the selected network. Find the
-            # best cloudlet server to run the application on.
-            selected_cloudlet = select_cloudlet(network['network'])
-            if not selected_cloudlet:
-                app.logger.error(
-                    "failed to select a cloudlet server to run app '%s' "
-                    "for user '%s'", app_id, user_id)
-                abort(400)
-            # Determine if a file was provided on the request to create.
-            overlay_path = os.path.join(
-                app.config['OVERLAYS_PATH'], '%s_%s.overlay' % (
-                    user_id, app_id))
-            if request.files.get('overlay'):
-                overlay_file = request.files.get('overlay')
-                overlay_file.save(overlay_path)
-            elif request.values.get('overlay'):
-                overlay_url = request.values.get('overlay')
-                overlay_response = urllib2.urlopen(overlay_url)
-                with open(overlay_path, 'wb') as stream:
-                    while True:
-                        chunk = overlay_response.read(16 * 1024)
-                        if not chunk:
-                            break
-                        stream.write(chunk)
-            else:
-                abort(400)
-            start_network(network)
-            interface_mac = random_mac()
-            app.logger.info(
-                "starting app '%s' for user '%s' on cloudlet server '%s' "
-                "connected to network '%s' with MAC '%s'",
-                app_id, user_id, selected_cloudlet['name'], network['network'],
-                interface_mac)
-            cloudlet_client = launch_vm(
-                selected_cloudlet, network['network'],
-                interface_mac, overlay_path)
-            app.logger.info(
-                "started app '%s' for user '%s' on cloudlet server '%s' "
-                "connected to network '%s' with MAC '%s'",
-                app_id, user_id, selected_cloudlet['name'], network['network'],
-                interface_mac)
-            app.logger.info(
-                "waiting for app '%s' for user '%s' on cloudlet server '%s' "
-                "connected to network '%s' with MAC '%s' to get an IP address",
-                app_id, user_id, selected_cloudlet['name'], network['network'],
-                interface_mac)
-            vm_ip = wait_for_ip(network['network'], interface_mac)
-            if not vm_ip:
-                # Never got an IP address, so lets stop the client.
-                app.logger.error(
-                    "failed waiting for IP address for app '%s' for user '%s' "
-                    "on cloudlet server '%s' connected to network '%s' "
-                    "with MAC '%s'",
-                    app_id, user_id, selected_cloudlet['name'],
-                    network['network'], interface_mac)
-                cloudlet_client.terminate()
-                if get_user_network(user_id) is None:
-                    stop_network(network)
-                abort(400)
-            network['apps'][app_id] = {
-                'cloudlet': selected_cloudlet,
-                'client': cloudlet_client,
-                'mac': interface_mac,
-                'ip': vm_ip,
-            }
-            return "Success"
-        elif action == "delete":
-            network, user_app = get_network_and_app(user_id, app_id)
-            user_app['client'].terminate()
-            atomic_network_release(user_id, app_id)
-            if get_user_network(user_id) is None:
-                stop_network(network)
-            return "Success"
+        try:
+            network = get_user_network(user_id, create=True)
+        except OutOfNetworksError:
+            abort(400)
+        user_app = network['apps'].get(app_id)
+        if user_app:
+            app.logger.error(
+                "app '%s' for user '%s' is already running in cloudlet",
+                app_id, user_id)
+            abort(400)
+        # Starting a new application on the selected network. Find the
+        # best cloudlet server to run the application on.
+        selected_cloudlet = select_cloudlet(network['network'])
+        if not selected_cloudlet:
+            app.logger.error(
+                "failed to select a cloudlet server to run app '%s' "
+                "for user '%s'", app_id, user_id)
+            abort(400)
+        # Determine if a file was provided on the request to create.
+        overlay_path = os.path.join(
+            app.config['OVERLAYS_PATH'], '%s_%s.overlay' % (
+                user_id, app_id))
+        if request.files.get('overlay'):
+            overlay_file = request.files.get('overlay')
+            overlay_file.save(overlay_path)
+        elif request.values.get('overlay'):
+            overlay_url = request.values.get('overlay')
+            overlay_response = urllib2.urlopen(overlay_url)
+            with open(overlay_path, 'wb') as stream:
+                while True:
+                    chunk = overlay_response.read(16 * 1024)
+                    if not chunk:
+                        break
+                    stream.write(chunk)
         else:
             abort(400)
+        start_network(network)
+        interface_mac = random_mac()
+        app.logger.info(
+            "starting app '%s' for user '%s' on cloudlet server '%s' "
+            "connected to network '%s' with MAC '%s'",
+            app_id, user_id, selected_cloudlet['name'], network['network'],
+            interface_mac)
+        cloudlet_client = launch_vm(
+            selected_cloudlet, network['network'],
+            interface_mac, overlay_path)
+        app.logger.info(
+            "started app '%s' for user '%s' on cloudlet server '%s' "
+            "connected to network '%s' with MAC '%s'",
+            app_id, user_id, selected_cloudlet['name'], network['network'],
+            interface_mac)
+        app.logger.info(
+            "waiting for app '%s' for user '%s' on cloudlet server '%s' "
+            "connected to network '%s' with MAC '%s' to get an IP address",
+            app_id, user_id, selected_cloudlet['name'], network['network'],
+            interface_mac)
+        vm_ip = wait_for_ip(network['network'], interface_mac)
+        if not vm_ip:
+            # Never got an IP address, so lets stop the client.
+            app.logger.error(
+                "failed waiting for IP address for app '%s' for user '%s' "
+                "on cloudlet server '%s' connected to network '%s' "
+                "with MAC '%s'",
+                app_id, user_id, selected_cloudlet['name'],
+                network['network'], interface_mac)
+            cloudlet_client.terminate()
+            if get_user_network(user_id) is None:
+                stop_network(network)
+            abort(400)
+        network['apps'][app_id] = {
+            'cloudlet': selected_cloudlet,
+            'client': cloudlet_client,
+            'mac': interface_mac,
+            'ip': vm_ip,
+        }
+        return make_response(
+            jsonify({
+                'mac': user_app['mac'],
+                'ip': user_app['ip'],
+            }), 201)
+    elif request.method == 'DELETE':
+        network, user_app = get_network_and_app(user_id, app_id)
+        user_app['client'].terminate()
+        atomic_network_release(user_id, app_id)
+        if get_user_network(user_id) is None:
+            stop_network(network)
+        return make_response('', 204)
     else:
         network, user_app = get_network_and_app(user_id, app_id)
         return jsonify({
