@@ -3,6 +3,7 @@ import os
 import random
 import threading
 import time
+import urllib2
 from collections import defaultdict
 from subprocess import check_call
 
@@ -247,12 +248,21 @@ def index():
                     "for user '%s'", app_id, user_id)
                 abort(400)
             # Determine if a file was provided on the request to create.
-            overlay_file = request.files.get('overlay')
             overlay_path = os.path.join(
                 app.config['OVERLAYS_PATH'], '%s_%s.overlay' % (
                     user_id, app_id))
-            if overlay_file:
+            if request.files.get('overlay'):
+                overlay_file = request.files.get('overlay')
                 overlay_file.save(overlay_path)
+            elif request.values.get('overlay'):
+                overlay_url = request.values.get('overlay')
+                overlay_response = urllib2.urlopen(overlay_url)
+                with open(overlay_path, 'wb') as stream:
+                    while True:
+                        chunk = overlay_response.read(16 * 1024)
+                        if not chunk:
+                            break
+                        stream.write(chunk)
             else:
                 abort(400)
             start_network(network)
