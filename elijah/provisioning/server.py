@@ -409,6 +409,7 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
             Protocol.SYNTHESIS_OPTION_EARLY_START : False,
             Protocol.SYNTHESIS_OPTION_SHOW_STATISTICS : False,
             Protocol.SYNTHESIS_OPTION_INTERFACE: None,
+            Protocol.SYNTHESIS_OPTION_INTERFACE_MAC: None,
             }
 
     def ret_fail(self, message):
@@ -545,7 +546,9 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
             self.resumed_VM = synthesis.SynthesizedVM(
                 modified_img, modified_mem, self.fuse,
                 interface=self.synthesis_option.get(
-                    Protocol.SYNTHESIS_OPTION_INTERFACE))
+                    Protocol.SYNTHESIS_OPTION_INTERFACE),
+                interface_mac=self.synthesis_option.get(
+                    Protocol.SYNTHESIS_OPTION_INTERFACE_MAC))
             time_start_resume = time.time()
             self.resumed_VM.start()
             time_end_resume = time.time()
@@ -574,7 +577,9 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
             self.resumed_VM = synthesis.SynthesizedVM(
                 modified_img, modified_mem, self.fuse,
                 interface=self.synthesis_option.get(
-                    Protocol.SYNTHESIS_OPTION_INTERFACE))
+                    Protocol.SYNTHESIS_OPTION_INTERFACE),
+                interface_mac=self.synthesis_option.get(
+                    Protocol.SYNTHESIS_OPTION_INTERFACE_MAC))
             self.resumed_VM.start()
 
             # 3. wait for fuse end
@@ -740,7 +745,9 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
             self.resumed_VM = synthesis.SynthesizedVM(
                 modified_img, modified_mem, self.fuse,
                 interface=self.synthesis_option.get(
-                    Protocol.SYNTHESIS_OPTION_INTERFACE))
+                    Protocol.SYNTHESIS_OPTION_INTERFACE),
+                interface_mac=self.synthesis_option.get(
+                    Protocol.SYNTHESIS_OPTION_INTERFACE_MAC))
             time_start_resume = time.time()
             self.resumed_VM.start()
             time_end_resume = time.time()
@@ -769,7 +776,9 @@ class SynthesisHandler(SocketServer.StreamRequestHandler):
             self.resumed_VM = synthesis.SynthesizedVM(
                 modified_img, modified_mem, self.fuse,
                 interface=self.synthesis_option.get(
-                    Protocol.SYNTHESIS_OPTION_INTERFACE))
+                    Protocol.SYNTHESIS_OPTION_INTERFACE),
+                interface_mac=self.synthesis_option.get(
+                    Protocol.SYNTHESIS_OPTION_INTERFACE_MAC))
             self.resumed_VM.start()
 
             # 3. wait for fuse end

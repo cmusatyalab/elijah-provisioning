@@ -78,6 +78,7 @@ class Protocol(object):
     SYNTHESIS_OPTION_EARLY_START = "option_early_start"
     SYNTHESIS_OPTION_SHOW_STATISTICS = "option_show_statistics"
     SYNTHESIS_OPTION_INTERFACE = "option_interface"
+    SYNTHESIS_OPTION_INTERFACE_MAC = "option_interface_mac"
 
 
 def default_app_function():
@@ -543,6 +544,9 @@ def process_command_line(argv):
     parser.add_option('-i', '--interface',
                       dest='interface', default=None,
                       help='Interface to connect to the VM (Default: no interface)')
+    parser.add_option('--interface-mac',
+                      dest='interface_mac', default=None,
+                      help='MAC address of the interface that gets connected to the VM (Default: random)')
     settings, args = parser.parse_args(argv)
 
     if settings.overlay_file is None and settings.overlay_url is None:
@@ -565,6 +569,8 @@ def main(argv=None):
     synthesis_option[Protocol.SYNTHESIS_OPTION_EARLY_START] = settings.early_start
     if settings.interface:
         synthesis_option[Protocol.SYNTHESIS_OPTION_INTERFACE] = settings.interface
+    if settings.interface_mac:
+        synthesis_option[Protocol.SYNTHESIS_OPTION_INTERFACE_MAC] = settings.interface_mac
     cloudlet_ip = None
     if settings.server_ip:
         cloudlet_ip = settings.server_ip

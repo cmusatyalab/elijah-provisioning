@@ -59,3 +59,4 @@ class Protocol(object):
     SYNTHESIS_OPTION_EARLY_START = "option_early_start"
     SYNTHESIS_OPTION_SHOW_STATISTICS = "option_show_statistics"
     SYNTHESIS_OPTION_INTERFACE = "option_interface"
+    SYNTHESIS_OPTION_INTERFACE_MAC = "option_interface_mac"

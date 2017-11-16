@@ -127,7 +127,7 @@ class VM_Overlay(native_threading.Thread):
                  base_mem=None, base_diskmeta=None,
                  base_memmeta=None, base_hashvalue=None,
                  nova_xml=None, nova_util=None, nova_conn=None,
-                 interface=None):
+                 interface=None, interface_mac=None):
         """create VM overlay from a user-customized VM.
         """
         self.base_disk = os.path.abspath(base_disk)
@@ -144,7 +144,9 @@ class VM_Overlay(native_threading.Thread):
         self.base_diskmeta = os.path.abspath(self.base_diskmeta)
         self.base_memmeta = os.path.abspath(self.base_memmeta)
         self.nova_util = nova_util
-        self.interface_xml = create_interface_xml(interface) if interface else None
+        self.interface_xml = (
+            create_interface_xml(interface, mac=interface_mac)
+            if interface else None)
         self.conn = nova_conn or get_libvirt_connection()
 
         # find base vm's hashvalue from DB
@@ -350,7 +352,7 @@ class SynthesizedVM(native_threading.Thread):
 
     def __init__(self, launch_disk, launch_mem, fuse,
                  disk_only=False, qemu_args=None,
-                 interface=None,
+                 interface=None, interface_mac=None,
                  **kwargs):
         # kwargs
         self.nova_xml = kwargs.get("nova_xml", None)
@@ -368,6 +370,7 @@ class SynthesizedVM(native_threading.Thread):
         self.launch_disk = launch_disk
         self.launch_mem = launch_mem
         self.interface = interface
+        self.interface_mac = interface_mac
 
         temp_qemu_dir = mkdtemp(prefix="cloudlet-overlay-")
         self.qemu_logfile = os.path.join(temp_qemu_dir, "qemu-trim-log")
@@ -436,12 +439,14 @@ class SynthesizedVM(native_threading.Thread):
             if self.disk_only:
                 # edit default XML to have new disk path
                 self.machine = run_vm(
-                    self.conn, self.new_xml_string, interface=self.interface,
+                    self.conn, self.new_xml_string,
+                    interface=self.interface, interface_mac=self.interface_mac,
                     vnc_disable=True)
             else:
                 interface_xml = None
                 if self.interface:
-                    interface_xml = create_interface_xml(self.interface)
+                    interface_xml = create_interface_xml(
+                        self.interface, mac=self.interface_mac)
                 self.machine = run_snapshot(self.conn, self.resumed_disk,
                                             self.resumed_mem, self.new_xml_str,
                                             resume_time=self.resume_time,
@@ -1086,18 +1091,20 @@ def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
     return fuse_process
 
 
-def create_interface_xml(interface_name):
+def create_interface_xml(interface_name, mac=None):
     interface = Element("interface")
     interface.set("type", "bridge")
     source = Element("source")
     source.set("bridge", interface_name)
     model = Element("model")
     model.set("type", "virtio")
-    mac = Element("mac")
-    mac.set("address", random_mac())
+    mac_element = Element("mac")
+    if mac is None:
+        mac = random_mac()
+    mac_element.set("address", mac)
     interface.append(source)
     interface.append(model)
-    interface.append(mac)
+    interface.append(mac_element)
     return ElementTree.tostring(interface)
 
 
@@ -1107,7 +1114,8 @@ def run_vm(conn, domain_xml, **kwargs):
     # Attach NIC now that the VM is running.
     interface_xml = None
     if kwargs.get('interface'):
-        interface_xml = create_interface_xml(kwargs.get('interface'))
+        interface_xml = create_interface_xml(
+            kwargs.get('interface'), mac=kwargs.get('interface_mac'))
         machine.attachDeviceFlags(
             interface_xml, libvirt.VIR_DOMAIN_AFFECT_LIVE)
 
@@ -1646,7 +1654,7 @@ def validate_handoffurl(handoff_url):
     return True
 
 
-def create_baseVM(disk_image_path, interface=None):
+def create_baseVM(disk_image_path, interface=None, interface_mac=None):
     # Create Base VM(disk, memory) snapshot using given VM disk image
     # :param disk_image_path : file path of the VM disk image
     # :returns: (generated base VM disk path, generated base VM memory path)
@@ -1688,7 +1696,8 @@ def create_baseVM(disk_image_path, interface=None):
     machine = None
     try:
         machine = run_vm(
-            conn, new_xml_string, interface=interface, wait_vnc=True)
+            conn, new_xml_string,
+            interface=interface, interface_mac=interface_mac, wait_vnc=True)
         base_hashvalue = _create_baseVM(conn,
                                         machine,
                                         disk_image_path,
@@ -1721,7 +1730,8 @@ def create_baseVM(disk_image_path, interface=None):
 def handlesig(signum, frame):
     LOG.info("Received signal(%d) to start handoff..." % signum)
 
-def synthesis(base_disk, overlay_path, interface=None, **kwargs):
+def synthesis(
+        base_disk, overlay_path, interface=None, interface_mac=None, **kwargs):
     """VM Synthesis and run recoverd VM
     :param base_disk: path to base disk
     :param overlay_path: path to VM overlay file
@@ -1773,7 +1783,8 @@ def synthesis(base_disk, overlay_path, interface=None, **kwargs):
     LOG.info("Resume the launch VM")
     synthesized_VM = SynthesizedVM(
         launch_disk, launch_mem, fuse, disk_only=disk_only,
-        qemu_args=qemu_args, nova_xml=nova_xml, interface=interface
+        qemu_args=qemu_args, nova_xml=nova_xml,
+        interface=interface, interface_mac=interface_mac
     )
     # no-pipelining
     delta_proc.start()

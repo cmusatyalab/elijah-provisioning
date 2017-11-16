@@ -1,5 +1,6 @@
 
 import os
+import random
 import threading
 from collections import defaultdict
 from subprocess import check_call
@@ -19,6 +20,15 @@ class OutOfNetworksError(Exception):
 
 class MissingConfigError(Exception):
     """Raised when the configuration is wrong."""
+
+
+def random_mac():
+    """Generate a random MAC address."""
+    return "52:54:00:%02x:%02x:%02x" % (
+        random.randint(0, 255),
+        random.randint(0, 255),
+        random.randint(0, 255),
+        )
 
 
 def synchronized(lock):
@@ -174,7 +184,7 @@ def stop_network(network):
     del network['open']
 
 
-def launch_vm(cloudlet, network, overlay_path):
+def launch_vm(cloudlet, network, mac, overlay_path):
     """Launch the VM on the `cloudlet` connected to network."""
     cloudlet_ip = cloudlet['ip']
     cloudlet_port = cloudlet.get('port', 8021)
@@ -184,6 +194,7 @@ def launch_vm(cloudlet, network, overlay_path):
     cloudlet_options[Protocol.SYNTHESIS_OPTION_EARLY_START] = False
     cloudlet_options[Protocol.SYNTHESIS_OPTION_INTERFACE] = (
         cloudlet_interface)
+    cloudlet_options[Protocol.SYNTHESIS_OPTION_INTERFACE_MAC] = mac
     cloudlet_client = Client(
         cloudlet_ip, cloudlet_port,
         overlay_file=overlay_path,
@@ -228,19 +239,24 @@ def index():
             else:
                 abort(400)
             start_network(network)
+            interface_mac = random_mac()
             app.logger.info(
                 "starting app '%s' for user '%s' on cloudlet server '%s' "
-                "connected to network '%s'",
-                app_id, user_id, selected_cloudlet['name'], network['network'])
+                "connected to network '%s' with MAC '%s'",
+                app_id, user_id, selected_cloudlet['name'], network['network'],
+                interface_mac)
             cloudlet_client = launch_vm(
-                selected_cloudlet, network['network'], overlay_path)
+                selected_cloudlet, network['network'],
+                interface_mac, overlay_path)
             app.logger.info(
                 "started app '%s' for user '%s' on cloudlet server '%s' "
-                "connected to network '%s'",
-                app_id, user_id, selected_cloudlet['name'], network['network'])
+                "connected to network '%s' with MAC '%s'",
+                app_id, user_id, selected_cloudlet['name'], network['network'],
+                interface_mac)
             network['apps'][app_id] = {
                 'cloudlet': selected_cloudlet,
                 'client': cloudlet_client,
+                'mac': interface_mac,
             }
             return "Success"
         elif action == "delete":
