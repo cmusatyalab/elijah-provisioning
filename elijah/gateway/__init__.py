@@ -308,7 +308,7 @@ def index():
         network, user_app = get_network_and_app(user_id, app_id)
         return jsonify({
             'mac': user_app['mac'],
-            'ip': vm_ip,
+            'ip': user_app['ip'],
         })
 
 
