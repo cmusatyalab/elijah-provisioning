@@ -21,7 +21,7 @@ fi
 
 VID=$1
 
-STATE_DIR="/var/lib/maas-cloudlet/dnsmasq"
+STATE_DIR="/var/lib/cloudlet/dnsmasq"
 PID_FILE=$STATE_DIR/dnsmasq-vlan-$VID.pid
 
 if [ -f "$PID_FILE" ]; then

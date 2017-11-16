@@ -14,9 +14,13 @@ fi
 
 VID=$1
 
-STATE_DIR="/var/lib/maas-cloudlet/dnsmasq"
+STATE_DIR="/var/lib/cloudlet/dnsmasq"
+LEASES_FILE="$STATE_DIR/vlan-$VID.leases"
 PID_FILE=$STATE_DIR/dnsmasq-vlan-$VID.pid
 
 if [ -f "$PID_FILE" ]; then
     kill "$(cat $PID_FILE)" 2> /dev/null
+    rm -f "$PID_FILE"
 fi
+
+rm -f "$LEASES_FILE"
