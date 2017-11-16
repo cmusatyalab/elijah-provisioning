@@ -18,13 +18,11 @@ class Leases(object):
 
     def __init__(self, filepath):
         self.filepath = filepath
-        self.reload()
+        self.load()
 
-    def reload(self):
+    def load(self):
         with open(self.filepath, 'rb') as stream:
-            self.content = stream.read().split('\n')
-        self.content = filter(None, self.content)
-        self.entries = self.parse()
+            self.content = filter(None, stream.read().split('\n'))
 
     def entries(self):
         for line in self.content:
