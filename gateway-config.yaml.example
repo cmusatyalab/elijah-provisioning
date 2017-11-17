@@ -1,0 +1,40 @@
+# VPN defines the binding information for the VPN service. This section is
+# optional but should normally be set so that the clients VPN's can connect
+# to the correct IP address. External IP is used to pass to the clients the
+# IP address they should connect to. When behind a NAT this would be the
+# external IP address forwarding the VPN ports.
+vpn:
+  external_ip: 74.128.1.1
+
+# Networks define the tenant networks that are assigned to a single user when
+# a create request is made. Only one user can use a tenant network at the same
+# time. Interface is the trunk interface that the VLAN interface should be
+# created on. VID is the VLAN ID that will be used by that tenant network.
+networks:
+  tenant10:
+    interface: ens3
+    vid: 10
+  tenant11:
+    interface: ens3
+    vid: 11
+  tenant12:
+    interface: ens3
+    vid: 12
+
+# Cloudlets define each synthesis server that is running on a worker node. IP
+# maps to the IP address the gateway should use to communicate with the worker.
+# Networks map the tenant network above to the bridge on the worker that
+# connects to that same tenant network.
+cloudlets:
+  worker0:
+    ip: 10.90.90.10
+    networks:
+      tenant10: br10
+      tenant11: br11
+      tenant12: br12
+  worker1:
+    ip: 10.90.90.11
+    networks:
+      tenant10: br10
+      tenant11: br11
+      tenant12: br12

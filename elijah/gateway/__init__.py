@@ -5,7 +5,7 @@ import threading
 import time
 import urllib2
 from collections import defaultdict
-from subprocess import check_call
+from subprocess import check_call, Popen, CalledProcessError
 
 import yaml
 from flask import Flask, abort, jsonify, make_response, request
@@ -169,8 +169,15 @@ def start_network(network):
     app.logger.info("starting network '%s'", network['network'])
     config = app.config['CLOUDLET_CONFIG']
     net_info = config['networks'][network['network']]
-    check_call(
-        ['cloudlet-add-vlan', net_info['interface'], str(net_info['vid'])])
+    external_ip = config.get('vpn', {}).get('external_ip')
+    env = os.environ.copy()
+    if external_ip:
+        env['OUTSIDE_IP'] = external_ip
+    process = Popen(
+        ['cloudlet-add-vlan', net_info['interface'], str(net_info['vid'])],
+        env=env)
+    if process.wait() != 0:
+        raise CalledProcessError(process.returncode, 'cloudlet-add-vlan')
     network['open'] = True
 
 
@@ -219,6 +226,16 @@ def wait_for_ip(network, mac):
                 return entry.ip
         time.sleep(0.25)
     return None
+
+
+def get_vpn_client_config(network):
+    """Get the VPN client configuration for `network`."""
+    config = app.config['CLOUDLET_CONFIG']
+    net_info = config['networks'][network]
+    ovpn_path = os.path.join(
+        '/var/lib/cloudlet/vpn/tenant%d-client.ovpn' % net_info['vid'])
+    with open(ovpn_path, 'r') as stream:
+        return stream.read()
 
 
 @app.route('/', methods=['GET', 'POST', 'DELETE'])
@@ -306,6 +323,7 @@ def index():
             jsonify({
                 'mac': interface_mac,
                 'ip': vm_ip,
+                'vpn': get_vpn_client_config(network['network']),
             }), 201)
     elif request.method == 'DELETE':
         network, user_app = get_network_and_app(user_id, app_id)
@@ -319,6 +337,7 @@ def index():
         return jsonify({
             'mac': user_app['mac'],
             'ip': user_app['ip'],
+            'vpn': get_vpn_client_config(network['network']),
         })
 
 
