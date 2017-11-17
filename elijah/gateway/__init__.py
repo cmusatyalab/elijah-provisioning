@@ -5,7 +5,7 @@ import threading
 import time
 import urllib2
 from collections import defaultdict
-from subprocess import check_call, Popen, CalledProcessError
+from subprocess import Popen, CalledProcessError
 
 import yaml
 from flask import Flask, abort, jsonify, make_response, request
@@ -170,9 +170,12 @@ def start_network(network):
     config = app.config['CLOUDLET_CONFIG']
     net_info = config['networks'][network['network']]
     external_ip = config.get('vpn', {}).get('external_ip')
+    port_offset = config.get('vpn', {}).get('port_offset')
     env = os.environ.copy()
     if external_ip:
         env['OUTSIDE_IP'] = external_ip
+    if port_offset:
+        env['CLOUDLET_VPN_PORT_OFFSET'] = port_offset
     process = Popen(
         ['cloudlet-add-vlan', net_info['interface'], str(net_info['vid'])],
         env=env)
@@ -190,7 +193,15 @@ def stop_network(network):
     app.logger.info("stopping network '%s'", network['network'])
     config = app.config['CLOUDLET_CONFIG']
     net_info = config['networks'][network['network']]
-    check_call(['cloudlet-delete-vlan', str(net_info['vid'])])
+    port_offset = config.get('vpn', {}).get('port_offset')
+    env = os.environ.copy()
+    if port_offset:
+        env['CLOUDLET_VPN_PORT_OFFSET'] = port_offset
+    process = Popen(
+        ['cloudlet-delete-vlan', str(net_info['vid'])],
+        env=env)
+    if process.wait() != 0:
+        raise CalledProcessError(process.returncode, 'cloudlet-delete-vlan')
     del network['open']
 
 

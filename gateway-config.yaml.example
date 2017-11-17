@@ -2,9 +2,12 @@
 # optional but should normally be set so that the clients VPN's can connect
 # to the correct IP address. External IP is used to pass to the clients the
 # IP address they should connect to. When behind a NAT this would be the
-# external IP address forwarding the VPN ports.
+# external IP address forwarding the VPN ports. Port offset defines the offset
+# for the port number to start with, e.g. tenant network with using VLAN 10
+# would connect to the VPN on port 2010.
 vpn:
   external_ip: 74.128.1.1
+  port_offset: 2000
 
 # Networks define the tenant networks that are assigned to a single user when
 # a create request is made. Only one user can use a tenant network at the same
