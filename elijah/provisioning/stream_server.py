@@ -47,7 +47,8 @@ from configuration import Const as Cloudlet_Const
 from compression import DecompProc
 from pprint import pformat
 import log as logging
-import subprocess
+import random
+import png
 import mmap
 import tool
 from delta import DeltaItem
@@ -418,25 +419,86 @@ def handlesig(signum, frame):
     LOG.info("Received signal(%d) to terminate VM..." % signum)
 
 class HandoffAnalysisProc(multiprocessing.Process):
-    def __init__(self, handoff_url, message_queue):
+    def __init__(self, handoff_url, message_queue, disk_size, mem_size):
         self.url = handoff_url
         self.mq = message_queue
+        self.viz_interval = 0.5 #500 msecs
+        self.disk_chunks = disk_size / 4096
+        self.mem_chunks = mem_size / 4096
+        self.time_start = time.time()
+        self.outfd = open(name='/var/tmp/cloudlet/handoff_from_%s_at_%d.log' % (self.url, self.time_start), mode = 'w')
+
+        self.disk_path = '/var/www/html/heatmap/disk.png'
+        self.disk_width, self.disk_height = self.layout(self.disk_chunks)
+        self.disk_img_data = [[0 for _ in range(self.disk_width)] for _ in range(self.disk_height)]
+        self.disk_writer = png.Writer(self.disk_width, self.disk_height, greyscale=True)
+
+        self.mem_path = '/var/www/html/heatmap/mem.png'
+        self.mem_width, self.mem_height = self.layout(self.mem_chunks)
+        self.mem_img_data = [[0 for _ in range(self.mem_width)] for _ in range(self.mem_height)]
+        self.mem_writer = png.Writer(self.mem_width, self.mem_height, greyscale=True)
         multiprocessing.Process.__init__(self, target=self.read_queue)
-        self.outfd = open(name='/var/tmp/cloudlet/handoff.log', mode='w')
+
+    def compute_factors(self,n):
+        return sorted(set(reduce(list.__add__,
+                          ([i, n / i] for i in range(1, int(n ** 0.5) + 1) if n % i == 0))))
+
+    def layout(self,n):
+        factors = self.compute_factors(n)
+        width = factors[len(factors) / 2]
+        height = factors[(len(factors) / 2) - 1]
+        while (float(height) / float(width) < 0.5):
+            n = n + 1
+            factors = self.compute_factors(n)
+            width = factors[len(factors) / 2]
+            height = factors[(len(factors) / 2) - 1]
+        return width, height
+
+    def update_imgs(self):
+        #DISK
+        disk_jpg = open(self.disk_path, 'wb')
+        self.disk_writer.write(disk_jpg, self.disk_img_data)
+        disk_jpg.close()
+
+        #MEMORY
+        mem_jpg = open(self.mem_path, 'wb')
+        self.mem_writer.write(mem_jpg, self.mem_img_data)
+        mem_jpg.close()
 
     def read_queue(self):
-        time_start = time.time()
         while True:
             self._running = True
+            #if((time.time() - self.time_start) % self.viz_interval == 0):
+
             try:
                 message = self.mq.get()
                 if message == "!E_O_Q!":
                     self.outfd.flush() #flush remaining buffer
                     self.outfd.close()
-                    filename = '/var/tmp/cloudlet/handoff_from_%s_at_%d.log' % (self.url, time.time())
-                    subprocess.call(["mv", "/var/tmp/cloudlet/handoff.log", filename])
+                    os.rename(self.disk_path, '/var/tmp/cloudlet/disk_from_%s_at_%d.png' % (self.url, self.time_start))
+                    os.rename(self.mem_path, '/var/tmp/cloudlet/mem_from_%s_at_%d.png' % (self.url, self.time_start))
                     break
-                self.outfd.write('%f ' % (time.time()-time_start))
+                elif message.startswith("M,A,"):
+                    #parse message to find index in third token
+                    # update self.mem_img_data
+                    tokens = message.split(',')
+                    if len(tokens) == 3 and tokens[2].isdigit():
+                        id = int(tokens[2])
+                        self.mem_img_data[id / self.mem_width][id % self.mem_width] = 255
+                elif message.startswith("D,A,"):
+                    #parse message to find index in third token
+                    #update self.disk_img_data
+                    tokens = message.split(',')
+                    if len(tokens) == 3 and tokens[2].isdigit():
+                        id = int(tokens[2])
+                        self.disk_img_data[id / self.disk_width][id % self.disk_width] = 255
+                elif message.startswith("B,R,"):
+                    self.update_imgs()
+                    self.outfd.write('%f ' % (time.time() - self.time_start))
+                    self.outfd.write("update_imgs")
+                    self.outfd.write("\n")
+
+                self.outfd.write('%f ' % (time.time()-self.time_start))
                 self.outfd.write(message)
                 self.outfd.write("\n")
             except EOFError:
@@ -528,22 +590,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         | header size | header | blob header size | blob header | blob data  |
         |  (4 bytes)  | (var)  | (4 bytes)        | (var bytes) | (var bytes)|
         '''
-
-        analysis_mq = multiprocessing.Queue()
-        analysis_proc = HandoffAnalysisProc(handoff_url=self.client_address[0],message_queue=analysis_mq)
-        analysis_proc.start()
-
-        analysis_mq.put("=" * 50)
-        analysis_mq.put("Adaptive VM Handoff Initiated")
-        analysis_mq.put("Client Connection - %s:%d" % (self.client_address[0], self.client_address[1])) #client_address is a tuple (ip, port)
-
-        if self.server.handoff_data is not None:
-            analysis_mq.put("Handoff via OpenStack")
-            via_openstack = True
-        else:
-            analysis_mq.put("Handoff via cloudlet CLI")
-            via_openstack = False
-
         # variable
         self.total_recved_size_cur = 0
         self.total_recved_size_prev = 0
@@ -557,6 +603,21 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         metadata = NetworkUtil.decoding(msgpack_data)
         launch_disk_size = metadata[Cloudlet_Const.META_RESUME_VM_DISK_SIZE]
         launch_memory_size = metadata[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
+
+        analysis_mq = multiprocessing.Queue()
+        analysis_proc = HandoffAnalysisProc(handoff_url=self.client_address[0],message_queue=analysis_mq, disk_size=launch_disk_size, mem_size=launch_memory_size)
+        analysis_proc.start()
+
+        analysis_mq.put("=" * 50)
+        analysis_mq.put("Adaptive VM Handoff Initiated")
+        analysis_mq.put("Client Connection - %s:%d" % (self.client_address[0], self.client_address[1])) #client_address is a tuple (ip, port)
+
+        if self.server.handoff_data is not None:
+            analysis_mq.put("Handoff via OpenStack")
+            via_openstack = True
+        else:
+            analysis_mq.put("Handoff via cloudlet CLI")
+            via_openstack = False
 
         synthesis_option, base_diskpath = self._check_validity(metadata)
         if base_diskpath is None:

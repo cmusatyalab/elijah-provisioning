@@ -1,0 +1,24 @@
+.area
+{
+    margin: auto;
+    padding: 10px;
+    width:45%;
+    float: left;
+}
+
+.osd
+{
+    border: 1px solid black;
+    background-color: #333;
+    color: #333;
+    margin: auto;
+}
+
+.heading
+{
+    font-size: 1.25em;
+    color: #333;
+    font-family: Arial;
+    font-weight: bold;
+    text-align: center;
+}

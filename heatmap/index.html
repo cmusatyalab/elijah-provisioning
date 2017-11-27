@@ -1,0 +1,81 @@
+<html>
+    <head>
+        <title>VM Handoff Heatmap</title>
+        <link rel="stylesheet" type="text/css" href="css/style.css">
+    </head>
+    <body>
+        <div class="area">
+            <div class="heading">Disk Snapshot</div>
+            <div id="osd-disk" class="osd"></div>
+        </div>
+        <div class="area">
+            <div class="heading">Memory Snapshot</div>
+            <div id="osd-memory" class="osd"></div>
+        </div>
+        <script src="openseadragon.min.js"></script>
+        <script type="text/javascript">
+            var diskSource = [{ type: 'image', url: 'disk.png'}]
+            var viewer = OpenSeadragon({
+                id: "osd-disk",
+                prefixUrl: "./images/",
+                tileSources: diskSource,
+                sequenceMode: true,
+                maxZoomLevel: 	4,
+                preserveViewport: true,
+                showNavigator:  true,
+                navigatorAutoFade: false,
+                maxImageCacheCount: 0
+            });
+
+           var viewer2 = OpenSeadragon({
+                id: "osd-memory",
+                prefixUrl: "./images/",
+                tileSources: [{
+                    type: 'image',
+                    url:  'mem.png'
+                } ],
+                sequenceMode: true,
+                maxZoomLevel: 	4,
+                preserveViewport: true,
+                showNavigator:  true,
+                navigatorAutoFade: false,
+                maxImageCacheCount: 0
+            });
+
+           function sleep(ms) {
+             return new Promise(resolve => setTimeout(resolve, ms));
+           }
+
+            async function loop() {
+                while(true)
+                {
+                    await sleep(500);
+                    var olddisk = viewer.world.getItemAt(0);
+                    var oldmem = viewer2.world.getItemAt(0);
+                    var diskUrl = 'disk.png?' + new Date().getTime();
+                    var memUrl = 'mem.png?' + new Date().getTime();
+                    var options =  { tileSource: {
+                                       type: 'image',
+                                       url: diskUrl
+                                 }, index: 0,
+                                    replace: true
+                                 };
+
+                    var options2 =  { tileSource: {
+                                       type: 'image',
+                                       url: memUrl
+                                 }, index: 0,
+                                    replace: true
+                                 };
+                    viewer.addTiledImage(options);
+                    viewer2.addTiledImage(options2);
+
+                };
+
+            }
+
+        loop();
+
+        </script>
+    </body>
+</html>
