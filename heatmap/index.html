@@ -4,15 +4,21 @@
         <link rel="stylesheet" type="text/css" href="css/style.css">
     </head>
     <body>
+        <div id="stats" class="stats"></div>
         <div class="area">
             <div class="heading">Disk Snapshot</div>
+            <div id="overlay-disk" class="filter"></div>
             <div id="osd-disk" class="osd"></div>
         </div>
+
         <div class="area">
             <div class="heading">Memory Snapshot</div>
+            <div id="overlay-mem" class="filter"></div>
             <div id="osd-memory" class="osd"></div>
         </div>
+
         <script src="openseadragon.min.js"></script>
+        <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
         <script type="text/javascript">
             var diskSource = [{ type: 'image', url: 'disk.png'}]
             var viewer = OpenSeadragon({
@@ -24,7 +30,15 @@
                 preserveViewport: true,
                 showNavigator:  true,
                 navigatorAutoFade: false,
-                maxImageCacheCount: 0
+                maxImageCacheCount: 0,
+                overlays: [{
+                    id: 'disk-filter',
+                    px: 0,
+                    py: 0,
+                    width: 32,
+                    height: 32,
+                    id: 'overlay-disk'
+                }]
             });
 
            var viewer2 = OpenSeadragon({
@@ -39,7 +53,15 @@
                 preserveViewport: true,
                 showNavigator:  true,
                 navigatorAutoFade: false,
-                maxImageCacheCount: 0
+                maxImageCacheCount: 0,
+                overlays: [{
+                    id: 'mem-filter',
+                    px: 0,
+                    py: 0,
+                    width: 32,
+                    height: 32,
+                    id: 'overlay-mem'
+                }]
             });
 
            function sleep(ms) {
@@ -49,7 +71,10 @@
             async function loop() {
                 while(true)
                 {
-                    await sleep(500);
+                    await sleep(1000);
+                    var element = document.getElementById("stats");
+                    if(element.innerHTML.includes("Complete"))
+                       break;
                     var olddisk = viewer.world.getItemAt(0);
                     var oldmem = viewer2.world.getItemAt(0);
                     var diskUrl = 'disk.png?' + new Date().getTime();
@@ -69,6 +94,11 @@
                                  };
                     viewer.addTiledImage(options);
                     viewer2.addTiledImage(options2);
+
+
+                    $.get( "stats.txt", function( data ) {
+                      $( "#stats" ).html( data );
+                    });
 
                 };
 

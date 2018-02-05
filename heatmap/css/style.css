@@ -1,9 +1,22 @@
+.stats
+{
+    width: 100%;
+    border: 1px solid black;;
+    background-color: transparent;
+    float: left;
+    font-size: 0.75em;
+    color: #000;
+    font-family: Arial;
+    font-weight: bold;
+    text-align: center;
+}
+
 .area
 {
     margin: auto;
-    padding: 10px;
-    width:45%;
+    width:50%;
     float: left;
+    position: relative;
 }
 
 .osd
@@ -21,4 +34,16 @@
     font-family: Arial;
     font-weight: bold;
     text-align: center;
+}
+
+.filter
+{
+    opacity:    0.4;
+    filter:     alpha(opacity=40);
+    font-size: 10pt;
+    color: #fff;
+    font-family: Arial;
+    font-weight: bold;
+    text-align: center;
+    background-image: url("../overlay.png");
 }

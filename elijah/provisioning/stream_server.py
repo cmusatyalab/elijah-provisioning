@@ -29,6 +29,7 @@ import signal
 import collections
 import tempfile
 import multiprocessing
+import Queue
 import threading
 from hashlib import sha256
 
@@ -422,11 +423,15 @@ class HandoffAnalysisProc(multiprocessing.Process):
     def __init__(self, handoff_url, message_queue, disk_size, mem_size):
         self.url = handoff_url
         self.mq = message_queue
-        self.viz_interval = 0.5 #500 msecs
+        self.viz_interval = 1 #1000 msecs
         self.disk_chunks = disk_size / 4096
         self.mem_chunks = mem_size / 4096
-        self.time_start = time.time()
+        self.time_start = self.last_update =  time.time()
+        self.num_blobs = 0
+        self.disk_applied = 0
+        self.mem_applied = 0
         self.outfd = open(name='/var/tmp/cloudlet/handoff_from_%s_at_%d.log' % (self.url, self.time_start), mode = 'w')
+        self.stats_path = '/var/www/html/heatmap/stats.txt'
 
         self.disk_path = '/var/www/html/heatmap/disk.png'
         self.disk_width, self.disk_height = self.layout(self.disk_chunks)
@@ -454,6 +459,19 @@ class HandoffAnalysisProc(multiprocessing.Process):
             height = factors[(len(factors) / 2) - 1]
         return width, height
 
+    def update_stats(self, handoff_complete=False):
+        self.stats_file = open(name=self.stats_path, mode = 'w')
+        self.stats_file.write('Elapsed Time: %f seconds<br/>' % (time.time() - self.time_start))
+        self.stats_file.write('Disk Size: %d MB<br/>' % ((self.disk_chunks * 4096) / (1024 * 1024)))
+        self.stats_file.write('Memory Size: %d MB<br/>' % ((self.mem_chunks * 4096) / (1024 * 1024)))
+        self.stats_file.write('Blobs Transmitted: %d <br/>' % self.num_blobs)
+        self.stats_file.write('Disk Chunks Applied: %d <br/>' % self.disk_applied)
+        self.stats_file.write('Memory Chunks Applied: %d <br/>' % self.mem_applied)
+        if(handoff_complete):
+            self.stats_file.write('<br/>Handoff Complete!<br/>')
+        self.stats_file.flush()
+        self.stats_file.close()
+
     def update_imgs(self):
         #DISK
         disk_jpg = open(self.disk_path, 'wb')
@@ -468,15 +486,23 @@ class HandoffAnalysisProc(multiprocessing.Process):
     def read_queue(self):
         while True:
             self._running = True
-            #if((time.time() - self.time_start) % self.viz_interval == 0):
+            if((time.time() - self.last_update) > self.viz_interval):
+                self.update_stats()
+                self.update_imgs()
+                self.outfd.write('%f ' % (time.time() - self.time_start))
+                self.outfd.write("update_imgs")
+                self.outfd.write("\n")
+                self.last_update = time.time()
 
             try:
-                message = self.mq.get()
+                message = self.mq.get(False)
                 if message == "!E_O_Q!":
                     self.outfd.flush() #flush remaining buffer
                     self.outfd.close()
+                    self.update_stats(handoff_complete=True)
                     os.rename(self.disk_path, '/var/tmp/cloudlet/disk_from_%s_at_%d.png' % (self.url, self.time_start))
                     os.rename(self.mem_path, '/var/tmp/cloudlet/mem_from_%s_at_%d.png' % (self.url, self.time_start))
+                    #os.remove(self.stats_path)
                     break
                 elif message.startswith("M,A,"):
                     #parse message to find index in third token
@@ -484,25 +510,28 @@ class HandoffAnalysisProc(multiprocessing.Process):
                     tokens = message.split(',')
                     if len(tokens) == 3 and tokens[2].isdigit():
                         id = int(tokens[2])
-                        self.mem_img_data[id / self.mem_width][id % self.mem_width] = 255
+                        heat = self.mem_img_data[id / self.mem_width][id % self.mem_width]
+                        self.mem_img_data[id / self.mem_width][id % self.mem_width] = 255 if ((heat+64) >= 255) else heat + 64
+                        self.mem_applied += 1
                 elif message.startswith("D,A,"):
                     #parse message to find index in third token
                     #update self.disk_img_data
                     tokens = message.split(',')
                     if len(tokens) == 3 and tokens[2].isdigit():
                         id = int(tokens[2])
-                        self.disk_img_data[id / self.disk_width][id % self.disk_width] = 255
+                        heat = self.disk_img_data[id / self.disk_width][id % self.disk_width]
+                        self.disk_img_data[id / self.disk_width][id % self.disk_width] = 255 if ((heat+64) >= 255) else heat + 64
+                        self.disk_applied += 1
                 elif message.startswith("B,R,"):
-                    self.update_imgs()
-                    self.outfd.write('%f ' % (time.time() - self.time_start))
-                    self.outfd.write("update_imgs")
-                    self.outfd.write("\n")
+                    self.num_blobs += 1
 
                 self.outfd.write('%f ' % (time.time()-self.time_start))
                 self.outfd.write(message)
                 self.outfd.write("\n")
             except EOFError:
                 break
+            except Queue.Empty:
+                pass
 
     def terminate(self):
         self.outfd.close()
