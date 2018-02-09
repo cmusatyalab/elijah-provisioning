@@ -1027,7 +1027,7 @@ def perform_handoff(handoff_data):
         metadata[Const.META_RESUME_VM_MEMORY_SIZE] = resume_memory_size
         time_network_start = time.time()
         client = StreamSynthesisClient(migration_dest_ip, migration_dest_port,
-                                       metadata, compdata_queue)
+                                       metadata, compdata_queue, process_controller)
         client.start()
         client.join()
         cpu_stat_end = psutil.cpu_times(percpu=True)

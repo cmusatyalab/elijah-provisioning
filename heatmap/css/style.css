@@ -4,10 +4,24 @@
     border: 1px solid black;;
     background-color: transparent;
     float: left;
-    font-size: 0.75em;
     color: #000;
     font-family: Arial;
+    font-size: 1.2em;
+    text-align: center;
+}
+
+.success
+{
+    color: #64f464;
+    background-color: #232;
+    border: 1px solid #64f464;
     font-weight: bold;
+}
+
+.stats-col
+{
+    width: 50%;
+    float: left;
     text-align: center;
 }
 

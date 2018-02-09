@@ -430,6 +430,7 @@ class HandoffAnalysisProc(multiprocessing.Process):
         self.num_blobs = 0
         self.disk_applied = 0
         self.mem_applied = 0
+        self.iter = 0
         self.outfd = open(name='/var/tmp/cloudlet/handoff_from_%s_at_%d.log' % (self.url, self.time_start), mode = 'w')
         self.stats_path = '/var/www/html/heatmap/stats.txt'
 
@@ -461,14 +462,21 @@ class HandoffAnalysisProc(multiprocessing.Process):
 
     def update_stats(self, handoff_complete=False):
         self.stats_file = open(name=self.stats_path, mode = 'w')
+        self.stats_file.write('<div class="stats-col">')
         self.stats_file.write('Elapsed Time: %f seconds<br/>' % (time.time() - self.time_start))
         self.stats_file.write('Disk Size: %d MB<br/>' % ((self.disk_chunks * 4096) / (1024 * 1024)))
         self.stats_file.write('Memory Size: %d MB<br/>' % ((self.mem_chunks * 4096) / (1024 * 1024)))
+        if (handoff_complete):
+            self.stats_file.write('<span class="success">Handoff Complete!</span><br/>')
+        self.stats_file.write('</div>')
+
+        self.stats_file.write('<div class="stats-col">')
+        self.stats_file.write('Iterations: %d <br/>' % self.iter)
         self.stats_file.write('Blobs Transmitted: %d <br/>' % self.num_blobs)
         self.stats_file.write('Disk Chunks Applied: %d <br/>' % self.disk_applied)
         self.stats_file.write('Memory Chunks Applied: %d <br/>' % self.mem_applied)
-        if(handoff_complete):
-            self.stats_file.write('<br/>Handoff Complete!<br/>')
+        self.stats_file.write('</div>')
+
         self.stats_file.flush()
         self.stats_file.close()
 
@@ -524,6 +532,10 @@ class HandoffAnalysisProc(multiprocessing.Process):
                         self.disk_applied += 1
                 elif message.startswith("B,R,"):
                     self.num_blobs += 1
+                elif message.startswith("iter,"):
+                    tokens = message.split(',')
+                    if len(tokens) == 2 and tokens[1].isdigit():
+                        self.iter = int(tokens[1])
 
                 self.outfd.write('%f ' % (time.time()-self.time_start))
                 self.outfd.write(message)
@@ -730,6 +742,9 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 disk_chunk_all.update(blob_disk_chunk)
             recv_blob_counter += 1
             analysis_mq.put("B,R,%d" % (recv_blob_counter))
+            data = self._recv_all(4)
+            iter = struct.unpack("!I", data)[0]
+            analysis_mq.put("iter,%d" % (iter))
 
         network_out_queue.put(Cloudlet_Const.QUEUE_SUCCESS_MESSAGE)
         delta_proc.join()
