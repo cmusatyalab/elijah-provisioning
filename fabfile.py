@@ -78,7 +78,7 @@ def install():
     with settings(hide('running'), warn_only=True):
         cmd = "apt-get install --force-yes -y qemu-kvm libvirt-bin libglu1-mesa "
         cmd += "gvncviewer python-dev python-libvirt python-lxml python-lzma "
-        cmd += "apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev"
+        cmd += "apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev apache2"
         if dist == "precise":
             cmd += " python-xdelta3"
             if sudo(cmd).failed:
@@ -101,7 +101,13 @@ def install():
     with cd(current_dir):
         if sudo("pip install -r requirements.txt").failed:
             abort("Failed to install python libraries")
-
+    #copy heatmap to webserver directory and set permissions
+    if sudo("mkdir /var/www/html/heatmap").failed:
+        abort("Failed to mkdir /var/www/html/heatmap")
+    if sudo("chmod 666 /var/www/html/heatmap").failed:
+        abort("Failed to set perms for heatmap directory")
+    with cd(current_dir):
+        sudo("cp -r heatmap/* /var/www/html/heatmap")
     # check bios.bin file
     bios_files = ["/usr/share/qemu/bios.bin",
                   "/usr/share/qemu/vgabios-cirrus.bin"]

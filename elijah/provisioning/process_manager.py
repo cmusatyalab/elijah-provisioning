@@ -65,7 +65,11 @@ class ProcessManager(threading.Thread):
         self.process_infos = dict()
         self.process_control = dict()
         self.stop = threading.Event()
-        self.migration_dest = "network"
+        self.migration_dest = "tcp"
+        self.comp_type = 99
+        self.comp_level = 99
+        self.mem_encoding = 99
+        self.disk_encoding = 99
 
         # load profiling information
         profile_path = os.path.abspath(VMOverlayCreationMode.PROFILE_DATAPATH)
@@ -129,18 +133,22 @@ class ProcessManager(threading.Thread):
                                    "comp_level": comp_level
                                    }
                              )
+            self.comp_type = comp_type
+            self.comp_level = comp_level
 
     def _change_disk_diff_mode(self, diff_algorithm):
         worker_names = self.process_list.keys()
         if "CreateDiskDeltalist" in worker_names:
             self._send_query("change_mode", ["CreateDiskDeltalist"],
                              data={"diff_algorithm": diff_algorithm})
+            self.disk_encoding = diff_algorithm
 
     def _change_memory_diff_mode(self, diff_algorithm):
         worker_names = self.process_list.keys()
         if "CreateMemoryDeltalist" in worker_names:
             self._send_query("change_mode", ["CreateMemoryDeltalist"],
                              data={"diff_algorithm": diff_algorithm})
+            self.mem_encoding = diff_algorithm
 
     def _get_queue_length(self):
         worker_names = self.process_list.keys()
@@ -301,8 +309,26 @@ class ProcessManager(threading.Thread):
         iteration_num = worker.monitor_current_iteration.value
         return iteration_num
 
+    def get_comp_type_level(self):
+        worker = self.process_list.get("CompressProc", None)
+        if worker is None:
+            return None
+        return worker.comp_type, worker.comp_level
+
+    def get_mem_encoding(self):
+        worker = self.process_list.get("CreateMemoryDeltalist", None)
+        if worker is None:
+            return None
+        return worker.diff_algorithm
+
+    def get_disk_encoding(self):
+        worker = self.process_list.get("CreateDiskDeltalist", None)
+        if worker is None:
+            return None
+        return worker.diff_algorithm
+
     def get_network_speed(self):
-        if self.migration_dest.startswith("network"):
+        if self.migration_dest.startswith("tcp"):
             # Only used for experiement.  If it's bigger than 0, adaptation use 
             # this value to transmit over the network
             if VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH > 0:
