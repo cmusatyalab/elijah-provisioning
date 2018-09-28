@@ -103,11 +103,12 @@ def install():
             abort("Failed to install python libraries")
     #copy heatmap to webserver directory and set permissions
     if sudo("mkdir /var/www/html/heatmap").failed:
-        abort("Failed to mkdir /var/www/html/heatmap")
-    if sudo("chmod 666 /var/www/html/heatmap").failed:
-        abort("Failed to set perms for heatmap directory")
+        print("Failed to mkdir /var/www/html/heatmap")
+    if sudo("chmod 777 /var/www/html/heatmap").failed:
+        print("Failed to set perms for heatmap directory")
     with cd(current_dir):
         sudo("cp -r heatmap/* /var/www/html/heatmap")
+
     # check bios.bin file
     bios_files = ["/usr/share/qemu/bios.bin",
                   "/usr/share/qemu/vgabios-cirrus.bin"]

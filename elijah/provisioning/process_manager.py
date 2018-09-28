@@ -66,10 +66,6 @@ class ProcessManager(threading.Thread):
         self.process_control = dict()
         self.stop = threading.Event()
         self.migration_dest = "tcp"
-        self.comp_type = 99
-        self.comp_level = 99
-        self.mem_encoding = 99
-        self.disk_encoding = 99
 
         # load profiling information
         profile_path = os.path.abspath(VMOverlayCreationMode.PROFILE_DATAPATH)
@@ -133,22 +129,18 @@ class ProcessManager(threading.Thread):
                                    "comp_level": comp_level
                                    }
                              )
-            self.comp_type = comp_type
-            self.comp_level = comp_level
 
     def _change_disk_diff_mode(self, diff_algorithm):
         worker_names = self.process_list.keys()
         if "CreateDiskDeltalist" in worker_names:
             self._send_query("change_mode", ["CreateDiskDeltalist"],
                              data={"diff_algorithm": diff_algorithm})
-            self.disk_encoding = diff_algorithm
 
     def _change_memory_diff_mode(self, diff_algorithm):
         worker_names = self.process_list.keys()
         if "CreateMemoryDeltalist" in worker_names:
             self._send_query("change_mode", ["CreateMemoryDeltalist"],
                              data={"diff_algorithm": diff_algorithm})
-            self.mem_encoding = diff_algorithm
 
     def _get_queue_length(self):
         worker_names = self.process_list.keys()
@@ -309,24 +301,6 @@ class ProcessManager(threading.Thread):
         iteration_num = worker.monitor_current_iteration.value
         return iteration_num
 
-    def get_comp_type_level(self):
-        worker = self.process_list.get("CompressProc", None)
-        if worker is None:
-            return None
-        return worker.comp_type, worker.comp_level
-
-    def get_mem_encoding(self):
-        worker = self.process_list.get("CreateMemoryDeltalist", None)
-        if worker is None:
-            return None
-        return worker.diff_algorithm
-
-    def get_disk_encoding(self):
-        worker = self.process_list.get("CreateDiskDeltalist", None)
-        if worker is None:
-            return None
-        return worker.diff_algorithm
-
     def get_network_speed(self):
         if self.migration_dest.startswith("tcp"):
             # Only used for experiement.  If it's bigger than 0, adaptation use 
@@ -380,20 +354,16 @@ class ProcessManager(threading.Thread):
                     total_size_dict_in, system_block_per_sec,\
                     system_out_bw_cur_est, system_in_bw_cur_est,\
                     system_out_bw_actual, system_in_bw_actual = system_speed
-                msg = "adaptation\t%f\t%0.2f\t%0.2f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f\t%0.4f" % \
-                    (time_current_iter,
-                     time_from_start,
+                msg = "[measurement]\t%0.2f\t%0.2f\t%0.4f\t%0.4f\t%0.4f\t%0.4f" % \
+                    (time_from_start,
                      network_bw,
-                     system_out_bw_actual,
-                     system_in_bw_actual,
-                     system_out_bw_cur_est,
-                     system_in_bw_cur_est,
                      total_p, total_r,
                      total_p_cur, total_r_cur)
                 LOG.debug(msg)
 
                 # first predict at 2 seconds and then for every 5 seconds
                 if time_from_start > 5 and (time_current_iter-time_prev_mode_change) > 5:
+                    LOG.debug("[measurement]\ttime\tbw\tavgP\tavgR\tcurrP\tcurrR")
                     item = self.mode_profile.predict_new_mode(
                         self.overlay_creation_mode,
                         p_dict_cur,
@@ -455,17 +425,17 @@ class ProcessManager(threading.Thread):
                         diff_str = MigrationMode.mode_diff_str(
                             old_mode_dict,
                             self.overlay_creation_mode.__dict__)
-                        LOG.debug("mode-change\t%f\t%0.2f\t%s\t%s\t%s\t%s" %
-                                  (time_current_iter,
-                                   time_from_start,
+                        LOG.debug("[adaptation]\t%0.2f\t%s\t%s\t%s\t%s" %
+                                  (time_from_start,
                                    diff_str,
                                    p_dict_cur,
                                    r_dict_cur,
                                    total_size_dict_in))
+
                     else:
                         LOG.debug(
-                            "mode-change\t%f\t%0.2f\tcurrent mode is the best" %
-                            (time_current_iter, time_from_start))
+                            "[adaptation]\t%0.2f\tcurrent mode is the best" %
+                            ( time_from_start))
             except Exception as e:
                 sys.stdout.write("[manager] Exception\n")
                 sys.stderr.write(traceback.format_exc())
