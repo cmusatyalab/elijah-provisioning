@@ -24,6 +24,7 @@ import ctypes
 import sys
 import traceback
 import Queue
+import zmq
 
 from .configuration import VMOverlayCreationMode
 from .migration_profile import MigrationMode
@@ -74,6 +75,14 @@ class ProcessManager(threading.Thread):
             raise ProcessManagerError(
                 "Cannot load profile at : %s" % profile_path)
         self.mode_profile = ModeProfile.load_from_file(profile_path)
+
+        if VMOverlayCreationMode.USE_PUBSUB_NETWORK_BANDWIDTH:
+            self.mqctx = zmq.Context.instance()
+            self.subscriber = self.mqctx.socket(zmq.SUB)
+            self.subscriber.connect("tcp://localhost:5556")
+            self.subscriber.setsockopt(zmq.SUBSCRIBE, b"bandwidth")
+
+
         super(ProcessManager, self).__init__(target=self.start_managing)
 
     def set_mode(self, new_mode, migration_dest):
@@ -307,6 +316,12 @@ class ProcessManager(threading.Thread):
             # this value to transmit over the network
             if VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH > 0:
                 return VMOverlayCreationMode.USE_STATIC_NETWORK_BANDWIDTH
+            elif VMOverlayCreationMode.USE_PUBSUB_NETWORK_BANDWIDTH:
+                try:
+                    topic, data = self.subscriber.recv_string(flags=zmq.NOBLOCK).split()
+                    return float(data)
+                except zmq.ZMQError:
+                    return None
             else:
                 worker = self.process_list.get("StreamSynthesisClient", None)
                 if worker is None:

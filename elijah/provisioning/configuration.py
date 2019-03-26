@@ -162,6 +162,7 @@ class VMOverlayCreationMode(object):
     # only used for experiement. If it's bigger than 0, adaptation use this
     # value to transmit over the network
     USE_STATIC_NETWORK_BANDWIDTH = -1
+    USE_PUBSUB_NETWORK_BANDWIDTH = False
     MEASURE_AVERAGE_TIME = 2  # seconds
     MAX_THREAD_NUM = 4
     HANDOFF_DEST_PORT_DEFAULT = 8022
