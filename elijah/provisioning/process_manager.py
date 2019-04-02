@@ -380,8 +380,8 @@ class ProcessManager(threading.Thread):
                 LOG.debug(msg)
 
                 # first predict at 2 seconds and then for every 5 seconds
-                if  (VMOverlayCreationMode.USE_PUBSUB_NETWORK_BANDWIDTH and self.new_bandwidth_published) or
-                 (time_from_start > 5 and (time_current_iter-time_prev_mode_change) > 5):
+                if  (VMOverlayCreationMode.USE_PUBSUB_NETWORK_BANDWIDTH and self.new_bandwidth_published) or /
+                    (time_from_start > 5 and (time_current_iter-time_prev_mode_change) > 5):
                     LOG.debug("[measurement]\ttime\tbw\tavgP\tavgR\tcurrP\tcurrR")
                     item = self.mode_profile.predict_new_mode(
                         self.overlay_creation_mode,
