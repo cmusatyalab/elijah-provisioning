@@ -81,6 +81,7 @@ class ProcessManager(threading.Thread):
             self.subscriber = self.mqctx.socket(zmq.SUB)
             self.subscriber.connect("tcp://localhost:5556")
             self.subscriber.setsockopt(zmq.SUBSCRIBE, b"bandwidth")
+            self.new_bandwidth_published = False
 
 
         super(ProcessManager, self).__init__(target=self.start_managing)
@@ -319,8 +320,10 @@ class ProcessManager(threading.Thread):
             elif VMOverlayCreationMode.USE_PUBSUB_NETWORK_BANDWIDTH:
                 try:
                     topic, data = self.subscriber.recv_string(flags=zmq.NOBLOCK).split()
+                    self.new_bandwidth_published = True
                     return float(data)
                 except zmq.ZMQError:
+                    self.new_bandwidth_published = False
                     return None
             else:
                 worker = self.process_list.get("StreamSynthesisClient", None)
@@ -377,7 +380,8 @@ class ProcessManager(threading.Thread):
                 LOG.debug(msg)
 
                 # first predict at 2 seconds and then for every 5 seconds
-                if time_from_start > 5 and (time_current_iter-time_prev_mode_change) > 5:
+                if  (VMOverlayCreationMode.USE_PUBSUB_NETWORK_BANDWIDTH and self.new_bandwidth_published) or
+                 (time_from_start > 5 and (time_current_iter-time_prev_mode_change) > 5):
                     LOG.debug("[measurement]\ttime\tbw\tavgP\tavgR\tcurrP\tcurrR")
                     item = self.mode_profile.predict_new_mode(
                         self.overlay_creation_mode,
