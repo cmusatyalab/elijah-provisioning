@@ -7,3 +7,4 @@ Cython==0.21.2
 psutil>=2.2.1
 testtools>=1.8.0
 cpu-affinity>=0.1.0
+zmq
