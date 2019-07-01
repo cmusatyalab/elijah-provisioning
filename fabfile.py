@@ -22,6 +22,7 @@ from distutils.version import LooseVersion
 env.run = local
 env.warn_only = True
 env.hosts = ['localhost']
+os_dist = None
 
 
 def check_system_support():
@@ -43,8 +44,8 @@ def check_system_support():
     cmd = "cat /etc/lsb-release | grep DISTRIB_CODENAME | awk -F'=' '{print $2}'"
     with settings(hide('everything'), warn_only=True):
         os_dist = run(cmd)
-        if os_dist != 'trusty' and os_dist != "xenial":
-            msg = "Support only Ubuntu Precise (14.04) or Ubuntu Trusty (16.04)"
+        if os_dist != 'bionic' and os_dist != "xenial":
+            msg = "Supported only on Ubuntu Bionic (18.04) or Xenial (16.04)"
             abort(msg)
         return os_dist
     return None
@@ -125,8 +126,12 @@ def install():
     username = env.get('user')
     if sudo("adduser %s kvm" % username).failed:
         abort("Cannot add user to kvm group")
-    if sudo("adduser %s libvirtd" % username).failed:
-        abort("Cannot add user to libvirtd group")
+    if os_dist == 'bionic':
+        grp = 'libvirt'
+    else:
+        grp = 'libvirtd'
+    if sudo("adduser %s %s" % (username, grp)).failed:
+        abort("Cannot add user to libvirt group")
 
     # Check fuse support:
     #   qemu-kvm changes the permission of /dev/fuse, so we revert back the
