@@ -806,7 +806,7 @@ def copy_disk(in_path, out_path):
 
 
 def get_libvirt_connection():
-    conn = libvirt.open("qemu:///session")
+    conn = libvirt.open("qemu:///system")
     return conn
 
 
@@ -1743,7 +1743,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
             options, dest_handoff_url, overlay_mode,
             synthesized_VM.fuse.mountpoint, synthesized_VM.qemu_logfile,
             synthesized_VM.qmp_channel, synthesized_VM.machine.ID(),
-            synthesized_VM.fuse.modified_disk_chunks, "qemu:///session",
+            synthesized_VM.fuse.modified_disk_chunks, "qemu:///system",
         )
         if True:
             # using in-memory data structure
