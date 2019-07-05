@@ -12,6 +12,7 @@ from fabric.api import sudo
 from fabric.api import task
 from fabric.api import abort
 from fabric.api import puts
+from fabric.contrib.files import comment
 from fabric.context_managers import cd
 from fabric.context_managers import settings
 from distutils.version import LooseVersion
@@ -132,6 +133,10 @@ def install():
         grp = 'libvirtd'
     if sudo("adduser %s %s" % (username, grp)).failed:
         abort("Cannot add user to libvirt group")
+
+    #Comment out the following deny rules for apparmor so that we can run in the qemu:///system space
+    comment('/etc/apparmor.d/abstractions/libvirt-qemu', 'deny /tmp/', use_sudo=True)
+    comment('/etc/apparmor.d/abstractions/libvirt-qemu', 'deny /var/tmp/', use_sudo=True)
 
     # Check fuse support:
     #   qemu-kvm changes the permission of /dev/fuse, so we revert back the
