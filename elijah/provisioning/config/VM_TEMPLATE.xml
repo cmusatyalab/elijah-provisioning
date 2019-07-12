@@ -11,9 +11,10 @@
 		 (at _convert_xml in cloudlet.py)
 	-->
 	<name>cloudlet</name>
-	<uuid>c7a5fdbd-cdaf-9455-926a-d65c16db1801</uuid>
-	<memory>1048576</memory>
-	<currentMemory>1048576</currentMemory>
+	<title>cloudlet</title>
+	<uuid>abc</uuid>
+	<memory>8388608</memory>
+	<currentMemory>8388608</currentMemory>
 	<vcpu>4</vcpu>
 	<cpu>
 		<!--
@@ -28,18 +29,18 @@
 		<topology sockets='1' cores='4' threads='1'/>
 	</cpu>
 	<os>
-		<type arch='x86_64' machine='pc-1.0'>hvm</type>
+		<type arch='x86_64' machine='pc'>hvm</type>
 	</os>
 	<devices>
 		<emulator>/usr/bin/qemu-system-x86_64</emulator>
 		<disk type='file' device='disk'>
 			<driver name='qemu' type='raw'/>
-			<source file='/home/krha/cloudlet/image/ubuntu-11.10-x86_64-server/ubuntu-11.raw' />
+			<source file='/fake/path' />
 			<target dev='hda' bus='ide' />
 		</disk>
 		<disk type='file' device='cdrom'>
 			<driver name='qemu' type='raw'/>
-			<source file='/home/krha/cloudlet/image/ubuntu-12.04.1-server-i386/ovftransport.iso' />
+			<source file='/fake/path' />
 			<target dev='hdc' />
 		</disk>
         <graphics type='vnc' port='-1' autoport='yes' keymap='en-us' listen='127.0.0.1'/>
