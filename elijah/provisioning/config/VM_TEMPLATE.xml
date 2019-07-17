@@ -29,7 +29,7 @@
 		<topology sockets='1' cores='4' threads='1'/>
 	</cpu>
 	<os>
-		<type arch='x86_64' machine='pc'>hvm</type>
+		<type arch='x86_64' machine='pc-1.0'>hvm</type>
 	</os>
 	<devices>
 		<emulator>/usr/bin/qemu-system-x86_64</emulator>
