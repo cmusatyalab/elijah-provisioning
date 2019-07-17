@@ -1,7 +1,6 @@
 MANIFEST
 TODO.md
 dist/
-bin/
 build/
 *.a
 *.o
