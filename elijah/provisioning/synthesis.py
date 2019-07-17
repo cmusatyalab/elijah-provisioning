@@ -340,7 +340,7 @@ class SynthesizedVM(native_threading.Thread):
     def __init__(self, launch_disk, launch_mem, fuse,
                  disk_only=False, qemu_args=None, **kwargs):
         # kwargs
-        self.nova_xml = kwargs.get("nova_xml", None)
+        self.xml = kwargs.get("xml", None)
         self.nova_util = kwargs.get("nova_util", None)
         self.conn = kwargs.get("nova_conn", None) or get_libvirt_connection()
         self.LOG = kwargs.get("log", None)
@@ -396,21 +396,19 @@ class SynthesizedVM(native_threading.Thread):
     def _generate_xml(self):
         # convert xml
         if self.disk_only:
-            xml = ElementTree.fromstring(open(Const.TEMPLATE_XML, "r").read())
             self.old_xml_str, self.new_xml_str = _convert_xml(
                 self.resumed_disk,
-                xml=xml,
                 qemu_logfile=self.qemu_logfile,
                 qemu_args=self.qemu_args,
             )
         else:
             self.old_xml_str, self.new_xml_str = _convert_xml(
                 self.resumed_disk,
+                xml=ElementTree.fromstring(self.xml) if self.xml is not None else None,
                 mem_snapshot=self.resumed_mem,
                 qemu_logfile=self.qemu_logfile,
                 qmp_channel=self.qmp_channel,
                 qemu_args=self.qemu_args,
-                nova_xml=self.nova_xml,
                 memory_snapshot_mode="live"
             )
 
@@ -421,8 +419,8 @@ class SynthesizedVM(native_threading.Thread):
         try:
             if self.disk_only:
                 # edit default XML to have new disk path
-                self.machine = run_vm(self.conn, self.new_xml_string,
-                                      vnc_disable=True)
+                self.machine = run_vm(self.conn, self.new_xml_str,
+                                      vnc_disable=True, persist=True)
             else:
                 self.machine = run_snapshot(self.conn, self.resumed_disk,
                                             self.resumed_mem, self.new_xml_str,
@@ -553,198 +551,197 @@ def _test_dma_accuracy(dma_dict, disk_deltalist, mem_deltalist):
 
 def _convert_xml(disk_path, xml=None, mem_snapshot=None,
                  qemu_logfile=None, qmp_channel=None,
-                 qemu_args=None, nova_xml=None,
-                 memory_snapshot_mode="suspend"):
+                 qemu_args=None, memory_snapshot_mode="suspend",
+                 nova_xml=None):
     """process libvirt xml header before launching the VM
     :param memory_snapshot_mode : behavior of libvrt memory snapshotting, [off|suspend|live]
     """
+    try:
+        if mem_snapshot is not None:
+            hdr = memory_util._QemuMemoryHeader(open(mem_snapshot))
+            xml = ElementTree.fromstring(hdr.xml)
+            existing_domain = True
+        elif xml is not None:
+            existing_domain = True
+        else: 
+            # if we aren't pulling from the snapshot header 
+            # and no XML was provided, use the default template
+            xml = ElementTree.fromstring(open(Const.TEMPLATE_XML, "r").read())
+            existing_domain = False
 
-    if xml is None and mem_snapshot is None:
-        msg = "we need either input xml or memory snapshot path"
-        raise CloudletGenerationError(msg)
 
-    if mem_snapshot is not None:
-        hdr = memory_util._QemuMemoryHeader(open(mem_snapshot))
-        xml = ElementTree.fromstring(hdr.xml)
-    original_xml_backup = ElementTree.tostring(xml)
+        original_xml_backup = ElementTree.tostring(xml)
 
-    vm_name = None
-    uuid = None
-    nova_vnc_element = None
-    if nova_xml is not None:
-        new_xml = ElementTree.fromstring(nova_xml)
-        vm_name = str(new_xml.find('name').text)
-        uuid = str(new_xml.find('uuid').text)
-        nova_graphics_element = new_xml.find('devices/graphics')
-        if (nova_graphics_element is not None) and \
-                (nova_graphics_element.get('type') == 'vnc'):
-            nova_vnc_element = nova_graphics_element
+        vm_name = None
+        uuid = None
+        nova_vnc_element = None
+        if existing_domain:
+            vm_name = str(xml.find('name').text)
+            uuid = str(xml.find('uuid').text)
+        else:
+            uuid = uuid4()
+            uuid_element = xml.find('uuid')
+            old_uuid = uuid_element.text
+            uuid_element.text = str(uuid)
+            vm_name = 'cloudlet-' + str(uuid.hex)
+            name_element = xml.find('name')
+            if name_element is None:
+                msg = "Malfomed XML input: %s", Const.TEMPLATE_XML
+                raise CloudletGenerationError(msg)
+            name_element.text = vm_name
 
-    # delete padding
-    padding_element = xml.find("description")
-    if padding_element is not None:
-        xml.remove(padding_element)
+        # TODO: perhaps we shouldn't coerce the machine type because of incompatibility?
+        #type = xml.find('os/type')
+        #type.attrib['machine'] = 'pc-1.0'
 
-    # enforce CPU model to qemu64 only if not specified
-    # svm should not be added since it is not supported in x86 (QEMU bug)
-    cpu_element = xml.find("cpu")
-    if cpu_element is None:
-        cpu_element = Element("cpu")
-        xml.append(cpu_element)
-    if cpu_element.find("model") is not None:
-        cpu_element.remove(cpu_element.find("model"))
-    if cpu_element.find("arch") is not None:
-        cpu_element.remove(cpu_element.find("arch"))
-    cpu_model_element = Element("model")
-    cpu_model_element.text = "core2duo"
-    cpu_model_element.set("fallback", "forbid")
-    cpu_element.append(cpu_model_element)
+        # enforce CPU model to qemu64 only if not specified
+        # svm should not be added since it is not supported in x86 (QEMU bug)
+        cpu_element = xml.find("cpu")
+        if cpu_element is None:
+            cpu_element = Element("cpu")
+            xml.append(cpu_element)
+        if cpu_element.find("model") is not None:
+            cpu_element.remove(cpu_element.find("model"))
+        if cpu_element.find("arch") is not None:
+            cpu_element.remove(cpu_element.find("arch"))
+        cpu_model_element = Element("model")
+        cpu_model_element.text = "core2duo"
+        cpu_model_element.set("fallback", "forbid")
+        cpu_element.append(cpu_model_element)
 
-    # update uuid
-    if uuid is None:
-        uuid = uuid4()
-    uuid_element = xml.find('uuid')
-    old_uuid = uuid_element.text
-    uuid_element.text = str(uuid)
-    # update sysinfo entry's uuid if it exist
-    # it has to match with uuid of the VM
-    sysinfo_entries = xml.findall('sysinfo/system/entry')
-    for entry in sysinfo_entries:
-        if(entry.attrib['name'] == 'uuid'):
-            entry.text = str(uuid)
 
-    # update vm_name
-    if vm_name is None:
-        vm_name = 'cloudlet-' + str(uuid.hex)
-    name_element = xml.find('name')
-    if name_element is None:
-        msg = "Malfomed XML input: %s", Const.TEMPLATE_XML
-        raise CloudletGenerationError(msg)
-    name_element.text = vm_name
+        # update sysinfo entry's uuid if it exist
+        # it has to match with uuid of the VM
+        sysinfo_entries = xml.findall('sysinfo/system/entry')
+        for entry in sysinfo_entries:
+            if(entry.attrib['name'] == 'uuid'):
+                entry.text = str(uuid)
 
-    # update vnc information
-    if nova_vnc_element is not None:
-        device_element = xml.find("devices")
-        graphics_elements = device_element.findall("graphics")
-        for graphics_element in graphics_elements:
-            if graphics_element.get("type") == "vnc":
-                device_element.remove(graphics_element)
-                device_element.append(nova_vnc_element)
+        # update vnc information
+        if nova_vnc_element is not None:
+            device_element = xml.find("devices")
+            graphics_elements = device_element.findall("graphics")
+            for graphics_element in graphics_elements:
+                if graphics_element.get("type") == "vnc":
+                    device_element.remove(graphics_element)
+                    device_element.append(nova_vnc_element)
 
-    # Use custom QEMU
-    qemu_emulator = xml.find('devices/emulator')
-    if qemu_emulator is None:
-        qemu_emulator = Element("emulator")
-        device_element = xml.find("devices")
-        device_element.append(qemu_emulator)
-    qemu_emulator.text = Const.QEMU_BIN_PATH
+        # Use custom QEMU
+        qemu_emulator = xml.find('devices/emulator')
+        if qemu_emulator is None:
+            qemu_emulator = Element("emulator")
+            device_element = xml.find("devices")
+            device_element.append(qemu_emulator)
+        qemu_emulator.text = Const.QEMU_BIN_PATH
 
-    # find all disk element(hdd, cdrom) and change them to new
-    disk_elements = xml.findall('devices/disk')
-    hdd_source = None
-    cdrom_source = None
-    for disk_element in disk_elements:
-        disk_type = disk_element.attrib['device']
-        if disk_type == 'disk':
-            hdd_source = disk_element.find('source')
-            hdd_driver = disk_element.find("driver")
-            if (hdd_driver is not None) and \
-                    (hdd_driver.get("type", None) is not None):
-                hdd_driver.set("type", "raw")
-        if disk_type == 'cdrom':
-            cdrom_source = disk_element.find('source')
-    if hdd_source is None:  # hdd path setting
-        msg = "Malfomed XML input: %s", Const.TEMPLATE_XML
-        raise CloudletGenerationError(msg)
-    hdd_source.set("file", os.path.abspath(disk_path))
-    if cdrom_source is not None:    # ovf path setting
-        cdrom_source.set("file", os.path.abspath(Const.TEMPLATE_OVF))
+        # find all disk element(hdd, cdrom) and change them to new
+        disk_elements = xml.findall('devices/disk')
+        hdd_source = None
+        cdrom_source = None
+        for disk_element in disk_elements:
+            disk_type = disk_element.attrib['device']
+            if disk_type == 'disk':
+                hdd_source = disk_element.find('source')
+                hdd_driver = disk_element.find("driver")
+                if (hdd_driver is not None) and \
+                        (hdd_driver.get("type", None) is not None):
+                    hdd_driver.set("type", "raw")
+            if disk_type == 'cdrom':
+                cdrom_source = disk_element.find('source')
+        if hdd_source is None:  # hdd path setting
+            msg = "Malfomed XML input: %s", Const.TEMPLATE_XML
+            raise CloudletGenerationError(msg)
+        hdd_source.set("file", os.path.abspath(disk_path))
+        if cdrom_source is not None:    # ovf path setting
+            cdrom_source.set("file", os.path.abspath(Const.TEMPLATE_OVF))
 
-    # append custom QEMU-argument
-    qemu_xmlns = "http://libvirt.org/schemas/domain/qemu/1.0"
-    qemu_element = xml.find("{%s}commandline" % qemu_xmlns)
-    if qemu_element is None:
-        qemu_element = Element("{%s}commandline" % qemu_xmlns)
-        xml.append(qemu_element)
-
-    # remove previous custom argument, if it exists
-    argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
-    remove_list = list()
-    for argument_item in argument_list:
-        arg_value = argument_item.get('value').strip()
-        if arg_value.startswith('-cloudlet') or\
-                arg_value.startswith('logfile=') or\
-                arg_value.startswith('raw='):
-            remove_list.append(argument_item)
-    for item in remove_list:
-        qemu_element.remove(item)
-    # append custom qemu argument
-    key_str = '-cloudlet'
-    value_str = "raw=%s" % memory_snapshot_mode
-    if qemu_logfile:
-        value_str += ",logfile=%s" % qemu_logfile
-    qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value': key_str}))
-    qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value': value_str}))
-
-    # remove previous qmp argument, if it exists
-    argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
-    remove_list = list()
-    for argument_item in argument_list:
-        arg_value = argument_item.get('value').strip()
-        if arg_value.startswith('-qmp') or arg_value.startswith('unix:'):
-            remove_list.append(argument_item)
-    for item in remove_list:
-        qemu_element.remove(item)
-    # append QMP channel for controlling live migration
-    if qmp_channel is not None:
-        qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value': '-qmp'}))
-        qemu_element.append(
-            Element(
-                "{%s}arg" % qemu_xmlns, {'value': "unix:%s,server,nowait" % qmp_channel}
-            )
-        )
-
-    # append qemu argument given from user
-    if qemu_args:
+        # append custom QEMU-argument
         qemu_xmlns = "http://libvirt.org/schemas/domain/qemu/1.0"
         qemu_element = xml.find("{%s}commandline" % qemu_xmlns)
         if qemu_element is None:
             qemu_element = Element("{%s}commandline" % qemu_xmlns)
             xml.append(qemu_element)
-        for each_argument in qemu_args:
+
+        # remove previous custom argument, if it exists
+        argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
+        remove_list = list()
+        for argument_item in argument_list:
+            arg_value = argument_item.get('value').strip()
+            if arg_value.startswith('-cloudlet') or\
+                    arg_value.startswith('logfile=') or\
+                    arg_value.startswith('raw='):
+                remove_list.append(argument_item)
+        for item in remove_list:
+            qemu_element.remove(item)
+        # append custom qemu argument
+        key_str = '-cloudlet'
+        value_str = "raw=%s" % memory_snapshot_mode
+        if qemu_logfile:
+            value_str += ",logfile=%s" % qemu_logfile
+        qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value': key_str}))
+        qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value': value_str}))
+
+        # remove previous qmp argument, if it exists
+        argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
+        remove_list = list()
+        for argument_item in argument_list:
+            arg_value = argument_item.get('value').strip()
+            if arg_value.startswith('-qmp') or arg_value.startswith('unix:'):
+                remove_list.append(argument_item)
+        for item in remove_list:
+            qemu_element.remove(item)
+        # append QMP channel for controlling live migration
+        if qmp_channel is not None:
+            qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value': '-qmp'}))
             qemu_element.append(
-                Element("{%s}arg" % qemu_xmlns, {'value': each_argument}))
+                Element(
+                    "{%s}arg" % qemu_xmlns, {'value': "unix:%s,server,nowait" % qmp_channel}
+                )
+            )
 
-    # TODO: Handle console/serial element properly
-    device_element = xml.find("devices")
-    console_elements = device_element.findall("console")
-    for console_element in console_elements:
-        device_element.remove(console_element)
-    serial_elements = device_element.findall("serial")
-    for serial_element in serial_elements:
-        device_element.remove(serial_element)
+        # append qemu argument given from user
+        if qemu_args:
+            qemu_xmlns = "http://libvirt.org/schemas/domain/qemu/1.0"
+            qemu_element = xml.find("{%s}commandline" % qemu_xmlns)
+            if qemu_element is None:
+                qemu_element = Element("{%s}commandline" % qemu_xmlns)
+                xml.append(qemu_element)
+            for each_argument in qemu_args:
+                qemu_element.append(
+                    Element("{%s}arg" % qemu_xmlns, {'value': each_argument}))
 
-    network_element = device_element.find("interface")
-    if network_element is not None:
-        network_filter = network_element.find("filterref")
-        if network_filter is not None:
-            network_element.remove(network_filter)
+        # TODO: Handle console/serial element properly
+        device_element = xml.find("devices")
+        console_elements = device_element.findall("console")
+        for console_element in console_elements:
+            device_element.remove(console_element)
+        serial_elements = device_element.findall("serial")
+        for serial_element in serial_elements:
+            device_element.remove(serial_element)
 
-    # remove security option: this option only works with OpenStack and
-    # causes error in standalone version
-    security_element = xml.find("seclabel")
-    if security_element is not None:
-        xml.remove(security_element)
-    new_security_label = Element("seclabel")
-    new_security_label.set("type", "dynamic")
-    new_security_label.set("relabel", "yes")
-    xml.append(new_security_label)
+        network_element = device_element.find("interface")
+        if network_element is not None:
+            network_filter = network_element.find("filterref")
+            if network_filter is not None:
+                network_element.remove(network_filter)
 
-    new_xml_str = ElementTree.tostring(xml)
-    new_xml_str = new_xml_str.replace(old_uuid, str(uuid))
-    if mem_snapshot is not None:
-        overwrite_xml(mem_snapshot, new_xml_str)
+        # remove security option: this option only works with OpenStack and
+        # causes error in standalone version
+        security_element = xml.find("seclabel")
+        if security_element is not None:
+            xml.remove(security_element)
+        new_security_label = Element("seclabel")
+        new_security_label.set("type", "dynamic")
+        new_security_label.set("relabel", "yes")
+        xml.append(new_security_label)
 
+        new_xml_str = ElementTree.tostring(xml)
+        if not existing_domain:
+            new_xml_str = new_xml_str.replace(old_uuid, str(uuid))
+        if mem_snapshot is not None:
+            overwrite_xml(mem_snapshot, new_xml_str)
+    except Exception as e:
+        print e
     return original_xml_backup, new_xml_str
 
 
@@ -1039,8 +1036,20 @@ def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
     return fuse_process
 
 
+def launch_vm(conn, domain_xml, transient=False):
+    if not transient:
+        machine = conn.defineXML(domain_xml)
+        machine.create()
+    else: # transient domain which will be lost after shutdown
+        machine = conn.createXML(domain_xml, 0)
+    return machine
+
 def run_vm(conn, domain_xml, **kwargs):
-    machine = conn.createXML(domain_xml, 0)
+    if kwargs.get('persist'):
+        machine = conn.defineXML(domain_xml)
+        machine.create()
+    else: # transient domain which will be lost after shutdown
+        machine = conn.createXML(domain_xml, 0)
 
     # Run VNC and wait until user finishes working
     if kwargs.get('vnc_disable'):
@@ -1325,9 +1334,7 @@ def restore_with_config(conn, mem_snapshot, xml):
         conn.restoreFlags(mem_snapshot, xml, libvirt.VIR_DOMAIN_SAVE_RUNNING)
         LOG.info("VM is restored...")
     except libvirt.libvirtError as e:
-        msg = "Error, make sure previous VM is closed and check QEMU_ARGUMENT"
-        message = "%s\nXML: %s\n%s" % \
-            (xml, str(e), msg)
+        message = "Libvirt error when restoring snapshot: %s\n" % e.message
         raise CloudletGenerationError(message)
 
 
@@ -1345,7 +1352,7 @@ def overwrite_xml(in_path, new_xml):
 def copy_with_xml(in_path, out_path, xml):
     fin = open(in_path)
     fout = open(out_path, 'wrb')
-    hdr = memory_util._QemuMemoryneader(fin)
+    hdr = memory_util._QemuMemoryHeader(fin)
 
     # Write header
     hdr.xml = xml
@@ -1564,7 +1571,7 @@ def validate_handoffurl(handoff_url):
     return True
 
 
-def create_baseVM(disk_image_path):
+def create_baseVM(disk_image_path, domain=None):
     # Create Base VM(disk, memory) snapshot using given VM disk image
     # :param disk_image_path : file path of the VM disk image
     # :returns: (generated base VM disk path, generated base VM memory path)
@@ -1575,8 +1582,9 @@ def create_baseVM(disk_image_path):
         Const.get_basepath(disk_image_path)
 
     # check sanity
-    if not os.path.exists(Const.TEMPLATE_XML):
-        raise CloudletGenerationError("Cannot find Base VM default XML at %s\n"
+    if domain is None:
+        if not os.path.exists(Const.TEMPLATE_XML):
+            raise CloudletGenerationError("Cannot find Base VM default XML at %s\n"
                                       % Const.TEMPLATE_XML)
     if not os.path.exists(Const.TEMPLATE_OVF):
         raise CloudletGenerationError("Cannot find ovf file for AMIt %s\n"
@@ -1599,13 +1607,23 @@ def create_baseVM(disk_image_path):
 
     # edit default XML to have new disk path
     conn = get_libvirt_connection()
-    xml = ElementTree.fromstring(open(Const.TEMPLATE_XML, "r").read())
-    xml, new_xml_string = _convert_xml(disk_path=disk_image_path, xml=xml)
-
+    if domain is None:
+        xml, new_xml_string = _convert_xml(disk_path=disk_image_path)
+    else:
+        xml = ElementTree.fromstring(domain)
+        xml, new_xml_string = _convert_xml(disk_path=disk_image_path, xml=xml)
+    
     # launch VM & wait for end of vnc
     machine = None
     try:
-        machine = run_vm(conn, new_xml_string, wait_vnc=True)
+        print 'Launching VM...\nPause VM when finished modifying to begin hashing of disk/memory state.' 
+        machine = launch_vm(conn, new_xml_string, transient=True)
+        #wait until VM is paused
+        while True:
+            state, _ = machine.state()
+            if state == libvirt.VIR_DOMAIN_PAUSED:
+                break
+
         base_hashvalue = _create_baseVM(conn,
                                         machine,
                                         disk_image_path,
@@ -1638,33 +1656,23 @@ def create_baseVM(disk_image_path):
 def handlesig(signum, frame):
     LOG.info("Received signal(%d) to start handoff..." % signum)
 
-def synthesis(base_disk, overlay_path, **kwargs):
+def synthesize(base_disk, overlay_path, **kwargs):
     """VM Synthesis and run recoverd VM
     :param base_disk: path to base disk
     :param overlay_path: path to VM overlay file
     :param kwargs-disk_only: synthesis size VM with only disk image
     :param kwargs-handoff_url: return residue of changed portion
     """
-    if os.path.exists(base_disk) == False:
-        msg = "Base disk does not exist at %s" % base_disk
-        raise CloudletGenerationError(msg)
     LOG.debug("==========================================")
     LOG.debug(overlay_path)
 
     disk_only = kwargs.get('disk_only', False)
     zip_container = kwargs.get('zip_container', False)
     handoff_url = kwargs.get('handoff_url', None)
-    if handoff_url is not None:
-        parsed_handoff_url = urlsplit(handoff_url)
-        if parsed_handoff_url.scheme != "file" and parsed_handoff_url.scheme != "tcp":
-            msg = "invalid handoff_url (%s). Only support file and tcp scheme" % handoff_url
-            raise CloudletGenerationError(msg)
-
     qemu_args = kwargs.get('qemu_args', False)
     overlay_mode = kwargs.get('overlay_mode', None)
     is_profiling_test = kwargs.get('is_profiling_test', False)
-
-    nova_xml = kwargs.get('nova_xml', None)
+    xml = kwargs.get('xml', None)
     base_mem = kwargs.get('base_mem', None)
     base_diskmeta = kwargs.get('base_diskmeta', None)
     base_memmeta = kwargs.get('base_memmeta', None)
@@ -1672,9 +1680,6 @@ def synthesis(base_disk, overlay_path, **kwargs):
     overlay_filename = NamedTemporaryFile(prefix="cloudlet-overlay-file-")
     decompe_time_s = time()
     if not zip_container:
-        if os.path.exists(overlay_path) == False:
-            msg = "VM overlay does not exist at %s" % overlay_path
-            raise CloudletGenerationError(msg)
         LOG.info("Decompressing VM overlay")
         meta_info = compression.decomp_overlay(overlay_path,
                                                overlay_filename.name)
@@ -1690,14 +1695,14 @@ def synthesis(base_disk, overlay_path, **kwargs):
     LOG.info("Resume the launch VM")
     synthesized_VM = SynthesizedVM(
         launch_disk, launch_mem, fuse, disk_only=disk_only,
-        qemu_args=qemu_args, nova_xml=nova_xml
+        qemu_args=qemu_args, xml=xml
     )
     # no-pipelining
     delta_proc.start()
     fuse_thread.start()
     delta_proc.join()
     fuse_thread.join()
-    synthesized_VM.resume()
+    machine = synthesized_VM.resume()
     if handoff_url is not None:
         # preload basevm hash dictionary for creating residue
         (base_diskmeta, base_mem, base_memmeta) =\
@@ -1706,12 +1711,14 @@ def synthesis(base_disk, overlay_path, **kwargs):
             base_diskmeta, base_memmeta)
         preload_thread.daemon = True
         preload_thread.start()
-
-    connect_vnc(synthesized_VM.machine, handoff_url is not None)
-
-    if handoff_url is not None:
         signal.signal(signal.SIGUSR1, handlesig)
         signal.pause()
+    else:
+        #wait until VM is paused
+        while True:
+            state, _ = machine.state()
+            if state == libvirt.VIR_DOMAIN_PAUSED:
+                break
 
     if handoff_url is not None:
         options = Options()
@@ -1731,6 +1738,7 @@ def synthesis(base_disk, overlay_path, **kwargs):
             if os.path.exists(os.path.dirname(dest_path)):
                 dest_handoff_url = "file://%s" % os.path.abspath(parsed_handoff_url.path)
             else:
+                print "Destination doesn't exist, attempting to use temporary file..."
                 temp_dir = mkdtemp(prefix="cloudlet-residue-")
                 residue_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
                 dest_handoff_url = "file://%s" % os.path.abspath(residue_zipfile)
@@ -1745,31 +1753,11 @@ def synthesis(base_disk, overlay_path, **kwargs):
             synthesized_VM.qmp_channel, synthesized_VM.machine.ID(),
             synthesized_VM.fuse.modified_disk_chunks, "qemu:///system",
         )
-        if True:
-            # using in-memory data structure
-            handoff_ds._load_vm_data()
-
-            try:
-                handoff.perform_handoff(handoff_ds)
-            except handoff.HandoffError as e:
-                LOG.error("Cannot perform VM handoff: %s" % (str(e)))
-        else:
-            # using subprocess
-            temp_dir = mkdtemp(prefix="cloudlet-handoffdata-")
-            handoff_datafile = os.path.join(temp_dir, "handoff_datafile")
-            handoff_ds.to_file(handoff_datafile)
-            try:
-                LOG.debug("start handoff")
-                output = subprocess.check_output([
-                    "/usr/local/bin/handoff-proc", "%s" % handoff_datafile])
-                LOG.debug("finish handoff")
-            except subprocess.CalledProcessError as e:
-                LOG.error("Failed to launch subprocess")
-                LOG.error("Cannot create residue : %s" % (str(e)))
-            finally:
-                if os.path.exists(temp_dir):
-                    shutil.rmtree(temp_dir)
-
+        handoff_ds._load_vm_data()
+        try:
+            handoff.perform_handoff(handoff_ds)
+        except handoff.HandoffError as e:
+            LOG.error("Cannot perform VM handoff: %s" % (str(e)))
         # print out residue location
         if residue_zipfile and os.path.exists(residue_zipfile):
             LOG.info("Save new VM overlay at: %s" %
@@ -1779,7 +1767,6 @@ def synthesis(base_disk, overlay_path, **kwargs):
     synthesized_VM.monitor.terminate()
     synthesized_VM.monitor.join()
     synthesized_VM.terminate()
-
 
 def info_vm_overlay(overlay_path):
     overlay_path = os.path.abspath(overlay_path)

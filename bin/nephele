@@ -1,0 +1,633 @@
+#!/usr/bin/env python
+#
+# Cloudlet Infrastructure for Mobile Computing
+#
+#   Author: Thomas Eiszler <teiszler@andrew.cmu.edu>
+#
+#   Copyright (C) 2011-2019 Carnegie Mellon University
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+
+from __future__ import division
+import argparse
+import errno
+import json
+import libvirt
+from libvirt import libvirtError
+from lxml import etree
+import os
+import random
+import subprocess
+import sys
+import textwrap
+import threading
+import time
+from uuid import uuid4
+import zipfile
+
+from elijah.provisioning import synthesis as synthesis
+from elijah.provisioning.configuration import Const as Const
+from elijah.provisioning.configuration import Options
+from elijah.provisioning import log as logging
+from elijah.provisioning.db.table_def import BaseVM
+from elijah.provisioning.db.table_def import Session
+from elijah.provisioning.db.table_def import OverlayVM
+from elijah.provisioning.db.api import DBConnector
+from elijah.provisioning.package import PackagingUtil
+
+HOSTS = (
+    'fog.elijah.cs.cmu.edu',
+)
+URI_TEMPLATE = 'qemu:///system'
+
+
+
+HOST_URI_MAP = dict((host.split('.')[0], URI_TEMPLATE.format(host=host))
+        for host in HOSTS)
+
+# Squash redundant reporting of libvirt errors to stderr.  This modifies
+# global state, since the Python bindings don't provide a way to do this
+# per-connection.
+libvirt.registerErrorHandler(lambda _ctx, _error: None, None)
+
+
+class Airavata(object):
+    def __init__(self):
+        self.conns = {}
+        for host_name, uri in HOST_URI_MAP.items():
+            try:
+                self.conns[host_name] = libvirt.open(uri)
+            except libvirtError, e:
+                print >>sys.stderr, '%s: %s' % (host_name, e)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.close()
+        return False
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        for conn in self.conns.values():
+            conn.close()
+        self.conns.clear()
+
+    def get_domain_map(self):
+        avds = {}
+        for host_name, conn in self.conns.items():
+            for domain in conn.listAllDomains(0):
+                avd = AiravataDomain(self, host_name, domain)
+                avds[avd.name] = avd
+        return avds
+        
+    def get_domains(self, descriptors=None):
+        # Enumerate domains
+        avds = self.get_domain_map()
+
+        if descriptors is None:
+            # Return all domains
+            return [t[1] for t in sorted(avds.items())]
+
+        names = set()
+        ret = []
+        def add(name):
+            # Ensure we only add each domain once
+            if name not in names:
+                names.add(name)
+                ret.append(avds[name])
+        for descriptor in descriptors:
+            if descriptor.startswith('@'):
+                # All domains on the specified host
+                for name in sorted(avd.name for avd in avds.values()
+                        if avd.host_name == descriptor[1:]):
+                    add(name)
+            else:
+                # Single domain
+                add(descriptor)
+        return ret
+
+
+class AiravataDomain(object):
+    STATE_MAP = {
+        libvirt.VIR_DOMAIN_NOSTATE:	'nostate',
+        libvirt.VIR_DOMAIN_RUNNING:	'running',
+        libvirt.VIR_DOMAIN_BLOCKED:	'blocked',
+        libvirt.VIR_DOMAIN_PAUSED:	'paused',
+        libvirt.VIR_DOMAIN_SHUTDOWN:	'shuttng',
+        libvirt.VIR_DOMAIN_SHUTOFF:	'shutoff',
+        libvirt.VIR_DOMAIN_CRASHED:	'crashed',
+        libvirt.VIR_DOMAIN_PMSUSPENDED:	'suspend',
+    }
+
+    def __init__(self, av, host_name, domain):
+        self._av = av
+        self._domain = domain
+        self.host_name = host_name
+        self.name = domain.name()
+        self.xml = domain.XMLDesc(libvirt.VIR_DOMAIN_XML_SECURE |
+                libvirt.VIR_DOMAIN_XML_INACTIVE)
+        self.state = self.STATE_MAP[domain.state(0)[0]]
+        self.autostart = bool(domain.autostart())
+        self.memory = int(domain.maxMemory() / 1024)
+        try:
+            self.cpus = domain.maxVcpus()
+        except libvirtError:
+            self.cpus = None
+
+        tree = etree.fromstring(self.xml)
+        res = tree.xpath('/domain/description/text()')
+        self.description = res[0] if len(res) else None
+        res = tree.xpath('/domain/devices/disk[not(@type="network")]')
+        self.using_local_disk = len(res) != 0
+
+    @property
+    def running(self):
+        return self.state in ('running', 'blocked', 'paused', 'shuttng')
+
+    def migrate(self, host_name):
+        if self.using_local_disk: # Do not migrate domains that use local fs
+            raise ValueError('{0.name} using local disk'.format(self))
+        if self.host_name == host_name:
+            raise ValueError('{0.name} already on {0.host_name}'.format(self))
+        dest = self._av.conns[host_name]
+
+        if self.state in ('running', 'paused'):
+            thr = threading.Thread(target=self._migrate_status_thread,
+                    args=(self.host_name, host_name, self._domain))
+            thr.daemon = True
+            thr.start()
+            domain = self._domain.migrate(dest,
+                    libvirt.VIR_MIGRATE_LIVE |
+                    libvirt.VIR_MIGRATE_PERSIST_DEST |
+                    libvirt.VIR_MIGRATE_UNDEFINE_SOURCE,
+                    None, None, 0)
+            thr.join()
+        elif self.state == 'shutoff':
+            tree = etree.fromstring(self.xml)
+
+            # fix up cross-platform differences in domain.xml
+            #if True: # dest.os == 'Ubuntu':
+            #    tree.find('os/type').attrib['machine'] = 'pc-1.0'
+            #    tree.find('devices/emulator').text = '/usr/bin/kvm'
+            #else:
+            #    tree.find('os/type').attrib['machine'] = 'rhel6.5.0'
+            #    tree.find('devices/emulator').text = '/usr/libexec/qemu-kvm'
+
+            domain = dest.defineXML(etree.tostring(tree))
+            try:
+                self._domain.undefine()
+            except libvirtError:
+                domain.undefine()
+                raise
+            self._migrate_progress(self.host_name, host_name)
+        else:
+            raise ValueError("Can't migrate {0.name} while in state {0.state}".format(self))
+
+        if self.autostart:
+            domain.setAutostart(1)
+        self._domain = domain
+        self.host_name = host_name
+
+    def _migrate_progress(self, source_host, dest_host, pct=None):
+        print '    {0.name:30}: {1:12} -> {2:12}  {3:3}%\r'.format(self,
+                source_host, dest_host, 100 if pct is None else int(pct)),
+        if pct is None:
+            print
+        sys.stdout.flush()
+
+    def _migrate_status_thread(self, source_host, dest_host, domain):
+        terminal = (
+            libvirt.VIR_DOMAIN_JOB_COMPLETED,
+            libvirt.VIR_DOMAIN_JOB_FAILED,
+            libvirt.VIR_DOMAIN_JOB_CANCELLED,
+        )
+        while True:
+            try:
+                (type, time_elapsed, time_remaining,
+                        data_total, data_processed, data_remaining,
+                        mem_total, mem_processed, mem_remaining,
+                        file_total, file_processed, file_remaining) = \
+                        domain.jobInfo()
+            except libvirtError:
+                break
+            if type in terminal:
+                break
+            # data_total is bogus
+            total = data_processed + data_remaining
+            self._migrate_progress(source_host, dest_host,
+                    (100 * data_processed / total) if total else 0)
+            time.sleep(0.25)
+        self._migrate_progress(source_host, dest_host)
+
+def backup_domains(args):
+    if os.path.exists(args.destdir):
+        raise ValueError('Destination exists')
+    os.mkdir(args.destdir)
+    with Airavata() as av:
+        for avd in av.get_domains():
+            subdir = os.path.join(args.destdir, avd.host_name)
+            if not os.path.exists(subdir):
+                os.mkdir(subdir)
+            dest = os.path.join(subdir, '{0}.xml'.format(avd.name))
+            with open(dest, 'w') as fh:
+                fh.write(avd.xml)
+
+def list_hosts(args):
+    # Get CPU count and memory usage for each host
+    with Airavata() as av:
+        hosts = {}
+        for host_name, conn in av.conns.items():
+            model, memory, cpus, mhz, nodes, sockets, cores, threads = \
+                    conn.getInfo()
+            hosts[host_name] = {
+                'cpus': cpus,
+                'mem': memory,
+                'allocated_cpus': 0,
+                'domain_mem': 0,
+                'running_domain_mem': 0,
+                'avds': [],
+            }
+        for avd in av.get_domains():
+            host = hosts[avd.host_name]
+            host['domain_mem'] += avd.memory
+            if avd.running:
+                host['running_domain_mem'] += avd.memory
+            if avd.cpus:
+                host['allocated_cpus'] += avd.cpus
+            host['avds'].append(avd)
+
+    alignment = ' ' * 22 if args.long else ''
+    for host, info in sorted(hosts.items()):
+        print '{0:12} {2}{1[allocated_cpus]:2} {1[cpus]:2} {1[running_domain_mem]:5} {1[domain_mem]:5} {1[mem]:5}'.format(host, info, alignment)
+
+        if args.long:
+            for avd in sorted(info['avds'], key=lambda avd: avd.name):
+                print '    {0.name:30} {1:>2}    {2:>5} {0.memory:5}'.format(avd, avd.cpus or '-', avd.memory if avd.running else '-')
+
+
+def list_domains(args):
+    sort_attr_map = {
+        'host': 'host_name',
+        'mem': 'memory',
+    }
+    fmt = '{0.name:30} {0.host_name:12} {0.state:7} {1:>2} {0.memory:5} {2}'
+    with Airavata() as av:
+        avds = av.get_domains(args.descriptor or None)
+        if args.sort:
+            sort_key = sort_attr_map.get(args.sort, args.sort)
+            avds.sort(key=lambda avd: getattr(avd, sort_key),
+                    reverse=sort_key in ('autostart',))
+        for avd in avds:
+            if args.running and not avd.running:
+                continue
+            print fmt.format(avd, avd.cpus or '-',
+                    'auto' if avd.autostart else '')
+            if args.long:
+                if avd.description:
+                    print textwrap.fill(avd.description,
+                            initial_indent=' ' * 4)
+                print
+
+def run_virsh(args):
+    # Munge command line
+    with Airavata() as av:
+        avds = av.get_domain_map()
+        cmdline = []
+        have_connection = False
+        connection_uri = None
+        for arg in args.args:
+            if arg == '--':
+                continue
+            elif arg in ('-c', '--connect'):
+                have_connection = True
+            elif arg in HOST_URI_MAP:
+                # Host name
+                arg = HOST_URI_MAP[arg]
+            elif arg in avds:
+                # Domain name
+                if connection_uri is None:
+                    connection_uri = HOST_URI_MAP[avds[arg].host_name]
+            cmdline.append(arg)
+        if connection_uri and not have_connection:
+            cmdline = ['-c', connection_uri] + cmdline
+
+    # Execute
+    cmdline.insert(0, 'virsh')
+    if not args.quiet:
+        print ' '.join(cmdline)
+    if args.dry_run:
+        return 0
+    else:
+        return subprocess.call(cmdline)
+
+
+def run_virsh_each(args):
+    # Split command line into descriptors and virsh args
+    descriptors = []
+    virsh_args = args.args
+    while virsh_args:
+        arg = virsh_args.pop(0)
+        if arg == '--':
+            break
+        descriptors.append(arg)
+    else:
+        raise ValueError('No virsh arguments specified')
+    if '{}' not in virsh_args:
+        raise ValueError('"{}" must be specified as a virsh argument')
+
+    # Run
+    with Airavata() as av:
+        ret = 0
+        for avd in av.get_domains(descriptors):
+            cmdline = ['virsh', '-c', HOST_URI_MAP[avd.host_name]]
+            for arg in virsh_args:
+                if arg == '{}':
+                    arg = avd.name
+                elif arg in HOST_URI_MAP:
+                    arg = HOST_URI_MAP[arg]
+                cmdline.append(arg)
+            if not args.quiet:
+                print ' '.join(cmdline)
+            if not args.dry_run:
+                cur_ret = subprocess.call(cmdline)
+                ret = ret or cur_ret
+    return ret
+
+def create_base(args):
+    try:
+        disk_image_path = args.path
+        if args.domain is not None:
+            with Airavata() as av:
+                avds = av.get_domains(args.domain or None)
+                for avd in avds:
+                    xml = avd.xml
+
+            disk_path, mem_path = synthesis.create_baseVM(disk_image_path, domain=xml)
+        else:
+            disk_path, mem_path = synthesis.create_baseVM(disk_image_path)
+        print "Created Base VM from this image: %s" % disk_image_path
+        print "Base Disk Image: %s" % disk_path
+        print "Base Memory Snapshot: %s" % mem_path
+    except KeyError as e:
+        print "Domain %s does not exist!" % args.domain
+
+def define_domain(args):
+    template = open(Const.TEMPLATE_XML, "r").read()
+    tree = etree.fromstring(template)
+    tree.find('name').text = args.name
+    tree.find('title').text = args.name
+    tree.find('uuid').text = str(uuid4())
+    tree.find('devices/emulator').text = Const.QEMU_BIN_PATH
+
+    conn = libvirt.open(URI_TEMPLATE)
+    #TODO Obtain upper bound from host and compare cpu/mem; can libvirt provide current values a la virt-manager?
+    if args.cpu is not None:
+        if args.cpu > 0:
+            # overwrite vcpu node in template
+            tree.find('vcpu').text = str(args.cpu)
+            tree.find('cpu/topology').attrib['cores'] = str(args.cpu)
+    if args.mem is not None:
+        if args.mem > 0:
+            # overwrite memory/currentMemory nodes in template
+            tree.find('memory').text = str(args.mem)
+            tree.find('currentMemory').text = str(args.mem)
+
+    # # find all disk element(hdd, cdrom) and change them to new
+    # disk_elements = tree.findall('devices/disk')
+    # hdd_source = None
+    # cdrom_source = None
+    # for disk_element in disk_elements:
+    #     disk_type = disk_element.attrib['device']
+    #     if disk_type == 'disk':
+    #         hdd_source = disk_element.find('source')
+    #         hdd_driver = disk_element.find('driver')
+    #         if (hdd_driver is not None) and \
+    #                 (hdd_driver.get("type", None) is not None):
+    #             hdd_driver.attrib['type'] = 'raw'
+    #     if disk_type == 'cdrom':
+    #         cdrom_source = disk_element.find('source')
+    # hdd_source.set("file", os.path.abspath(args.path))
+    # if cdrom_source is not None:    # ovf path setting
+    #     cdrom_source.set("file", os.path.abspath(Const.TEMPLATE_OVF))
+
+    machine = conn.defineXML(etree.tostring(tree))
+    conn.close()
+
+def generate_overlay(args):
+    try:
+        options = Options()
+        options.DISK_ONLY = args.disk_only
+        options.TRIM_SUPPORT = not args.no_trim
+        options.FREE_SUPPORT = args.free_mem
+        options.ZIP_CONTAINER = args.zip
+        # resume base vm for creating vm overlay
+        vm_overlay = synthesis.VM_Overlay(args.path, options,
+                                            qemu_args=None)
+        print 'Launching VM...\nPause VM when finished modifying to begin hashing of disk/memory state.' 
+        machine = vm_overlay.resume_basevm()
+         
+        #wait until VM is paused
+        while True:
+            state, _ = machine.state()
+            if state == libvirt.VIR_DOMAIN_PAUSED:
+                break
+        print 'VM entered paused state. Generating overlay of disk and memory...'
+        vm_overlay.create_overlay()
+
+        # print output
+        if args.zip is False:
+            sys.stdout.write("[INFO] overlay metafile (%ld) : %s\n" %
+                                (os.path.getsize(vm_overlay.overlay_metafile),
+                                vm_overlay.overlay_metafile))
+            for overlay_file in vm_overlay.overlay_files:
+                sys.stdout.write(
+                    "[INFO] overlay (%ld) : %s\n" %
+                    (os.path.getsize(overlay_file), overlay_file))
+        else:
+            overlay_zip = zipfile.ZipFile(vm_overlay.overlay_zipfile)
+            filesize_count = 0
+            for zipinfo in overlay_zip.infolist():
+                if zipinfo.filename == Const.OVERLAY_META:
+                    msg = "meta file : (%ld) bytes\n" % \
+                        (zipinfo.file_size)
+                else:
+                    msg = "blob file : (%ld) bytes (%s)\n" % \
+                        (zipinfo.file_size, zipinfo.filename)
+                filesize_count += zipinfo.file_size
+                sys.stdout.write(msg)
+            sys.stdout.write(
+                "zip overhead : (%ld) bytes\n" %
+                (os.path.getsize(vm_overlay.overlay_zipfile) - filesize_count))
+    except Exception as e:
+        print "Failed to create overlay: %s" % str(e)
+    os.rename(vm_overlay.overlay_zipfile, args.dest)
+
+
+def list_base(args):
+    dbconn = DBConnector()
+    basevm_list = dbconn.list_item(BaseVM)
+    sys.stdout.write("hash value" + "\t\t\t\t\t" + "path\n")
+    sys.stdout.write("-"*90 + "\n")
+    for item in basevm_list:
+        sys.stdout.write(item.hash_value + "\t" + item.disk_path + "\n")
+    sys.stdout.write("-"*90 + "\n")
+
+def delete_base(args):
+    dbconn, deleting_base = PackagingUtil._get_matching_basevm(
+        disk_path=args.path)
+    if deleting_base is not None:
+        dbconn.del_item(deleting_base)
+    else:
+        print "Cannot find matching base disk!\n"
+        return 1
+
+def export_base(args):
+        basedisk_path = args.path
+        _, matching_basevm = PackagingUtil._get_matching_basevm(disk_path=basedisk_path)
+        output_path = args.dest
+        if matching_basevm is not None:
+            PackagingUtil.export_basevm(
+                output_path,
+                basedisk_path,
+                matching_basevm.hash_value)
+        else:
+            print "Cannot find matching base disk!"
+            return 1
+
+def import_base(args):
+        import_file = args.path
+        if os.path.exists(import_file) == False or \
+            os.access(import_file, os.R_OK) == False:
+           print "Cannot read file: %s" % import_file
+           return 1
+        PackagingUtil.import_basevm(import_file)
+
+def synthesize(args):
+        domain = args.domain
+        conn = libvirt.open(URI_TEMPLATE)
+        dom = conn.lookupByName(domain)
+
+        xml = dom.XMLDesc(0)
+        disk_image_path = args.base
+        overlay_meta = args.overlay
+        is_zip_contained, url_path = PackagingUtil.is_zip_contained(
+            overlay_meta)
+        if is_zip_contained is True:
+            overlay_meta = url_path
+        try:
+            if args.dest is not None:
+                ret = synthesis.validate_handoffurl(args.dest)
+                if not ret:
+                    msg = "(%s) is invalid handoff URL" % args.dest
+                    raise synthesis.CloudletGenerationError(msg)
+
+            synthesis.synthesize(disk_image_path, overlay_meta,
+                                disk_only=args.disk_only,
+                                handoff_url=args.dest,
+                                zip_container=is_zip_contained,
+                                xml=xml)
+        except Exception as e:
+            print "Failed to synthesize: %s" % str(e)
+            return 1
+
+def print_args(args):
+    print args
+
+def _main():
+    parser = argparse.ArgumentParser(prog='nephele', description='Manage VMs across cloudlets.')
+    subparsers = parser.add_subparsers(title='command')
+
+    domain_parser = subparsers.add_parser('domain', help='Invoke domain related commands')
+    domain_parsers = domain_parser.add_subparsers(title='domain')
+    list_parser = domain_parsers.add_parser('list', help='List libvirt domains')
+    list_parser.set_defaults(func=list_domains)
+    list_parser.add_argument('-l', '--long', action='store_true',
+            help='show domain descriptions')
+    list_parser.add_argument('-r', '--running', action='store_true',
+            help='show only running domains')
+    list_parser.add_argument('-s', dest='sort',
+            choices=('name', 'host', 'state', 'cpus', 'mem', 'autostart'),
+            help='sort key')
+    list_parser.add_argument('descriptor', nargs='*',
+            help='domain or @host')
+    define_parser = domain_parsers.add_parser('define', help='Define a libvirt domain based on a template')
+    define_parser.set_defaults(func=define_domain)
+    define_parser.add_argument('name', help='Name for the VM instance')
+  #  define_parser.add_argument('path', help='Path to base image. Use nephele base list to view paths')
+    define_parser.add_argument('-c', '--cpu', type=int, help='Override number of vCPUs. By default, the number specified in the VM_TEMPLATE.xml will be used.')
+    define_parser.add_argument('-m', '--mem', type=int, help='Override amount of memory (in KiB). By default, the number specified in the VM_TEMPLATE.xml will be used.')
+
+    base_parser = subparsers.add_parser('base', help='Management of base VM images')
+    base_subparsers = base_parser.add_subparsers(title='base')
+    create_parser = base_subparsers.add_parser('create', help='Create a base image from an existing raw disk image and domain XML')
+    create_parser.add_argument('path', help='Path to an existing base image in raw format')
+    create_parser.add_argument('domain', nargs='*', help='use the following domain to instantiate')
+    create_parser.set_defaults(func=create_base)
+
+    delete_base_parser = base_subparsers.add_parser('delete', help='Remove a base image from the registry')
+    delete_base_parser.add_argument('path', help='Path of base image to remove')
+    delete_base_parser.set_defaults(func=delete_base)
+
+    export_parser = base_subparsers.add_parser('export', help='Export a zip file containing a compressed base image')
+    export_parser.add_argument('path', help='Path of base image to export')
+    export_parser.add_argument('dest', help='destination of exported zip file')
+    export_parser.set_defaults(func=export_base)
+
+    import_parser = base_subparsers.add_parser('import', help='Import a base image from a compressed zip file')
+    import_parser.add_argument('path', help='an existing zip file containing a base image')
+    import_parser.set_defaults(func=import_base)
+
+    list_base_parser = base_subparsers.add_parser('list', help='List base images in the registry')
+    list_base_parser.set_defaults(func=list_base)
+
+    snapshot_parser = subparsers.add_parser('snapshot', help='Management of VM snapshots')
+    snapshot_subparsers = snapshot_parser.add_subparsers(title='snapshot')
+
+    details_parser = snapshot_subparsers.add_parser('details', help='Output details of an existing snapshot')
+    details_parser.add_argument('id', help='an existing snapshot to inspect')
+    details_parser.set_defaults(func=print_args)
+
+    list_snapshot_parser = base_subparsers.add_parser('list', help='List snapshots in the registry')
+    list_snapshot_parser.set_defaults(func=list_snapshots)
+
+    generate_parser = snapshot_subparsers.add_parser('generate', help='Interact with a base VM to create a new snapshot')
+    generate_parser.add_argument('path', help='an existing base image to start with')
+    generate_parser.add_argument('dest', help='Destination path for snapshot')
+    generate_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
+    generate_parser.add_argument('-m', '--free-mem', action='store_true', help='Extract free memory (default=False)')
+    generate_parser.add_argument('-t', '--no-trim', action='store_true', help='Disable TRIM support. (default=False)')
+    generate_parser.add_argument('-z', '--zip', default=True, action='store_true', help='Package snapshot files into a single zip. (default=True))')
+    generate_parser.set_defaults(func=generate_snapshot)
+    
+    synthesize_parser = subparsers.add_parser('synthesize',
+            help='Rapidly provision a VM from a base image and a snapshot')
+    synthesize_parser.add_argument('base', help='Base image to synthesize upon')
+    synthesize_parser.add_argument('snapshot', help='Disk/memory delta to apply to base')
+    synthesize_parser.add_argument('domain', help='Domain XML to use as the template')
+    synthesize_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
+    synthesize_parser.add_argument('-t', '--dest', help='Handoff destination. Can be local in the form file:///<path> or a remote location in the form tcp://<ip or DNS>')
+    synthesize_parser.set_defaults(func=synthesize)
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+    args = parser.parse_args()
+    ret = args.func(args) or 0
+    sys.exit(ret)
+
+
+
+if __name__ == '__main__':
+    _main()
