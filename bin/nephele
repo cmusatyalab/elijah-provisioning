@@ -39,9 +39,7 @@ from elijah.provisioning import synthesis as synthesis
 from elijah.provisioning.configuration import Const as Const
 from elijah.provisioning.configuration import Options
 from elijah.provisioning import log as logging
-from elijah.provisioning.db.table_def import BaseVM
-from elijah.provisioning.db.table_def import Session
-from elijah.provisioning.db.table_def import OverlayVM
+import elijah.provisioning.db.table_def as table_def
 from elijah.provisioning.db.api import DBConnector
 from elijah.provisioning.package import PackagingUtil
 
@@ -474,16 +472,58 @@ def generate_snapshot(args):
     except Exception as e:
         print "Failed to create overlay: %s" % str(e)
     os.rename(vm_overlay.overlay_zipfile, args.dest)
+    # save the result to DB
+    dbconn = DBConnector()
+    list = dbconn.list_item(table_def.Snapshot)
+    for item in list:
+        if args.dest == item.path:
+            dbconn.del_item(item)
+            break
+    _, basevm = PackagingUtil._get_matching_basevm(disk_path=args.path)
+    new = table_def.Snapshot(args.dest, basevm.hash_value)
+    dbconn.add_item(new)
 
 
 def list_base(args):
     dbconn = DBConnector()
-    basevm_list = dbconn.list_item(BaseVM)
-    sys.stdout.write("hash value" + "\t\t\t\t\t" + "path\n")
-    sys.stdout.write("-"*90 + "\n")
-    for item in basevm_list:
-        sys.stdout.write(item.hash_value + "\t" + item.disk_path + "\n")
-    sys.stdout.write("-"*90 + "\n")
+    list = dbconn.list_item(table_def.BaseVM)
+    print "*"*150
+    print "{:*>150}".format('NEPHELE - Base Images')
+    print "*"*150
+    print "{:-^64}|{:-^86}".format('SHA-256', 'Path')
+    for item in list:
+        print "{:^64}|{:^86}".format(item.hash_value, item.disk_path)
+    print "*"*150
+
+def list_snapshots(args):
+    dbconn = DBConnector()
+#    new_snapshot = table_def.Snapshot('/root/blah2.zip', str(uuid4()))
+#    dbconn.add_item(new_snapshot)
+
+    list = dbconn.list_item(table_def.Snapshot)
+    print "*"*150
+    print "{:*>150}".format('NEPHELE - Snapshots')
+    print "*"*150
+    print "{:-^55}|{:-^64}|{:-^30}".format('Path', 'Base', 'Created')
+    for item in list:
+        print "{:^55}|{:^64}|{:^30}".format(item.path, item.basevm, str(item.create_time))
+    print "*"*150
+
+def delete_snapshot(args):
+    dbconn = DBConnector()
+    if args.path:
+        path = os.path.abspath(args.path)
+    list = dbconn.list_item(table_def.Snapshot)
+    snapshot = None
+    for item in list:
+        if (path == item.path):
+            snapshot = item
+            break
+    if snapshot is not None:
+        dbconn.del_item(snapshot)
+    else:
+        print "Cannot find matching snapshot with path %s\n" % (args.path)
+        return 1
 
 def delete_base(args):
     dbconn, deleting_base = PackagingUtil._get_matching_basevm(
@@ -600,7 +640,11 @@ def _main():
     details_parser.set_defaults(func=print_args)
 
     list_snapshot_parser = snapshot_subparsers.add_parser('list', help='List snapshots in the registry')
-    list_snapshot_parser.set_defaults(func=print_args)
+    list_snapshot_parser.set_defaults(func=list_snapshots)
+
+    delete_snapshot_parser = snapshot_subparsers.add_parser('delete', help='Remove a snapshot from the registry')
+    delete_snapshot_parser.add_argument('path', help='Path of snapshot to remove')
+    delete_snapshot_parser.set_defaults(func=delete_snapshot)
 
     generate_parser = snapshot_subparsers.add_parser('generate', help='Interact with a base VM to create a new snapshot')
     generate_parser.add_argument('path', help='an existing base image to start with')

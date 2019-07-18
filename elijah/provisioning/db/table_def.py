@@ -44,6 +44,19 @@ class BaseVM(Base):
         self.disk_path = disk_path
         self.hash_value = hash_value
 
+class Snapshot(Base):
+    """
+    """
+    __tablename__ = "snapshots"
+
+    path = Column(String, primary_key=True)
+    basevm = Column(String, ForeignKey(BaseVM.hash_value))
+    create_time = Column(DateTime, nullable=False)
+
+    def __init__(self, path, basevm):
+        self.path = path
+        self.basevm = basevm
+        self.create_time = datetime.datetime.now()
 
 class Session(Base):
     """ """
