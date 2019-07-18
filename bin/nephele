@@ -426,7 +426,7 @@ def define_domain(args):
     machine = conn.defineXML(etree.tostring(tree))
     conn.close()
 
-def generate_overlay(args):
+def generate_snapshot(args):
     try:
         options = Options()
         options.DISK_ONLY = args.disk_only
@@ -521,8 +521,7 @@ def synthesize(args):
         dom = conn.lookupByName(domain)
 
         xml = dom.XMLDesc(0)
-        disk_image_path = args.base
-        overlay_meta = args.overlay
+        overlay_meta = args.snapshot
         is_zip_contained, url_path = PackagingUtil.is_zip_contained(
             overlay_meta)
         if is_zip_contained is True:
@@ -534,7 +533,7 @@ def synthesize(args):
                     msg = "(%s) is invalid handoff URL" % args.dest
                     raise synthesis.CloudletGenerationError(msg)
 
-            synthesis.synthesize(disk_image_path, overlay_meta,
+            synthesis.synthesize(None, overlay_meta,
                                 disk_only=args.disk_only,
                                 handoff_url=args.dest,
                                 zip_container=is_zip_contained,
@@ -600,8 +599,8 @@ def _main():
     details_parser.add_argument('id', help='an existing snapshot to inspect')
     details_parser.set_defaults(func=print_args)
 
-    list_snapshot_parser = base_subparsers.add_parser('list', help='List snapshots in the registry')
-    list_snapshot_parser.set_defaults(func=list_snapshots)
+    list_snapshot_parser = snapshot_subparsers.add_parser('list', help='List snapshots in the registry')
+    list_snapshot_parser.set_defaults(func=print_args)
 
     generate_parser = snapshot_subparsers.add_parser('generate', help='Interact with a base VM to create a new snapshot')
     generate_parser.add_argument('path', help='an existing base image to start with')
@@ -613,9 +612,8 @@ def _main():
     generate_parser.set_defaults(func=generate_snapshot)
     
     synthesize_parser = subparsers.add_parser('synthesize',
-            help='Rapidly provision a VM from a base image and a snapshot')
-    synthesize_parser.add_argument('base', help='Base image to synthesize upon')
-    synthesize_parser.add_argument('snapshot', help='Disk/memory delta to apply to base')
+            help='Rapidly provision a VM from an existing snapshot')
+    synthesize_parser.add_argument('snapshot', help='Disk/memory delta to synthesize')
     synthesize_parser.add_argument('domain', help='Domain XML to use as the template')
     synthesize_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
     synthesize_parser.add_argument('-t', '--dest', help='Handoff destination. Can be local in the form file:///<path> or a remote location in the form tcp://<ip or DNS>')
