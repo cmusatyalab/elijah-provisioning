@@ -1687,6 +1687,18 @@ def synthesize(base_disk, overlay_path, **kwargs):
         meta_info = compression.decomp_overlayzip(overlay_path,
                                                   overlay_filename.name)
 
+    base_sha = meta_info[Const.META_BASE_VM_SHA256]
+    base_found = False
+    dbconn = db_api.DBConnector()
+    basevm_list = dbconn.list_item(db_table.BaseVM)
+    for basevm_row in basevm_list:
+        if basevm_row.hash_value == base_sha:
+            base_disk = os.path.abspath(basevm_row.disk_path)
+            base_found = True
+    if not base_found:
+        msg = "Cannot find base image (SHA-256: %s) referenced in overlay: %s" % (base_sha, overlay_path)
+        raise CloudletGenerationError(msg)
+
     LOG.info("Decompression time : %f (s)" % (time()-decompe_time_s))
     LOG.info("Recovering launch VM")
     launch_disk, launch_mem, fuse, delta_proc, fuse_thread = \
