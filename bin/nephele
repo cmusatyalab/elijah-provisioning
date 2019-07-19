@@ -490,10 +490,10 @@ def list_base(args):
     print "*"*150
     print "{:*>150}".format('NEPHELE - Base Images')
     print "*"*150
-    print "{:-^64}|{:-^86}".format('SHA-256', 'Path')
+    print "\n{:-^64}|{:-^86}".format('SHA-256', 'Path')
     for item in list:
         print "{:^64}|{:^86}".format(item.hash_value, item.disk_path)
-    print "*"*150
+    print "-"*150
 
 def list_snapshots(args):
     dbconn = DBConnector()
@@ -504,10 +504,10 @@ def list_snapshots(args):
     print "*"*150
     print "{:*>150}".format('NEPHELE - Snapshots')
     print "*"*150
-    print "{:-^55}|{:-^64}|{:-^30}".format('Path', 'Base', 'Created')
+    print "\n{:-^55}|{:-^64}|{:-^30}".format('Path', 'Base', 'Created')
     for item in list:
         print "{:^55}|{:^64}|{:^30}".format(item.path, item.basevm, str(item.create_time))
-    print "*"*150
+    print "-"*150
 
 def delete_snapshot(args):
     dbconn = DBConnector()
@@ -522,7 +522,7 @@ def delete_snapshot(args):
     if snapshot is not None:
         dbconn.del_item(snapshot)
     else:
-        print "Cannot find matching snapshot with path %s\n" % (args.path)
+        print "Cannot find matching snapshot at path %s\n" % (args.path)
         return 1
 
 def delete_base(args):
@@ -582,6 +582,18 @@ def synthesize(args):
             print "Failed to synthesize: %s" % str(e)
             return 1
 
+def snapshot_details(args):
+        try:
+            output = synthesis.info_vm_overlay(args.path)
+            print("\n")
+            print(output)
+        except Exception as e:
+            print(str(e))
+            print(
+                "%s\nFailed to get overlay details" % str(
+                    traceback.format_exc()))
+            return 1
+
 def print_args(args):
     print args
 
@@ -636,8 +648,12 @@ def _main():
     snapshot_subparsers = snapshot_parser.add_subparsers(title='snapshot')
 
     details_parser = snapshot_subparsers.add_parser('details', help='Output details of an existing snapshot')
-    details_parser.add_argument('id', help='an existing snapshot to inspect')
-    details_parser.set_defaults(func=print_args)
+    details_parser.add_argument('path', help='Path to an existing snapshot to inspect')
+    details_parser.set_defaults(func=snapshot_details)
+
+    import_snapshot_parser = snapshot_subparsers.add_parser('import', help='Import a snapshot from a compressed zip file')
+    import_snapshot_parser.add_argument('path', help='an existing zip file containing a snapshot')
+    import_snapshot_parser.set_defaults(func=print_args)
 
     list_snapshot_parser = snapshot_subparsers.add_parser('list', help='List snapshots in the registry')
     list_snapshot_parser.set_defaults(func=list_snapshots)
@@ -668,8 +684,6 @@ def _main():
     args = parser.parse_args()
     ret = args.func(args) or 0
     sys.exit(ret)
-
-
 
 if __name__ == '__main__':
     _main()
