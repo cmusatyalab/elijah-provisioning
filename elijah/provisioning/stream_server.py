@@ -32,7 +32,7 @@ import multiprocessing
 import Queue
 import threading
 from hashlib import sha256
-
+import libvirt
 import shutil
 
 from server import NetworkUtil
@@ -807,10 +807,11 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             LOG.info("send ack to client: %d" % len(ack_data))
             self.request.sendall(ack_data)
 
-            connect_vnc(synthesized_vm.machine, True)
-
-            signal.signal(signal.SIGUSR1, handlesig)
-            signal.pause()
+            #wait until VM is paused
+            while True:
+                state, _ = synthesized_vm.machine.state()
+                if state == libvirt.VIR_DOMAIN_PAUSED:
+                    break
 
             synthesized_vm.monitor.terminate()
             synthesized_vm.monitor.join()
