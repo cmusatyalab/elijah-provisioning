@@ -43,6 +43,7 @@ from tempfile import mkdtemp
 from time import time
 from time import sleep
 from optparse import OptionParser
+import datetime
 
 from . import memory
 from . import disk
@@ -62,6 +63,9 @@ from . import qmp_af_unix
 from .tool import comp_lzma
 from . import compression
 from . import log as logging
+import elijah.provisioning.db.table_def as table_def
+from elijah.provisioning.db.api import DBConnector
+from elijah.provisioning.package import PackagingUtil
 
 
 # to work with OpenStack's eventlet
@@ -1676,6 +1680,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
     base_mem = kwargs.get('base_mem', None)
     base_diskmeta = kwargs.get('base_diskmeta', None)
     base_memmeta = kwargs.get('base_memmeta', None)
+    save_snapshot = False
 
     overlay_filename = NamedTemporaryFile(prefix="cloudlet-overlay-file-")
     decompe_time_s = time()
@@ -1715,14 +1720,15 @@ def synthesize(base_disk, overlay_path, **kwargs):
     delta_proc.join()
     fuse_thread.join()
     machine = synthesized_VM.resume()
+
+    # preload basevm hash dictionary for creating residue
+    (base_diskmeta, base_mem, base_memmeta) =\
+        Const.get_basepath(base_disk, check_exist=False)
+    preload_thread = handoff.PreloadResidueData(
+        base_diskmeta, base_memmeta)
+    preload_thread.daemon = True
+    preload_thread.start()
     if handoff_url is not None:
-        # preload basevm hash dictionary for creating residue
-        (base_diskmeta, base_mem, base_memmeta) =\
-            Const.get_basepath(base_disk, check_exist=False)
-        preload_thread = handoff.PreloadResidueData(
-            base_diskmeta, base_memmeta)
-        preload_thread.daemon = True
-        preload_thread.start()
         signal.signal(signal.SIGUSR1, handlesig)
         signal.pause()
     else:
@@ -1731,49 +1737,63 @@ def synthesize(base_disk, overlay_path, **kwargs):
             state, _ = machine.state()
             if state == libvirt.VIR_DOMAIN_PAUSED:
                 break
+        #make a new snapshot and store it
+        path, ext = os.path.splitext(overlay_path)
+        handoff_url = 'file://%s' % (path+datetime.datetime.now().strftime('%Y%m%d_%H%M%S')+ext)
+        save_snapshot = True
 
-    if handoff_url is not None:
-        options = Options()
-        options.TRIM_SUPPORT = True
-        options.FREE_SUPPORT = True
-        options.DISK_ONLY = False
-        preload_thread.join()
-        (base_diskmeta, base_mem, base_memmeta) = \
-            Const.get_basepath(base_disk, check_exist=False)
-        base_vm_paths = [base_disk, base_mem, base_diskmeta, base_memmeta]
-        # prepare data structure for VM handoff
-        residue_zipfile = None
-        dest_handoff_url = handoff_url
-        parsed_handoff_url = urlsplit(handoff_url)
-        if parsed_handoff_url.scheme == "file":
-            dest_path = parsed_handoff_url.path
-            if os.path.exists(os.path.dirname(dest_path)):
-                dest_handoff_url = "file://%s" % os.path.abspath(parsed_handoff_url.path)
-            else:
-                print "Destination doesn't exist, attempting to use temporary file..."
-                temp_dir = mkdtemp(prefix="cloudlet-residue-")
-                residue_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
-                dest_handoff_url = "file://%s" % os.path.abspath(residue_zipfile)
-        handoff_ds = handoff.HandoffDataSend()
-        LOG.debug("save data to file")
-        handoff_ds.save_data(
-            base_vm_paths, meta_info[Const.META_BASE_VM_SHA256],
-            preload_thread.basedisk_hashdict,
-            preload_thread.basemem_hashdict,
-            options, dest_handoff_url, overlay_mode,
-            synthesized_VM.fuse.mountpoint, synthesized_VM.qemu_logfile,
-            synthesized_VM.qmp_channel, synthesized_VM.machine.ID(),
-            synthesized_VM.fuse.modified_disk_chunks, "qemu:///system",
-        )
-        handoff_ds._load_vm_data()
-        try:
-            handoff.perform_handoff(handoff_ds)
-        except handoff.HandoffError as e:
-            LOG.error("Cannot perform VM handoff: %s" % (str(e)))
-        # print out residue location
-        if residue_zipfile and os.path.exists(residue_zipfile):
-            LOG.info("Save new VM overlay at: %s" %
-                    (os.path.abspath(residue_zipfile)))
+
+    options = Options()
+    options.TRIM_SUPPORT = True
+    options.FREE_SUPPORT = True
+    options.DISK_ONLY = False
+    preload_thread.join()
+    (base_diskmeta, base_mem, base_memmeta) = \
+        Const.get_basepath(base_disk, check_exist=False)
+    base_vm_paths = [base_disk, base_mem, base_diskmeta, base_memmeta]
+    # prepare data structure for VM handoff
+    residue_zipfile = None
+    dest_handoff_url = handoff_url
+    parsed_handoff_url = urlsplit(handoff_url)
+    if parsed_handoff_url.scheme == "file":
+        dest_path = parsed_handoff_url.path
+        if os.path.exists(os.path.dirname(dest_path)):
+            dest_handoff_url = "file://%s" % os.path.abspath(parsed_handoff_url.path)
+        else:
+            print "Destination doesn't exist, attempting to use temporary file..."
+            temp_dir = mkdtemp(prefix="cloudlet-residue-")
+            residue_zipfile = os.path.join(temp_dir, Const.OVERLAY_ZIP)
+            dest_handoff_url = "file://%s" % os.path.abspath(residue_zipfile)
+    handoff_ds = handoff.HandoffDataSend()
+    LOG.debug("save data to file")
+    handoff_ds.save_data(
+        base_vm_paths, meta_info[Const.META_BASE_VM_SHA256],
+        preload_thread.basedisk_hashdict,
+        preload_thread.basemem_hashdict,
+        options, dest_handoff_url, overlay_mode,
+        synthesized_VM.fuse.mountpoint, synthesized_VM.qemu_logfile,
+        synthesized_VM.qmp_channel, synthesized_VM.machine.ID(),
+        synthesized_VM.fuse.modified_disk_chunks, "qemu:///system",
+    )
+    handoff_ds._load_vm_data()
+    try:
+        handoff.perform_handoff(handoff_ds)
+    except handoff.HandoffError as e:
+        LOG.error("Cannot perform VM handoff: %s" % (str(e)))
+    # print out residue location
+    if residue_zipfile and os.path.exists(residue_zipfile):
+        LOG.info("Save new VM overlay at: %s" %
+                (os.path.abspath(residue_zipfile)))
+    if save_snapshot:
+        dbconn = DBConnector()
+        list = dbconn.list_item(table_def.Snapshot)
+        for item in list:
+            if os.path.abspath(parsed_handoff_url.path) == item.path:
+                dbconn.del_item(item)
+                break
+        _, basevm = PackagingUtil._get_matching_basevm(disk_path=base_disk)
+        new = table_def.Snapshot(os.path.abspath(parsed_handoff_url.path), basevm.hash_value)
+        dbconn.add_item(new)
 
     # terminate
     synthesized_VM.monitor.terminate()

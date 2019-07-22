@@ -434,9 +434,8 @@ def generate_snapshot(args):
         # resume base vm for creating vm overlay
         vm_overlay = synthesis.VM_Overlay(args.path, options,
                                             qemu_args=None)
-        print 'Launching VM...\nPause VM when finished modifying to begin hashing of disk/memory state.' 
         machine = vm_overlay.resume_basevm()
-         
+        print 'Launching VM...\nPause VM when finished modifying to begin hashing of disk/memory state.'  
         #wait until VM is paused
         while True:
             state, _ = machine.state()
@@ -589,9 +588,6 @@ def snapshot_details(args):
             print(output)
         except Exception as e:
             print(str(e))
-            print(
-                "%s\nFailed to get overlay details" % str(
-                    traceback.format_exc()))
             return 1
 
 def print_args(args):
