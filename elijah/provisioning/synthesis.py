@@ -1721,7 +1721,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
                 break
         #make a new snapshot and store it
         path, ext = os.path.splitext(overlay_path)
-        handoff_url = 'file://%s' % (path+'!'+ext)
+        handoff_url = 'file://%s' % (path+'-'+ext)
         save_snapshot = True
         print 'VM entered paused state. Generating snapshot of disk and memory...'
 
