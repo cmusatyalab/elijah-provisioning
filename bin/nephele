@@ -375,7 +375,7 @@ def create_base(args):
         # use qemu-img to ensure the disk image is in 'raw' format
         # and if not, convert it
         #disk_image_path = check_and_convert_to_raw(disk_image_path)
-        disk_path, mem_path = synthesis.create_baseVM(disk_image_path, title=args.title)
+        disk_path, mem_path = synthesis.create_baseVM(disk_image_path, title=args.title, cpus=args.cpu, mem=args.mem)
         print "Created Base VM from this image: %s" % disk_image_path
         print "Base Disk Image: %s" % disk_path
         print "Base Memory Snapshot: %s" % mem_path
@@ -592,31 +592,13 @@ def _main():
     parser = argparse.ArgumentParser(prog='nephele', description='Manage VMs across cloudlets.')
     subparsers = parser.add_subparsers(title='command')
 
-    domain_parser = subparsers.add_parser('domain', help='Invoke domain related commands')
-    domain_parsers = domain_parser.add_subparsers(title='domain')
-    list_parser = domain_parsers.add_parser('list', help='List libvirt domains')
-    list_parser.set_defaults(func=list_domains)
-    list_parser.add_argument('-l', '--long', action='store_true',
-            help='show domain descriptions')
-    list_parser.add_argument('-r', '--running', action='store_true',
-            help='show only running domains')
-    list_parser.add_argument('-s', dest='sort',
-            choices=('name', 'host', 'state', 'cpus', 'mem', 'autostart'),
-            help='sort key')
-    list_parser.add_argument('descriptor', nargs='*',
-            help='domain or @host')
-    define_parser = domain_parsers.add_parser('define', help='Define a libvirt domain based on a template')
-    define_parser.set_defaults(func=define_domain)
-    define_parser.add_argument('name', help='Name for the VM instance')
-  #  define_parser.add_argument('path', help='Path to base image. Use nephele base list to view paths')
-    define_parser.add_argument('-c', '--cpu', type=int, help='Override number of vCPUs. By default, the number specified in the VM_TEMPLATE.xml will be used.')
-    define_parser.add_argument('-m', '--mem', type=int, help='Override amount of memory (in KiB). By default, the number specified in the VM_TEMPLATE.xml will be used.')
-
     base_parser = subparsers.add_parser('base', help='Management of base VM images')
     base_subparsers = base_parser.add_subparsers(title='base')
     create_parser = base_subparsers.add_parser('create', help='Create a base image from an existing raw disk image and domain XML')
     create_parser.add_argument('path', help='Path to an existing base image in raw format')
     create_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
+    create_parser.add_argument('-c', '--cpu', type=int, help='Override number of vCPUs. By default, the number specified in the VM_TEMPLATE.xml will be used.')
+    create_parser.add_argument('-m', '--mem', type=int, help='Override amount of memory (in KiB). By default, the number specified in the VM_TEMPLATE.xml will be used.')
     create_parser.set_defaults(func=create_base)
 
     delete_base_parser = base_subparsers.add_parser('delete', help='Remove a base image from the registry')

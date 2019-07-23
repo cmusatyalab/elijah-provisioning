@@ -559,7 +559,8 @@ def _test_dma_accuracy(dma_dict, disk_deltalist, mem_deltalist):
 def _convert_xml(disk_path, xml=None, mem_snapshot=None,
                  qemu_logfile=None, qmp_channel=None,
                  qemu_args=None, memory_snapshot_mode="suspend",
-                 nova_xml=None, title=None, operation=None):
+                 nova_xml=None, title=None, operation=None,
+                 cpus=None, mem=None):
     """process libvirt xml header before launching the VM
     :param memory_snapshot_mode : behavior of libvrt memory snapshotting, [off|suspend|live]
     """
@@ -608,6 +609,16 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None,
         cpu_model_element.set("fallback", "forbid")
         cpu_element.append(cpu_model_element)
 
+        if cpus is not None:
+            if cpus > 0:
+                # overwrite vcpu node in template
+                xml.find('vcpu').text = str(cpus)
+                xml.find('cpu/topology').attrib['cores'] = str(cpus)
+        if mem is not None:
+            if mem > 0:
+                # overwrite memory/currentMemory nodes in template
+                xml.find('memory').text = str(mem)
+                xml.find('currentMemory').text = str(mem)
 
         # update sysinfo entry's uuid if it exist
         # it has to match with uuid of the VM
@@ -1561,7 +1572,7 @@ def validate_handoffurl(handoff_url):
     return True
 
 
-def create_baseVM(disk_image_path, title=None):
+def create_baseVM(disk_image_path, title=None, cpus=None, mem=None):
     # Create Base VM(disk, memory) snapshot using given VM disk image
     # :param disk_image_path : file path of the VM disk image
     # :returns: (generated base VM disk path, generated base VM memory path)
@@ -1596,7 +1607,7 @@ def create_baseVM(disk_image_path, title=None):
 
     # edit default XML to have new disk path
     conn = get_libvirt_connection()
-    xml, new_xml_string = _convert_xml(disk_path=disk_image_path, title=title, operation='Creating Base VM Image')
+    xml, new_xml_string = _convert_xml(disk_path=disk_image_path, title=title, operation='Creating Base VM Image', cpus=cpus, mem=mem)
     
     # launch VM & wait for end of vnc
     machine = None
