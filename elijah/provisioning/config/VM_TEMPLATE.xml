@@ -12,6 +12,7 @@
 	-->
 	<name>cloudlet</name>
 	<title>cloudlet</title>
+	<description>Nephele</description>
 	<uuid>abc</uuid>
 	<memory>8388608</memory>
 	<currentMemory>8388608</currentMemory>

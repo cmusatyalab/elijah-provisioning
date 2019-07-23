@@ -168,7 +168,7 @@ class VM_Overlay(native_threading.Thread):
         native_threading.Thread.__init__(self, target=self.create_overlay)
 
     @wrap_vm_fault
-    def resume_basevm(self):
+    def resume_basevm(self, title=None):
         if (self.options is None) or (isinstance(self.options, Options) == False):
             msg = "Given option class is invalid: %s" % str(self.options)
             raise CloudletGenerationError(msg)
@@ -229,7 +229,7 @@ class VM_Overlay(native_threading.Thread):
         self.old_xml_str, self.new_xml_str = _convert_xml(
             self.modified_disk, mem_snapshot=self.base_mem_fuse,
             qemu_logfile=self.qemu_logfile, qemu_args=self.qemu_args,
-            nova_xml=self.nova_xml)
+            nova_xml=self.nova_xml, title=title, operation='Generate customized snapshot')
         self.machine = run_snapshot(self.conn, self.modified_disk,
                                     self.base_mem_fuse, self.new_xml_str)
         return self.machine
@@ -345,6 +345,7 @@ class SynthesizedVM(native_threading.Thread):
                  disk_only=False, qemu_args=None, **kwargs):
         # kwargs
         self.xml = kwargs.get("xml", None)
+        self.title = kwargs.get("title", None)
         self.nova_util = kwargs.get("nova_util", None)
         self.conn = kwargs.get("nova_conn", None) or get_libvirt_connection()
         self.LOG = kwargs.get("log", None)
@@ -413,7 +414,9 @@ class SynthesizedVM(native_threading.Thread):
                 qemu_logfile=self.qemu_logfile,
                 qmp_channel=self.qmp_channel,
                 qemu_args=self.qemu_args,
-                memory_snapshot_mode="live"
+                memory_snapshot_mode="live",
+                title=self.title,
+                operation='Synthesized memory/disk snapshot'
             )
 
     def resume(self):
@@ -424,7 +427,7 @@ class SynthesizedVM(native_threading.Thread):
             if self.disk_only:
                 # edit default XML to have new disk path
                 self.machine = run_vm(self.conn, self.new_xml_str,
-                                      vnc_disable=True, persist=True)
+                                      vnc_disable=True)
             else:
                 self.machine = run_snapshot(self.conn, self.resumed_disk,
                                             self.resumed_mem, self.new_xml_str,
@@ -556,7 +559,7 @@ def _test_dma_accuracy(dma_dict, disk_deltalist, mem_deltalist):
 def _convert_xml(disk_path, xml=None, mem_snapshot=None,
                  qemu_logfile=None, qmp_channel=None,
                  qemu_args=None, memory_snapshot_mode="suspend",
-                 nova_xml=None):
+                 nova_xml=None, title=None, operation=None):
     """process libvirt xml header before launching the VM
     :param memory_snapshot_mode : behavior of libvrt memory snapshotting, [off|suspend|live]
     """
@@ -564,35 +567,27 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None,
         if mem_snapshot is not None:
             hdr = memory_util._QemuMemoryHeader(open(mem_snapshot))
             xml = ElementTree.fromstring(hdr.xml)
-            existing_domain = True
-        elif xml is not None:
-            existing_domain = True
         else: 
-            # if we aren't pulling from the snapshot header 
-            # and no XML was provided, use the default template
             xml = ElementTree.fromstring(open(Const.TEMPLATE_XML, "r").read())
-            existing_domain = False
-
-
         original_xml_backup = ElementTree.tostring(xml)
 
         vm_name = None
         uuid = None
         nova_vnc_element = None
-        if existing_domain:
-            vm_name = str(xml.find('name').text)
-            uuid = str(xml.find('uuid').text)
-        else:
-            uuid = uuid4()
-            uuid_element = xml.find('uuid')
-            old_uuid = uuid_element.text
-            uuid_element.text = str(uuid)
-            vm_name = 'cloudlet-' + str(uuid.hex)
-            name_element = xml.find('name')
-            if name_element is None:
-                msg = "Malfomed XML input: %s", Const.TEMPLATE_XML
-                raise CloudletGenerationError(msg)
-            name_element.text = vm_name
+        if title is not None:
+            xml.find('title').text = title
+        if operation is not None:
+            xml.find('description').text = '*NEPHELE managed* - %s' % operation
+        uuid = uuid4()
+        uuid_element = xml.find('uuid')
+        old_uuid = uuid_element.text
+        uuid_element.text = str(uuid)
+        vm_name = 'nephele-' + str(uuid.hex)
+        name_element = xml.find('name')
+        if name_element is None:
+            msg = "Malfomed XML input: %s", Const.TEMPLATE_XML
+            raise CloudletGenerationError(msg)
+        name_element.text = vm_name
 
         # TODO: perhaps we shouldn't coerce the machine type because of incompatibility?
         #type = xml.find('os/type')
@@ -740,8 +735,7 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None,
         xml.append(new_security_label)
 
         new_xml_str = ElementTree.tostring(xml)
-        if not existing_domain:
-            new_xml_str = new_xml_str.replace(old_uuid, str(uuid))
+        new_xml_str = new_xml_str.replace(old_uuid, str(uuid))
         if mem_snapshot is not None:
             overwrite_xml(mem_snapshot, new_xml_str)
     except Exception as e:
@@ -1040,20 +1034,12 @@ def run_fuse(bin_path, chunk_size, original_disk, fuse_disk_size,
     return fuse_process
 
 
-def launch_vm(conn, domain_xml, transient=False):
-    if not transient:
-        machine = conn.defineXML(domain_xml)
-        machine.create()
-    else: # transient domain which will be lost after shutdown
-        machine = conn.createXML(domain_xml, 0)
+def launch_vm(conn, domain_xml):
+    machine = conn.createXML(domain_xml, 0)
     return machine
 
 def run_vm(conn, domain_xml, **kwargs):
-    if kwargs.get('persist'):
-        machine = conn.defineXML(domain_xml)
-        machine.create()
-    else: # transient domain which will be lost after shutdown
-        machine = conn.createXML(domain_xml, 0)
+    machine = conn.createXML(domain_xml, 0)
 
     # Run VNC and wait until user finishes working
     if kwargs.get('vnc_disable'):
@@ -1575,7 +1561,7 @@ def validate_handoffurl(handoff_url):
     return True
 
 
-def create_baseVM(disk_image_path, domain=None):
+def create_baseVM(disk_image_path, title=None):
     # Create Base VM(disk, memory) snapshot using given VM disk image
     # :param disk_image_path : file path of the VM disk image
     # :returns: (generated base VM disk path, generated base VM memory path)
@@ -1586,9 +1572,8 @@ def create_baseVM(disk_image_path, domain=None):
         Const.get_basepath(disk_image_path)
 
     # check sanity
-    if domain is None:
-        if not os.path.exists(Const.TEMPLATE_XML):
-            raise CloudletGenerationError("Cannot find Base VM default XML at %s\n"
+    if not os.path.exists(Const.TEMPLATE_XML):
+        raise CloudletGenerationError("Cannot find Base VM default XML at %s\n"
                                       % Const.TEMPLATE_XML)
     if not os.path.exists(Const.TEMPLATE_OVF):
         raise CloudletGenerationError("Cannot find ovf file for AMIt %s\n"
@@ -1611,17 +1596,13 @@ def create_baseVM(disk_image_path, domain=None):
 
     # edit default XML to have new disk path
     conn = get_libvirt_connection()
-    if domain is None:
-        xml, new_xml_string = _convert_xml(disk_path=disk_image_path)
-    else:
-        xml = ElementTree.fromstring(domain)
-        xml, new_xml_string = _convert_xml(disk_path=disk_image_path, xml=xml)
+    xml, new_xml_string = _convert_xml(disk_path=disk_image_path, title=title, operation='Creating Base VM Image')
     
     # launch VM & wait for end of vnc
     machine = None
     try:
         print 'Launching VM...\nPause VM when finished modifying to begin hashing of disk/memory state.' 
-        machine = launch_vm(conn, new_xml_string, transient=True)
+        machine = launch_vm(conn, new_xml_string)
         #wait until VM is paused
         while True:
             state, _ = machine.state()
@@ -1681,6 +1662,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
     base_diskmeta = kwargs.get('base_diskmeta', None)
     base_memmeta = kwargs.get('base_memmeta', None)
     save_snapshot = False
+    title = kwargs.get('title', None)
 
     overlay_filename = NamedTemporaryFile(prefix="cloudlet-overlay-file-")
     decompe_time_s = time()
@@ -1712,7 +1694,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
     LOG.info("Resume the launch VM")
     synthesized_VM = SynthesizedVM(
         launch_disk, launch_mem, fuse, disk_only=disk_only,
-        qemu_args=qemu_args, xml=xml
+        qemu_args=qemu_args, title=title
     )
     # no-pipelining
     delta_proc.start()
@@ -1739,8 +1721,9 @@ def synthesize(base_disk, overlay_path, **kwargs):
                 break
         #make a new snapshot and store it
         path, ext = os.path.splitext(overlay_path)
-        handoff_url = 'file://%s' % (path+datetime.datetime.now().strftime('%Y%m%d_%H%M%S')+ext)
+        handoff_url = 'file://%s' % (path+'!'+ext)
         save_snapshot = True
+        print 'VM entered paused state. Generating snapshot of disk and memory...'
 
 
     options = Options()

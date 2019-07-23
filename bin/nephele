@@ -364,18 +364,18 @@ def run_virsh_each(args):
                 ret = ret or cur_ret
     return ret
 
+def check_and_convert_to_raw(path):
+    #qemu_img info <path>
+    #scan for raw
+    pass
+
 def create_base(args):
     try:
         disk_image_path = args.path
-        if args.domain is not None:
-            with Airavata() as av:
-                avds = av.get_domains(args.domain or None)
-                for avd in avds:
-                    xml = avd.xml
-
-            disk_path, mem_path = synthesis.create_baseVM(disk_image_path, domain=xml)
-        else:
-            disk_path, mem_path = synthesis.create_baseVM(disk_image_path)
+        # use qemu-img to ensure the disk image is in 'raw' format
+        # and if not, convert it
+        #disk_image_path = check_and_convert_to_raw(disk_image_path)
+        disk_path, mem_path = synthesis.create_baseVM(disk_image_path, title=args.title)
         print "Created Base VM from this image: %s" % disk_image_path
         print "Base Disk Image: %s" % disk_path
         print "Base Memory Snapshot: %s" % mem_path
@@ -434,14 +434,14 @@ def generate_snapshot(args):
         # resume base vm for creating vm overlay
         vm_overlay = synthesis.VM_Overlay(args.path, options,
                                             qemu_args=None)
-        machine = vm_overlay.resume_basevm()
+        machine = vm_overlay.resume_basevm(args.title)
         print 'Launching VM...\nPause VM when finished modifying to begin hashing of disk/memory state.'  
         #wait until VM is paused
         while True:
             state, _ = machine.state()
             if state == libvirt.VIR_DOMAIN_PAUSED:
                 break
-        print 'VM entered paused state. Generating overlay of disk and memory...'
+        print 'VM entered paused state. Generating snapshot of disk and memory...'
         vm_overlay.create_overlay()
 
         # print output
@@ -555,11 +555,6 @@ def import_base(args):
         PackagingUtil.import_basevm(import_file)
 
 def synthesize(args):
-        domain = args.domain
-        conn = libvirt.open(URI_TEMPLATE)
-        dom = conn.lookupByName(domain)
-
-        xml = dom.XMLDesc(0)
         overlay_meta = args.snapshot
         is_zip_contained, url_path = PackagingUtil.is_zip_contained(
             overlay_meta)
@@ -576,7 +571,7 @@ def synthesize(args):
                                 disk_only=args.disk_only,
                                 handoff_url=args.dest,
                                 zip_container=is_zip_contained,
-                                xml=xml)
+                                title=args.title)
         except Exception as e:
             print "Failed to synthesize: %s" % str(e)
             return 1
@@ -621,7 +616,7 @@ def _main():
     base_subparsers = base_parser.add_subparsers(title='base')
     create_parser = base_subparsers.add_parser('create', help='Create a base image from an existing raw disk image and domain XML')
     create_parser.add_argument('path', help='Path to an existing base image in raw format')
-    create_parser.add_argument('domain', nargs='*', help='use the following domain to instantiate')
+    create_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
     create_parser.set_defaults(func=create_base)
 
     delete_base_parser = base_subparsers.add_parser('delete', help='Remove a base image from the registry')
@@ -661,18 +656,19 @@ def _main():
     generate_parser = snapshot_subparsers.add_parser('generate', help='Interact with a base VM to create a new snapshot')
     generate_parser.add_argument('path', help='an existing base image to start with')
     generate_parser.add_argument('dest', help='Destination path for snapshot')
+    generate_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
     generate_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
     generate_parser.add_argument('-m', '--free-mem', action='store_true', help='Extract free memory (default=False)')
-    generate_parser.add_argument('-t', '--no-trim', action='store_true', help='Disable TRIM support. (default=False)')
+    generate_parser.add_argument('-n', '--no-trim', action='store_true', help='Disable TRIM support. (default=False)')
     generate_parser.add_argument('-z', '--zip', default=True, action='store_true', help='Package snapshot files into a single zip. (default=True))')
     generate_parser.set_defaults(func=generate_snapshot)
     
     synthesize_parser = subparsers.add_parser('synthesize',
             help='Rapidly provision a VM from an existing snapshot')
     synthesize_parser.add_argument('snapshot', help='Disk/memory delta to synthesize')
-    synthesize_parser.add_argument('domain', help='Domain XML to use as the template')
+    synthesize_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
     synthesize_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
-    synthesize_parser.add_argument('-t', '--dest', help='Handoff destination. Can be local in the form file:///<path> or a remote location in the form tcp://<ip or DNS>')
+    synthesize_parser.add_argument('-r', '--dest', help='Handoff destination. Can be local in the form file:///<path> or a remote location in the form tcp://<ip or DNS>')
     synthesize_parser.set_defaults(func=synthesize)
 
     if len(sys.argv) == 1:
