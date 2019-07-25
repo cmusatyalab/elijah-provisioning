@@ -476,7 +476,11 @@ def delete_snapshot(args):
             snapshot = item
             break
     if snapshot is not None:
-        dbconn.del_item(snapshot)
+        if raw_input("Are you sure you wish to delete the following snapshot: %s? (y/N): " % (args.path)).lower().strip().startswith("y"):
+            dbconn.del_item(snapshot)
+            print "Snapshot removed from database."
+            os.remove(args.path)
+            print "Snapshot deleted from disk."
     else:
         print "Cannot find matching snapshot at path %s\n" % (args.path)
         return 1
@@ -485,7 +489,9 @@ def delete_base(args):
     dbconn, deleting_base = PackagingUtil._get_matching_basevm(
         disk_path=args.path)
     if deleting_base is not None:
-        dbconn.del_item(deleting_base)
+        if raw_input("Are you sure you wish to delete the following base image: %s? (y/N): " % (args.path)).lower().strip().startswith("y"):
+            if raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N)").lower().strip().startswith("y"):
+                dbconn.del_item(deleting_base)
     else:
         print "Cannot find matching base disk!\n"
         return 1
@@ -549,18 +555,14 @@ def _main():
     parser = argparse.ArgumentParser(prog='nephele', description='Manage VMs across cloudlets.')
     subparsers = parser.add_subparsers(title='command')
 
-    base_parser = subparsers.add_parser('base', help='Management of base VM images')
+    base_parser = subparsers.add_parser('image', help='Management of base VM images')
     base_subparsers = base_parser.add_subparsers(title='base')
-    create_parser = base_subparsers.add_parser('create', help='Create a base image from an existing raw disk image and domain XML')
-    create_parser.add_argument('path', help='Path to an existing base image in raw format')
-    create_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
-    create_parser.add_argument('-c', '--cpu', type=int, help='Override number of vCPUs. By default, the number specified in the VM_TEMPLATE.xml will be used.')
-    create_parser.add_argument('-m', '--mem', type=int, help='Override amount of memory (in KiB). By default, the number specified in the VM_TEMPLATE.xml will be used.')
-    create_parser.set_defaults(func=create_base)
-
-    delete_base_parser = base_subparsers.add_parser('delete', help='Remove a base image from the registry')
-    delete_base_parser.add_argument('path', help='Path of base image to remove')
-    delete_base_parser.set_defaults(func=delete_base)
+    build_parser = base_subparsers.add_parser('build', help='Build a base image from an existing raw disk image')
+    build_parser.add_argument('path', help='Path to an existing base image in raw format')
+    build_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
+    build_parser.add_argument('-c', '--cpu', type=int, help='Override number of vCPUs. By default, the number specified in the VM_TEMPLATE.xml will be used.')
+    build_parser.add_argument('-m', '--mem', type=int, help='Override amount of memory (in KiB). By default, the number specified in the VM_TEMPLATE.xml will be used.')
+    build_parser.set_defaults(func=create_base)
 
     export_parser = base_subparsers.add_parser('export', help='Export a zip file containing a compressed base image')
     export_parser.add_argument('path', help='Path of base image to export')
@@ -571,26 +573,15 @@ def _main():
     import_parser.add_argument('path', help='an existing zip file containing a base image')
     import_parser.set_defaults(func=import_base)
 
-    list_base_parser = base_subparsers.add_parser('list', help='List base images in the registry')
+    list_base_parser = base_subparsers.add_parser('ls', help='List base images tracked by Nephele')
     list_base_parser.set_defaults(func=list_base)
+
+    delete_base_parser = base_subparsers.add_parser('rm', help='Remove a base image from Nephele')
+    delete_base_parser.add_argument('path', help='Path of base image to remove')
+    delete_base_parser.set_defaults(func=delete_base)
 
     snapshot_parser = subparsers.add_parser('snapshot', help='Management of VM snapshots')
     snapshot_subparsers = snapshot_parser.add_subparsers(title='snapshot')
-
-    details_parser = snapshot_subparsers.add_parser('details', help='Output details of an existing snapshot')
-    details_parser.add_argument('path', help='Path to an existing snapshot to inspect')
-    details_parser.set_defaults(func=snapshot_details)
-
-    import_snapshot_parser = snapshot_subparsers.add_parser('import', help='Import a snapshot from a compressed zip file')
-    import_snapshot_parser.add_argument('path', help='an existing zip file containing a snapshot')
-    import_snapshot_parser.set_defaults(func=print_args)
-
-    list_snapshot_parser = snapshot_subparsers.add_parser('list', help='List snapshots in the registry')
-    list_snapshot_parser.set_defaults(func=list_snapshots)
-
-    delete_snapshot_parser = snapshot_subparsers.add_parser('delete', help='Remove a snapshot from the registry')
-    delete_snapshot_parser.add_argument('path', help='Path of snapshot to remove')
-    delete_snapshot_parser.set_defaults(func=delete_snapshot)
 
     generate_parser = snapshot_subparsers.add_parser('generate', help='Interact with a base VM to create a new snapshot')
     generate_parser.add_argument('path', help='an existing base image to start with')
@@ -601,14 +592,29 @@ def _main():
     generate_parser.add_argument('-n', '--no-trim', action='store_true', help='Disable TRIM support. (default=False)')
     generate_parser.add_argument('-z', '--zip', default=True, action='store_true', help='Package snapshot files into a single zip. (default=True))')
     generate_parser.set_defaults(func=generate_snapshot)
-    
-    synthesize_parser = subparsers.add_parser('synthesize',
-            help='Rapidly provision a VM from an existing snapshot')
-    synthesize_parser.add_argument('snapshot', help='Disk/memory delta to synthesize')
-    synthesize_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
-    synthesize_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
-    synthesize_parser.add_argument('-r', '--dest', help='Handoff destination. Can be local in the form file:///<path> or a remote location in the form tcp://<ip or DNS>')
-    synthesize_parser.set_defaults(func=synthesize)
+
+    import_snapshot_parser = snapshot_subparsers.add_parser('import', help='Import a snapshot from a compressed zip file')
+    import_snapshot_parser.add_argument('path', help='an existing zip file containing a snapshot')
+    import_snapshot_parser.set_defaults(func=print_args)
+
+    details_parser = snapshot_subparsers.add_parser('inspect', help='Output details of a snapshot')
+    details_parser.add_argument('path', help='Path to an existing snapshot to inspect')
+    details_parser.set_defaults(func=snapshot_details)
+
+    list_snapshot_parser = snapshot_subparsers.add_parser('ls', help='List snapshots known to nephele')
+    list_snapshot_parser.set_defaults(func=list_snapshots)
+
+    delete_snapshot_parser = snapshot_subparsers.add_parser('rm', help='Remove a snapshot from nephele')
+    delete_snapshot_parser.add_argument('path', help='Path of snapshot to remove')
+    delete_snapshot_parser.set_defaults(func=delete_snapshot)
+
+    run_parser = subparsers.add_parser('run',
+            help='Instantiate a VM from an existing snapshot')
+    run_parser.add_argument('snapshot', help='Disk/memory snapshot to instantiate from')
+    run_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
+    run_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
+    run_parser.add_argument('-r', '--dest', help='Handoff destination. Can be local in the form file:///<path> or a remote location in the form tcp://<ip or DNS>')
+    run_parser.set_defaults(func=synthesize)
 
     if len(sys.argv) == 1:
         parser.print_help()
