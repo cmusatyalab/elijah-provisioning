@@ -416,7 +416,7 @@ class SynthesizedVM(native_threading.Thread):
                 qemu_args=self.qemu_args,
                 memory_snapshot_mode="live",
                 title=self.title,
-                operation='Synthesized memory/disk snapshot'
+                operation='Instantiated memory/disk snapshot'
             )
 
     def resume(self):
@@ -575,10 +575,6 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None,
         vm_name = None
         uuid = None
         nova_vnc_element = None
-        if title is not None:
-            xml.find('title').text = title
-        if operation is not None:
-            xml.find('description').text = '*NEPHELE managed* - %s' % operation
         uuid = uuid4()
         uuid_element = xml.find('uuid')
         old_uuid = uuid_element.text
@@ -589,6 +585,12 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None,
             msg = "Malfomed XML input: %s", Const.TEMPLATE_XML
             raise CloudletGenerationError(msg)
         name_element.text = vm_name
+        if title is not None:
+            xml.find('title').text = title
+        else:
+            xml.find('title').text = vm_name
+        if operation is not None:
+            xml.find('description').text = '*NEPHELE managed* - %s' % operation
 
         # TODO: perhaps we shouldn't coerce the machine type because of incompatibility?
         #type = xml.find('os/type')
@@ -1729,12 +1731,32 @@ def synthesize(base_disk, overlay_path, **kwargs):
         while True:
             state, _ = machine.state()
             if state == libvirt.VIR_DOMAIN_PAUSED:
+                #make a new snapshot and store it
+                path, ext = os.path.splitext(overlay_path)
+                handoff_url = 'file://%s' % (path+'-'+ext)
+                save_snapshot = True
+                print 'VM entered paused state. Generating snapshot of disk and memory...'
                 break
-        #make a new snapshot and store it
-        path, ext = os.path.splitext(overlay_path)
-        handoff_url = 'file://%s' % (path+'-'+ext)
-        save_snapshot = True
-        print 'VM entered paused state. Generating snapshot of disk and memory...'
+            elif state == libvirt.VIR_DOMAIN_SHUTDOWN:
+                #disambiguate between reboot and shutoff
+                sleep(1)
+                try:
+                    if machine.isActive():
+                        state, _ = machine.state()
+                        if state == libvirt.VIR_DOMAIN_RUNNING:
+                            continue
+                        else:
+                            print "VM has been powered off. Tearing down FUSE..."
+                            synthesized_VM.terminate()
+                            return
+                    else:
+                        print "VM is no longer running. Tearing down FUSE..."
+                        synthesized_VM.terminate()
+                        return
+                except libvirt.libvirtError as e:
+                    synthesized_VM.terminate()
+                    return
+
 
 
     options = Options()
