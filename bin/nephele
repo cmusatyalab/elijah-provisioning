@@ -382,48 +382,6 @@ def create_base(args):
     except KeyError as e:
         print "Domain %s does not exist!" % args.domain
 
-def define_domain(args):
-    template = open(Const.TEMPLATE_XML, "r").read()
-    tree = etree.fromstring(template)
-    tree.find('name').text = args.name
-    tree.find('title').text = args.name
-    tree.find('uuid').text = str(uuid4())
-    tree.find('devices/emulator').text = Const.QEMU_BIN_PATH
-
-    conn = libvirt.open(URI_TEMPLATE)
-    #TODO Obtain upper bound from host and compare cpu/mem; can libvirt provide current values a la virt-manager?
-    if args.cpu is not None:
-        if args.cpu > 0:
-            # overwrite vcpu node in template
-            tree.find('vcpu').text = str(args.cpu)
-            tree.find('cpu/topology').attrib['cores'] = str(args.cpu)
-    if args.mem is not None:
-        if args.mem > 0:
-            # overwrite memory/currentMemory nodes in template
-            tree.find('memory').text = str(args.mem)
-            tree.find('currentMemory').text = str(args.mem)
-
-    # # find all disk element(hdd, cdrom) and change them to new
-    # disk_elements = tree.findall('devices/disk')
-    # hdd_source = None
-    # cdrom_source = None
-    # for disk_element in disk_elements:
-    #     disk_type = disk_element.attrib['device']
-    #     if disk_type == 'disk':
-    #         hdd_source = disk_element.find('source')
-    #         hdd_driver = disk_element.find('driver')
-    #         if (hdd_driver is not None) and \
-    #                 (hdd_driver.get("type", None) is not None):
-    #             hdd_driver.attrib['type'] = 'raw'
-    #     if disk_type == 'cdrom':
-    #         cdrom_source = disk_element.find('source')
-    # hdd_source.set("file", os.path.abspath(args.path))
-    # if cdrom_source is not None:    # ovf path setting
-    #     cdrom_source.set("file", os.path.abspath(Const.TEMPLATE_OVF))
-
-    machine = conn.defineXML(etree.tostring(tree))
-    conn.close()
-
 def generate_snapshot(args):
     try:
         options = Options()
@@ -481,7 +439,6 @@ def generate_snapshot(args):
     _, basevm = PackagingUtil._get_matching_basevm(disk_path=args.path)
     new = table_def.Snapshot(args.dest, basevm.hash_value)
     dbconn.add_item(new)
-
 
 def list_base(args):
     dbconn = DBConnector()
