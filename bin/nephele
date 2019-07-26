@@ -27,6 +27,7 @@ from libvirt import libvirtError
 from lxml import etree
 import os
 import random
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -52,6 +53,10 @@ URI_TEMPLATE = 'qemu:///system'
 
 HOST_URI_MAP = dict((host.split('.')[0], URI_TEMPLATE.format(host=host))
         for host in HOSTS)
+
+DIR_NEPHELE = '/var/nephele/'
+DIR_NEPHELE_IMAGES = '/var/nephele/images/'
+DIR_NEPHELE_SNAPSHOTS = '/var/nephele/snapshots/'
 
 # Squash redundant reporting of libvirt errors to stderr.  This modifies
 # global state, since the Python bindings don't provide a way to do this
@@ -369,12 +374,21 @@ def check_and_convert_to_raw(path):
     #scan for raw
     pass
 
-def create_base(args):
+def build_base(args):
     try:
-        disk_image_path = args.path
-        # use qemu-img to ensure the disk image is in 'raw' format
+        source = args.path
+        disk_image_path = DIR_NEPHELE_IMAGES + source[source.rindex('/'):]
+        # TODO: use qemu-img to ensure the disk image is in 'raw' format
         # and if not, convert it
         #disk_image_path = check_and_convert_to_raw(disk_image_path)
+
+        # check if this filename already exists and warn
+        if os.path.exists(disk_image_path):
+            if not raw_input("An image with this filename already exists.\nAre you sure you wish to overwrite the following base image: %s? (y/N): " % (disk_image_path)).lower().strip().startswith("y"):
+                sys.exit(1)
+            if not raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
+                sys.exit(1)
+        shutil.copy(source, disk_image_path)
         disk_path, mem_path = synthesis.create_baseVM(disk_image_path, title=args.title, cpus=args.cpu, mem=args.mem)
         print "Created Base VM from this image: %s" % disk_image_path
         print "Base Disk Image: %s" % disk_path
@@ -443,27 +457,17 @@ def generate_snapshot(args):
 def list_base(args):
     dbconn = DBConnector()
     list = dbconn.list_item(table_def.BaseVM)
-    print "*"*150
-    print "{:*>150}".format('NEPHELE - Base Images')
-    print "*"*150
-    print "\n{:-^64}|{:-^86}".format('SHA-256', 'Path')
+    print "{:<12}{:^8}{:<43}{:^8}{:<43}".format('IMAGE ID','', 'NAME', '', 'SOURCE')
     for item in list:
-        print "{:^64}|{:^86}".format(item.hash_value, item.disk_path)
-    print "-"*150
+        print "{:<12}{:^8}{:<43}{:^8}{:<43}".format(item.hash_value[:12],'', item.disk_path, '', '<source path>')
+        str.rindex
 
 def list_snapshots(args):
     dbconn = DBConnector()
-#    new_snapshot = table_def.Snapshot('/root/blah2.zip', str(uuid4()))
-#    dbconn.add_item(new_snapshot)
-
     list = dbconn.list_item(table_def.Snapshot)
-    print "*"*150
-    print "{:*>150}".format('NEPHELE - Snapshots')
-    print "*"*150
-    print "\n{:-^55}|{:-^64}|{:-^30}".format('Path', 'Base', 'Created')
+    print "{:<43}{:^8}{:<12}{:^8}{:<43}".format('SNAPSHOT', '','IMAGE ID', '','CREATED')
     for item in list:
-        print "{:^55}|{:^64}|{:^30}".format(item.path, item.basevm, str(item.create_time))
-    print "-"*150
+        print "{:<43}{:^8}{:<12}{:^8}{:<43}".format(item.path, '', item.basevm[:12], '', str(item.create_time))
 
 def delete_snapshot(args):
     dbconn = DBConnector()
@@ -490,7 +494,7 @@ def delete_base(args):
         disk_path=args.path)
     if deleting_base is not None:
         if raw_input("Are you sure you wish to delete the following base image: %s? (y/N): " % (args.path)).lower().strip().startswith("y"):
-            if raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N)").lower().strip().startswith("y"):
+            if raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
                 dbconn.del_item(deleting_base)
     else:
         print "Cannot find matching base disk!\n"
@@ -562,7 +566,7 @@ def _main():
     build_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
     build_parser.add_argument('-c', '--cpu', type=int, help='Override number of vCPUs. By default, the number specified in the VM_TEMPLATE.xml will be used.')
     build_parser.add_argument('-m', '--mem', type=int, help='Override amount of memory (in KiB). By default, the number specified in the VM_TEMPLATE.xml will be used.')
-    build_parser.set_defaults(func=create_base)
+    build_parser.set_defaults(func=build_base)
 
     export_parser = base_subparsers.add_parser('export', help='Export a zip file containing a compressed base image')
     export_parser.add_argument('path', help='Path of base image to export')
@@ -583,23 +587,23 @@ def _main():
     snapshot_parser = subparsers.add_parser('snapshot', help='Management of VM snapshots')
     snapshot_subparsers = snapshot_parser.add_subparsers(title='snapshot')
 
-    generate_parser = snapshot_subparsers.add_parser('generate', help='Interact with a base VM to create a new snapshot')
-    generate_parser.add_argument('path', help='an existing base image to start with')
-    generate_parser.add_argument('dest', help='Destination path for snapshot')
-    generate_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
-    generate_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
-    generate_parser.add_argument('-m', '--free-mem', action='store_true', help='Extract free memory (default=False)')
-    generate_parser.add_argument('-n', '--no-trim', action='store_true', help='Disable TRIM support. (default=False)')
-    generate_parser.add_argument('-z', '--zip', default=True, action='store_true', help='Package snapshot files into a single zip. (default=True))')
-    generate_parser.set_defaults(func=generate_snapshot)
+    build_snapshot_parser = snapshot_subparsers.add_parser('build', help='Interact with a base VM to create a new snapshot')
+    build_snapshot_parser.add_argument('path', help='an existing base image to start with')
+    build_snapshot_parser.add_argument('dest', help='Destination path for snapshot')
+    build_snapshot_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
+    build_snapshot_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
+    build_snapshot_parser.add_argument('-m', '--free-mem', action='store_true', help='Extract free memory (default=False)')
+    build_snapshot_parser.add_argument('-n', '--no-trim', action='store_true', help='Disable TRIM support. (default=False)')
+    build_snapshot_parser.add_argument('-z', '--zip', default=True, action='store_true', help='Package snapshot files into a single zip. (default=True))')
+    build_snapshot_parser.set_defaults(func=generate_snapshot)
 
     import_snapshot_parser = snapshot_subparsers.add_parser('import', help='Import a snapshot from a compressed zip file')
     import_snapshot_parser.add_argument('path', help='an existing zip file containing a snapshot')
     import_snapshot_parser.set_defaults(func=print_args)
 
-    details_parser = snapshot_subparsers.add_parser('inspect', help='Output details of a snapshot')
-    details_parser.add_argument('path', help='Path to an existing snapshot to inspect')
-    details_parser.set_defaults(func=snapshot_details)
+    inspect_parser = snapshot_subparsers.add_parser('inspect', help='Output details of a snapshot')
+    inspect_parser.add_argument('path', help='Path to an existing snapshot to inspect')
+    inspect_parser.set_defaults(func=snapshot_details)
 
     list_snapshot_parser = snapshot_subparsers.add_parser('ls', help='List snapshots known to nephele')
     list_snapshot_parser.set_defaults(func=list_snapshots)
