@@ -391,8 +391,8 @@ def build_base(args):
                 sys.exit(1)
         print "Copying source image to %s..." % DIR_NEPHELE_IMAGES
         shutil.copy(source, disk_image_path)
-        disk_path, mem_path = synthesis.create_baseVM(disk_image_path, title=args.title, cpus=args.cpu, mem=args.mem)
-        print "Created Base VM from this image: %s" % disk_image_path
+        disk_path, mem_path = synthesis.create_baseVM(disk_image_path, source=source, title=args.title, cpus=args.cpu, mem=args.mem)
+        print "Created Base VM from this source image: %s" % source
         print "Base Disk Image: %s" % disk_path
         print "Base Memory Snapshot: %s" % mem_path
     except KeyError as e:
@@ -459,9 +459,9 @@ def build_snapshot(args):
 def list_base(args):
     dbconn = DBConnector()
     list = dbconn.list_item(table_def.BaseVM)
-    print "{:<12}{:^8}{:<43}{:^8}{:<43}".format('IMAGE ID','', 'NAME', '', 'SOURCE')
+    print "{:<12}{:^8}{:<43}{:^8}{:<43}".format('IMAGE ID','', 'NAME (/var/nephele/images/)', '', 'SOURCE')
     for item in list:
-        print "{:<12}{:^8}{:<43}{:^8}{:<43}".format(item.hash_value[:12],'', item.disk_path, '', '<source path>')
+        print "{:<12}{:^8}{:<43}{:^8}{:<43}".format(item.hash_value[:12],'', item.disk_path[item.disk_path.rindex('/')+1:], '', item.source)
         str.rindex
 
 def list_snapshots(args):
@@ -470,6 +470,13 @@ def list_snapshots(args):
     print "{:<43}{:^8}{:<12}{:^8}{:<43}".format('SNAPSHOT', '','IMAGE ID', '','CREATED')
     for item in list:
         print "{:<43}{:^8}{:<12}{:^8}{:<43}".format(item.path, '', item.basevm[:12], '', str(item.create_time))
+
+def list_instances(args):
+    dbconn = DBConnector()
+    list = dbconn.list_item(table_def.Instances)
+    print "{:<43}{:^8}{:<12}{:^8}{:<43}".format('TITLE', '','PID', '','STARTED')
+    for item in list:
+        print "{:<43}{:^8}{:<12}{:^8}{:<43}".format(item.title, '', item.pid, '', str(item.start_time))
 
 def delete_snapshot(args):
     dbconn = DBConnector()
@@ -541,6 +548,11 @@ def synthesize(args):
                     msg = "(%s) is invalid handoff URL" % args.dest
                     raise synthesis.CloudletGenerationError(msg)
 
+            # save the instance info to DB
+            dbconn = DBConnector()
+            new = table_def.Instances(args.title, os.getpid())
+            dbconn.add_item(new)
+
             synthesis.synthesize(None, overlay_meta,
                                 disk_only=args.disk_only,
                                 handoff_url=args.dest,
@@ -549,6 +561,13 @@ def synthesize(args):
         except Exception as e:
             print "Failed to synthesize: %s" % str(e)
             return 1
+        finally:
+            dbconn = DBConnector()
+            list = dbconn.list_item(table_def.Instances)
+            for item in list:
+                if args.title == item.title:
+                    dbconn.del_item(item)
+                    break
 
 def snapshot_details(args):
         try:
@@ -565,6 +584,9 @@ def print_args(args):
 def _main():
     parser = argparse.ArgumentParser(prog='nephele', description='Manage VMs across cloudlets.')
     subparsers = parser.add_subparsers(title='command')
+
+    list_instances_parser = subparsers.add_parser('ls', help='List running nephele instances')
+    list_instances_parser.set_defaults(func=list_instances)
 
     base_parser = subparsers.add_parser('image', help='Management of base VM images')
     base_subparsers = base_parser.add_subparsers(title='base')

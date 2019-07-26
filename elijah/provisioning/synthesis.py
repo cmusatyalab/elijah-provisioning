@@ -1574,7 +1574,7 @@ def validate_handoffurl(handoff_url):
     return True
 
 
-def create_baseVM(disk_image_path, title=None, cpus=None, mem=None):
+def create_baseVM(disk_image_path, source=None, title=None, cpus=None, mem=None):
     # Create Base VM(disk, memory) snapshot using given VM disk image
     # :param disk_image_path : file path of the VM disk image
     # :returns: (generated base VM disk path, generated base VM memory path)
@@ -1636,7 +1636,7 @@ def create_baseVM(disk_image_path, title=None, cpus=None, mem=None):
         if disk_image_path == item.disk_path:
             dbconn.del_item(item)
             break
-    new_basevm = db_table.BaseVM(disk_image_path, base_hashvalue)
+    new_basevm = db_table.BaseVM(disk_image_path, base_hashvalue, source)
     dbconn.add_item(new_basevm)
 
     # write hashvalue to file

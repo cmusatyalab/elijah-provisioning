@@ -36,20 +36,40 @@ class BaseVM(Base):
     """
     """
     __tablename__ = "base_vm"
-
-    disk_path = Column(String, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    disk_path = Column(String)
     hash_value = Column(String, unique=True, nullable=False)
+    source = Column(String)
 
-    def __init__(self, disk_path, hash_value):
+    def __init__(self, disk_path, hash_value, source):
         self.disk_path = disk_path
         self.hash_value = hash_value
+        self.source = source
+
+class Instances(Base):
+    """
+    Captures the pid and title of an instantiated VM
+    so that we can send signals to running instances
+    """
+    __tablename__ = "instances"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String, nullable=False)
+    pid = Column(Integer, nullable=False)
+    start_time = Column(DateTime, nullable=False)
+
+    def __init__(self, title, pid):
+        self.title = title
+        self.pid = pid
+        self.start_time = datetime.datetime.now()
 
 class Snapshot(Base):
     """
     """
     __tablename__ = "snapshots"
 
-    path = Column(String, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    path = Column(String)
     basevm = Column(String, ForeignKey(BaseVM.hash_value))
     create_time = Column(DateTime, nullable=False)
 
