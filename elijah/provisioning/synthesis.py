@@ -1591,12 +1591,6 @@ def create_baseVM(disk_image_path, title=None, cpus=None, mem=None):
     if not os.path.exists(Const.TEMPLATE_OVF):
         raise CloudletGenerationError("Cannot find ovf file for AMIt %s\n"
                                       % Const.TEMPLATE_OVF)
-    if os.path.exists(base_mempath):
-        warning_msg = "Warning: (%s) exist.\nAre you sure to overwrite? (y/N) "\
-            % (base_mempath)
-        ret = raw_input(warning_msg)
-        if str(ret).lower() != 'y':
-            sys.exit(1)
 
     # allow write permission to base disk and delete all previous files
     #os.chmod(disk_image_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)

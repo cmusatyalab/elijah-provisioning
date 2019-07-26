@@ -22,6 +22,7 @@ from __future__ import division
 import argparse
 import errno
 import json
+import glob
 import libvirt
 from libvirt import libvirtError
 from lxml import etree
@@ -388,6 +389,7 @@ def build_base(args):
                 sys.exit(1)
             if not raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
                 sys.exit(1)
+        print "Copying source image to %s..." % DIR_NEPHELE_IMAGES
         shutil.copy(source, disk_image_path)
         disk_path, mem_path = synthesis.create_baseVM(disk_image_path, title=args.title, cpus=args.cpu, mem=args.mem)
         print "Created Base VM from this image: %s" % disk_image_path
@@ -396,7 +398,7 @@ def build_base(args):
     except KeyError as e:
         print "Domain %s does not exist!" % args.domain
 
-def generate_snapshot(args):
+def build_snapshot(args):
     try:
         options = Options()
         options.DISK_ONLY = args.disk_only
@@ -496,6 +498,11 @@ def delete_base(args):
         if raw_input("Are you sure you wish to delete the following base image: %s? (y/N): " % (args.path)).lower().strip().startswith("y"):
             if raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
                 dbconn.del_item(deleting_base)
+                print "Image removed from database."
+                ext = str(args.path).rindex('.')
+                for f in glob.glob(args.path[:ext] + '*'):
+                    os.remove(f)
+                print "Image deleted from disk."
     else:
         print "Cannot find matching base disk!\n"
         return 1
@@ -595,7 +602,7 @@ def _main():
     build_snapshot_parser.add_argument('-m', '--free-mem', action='store_true', help='Extract free memory (default=False)')
     build_snapshot_parser.add_argument('-n', '--no-trim', action='store_true', help='Disable TRIM support. (default=False)')
     build_snapshot_parser.add_argument('-z', '--zip', default=True, action='store_true', help='Package snapshot files into a single zip. (default=True))')
-    build_snapshot_parser.set_defaults(func=generate_snapshot)
+    build_snapshot_parser.set_defaults(func=build_snapshot)
 
     import_snapshot_parser = snapshot_subparsers.add_parser('import', help='Import a snapshot from a compressed zip file')
     import_snapshot_parser.add_argument('path', help='an existing zip file containing a snapshot')
