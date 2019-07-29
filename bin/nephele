@@ -26,9 +26,11 @@ import glob
 import libvirt
 from libvirt import libvirtError
 from lxml import etree
+import msgpack
 import os
 import random
 import shutil
+import signal
 import subprocess
 import sys
 import textwrap
@@ -398,6 +400,16 @@ def build_base(args):
     except KeyError as e:
         print "Domain %s does not exist!" % args.domain
 
+def find_base(id):
+    base = None
+    dbconn = DBConnector()
+    list = dbconn.list_item(table_def.BaseVM)
+    for item in list:
+        if id == item.hash_value[:12]:
+            base = item
+            break
+    return dbconn, base
+
 def build_snapshot(args):
     try:
         options = Options()
@@ -405,8 +417,12 @@ def build_snapshot(args):
         options.TRIM_SUPPORT = not args.no_trim
         options.FREE_SUPPORT = args.free_mem
         options.ZIP_CONTAINER = args.zip
-        # resume base vm for creating vm overlay
-        vm_overlay = synthesis.VM_Overlay(args.path, options,
+
+        _, base = find_base(args.id)
+        if base is None:
+            print "Failed to find matching image with id: %s" % args.id
+            return
+        vm_overlay = synthesis.VM_Overlay(base.disk_path, options,
                                             qemu_args=None)
         machine = vm_overlay.resume_basevm(args.title)
         print 'Launching VM...\nPause VM when finished modifying to begin hashing of disk/memory state.'  
@@ -452,8 +468,7 @@ def build_snapshot(args):
         if args.dest == item.path:
             dbconn.del_item(item)
             break
-    _, basevm = PackagingUtil._get_matching_basevm(disk_path=args.path)
-    new = table_def.Snapshot(args.dest, basevm.hash_value)
+    new = table_def.Snapshot(args.dest, base.hash_value)
     dbconn.add_item(new)
 
 def list_base(args):
@@ -499,33 +514,31 @@ def delete_snapshot(args):
         return 1
 
 def delete_base(args):
-    dbconn, deleting_base = PackagingUtil._get_matching_basevm(
-        disk_path=args.path)
-    if deleting_base is not None:
-        if raw_input("Are you sure you wish to delete the following base image: %s? (y/N): " % (args.path)).lower().strip().startswith("y"):
+    dbconn, base = find_base(args.id)
+    if base is None:
+        print "Failed to find matching image with id: %s" % args.id
+        return
+    else:
+        if raw_input("Are you sure you wish to delete the following base image: %s? (y/N): " % (base.disk_path)).lower().strip().startswith("y"):
             if raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
-                dbconn.del_item(deleting_base)
+                dbconn.del_item(base)
                 print "Image removed from database."
-                ext = str(args.path).rindex('.')
-                for f in glob.glob(args.path[:ext] + '*'):
+                ext = str(base.disk_path).rindex('.')
+                for f in glob.glob(base.disk_path[:ext] + '*'):
                     os.remove(f)
                 print "Image deleted from disk."
-    else:
-        print "Cannot find matching base disk!\n"
-        return 1
 
 def export_base(args):
-        basedisk_path = args.path
-        _, matching_basevm = PackagingUtil._get_matching_basevm(disk_path=basedisk_path)
+        _, base = find_base(args.id)
+
         output_path = args.dest
-        if matching_basevm is not None:
+        if base is not None:
             PackagingUtil.export_basevm(
                 output_path,
-                basedisk_path,
-                matching_basevm.hash_value)
+                base.disk_path,
+                base.hash_value)
         else:
-            print "Cannot find matching base disk!"
-            return 1
+            print "Failed to find matching image with id: %s" % args.id
 
 def import_base(args):
         import_file = args.path
@@ -536,6 +549,8 @@ def import_base(args):
         PackagingUtil.import_basevm(import_file)
 
 def synthesize(args):
+        if os.fork():
+            os._exit(1)
         overlay_meta = args.snapshot
         is_zip_contained, url_path = PackagingUtil.is_zip_contained(
             overlay_meta)
@@ -578,6 +593,29 @@ def snapshot_details(args):
             print(str(e))
             return 1
 
+def handoff(args):
+    handoff_url = 'tcp://' + args.dest + ':8021'
+
+    dbconn = DBConnector()
+    list = dbconn.list_item(table_def.Instances)
+    instance = None
+    for item in list:
+        if (args.title == item.title):
+            instance = item
+            break
+    if instance is not None:
+        #send USR1 to that process and put the destination into a temp file for reading
+        fdest = open('/tmp/.cloudlet-handoff', "wb")
+        meta = dict()
+        meta['title'] = item.title
+        meta['pid'] = item.pid
+        meta['url'] = handoff_url
+        fdest.write(msgpack.packb(meta))
+        fdest.close()
+        #os.kill(item.pid, signal.SIGUSR1)
+    else:
+        print 'Cannot find a running instance with the title [%s]!' % args.title
+
 def print_args(args):
     print args
 
@@ -598,7 +636,7 @@ def _main():
     build_parser.set_defaults(func=build_base)
 
     export_parser = base_subparsers.add_parser('export', help='Export a zip file containing a compressed base image')
-    export_parser.add_argument('path', help='Path of base image to export')
+    export_parser.add_argument('id', help='ID of base image to export')
     export_parser.add_argument('dest', help='destination of exported zip file')
     export_parser.set_defaults(func=export_base)
 
@@ -610,14 +648,14 @@ def _main():
     list_base_parser.set_defaults(func=list_base)
 
     delete_base_parser = base_subparsers.add_parser('rm', help='Remove a base image from Nephele')
-    delete_base_parser.add_argument('path', help='Path of base image to remove')
+    delete_base_parser.add_argument('id', help='ID of base image to remove')
     delete_base_parser.set_defaults(func=delete_base)
 
     snapshot_parser = subparsers.add_parser('snapshot', help='Management of VM snapshots')
     snapshot_subparsers = snapshot_parser.add_subparsers(title='snapshot')
 
     build_snapshot_parser = snapshot_subparsers.add_parser('build', help='Interact with a base VM to create a new snapshot')
-    build_snapshot_parser.add_argument('path', help='an existing base image to start with')
+    build_snapshot_parser.add_argument('id', help='an existing base image to start with')
     build_snapshot_parser.add_argument('dest', help='Destination path for snapshot')
     build_snapshot_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
     build_snapshot_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
@@ -644,10 +682,15 @@ def _main():
     run_parser = subparsers.add_parser('run',
             help='Instantiate a VM from an existing snapshot')
     run_parser.add_argument('snapshot', help='Disk/memory snapshot to instantiate from')
-    run_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
+    run_parser.add_argument('title',  help='Title of the VM instance to display')
     run_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
-    run_parser.add_argument('-r', '--dest', help='Handoff destination. Can be local in the form file:///<path> or a remote location in the form tcp://<ip or DNS>')
+    run_parser.add_argument('-t', '--dest', help='Handoff destination - IP address or DNS name.')
     run_parser.set_defaults(func=synthesize)
+
+    handoff_parser = subparsers.add_parser('handoff', help='Handoff a running instance to another node')
+    handoff_parser.add_argument('title',  help='Title of the VM instance to handoff')
+    handoff_parser.add_argument('dest', help='Handoff destination - IP address or DNS name.')
+    handoff_parser.set_defaults(func=handoff)
 
     if len(sys.argv) == 1:
         parser.print_help()
