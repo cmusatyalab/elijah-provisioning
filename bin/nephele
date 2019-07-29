@@ -594,7 +594,7 @@ def snapshot_details(args):
             return 1
 
 def handoff(args):
-    handoff_url = 'tcp://' + args.dest + ':8021'
+    handoff_url = 'tcp://' + args.dest + ':8022'
 
     dbconn = DBConnector()
     list = dbconn.list_item(table_def.Instances)
@@ -612,7 +612,7 @@ def handoff(args):
         meta['url'] = handoff_url
         fdest.write(msgpack.packb(meta))
         fdest.close()
-        #os.kill(item.pid, signal.SIGUSR1)
+        os.kill(item.pid, signal.SIGUSR1)
     else:
         print 'Cannot find a running instance with the title [%s]!' % args.title
 

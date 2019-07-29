@@ -81,7 +81,8 @@ except ImportError as e:
 
 
 LOG = logging.getLogger(__name__)
-
+HANDOFF_TEMP = '/tmp/.cloudlet-handoff'
+HANDOFF_SIGNAL_RECEIVED = False
 
 class CloudletGenerationError(Exception):
     pass
@@ -1646,7 +1647,9 @@ def create_baseVM(disk_image_path, source=None, title=None, cpus=None, mem=None)
     return disk_image_path, base_mempath
 
 def handlesig(signum, frame):
+    global HANDOFF_SIGNAL_RECEIVED
     LOG.info("Received signal(%d) to start handoff..." % signum)
+    HANDOFF_SIGNAL_RECEIVED = True
 
 def synthesize(base_disk, overlay_path, **kwargs):
     """VM Synthesis and run recoverd VM
@@ -1717,39 +1720,47 @@ def synthesize(base_disk, overlay_path, **kwargs):
         base_diskmeta, base_memmeta)
     preload_thread.daemon = True
     preload_thread.start()
-    if handoff_url is not None:
-        signal.signal(signal.SIGUSR1, handlesig)
-        signal.pause()
-    else:
-        #wait until VM is paused
-        while True:
-            state, _ = machine.state()
-            if state == libvirt.VIR_DOMAIN_PAUSED:
-                #make a new snapshot and store it
-                path, ext = os.path.splitext(overlay_path)
-                handoff_url = 'file://%s' % (path+'-'+ext)
-                save_snapshot = True
-                print 'VM entered paused state. Generating snapshot of disk and memory...'
-                break
-            elif state == libvirt.VIR_DOMAIN_SHUTDOWN:
-                #disambiguate between reboot and shutoff
-                sleep(1)
-                try:
-                    if machine.isActive():
-                        state, _ = machine.state()
-                        if state == libvirt.VIR_DOMAIN_RUNNING:
-                            continue
-                        else:
-                            print "VM has been powered off. Tearing down FUSE..."
-                            synthesized_VM.terminate()
-                            return
+    signal.signal(signal.SIGUSR1, handlesig)
+    while True:
+        state, _ = machine.state()
+        if state == libvirt.VIR_DOMAIN_PAUSED:
+            #make a new snapshot and store it
+            path, ext = os.path.splitext(overlay_path)
+            handoff_url = 'file://%s' % (path+'-'+ext)
+            save_snapshot = True
+            print 'VM entered paused state. Generating snapshot of disk and memory...'
+            break
+        elif state == libvirt.VIR_DOMAIN_SHUTDOWN:
+            #disambiguate between reboot and shutoff
+            sleep(1)
+            try:
+                if machine.isActive():
+                    state, _ = machine.state()
+                    if state == libvirt.VIR_DOMAIN_RUNNING:
+                        continue
                     else:
-                        print "VM is no longer running. Tearing down FUSE..."
+                        print "VM has been powered off. Tearing down FUSE..."
                         synthesized_VM.terminate()
                         return
-                except libvirt.libvirtError as e:
+                else:
+                    print "VM is no longer running. Tearing down FUSE..."
                     synthesized_VM.terminate()
                     return
+            except libvirt.libvirtError as e:
+                synthesized_VM.terminate()
+                return
+        elif HANDOFF_SIGNAL_RECEIVED == True:
+            #read destination from file
+            fdest = open(HANDOFF_TEMP, "rb")
+            meta = msgpack.unpackb(fdest.read())
+            fdest.close()
+            #validate that the meta data is really for us
+            if meta['pid'] == os.getpid():
+                handoff_url = meta['url']
+                print 'Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url'])
+                break
+            else:
+                print 'PID in %s does not match getpid!' % HANDOFF_TEMP
 
 
 
