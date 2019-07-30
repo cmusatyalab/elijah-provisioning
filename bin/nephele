@@ -557,12 +557,6 @@ def synthesize(args):
         if is_zip_contained is True:
             overlay_meta = url_path
         try:
-            if args.dest is not None:
-                ret = synthesis.validate_handoffurl(args.dest)
-                if not ret:
-                    msg = "(%s) is invalid handoff URL" % args.dest
-                    raise synthesis.CloudletGenerationError(msg)
-
             # save the instance info to DB
             dbconn = DBConnector()
             new = table_def.Instances(args.title, os.getpid())
@@ -570,7 +564,7 @@ def synthesize(args):
 
             synthesis.synthesize(None, overlay_meta,
                                 disk_only=args.disk_only,
-                                handoff_url=args.dest,
+                                handoff_url=None,
                                 zip_container=is_zip_contained,
                                 title=args.title)
         except Exception as e:
@@ -684,7 +678,6 @@ def _main():
     run_parser.add_argument('snapshot', help='Disk/memory snapshot to instantiate from')
     run_parser.add_argument('title',  help='Title of the VM instance to display')
     run_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
-    run_parser.add_argument('-t', '--dest', help='Handoff destination - IP address or DNS name.')
     run_parser.set_defaults(func=synthesize)
 
     handoff_parser = subparsers.add_parser('handoff', help='Handoff a running instance to another node')
