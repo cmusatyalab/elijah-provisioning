@@ -130,7 +130,7 @@ def install():
     username = env.get('user')
     if sudo("adduser %s kvm" % username).failed:
         abort("Cannot add user to kvm group")
-    if os_dist == 'bionic':
+    if dist == 'bionic':
         grp = 'libvirt'
     else:
         grp = 'libvirtd'
