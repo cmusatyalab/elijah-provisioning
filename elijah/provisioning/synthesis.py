@@ -1651,6 +1651,27 @@ def handlesig(signum, frame):
     LOG.info("Received signal(%d) to start handoff..." % signum)
     HANDOFF_SIGNAL_RECEIVED = True
 
+def increment_filename(path):
+    #strip file:// prefix
+    if path.startswith('file://'):
+        path = path[7:]
+    path      = os.path.expanduser(path)
+    if not os.path.exists(path):
+        return path
+
+    root, ext = os.path.splitext(path)
+    if root.rfind('_') != -1:
+        root = root[:root.rfind('_')]
+    dir       = os.path.dirname(root)
+    fname     = os.path.basename(root)
+    candidate = fname+ext
+    index     = 1
+    ls        = set(os.listdir(dir))
+    while candidate in ls:
+            candidate = "{}_{}{}".format(fname,index,ext)
+            index    += 1
+    return os.path.join(dir,candidate)
+
 def synthesize(base_disk, overlay_path, **kwargs):
     """VM Synthesis and run recoverd VM
     :param base_disk: path to base disk
@@ -1725,8 +1746,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
         state, _ = machine.state()
         if state == libvirt.VIR_DOMAIN_PAUSED:
             #make a new snapshot and store it
-            path, ext = os.path.splitext(overlay_path)
-            handoff_url = 'file://%s' % (path+'-'+ext)
+            handoff_url = 'file://%s' % (increment_filename(overlay_path)) 
             save_snapshot = True
             print 'VM entered paused state. Generating snapshot of disk and memory...'
             break
