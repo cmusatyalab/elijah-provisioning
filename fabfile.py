@@ -110,6 +110,9 @@ def install():
         print("Failed to set perms for heatmap directory")
     with cd(current_dir):
         sudo("cp -r heatmap/* /var/www/html/heatmap")
+    if not os.path.exists('/var/nephele/images'):
+        if sudo("mkdir -p /var/nephele/images").failed:
+            print("Failed to create nephele image directory!")
 
     # check bios.bin file
     bios_files = ["/usr/share/qemu/bios.bin",
