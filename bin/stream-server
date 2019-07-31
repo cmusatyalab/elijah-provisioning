@@ -57,7 +57,7 @@ def main(argv=sys.argv):
         settings.handoff_datafile = os.path.abspath(settings.handoff_datafile)
 
     server = StreamSynthesisServer(
-        int(settings.port_number), timeout=120,
+        int(settings.port_number), timeout=None,
         handoff_datafile=settings.handoff_datafile
     )
     try:

@@ -807,11 +807,24 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             LOG.info("send ack to client: %d" % len(ack_data))
             self.request.sendall(ack_data)
 
-            #wait until VM is paused
             while True:
                 state, _ = synthesized_vm.machine.state()
-                if state == libvirt.VIR_DOMAIN_PAUSED:
-                    break
+                if state == libvirt.VIR_DOMAIN_SHUTDOWN:
+                    #disambiguate between reboot and shutoff
+                    sleep(1)
+                    try:
+                        if machine.isActive():
+                            state, _ = machine.state()
+                            if state == libvirt.VIR_DOMAIN_RUNNING:
+                                continue
+                            else:
+                                print "VM has been powered off. Tearing down FUSE..."
+                                break
+                        else:
+                            print "VM is no longer running. Tearing down FUSE..."
+                            break
+                    except libvirt.libvirtError as e:
+                        break
 
             synthesized_vm.monitor.terminate()
             synthesized_vm.monitor.join()
@@ -868,7 +881,6 @@ class StreamSynthesisServer(SocketServer.TCPServer):
         self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         LOG.info("* Server configuration")
         LOG.info(" - Open TCP Server at %s" % (str(server_address)))
-        LOG.info(" - Time out for waiting: %d" % (self.timeout))
         LOG.info(" - Disable Nagle(No TCP delay)  : %s" \
                 % str(self.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY)))
         LOG.info("-"*50)
