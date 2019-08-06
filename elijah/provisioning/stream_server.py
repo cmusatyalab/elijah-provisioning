@@ -811,10 +811,10 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 state, _ = synthesized_vm.machine.state()
                 if state == libvirt.VIR_DOMAIN_SHUTDOWN:
                     #disambiguate between reboot and shutoff
-                    sleep(1)
+                    time.sleep(1)
                     try:
-                        if machine.isActive():
-                            state, _ = machine.state()
+                        if synthesized_vm.machine.isActive():
+                            state, _ = synthesized_vm.machine.state()
                             if state == libvirt.VIR_DOMAIN_RUNNING:
                                 continue
                             else:
