@@ -34,16 +34,23 @@ import threading
 from hashlib import sha256
 import libvirt
 import shutil
+from tempfile import mkdtemp
+from urlparse import urlsplit
+import msgpack
 
 from server import NetworkUtil
 from synthesis_protocol import Protocol as Protocol
 from synthesis import run_fuse
 from synthesis import SynthesizedVM
 from synthesis import connect_vnc
-from handoff import HandoffDataRecv
+from synthesis import increment_filename
+import handoff
+from elijah.provisioning.package import PackagingUtil
 
 from db.api import DBConnector
 from db.table_def import BaseVM
+from db import table_def
+from configuration import Options
 from configuration import Const as Cloudlet_Const
 from compression import DecompProc
 from pprint import pformat
@@ -56,6 +63,8 @@ from delta import DeltaItem
 
 LOG = logging.getLogger(__name__)
 session_resources = dict()   # dict[session_id] = obj(SessionResource)
+HANDOFF_TEMP = '/tmp/.cloudlet-handoff'
+HANDOFF_SIGNAL_RECEIVED = False
 
 class StreamSynthesisError(Exception):
     pass
@@ -416,9 +425,6 @@ class FuseFeedingProc(multiprocessing.Process):
     def terminate(self):
         self.stop.set()
 
-def handlesig(signum, frame):
-    LOG.info("Received signal(%d) to terminate VM..." % signum)
-
 class HandoffAnalysisProc(multiprocessing.Process):
     def __init__(self, handoff_url, message_queue, disk_size, mem_size):
         self.url = handoff_url
@@ -624,6 +630,11 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 requested_base = each_basevm['diskpath']
         return [synthesis_option, requested_base]
 
+    def handlesig(self,signum, frame):
+        global HANDOFF_SIGNAL_RECEIVED
+        LOG.info("Received signal(%d) to start handoff..." % signum)
+        HANDOFF_SIGNAL_RECEIVED = True
+
     def handle(self):
         '''Handle request from the client
         Each request follows this format:
@@ -644,7 +655,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         metadata = NetworkUtil.decoding(msgpack_data)
         launch_disk_size = metadata[Cloudlet_Const.META_RESUME_VM_DISK_SIZE]
         launch_memory_size = metadata[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
-
+        title = 'handoff-from-'+ str(self.client_address[0])
+        
         analysis_mq = multiprocessing.Queue()
         analysis_proc = HandoffAnalysisProc(handoff_url=self.client_address[0],message_queue=analysis_mq, disk_size=launch_disk_size, mem_size=launch_memory_size)
         analysis_proc.start()
@@ -772,6 +784,11 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             sys.stdout.write("openstack\t%s\t%s\t%s\t%s" % (launch_disk_size, launch_memory_size, disk_overlay_map, memory_overlay_map))
 
         else:
+            # save the instance info to DB
+            dbconn = DBConnector()
+            new = table_def.Instances(title, os.getpid())
+            dbconn.add_item(new)
+
             # We told to FUSE that we have everything ready, so we need to wait
             # until delta_proc finishes. we cannot start VM before delta_proc
             # finishes, because we don't know what will be modified in the future
@@ -807,9 +824,20 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             LOG.info("send ack to client: %d" % len(ack_data))
             self.request.sendall(ack_data)
 
+            preload_thread = handoff.PreloadResidueData(
+                base_diskmeta, base_memmeta)
+            preload_thread.daemon = True
+            preload_thread.start()
+            signal.signal(signal.SIGUSR1, self.handlesig)
             while True:
                 state, _ = synthesized_vm.machine.state()
-                if state == libvirt.VIR_DOMAIN_SHUTDOWN:
+                if state == libvirt.VIR_DOMAIN_PAUSED:
+                    #make a new snapshot and store it
+                    handoff_url = 'file:///root/%s' % (increment_filename(title)) 
+                    save_snapshot = True
+                    print 'VM entered paused state. Generating snapshot of disk and memory...'
+                    break
+                elif state == libvirt.VIR_DOMAIN_SHUTDOWN:
                     #disambiguate between reboot and shutoff
                     time.sleep(1)
                     try:
@@ -819,16 +847,95 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                                 continue
                             else:
                                 print "VM has been powered off. Tearing down FUSE..."
-                                break
+                                synthesized_vm.terminate()
                         else:
                             print "VM is no longer running. Tearing down FUSE..."
-                            break
+                            synthesized_vm.terminate()
                     except libvirt.libvirtError as e:
+                        synthesized_vm.terminate()
+                    finally:
+                        dbconn = DBConnector()
+                        list = dbconn.list_item(table_def.Instances)
+                        for item in list:
+                            if title == item.title:
+                                dbconn.del_item(item)
+                                break
+                        return
+                elif HANDOFF_SIGNAL_RECEIVED == True:
+                    #read destination from file
+                    fdest = open(HANDOFF_TEMP, "rb")
+                    meta = msgpack.unpackb(fdest.read())
+                    fdest.close()
+                    #validate that the meta data is really for us
+                    if meta['pid'] == os.getpid():
+                        handoff_url = meta['url']
+                        print 'Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url'])
                         break
+                    else:
+                        print 'PID in %s does not match getpid!' % HANDOFF_TEMP
+        
+
+            options = Options()
+            options.TRIM_SUPPORT = True
+            options.FREE_SUPPORT = True
+            options.DISK_ONLY = False
+            preload_thread.join()
+            (base_diskmeta, base_mem, base_memmeta) = \
+                Cloudlet_Const.get_basepath(base_diskpath, check_exist=False)
+            base_vm_paths = [base_diskpath, base_mem, base_diskmeta, base_memmeta]
+            # prepare data structure for VM handoff
+            residue_zipfile = None
+            dest_handoff_url = handoff_url
+            parsed_handoff_url = urlsplit(handoff_url)
+            if parsed_handoff_url.scheme == "file":
+                dest_path = parsed_handoff_url.path
+                if os.path.exists(os.path.dirname(dest_path)):
+                    dest_handoff_url = "file://%s" % os.path.abspath(parsed_handoff_url.path)
+                else:
+                    print "Destination doesn't exist, attempting to use temporary file..."
+                    temp_dir = mkdtemp(prefix="cloudlet-residue-")
+                    residue_zipfile = os.path.join(temp_dir, Cloudlet_Const.OVERLAY_ZIP)
+                    dest_handoff_url = "file://%s" % os.path.abspath(residue_zipfile)
+            handoff_ds = handoff.HandoffDataSend()
+            LOG.debug("save data to file")
+            handoff_ds.save_data(
+                base_vm_paths, blob_header.get(Cloudlet_Const.META_BASE_VM_SHA256),
+                preload_thread.basedisk_hashdict,
+                preload_thread.basemem_hashdict,
+                options, dest_handoff_url, None,
+                synthesized_vm.fuse.mountpoint, synthesized_vm.qemu_logfile,
+                synthesized_vm.qmp_channel, synthesized_vm.machine.ID(),
+                synthesized_vm.fuse.modified_disk_chunks, "qemu:///system",
+            )
+            handoff_ds._load_vm_data()
+            try:
+                handoff.perform_handoff(handoff_ds)
+            except handoff.HandoffError as e:
+                LOG.error("Cannot perform VM handoff: %s" % (str(e)))
+            # print out residue location
+            if residue_zipfile and os.path.exists(residue_zipfile):
+                LOG.info("Save new VM overlay at: %s" %
+                        (os.path.abspath(residue_zipfile)))
+            if save_snapshot:
+                dbconn = DBConnector()
+                list = dbconn.list_item(table_def.Snapshot)
+                for item in list:
+                    if os.path.abspath(parsed_handoff_url.path) == item.path:
+                        dbconn.del_item(item)
+                        break
+                _, basevm = PackagingUtil._get_matching_basevm(disk_path=base_diskpath)
+                new = table_def.Snapshot(os.path.abspath(parsed_handoff_url.path), basevm.hash_value)
+                dbconn.add_item(new)
 
             synthesized_vm.monitor.terminate()
             synthesized_vm.monitor.join()
             synthesized_vm.terminate()
+            dbconn = DBConnector()
+            list = dbconn.list_item(table_def.Instances)
+            for item in list:
+                if title == item.title:
+                    dbconn.del_item(item)
+                    break
 
     def terminate(self):
         # force terminate when something wrong in handling request
