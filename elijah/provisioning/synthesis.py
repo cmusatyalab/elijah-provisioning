@@ -346,7 +346,7 @@ class OverlayMonitoringInfo(object):
 class SynthesizedVM(native_threading.Thread):
 
     def __init__(self, launch_disk, launch_mem, fuse,
-                 disk_only=False, qemu_args=None, **kwargs):
+                 disk_only=False, qemu_args=None, fwd_ports=None, **kwargs):
         # kwargs
         self.xml = kwargs.get("xml", None)
         self.title = kwargs.get("title", None)
@@ -360,6 +360,7 @@ class SynthesizedVM(native_threading.Thread):
         self.machine = None
         self.disk_only = disk_only
         self.qemu_args = qemu_args
+        self.fwd_ports = fwd_ports.split(',')
         self.fuse = fuse
         self.launch_disk = launch_disk
         self.launch_mem = launch_mem
@@ -420,7 +421,8 @@ class SynthesizedVM(native_threading.Thread):
                 qemu_args=self.qemu_args,
                 memory_snapshot_mode="live",
                 title=self.title,
-                operation='Instantiated memory/disk snapshot'
+                operation='Instantiated memory/disk snapshot',
+                fwd_ports=self.fwd_ports
             )
 
     def resume(self):
@@ -564,7 +566,7 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None,
                  qemu_logfile=None, qmp_channel=None,
                  qemu_args=None, memory_snapshot_mode="suspend",
                  nova_xml=None, title=None, operation=None,
-                 cpus=None, mem=None):
+                 cpus=None, mem=None,fwd_ports=None):
     """process libvirt xml header before launching the VM
     :param memory_snapshot_mode : behavior of libvrt memory snapshotting, [off|suspend|live]
     """
@@ -714,6 +716,16 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None,
                     "{%s}arg" % qemu_xmlns, {'value': "unix:%s,server,nowait" % qmp_channel}
                 )
             )
+
+        if fwd_ports is not None:
+            for f in fwd_ports:
+                qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value': '-redir'}))
+                qemu_element.append(
+                    Element(
+                        "{%s}arg" % qemu_xmlns, {'value': "tcp:%s::%s" % (f,f)}
+                    )
+                )
+
 
         # append qemu argument given from user
         if qemu_args:
@@ -1699,6 +1711,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
     base_memmeta = kwargs.get('base_memmeta', None)
     save_snapshot = False
     title = kwargs.get('title', None)
+    fwd_ports = kwargs.get('fwd_ports', None)
 
     overlay_filename = NamedTemporaryFile(prefix="cloudlet-overlay-file-")
     decompe_time_s = time()
@@ -1730,7 +1743,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
     LOG.info("Resume the launch VM")
     synthesized_VM = SynthesizedVM(
         launch_disk, launch_mem, fuse, disk_only=disk_only,
-        qemu_args=qemu_args, title=title
+        qemu_args=qemu_args, title=title, fwd_ports=fwd_ports
     )
     # no-pipelining
     delta_proc.start()

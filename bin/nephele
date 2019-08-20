@@ -616,7 +616,8 @@ def synthesize(args):
                                 disk_only=args.disk_only,
                                 handoff_url=None,
                                 zip_container=is_zip_contained,
-                                title=args.title)
+                                title=args.title,
+                                fwd_ports=args.ports)
         except Exception as e:
             print "Failed to synthesize: %s" % str(e)
             return 1
@@ -728,6 +729,7 @@ def _main():
     run_parser.add_argument('snapshot', help='Disk/memory snapshot to instantiate from')
     run_parser.add_argument('title',  help='Title of the VM instance to display')
     run_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
+    run_parser.add_argument('-p', '--ports', help='Comma separated list of ports to forward from host to guest. -p 22,80,8080')
     run_parser.set_defaults(func=synthesize)
 
     handoff_parser = subparsers.add_parser('handoff', help='Handoff a running instance to another node')
