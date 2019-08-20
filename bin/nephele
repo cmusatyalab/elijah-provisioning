@@ -33,6 +33,7 @@ import shutil
 import signal
 import subprocess
 import sys
+from tempfile import NamedTemporaryFile
 import textwrap
 import threading
 import time
@@ -40,6 +41,7 @@ from uuid import uuid4
 import zipfile
 
 from elijah.provisioning import synthesis as synthesis
+from elijah.provisioning import compression as compression
 from elijah.provisioning.configuration import Const as Const
 from elijah.provisioning.configuration import Options
 from elijah.provisioning import log as logging
@@ -378,27 +380,22 @@ def check_and_convert_to_raw(path):
     pass
 
 def build_base(args):
-    try:
-        source = args.path
-        disk_image_path = DIR_NEPHELE_IMAGES + source[source.rindex('/'):]
-        # TODO: use qemu-img to ensure the disk image is in 'raw' format
-        # and if not, convert it
-        #disk_image_path = check_and_convert_to_raw(disk_image_path)
+    source = args.path
+    disk_image_path = DIR_NEPHELE_IMAGES + source[source.rindex('/'):]
 
-        # check if this filename already exists and warn
-        if os.path.exists(disk_image_path):
-            if not raw_input("An image with this filename already exists.\nAre you sure you wish to overwrite the following base image: %s? (y/N): " % (disk_image_path)).lower().strip().startswith("y"):
-                sys.exit(1)
-            if not raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
-                sys.exit(1)
-        print "Copying source image to %s..." % DIR_NEPHELE_IMAGES
-        shutil.copy(source, disk_image_path)
-        disk_path, mem_path = synthesis.create_baseVM(disk_image_path, source=source, title=args.title, cpus=args.cpu, mem=args.mem)
-        print "Created Base VM from this source image: %s" % source
-        print "Base Disk Image: %s" % disk_path
-        print "Base Memory Snapshot: %s" % mem_path
-    except KeyError as e:
-        print "Domain %s does not exist!" % args.domain
+    # check if this filename already exists and warn
+    if os.path.exists(disk_image_path):
+        if not raw_input("An image with this filename already exists.\nAre you sure you wish to overwrite the following base image: %s? (y/N): " % (disk_image_path)).lower().strip().startswith("y"):
+            sys.exit(1)
+        if not raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
+            sys.exit(1)
+    print "Copying/converting source image into %s..." % DIR_NEPHELE_IMAGES
+    os.system('qemu-img convert -O raw %s %s' % (source, disk_image_path))
+
+    disk_path, mem_path = synthesis.create_baseVM(disk_image_path, source=source, title=args.title, cpus=args.cpu, mem=args.mem)
+    print "Created Base VM from this source image: %s" % source
+    print "Base Disk Image: %s" % disk_path
+    print "Base Memory Snapshot: %s" % mem_path
 
 def find_base(id):
     base = None
@@ -513,6 +510,13 @@ def delete_snapshot(args):
         print "Cannot find matching snapshot at path %s\n" % (args.path)
         return 1
 
+def clear_instances(args):
+    dbconn = DBConnector()
+    list = dbconn.list_item(table_def.Instances)
+    for item in list:
+        dbconn.del_item(item)
+    return 1
+
 def delete_base(args):
     dbconn, base = find_base(args.id)
     if base is None:
@@ -529,24 +533,70 @@ def delete_base(args):
                 print "Image deleted from disk."
 
 def export_base(args):
-        _, base = find_base(args.id)
+    _, base = find_base(args.id)
 
-        output_path = args.dest
-        if base is not None:
-            PackagingUtil.export_basevm(
-                output_path,
-                base.disk_path,
-                base.hash_value)
-        else:
-            print "Failed to find matching image with id: %s" % args.id
+    output_path = args.dest
+    if base is not None:
+        PackagingUtil.export_basevm(
+            output_path,
+            base.disk_path,
+            base.hash_value)
+    else:
+        print "Failed to find matching image with id: %s" % args.id
 
 def import_base(args):
-        import_file = args.path
-        if os.path.exists(import_file) == False or \
-            os.access(import_file, os.R_OK) == False:
-           print "Cannot read file: %s" % import_file
-           return 1
-        PackagingUtil.import_basevm(import_file)
+    source = args.path
+    if os.path.exists(source) == False or os.access(source, os.R_OK) == False:
+        print "Cannot read file: %s" % source
+        return 1
+   
+    (base_hashvalue, disk_name, memory_name, diskhash_name, memoryhash_name) = \
+            PackagingUtil._get_basevm_attribute(source)
+    disk_image_path = DIR_NEPHELE_IMAGES + disk_name
+
+    # check if this filename already exists and warn
+    if os.path.exists(disk_image_path):
+        if not raw_input("An image with this filename already exists.\nAre you sure you wish to overwrite the following base image: %s? (y/N): " % (disk_image_path)).lower().strip().startswith("y"):
+            sys.exit(1)
+        if not raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
+            sys.exit(1)
+    print "Decompressing image to %s..." % DIR_NEPHELE_IMAGES
+    zipbase = zipfile.ZipFile(source, 'r')
+    zipbase.extractall(DIR_NEPHELE_IMAGES)
+    print "Extracted image files to %s." % (disk_image_path)
+
+    # add to DB
+    new_basevm = table_def.BaseVM(disk_image_path, base_hashvalue, source)
+    dbconn = DBConnector()
+    dbconn.add_item(new_basevm)
+
+def import_snapshot(args):
+    if not os.path.exists(args.path):
+        print "Snapshot path (%s) does not exist!" % (args.path)
+    else:
+        url = 'file://' + os.path.abspath(args.path)
+        overlay_filename = NamedTemporaryFile(prefix="cloudlet-overlay-file-")
+        meta_info = compression.decomp_overlayzip(url, overlay_filename.name)
+
+        base_sha = meta_info[Const.META_BASE_VM_SHA256]
+        base_found = False
+        dbconn = DBConnector()
+        basevm_list = dbconn.list_item(table_def.BaseVM)
+        for basevm_row in basevm_list:
+            if basevm_row.hash_value == base_sha:
+                base_found = True
+                break
+        if not base_found:
+            print "Cannot find base image (SHA-256: %s) referenced in overlay: %s" % (base_sha, args.path)
+
+        # save the result to DB
+        list = dbconn.list_item(table_def.Snapshot)
+        for item in list:
+            if args.path == item.path:
+                dbconn.del_item(item)
+                break
+        new = table_def.Snapshot(args.path, basevm_row.hash_value)
+        dbconn.add_item(new)
 
 def synthesize(args):
         if os.fork():
@@ -660,7 +710,7 @@ def _main():
 
     import_snapshot_parser = snapshot_subparsers.add_parser('import', help='Import a snapshot from a compressed zip file')
     import_snapshot_parser.add_argument('path', help='an existing zip file containing a snapshot')
-    import_snapshot_parser.set_defaults(func=print_args)
+    import_snapshot_parser.set_defaults(func=import_snapshot)
 
     inspect_parser = snapshot_subparsers.add_parser('inspect', help='Output details of a snapshot')
     inspect_parser.add_argument('path', help='Path to an existing snapshot to inspect')
@@ -684,6 +734,9 @@ def _main():
     handoff_parser.add_argument('title',  help='Title of the VM instance to handoff')
     handoff_parser.add_argument('dest', help='Handoff destination - IP address or DNS name.')
     handoff_parser.set_defaults(func=handoff)
+
+    clear_parser = subparsers.add_parser('clear', help='Clear table of running instances')
+    clear_parser.set_defaults(func=clear_instances)
 
     if len(sys.argv) == 1:
         parser.print_help()

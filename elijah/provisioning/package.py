@@ -650,7 +650,7 @@ class PackagingUtil(object):
         # add to DB
         LOG.info("Register New Base to DB")
         LOG.info("ID for the new Base VM: %s" % base_hashvalue)
-        new_basevm = BaseVM(disk_target_path, base_hashvalue)
+        new_basevm = BaseVM(disk_target_path, base_hashvalue, filename)
         LOG.info("Success")
         dbconn.add_item(new_basevm)
         return disk_target_path, base_hashvalue
