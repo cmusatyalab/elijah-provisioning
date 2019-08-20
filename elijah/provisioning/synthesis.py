@@ -309,6 +309,9 @@ class VM_Overlay(native_threading.Thread):
         # delete cloudlet-qemu-log directory
         if os.path.exists(os.path.dirname(self.qemu_logfile)):
             shutil.rmtree(os.path.dirname(self.qemu_logfile))
+        if hasattr(self, 'machine'):
+            _terminate_vm(self.conn, self.machine)
+            self.machine = None
 
     def exception_handler(self):
         # make sure to destory the VM
@@ -1625,10 +1628,12 @@ def create_baseVM(disk_image_path, source=None, title=None, cpus=None, mem=None)
                                         base_memmeta)
     except Exception as e:
         LOG.error("failed at %s" % str(traceback.format_exc()))
+        sys.exit(1)
+    finally:
         if machine is not None:
             _terminate_vm(conn, machine)
             machine = None
-        sys.exit(1)
+        
 
     # save the result to DB
     dbconn = db_api.DBConnector()
