@@ -360,7 +360,10 @@ class SynthesizedVM(native_threading.Thread):
         self.machine = None
         self.disk_only = disk_only
         self.qemu_args = qemu_args
-        self.fwd_ports = fwd_ports.split(',')
+        if fwd_ports is not None:
+            self.fwd_ports = fwd_ports.split(',')
+        else:
+            self.fwd_ports = None
         self.fuse = fuse
         self.launch_disk = launch_disk
         self.launch_mem = launch_mem
@@ -485,7 +488,7 @@ def _terminate_vm(conn, machine):
 
 
 def _update_overlay_meta(original_meta, new_path, blob_info=None):
-    fout = open(new_path, "wrb")
+    fout = open(new_path, "r+b")
 
     if blob_info:
         original_meta[Const.META_OVERLAY_FILES] = blob_info
@@ -902,7 +905,7 @@ def get_overlay_deltalist(monitoring_info, options,
 
 def _create_overlay_meta(overlay_metafile, base_hash, modified_disksize,
                          modified_memsize, blob_info):
-    fout = open(overlay_metafile, "wrb")
+    fout = open(overlay_metafile, "r+b")
 
     meta_dict = dict()
     meta_dict[Const.META_BASE_VM_SHA256] = base_hash
@@ -1370,7 +1373,7 @@ def overwrite_xml(in_path, new_xml):
 
 def copy_with_xml(in_path, out_path, xml):
     fin = open(in_path)
-    fout = open(out_path, 'wrb')
+    fout = open(out_path, 'r+b')
     hdr = memory_util._QemuMemoryHeader(fin)
 
     # Write header

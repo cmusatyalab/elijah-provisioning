@@ -585,8 +585,8 @@ class Recovered_delta(multiprocessing.Process):
         self.base_mem_fd = open(self.base_mem, "rb")
         self.raw_mem = mmap.mmap(self.base_mem_fd.fileno(), 0, prot=mmap.PROT_READ)
         self.out_pipe = open(self.out_pipename, "w")
-        self.recover_mem_fd = open(self.output_mem_path, "wrb")
-        self.recover_disk_fd = open(self.output_disk_path, "wrb")
+        self.recover_mem_fd = open(self.output_mem_path, "r+b")
+        self.recover_disk_fd = open(self.output_disk_path, "r+b")
         overlay_stream = open(self.overlay_path, "r")
         delta_counter = collections.Counter()
         delta_times = collections.Counter()
@@ -772,29 +772,37 @@ class Recovered_delta(multiprocessing.Process):
         self.recovered_hash_dict = None
         self.live_migration_iteration_dict.clear()
         self.live_migration_iteration_dict = None
-        if self.base_disk_fd is not None:
-            self.base_disk_fd.close()
-            self.base_disk_fd = None
-        if self.base_mem_fd is not None:
-            self.base_mem_fd.close()
-            self.base_mem_fd = None
         if self.raw_disk is not None:
+            LOG.debug("Closing disk mmap...")
             self.raw_disk.close()
             self.raw_disk = None
         if self.raw_mem is not None:
+            LOG.debug("Closing memory mmap...")
             self.raw_mem.close()
             self.raw_mem = None
         if self.raw_mem_overlay is not None:
             self.raw_mem_overlay.close()
             self.raw_mem_overlay = None
+        if self.base_disk_fd is not None:
+            time_close_start = time.time()
+            self.base_disk_fd.close()
+            self.base_disk_fd = None
+            LOG.debug("File closing time for (%s): %f" % (self.base_disk, time.time()-time_close_start))
+        if self.base_mem_fd is not None:
+            time_close_start = time.time()
+            self.base_mem_fd.close()
+            self.base_mem_fd = None
+            LOG.debug("File closing time for (%s): %f" % (self.base_mem, time.time()-time_close_start))
         if hasattr(self, "recover_disk_fd"):
+            time_close_start = time.time()
             self.recover_disk_fd.close()
             self.recover_disk_fd = None
+            LOG.debug("File closing time for (%s): %f" % (self.output_disk_path, time.time()-time_close_start))
         if hasattr(self, "recover_mem_fd"):
             time_close_start = time.time()
             self.recover_mem_fd.close()
             self.recover_mem_fd = None
-            LOG.debug("File closing time for recover memory snapshot: %f" % (time.time()-time_close_start))
+            LOG.debug("File closing time for (%s): %f" % (self.output_mem_path, time.time()-time_close_start))
 
 
 def deduplicate_deltaitem(hash_dict, delta_item, ref_id):

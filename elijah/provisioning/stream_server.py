@@ -111,8 +111,8 @@ class RecoverDeltaProc(multiprocessing.Process):
         self.raw_disk = mmap.mmap(self.base_disk_fd.fileno(), 0, prot=mmap.PROT_READ)
         self.base_mem_fd = open(self.base_mem, "rb")
         self.raw_mem = mmap.mmap(self.base_mem_fd.fileno(), 0, prot=mmap.PROT_READ)
-        self.recover_mem_fd = open(self.output_mem_path, "wrb")
-        self.recover_disk_fd = open(self.output_disk_path, "wrb")
+        self.recover_mem_fd = open(self.output_mem_path, "r+b")
+        self.recover_disk_fd = open(self.output_disk_path, "r+b")
         delta_counter = collections.Counter()
         delta_times = collections.Counter()
         unresolved_deltaitem_list = []
@@ -549,6 +549,9 @@ class HandoffAnalysisProc(multiprocessing.Process):
             except EOFError:
                 break
             except Queue.Empty:
+                pass
+            except IndexError:
+                LOG.error("%s" % str(message))
                 pass
 
     def terminate(self):
