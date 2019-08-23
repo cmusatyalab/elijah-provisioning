@@ -658,7 +658,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         metadata = NetworkUtil.decoding(msgpack_data)
         launch_disk_size = metadata[Cloudlet_Const.META_RESUME_VM_DISK_SIZE]
         launch_memory_size = metadata[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
-        title = 'handoff-from-'+ str(self.client_address[0])
+        title = metadata[Cloudlet_Const.META_VM_TITLE]
         
         analysis_mq = multiprocessing.Queue()
         analysis_proc = HandoffAnalysisProc(handoff_url=self.client_address[0],message_queue=analysis_mq, disk_size=launch_disk_size, mem_size=launch_memory_size)

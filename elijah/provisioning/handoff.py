@@ -770,7 +770,8 @@ class HandoffDataSend(object):
                   options, handoff_addr, overlay_mode,      # handoff configuration
                   fuse_mountpoint, qemu_logpath,            # running VM instance
                   qmp_channel_path, vm_id,                  # running VM instance
-                  dirty_disk_chunks, libvirt_conn_addr):    # running VM instance
+                  dirty_disk_chunks, libvirt_conn_addr,
+                  title=None, fwd_ports=None):    # running VM instance
         self.base_vm_paths = base_vm_paths
         self.basevm_sha256_hash = basevm_sha256_hash
         self.basedisk_hashdict = basedisk_hashdict
@@ -785,6 +786,8 @@ class HandoffDataSend(object):
         self.libvirt_conn_addr = libvirt_conn_addr
         self.vm_id = vm_id
         self.dirty_disk_chunks = dirty_disk_chunks
+        self.title = title
+        self.fwd_ports = fwd_ports
 
     def to_file(self, filename):
         serialized_buf = dict()
@@ -813,7 +816,9 @@ class HandoffDataSend(object):
                 handoff_data_dict['qmp_channel_path'],
                 handoff_data_dict['vm_id'],
                 handoff_data_dict['dirty_disk_chunks'],
-                handoff_data_dict['libvirt_conn_addr']
+                handoff_data_dict['libvirt_conn_addr'],
+                handoff_data_dict['title'],
+                handoff_data_dict['fwd_ports']
             )
             handoff_data._load_vm_data()
             return handoff_data
@@ -1025,6 +1030,8 @@ def perform_handoff(handoff_data):
         metadata[Const.META_BASE_VM_SHA256] = handoff_data.basevm_sha256_hash
         metadata[Const.META_RESUME_VM_DISK_SIZE] = resume_disk_size
         metadata[Const.META_RESUME_VM_MEMORY_SIZE] = resume_memory_size
+        metadata[Const.META_VM_TITLE] = handoff_data.title
+        metadata[Const.META_FWD_PORTS] = handoff_data.fwd_ports
         time_network_start = time.time()
         client = StreamSynthesisClient(migration_dest_ip, migration_dest_port,
                                        metadata, compdata_queue, process_controller)

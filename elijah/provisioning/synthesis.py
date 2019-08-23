@@ -1836,6 +1836,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
         synthesized_VM.fuse.mountpoint, synthesized_VM.qemu_logfile,
         synthesized_VM.qmp_channel, synthesized_VM.machine.ID(),
         synthesized_VM.fuse.modified_disk_chunks, "qemu:///system",
+        title, fwd_ports
     )
     handoff_ds._load_vm_data()
     try:

@@ -79,6 +79,8 @@ class Const(object):
     META_OVERLAY_FILE_SIZE = "overlay_size"
     META_OVERLAY_FILE_DISK_CHUNKS = "disk_chunk"
     META_OVERLAY_FILE_MEMORY_CHUNKS = "memory_chunk"
+    META_VM_TITLE = "title"
+    META_FWD_PORTS = "fwd_ports"
 
     MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
     QEMU_BIN_PATH = which("qemu-system-x86_64")
