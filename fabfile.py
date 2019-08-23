@@ -12,7 +12,7 @@ from fabric.api import sudo
 from fabric.api import task
 from fabric.api import abort
 from fabric.api import puts
-from fabric.contrib.files import comment,append
+from fabric.contrib.files import comment,append,upload_template
 from fabric.context_managers import cd
 from fabric.context_managers import settings
 from distutils.version import LooseVersion
@@ -143,6 +143,7 @@ def install():
     append('/etc/apparmor.d/abstractions/libvirt-qemu', '/tmp/cloudlet-*/** rw,', use_sudo=True)
     append('/etc/apparmor.d/abstractions/libvirt-qemu', '/tmp/qemu_debug_messages rw,', use_sudo=True)
     append('/etc/apparmor.d/abstractions/libvirt-qemu', '/tmp/qemu* rw,', use_sudo=True)  
+    upload_template('TEMPLATE.qemu','/etc/apparmor.d/libvirt/TEMPLATE.qemu', use_sudo=True)
 
     # Check fuse support:
     #   qemu-kvm changes the permission of /dev/fuse, so we revert back the
