@@ -111,8 +111,8 @@ class RecoverDeltaProc(multiprocessing.Process):
         self.raw_disk = mmap.mmap(self.base_disk_fd.fileno(), 0, prot=mmap.PROT_READ)
         self.base_mem_fd = open(self.base_mem, "rb")
         self.raw_mem = mmap.mmap(self.base_mem_fd.fileno(), 0, prot=mmap.PROT_READ)
-        self.recover_mem_fd = open(self.output_mem_path, "r+b")
-        self.recover_disk_fd = open(self.output_disk_path, "r+b")
+        self.recover_mem_fd = open(self.output_mem_path, "wb")
+        self.recover_disk_fd = open(self.output_disk_path, "wb")
         delta_counter = collections.Counter()
         delta_times = collections.Counter()
         unresolved_deltaitem_list = []

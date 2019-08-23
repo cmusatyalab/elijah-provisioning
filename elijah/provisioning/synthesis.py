@@ -905,7 +905,7 @@ def get_overlay_deltalist(monitoring_info, options,
 
 def _create_overlay_meta(overlay_metafile, base_hash, modified_disksize,
                          modified_memsize, blob_info):
-    fout = open(overlay_metafile, "r+b")
+    fout = open(overlay_metafile, "wb")
 
     meta_dict = dict()
     meta_dict[Const.META_BASE_VM_SHA256] = base_hash

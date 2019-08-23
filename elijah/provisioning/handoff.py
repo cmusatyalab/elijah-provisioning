@@ -700,7 +700,7 @@ def _waiting_to_finish(process_controller, worker_name):
 def _generate_overlaymeta(overlay_metapath, overlay_info, base_hashvalue,
                           launchdisk_size, launchmem_size):
     # create metadata
-    fout = open(overlay_metapath, "r+b")
+    fout = open(overlay_metapath, "wb")
 
     meta_dict = dict()
     meta_dict[Const.META_BASE_VM_SHA256] = base_hashvalue
