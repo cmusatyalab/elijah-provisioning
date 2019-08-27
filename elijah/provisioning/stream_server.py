@@ -660,7 +660,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         launch_memory_size = metadata[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
         title = metadata[Cloudlet_Const.META_VM_TITLE]
         fwd_ports = metadata[Cloudlet_Const.META_FWD_PORTS]
-        
+
         analysis_mq = multiprocessing.Queue()
         analysis_proc = HandoffAnalysisProc(handoff_url=self.client_address[0],message_queue=analysis_mq, disk_size=launch_disk_size, mem_size=launch_memory_size)
         analysis_proc.start()
@@ -804,7 +804,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                             valid_bit=1)
             time_fuse_end = time.time()
 
-            synthesized_vm = SynthesizedVM(launch_disk, launch_mem, fuse, title=title, fwd_ports=fwd_ports)
+            synthesized_vm = SynthesizedVM(launch_disk, launch_mem, fuse, title=title)
 
             synthesized_vm.start()
             synthesized_vm.join()
