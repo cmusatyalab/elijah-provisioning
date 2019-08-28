@@ -660,6 +660,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         launch_memory_size = metadata[Cloudlet_Const.META_RESUME_VM_MEMORY_SIZE]
         title = metadata[Cloudlet_Const.META_VM_TITLE]
         fwd_ports = metadata[Cloudlet_Const.META_FWD_PORTS]
+        base_hash = metadata[Cloudlet_Const.META_BASE_VM_SHA256]
 
         analysis_mq = multiprocessing.Queue()
         analysis_proc = HandoffAnalysisProc(handoff_url=self.client_address[0],message_queue=analysis_mq, disk_size=launch_disk_size, mem_size=launch_memory_size)
@@ -903,13 +904,14 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             handoff_ds = handoff.HandoffDataSend()
             LOG.debug("save data to file")
             handoff_ds.save_data(
-                base_vm_paths, blob_header.get(Cloudlet_Const.META_BASE_VM_SHA256),
+                base_vm_paths, base_hash,
                 preload_thread.basedisk_hashdict,
                 preload_thread.basemem_hashdict,
                 options, dest_handoff_url, None,
                 synthesized_vm.fuse.mountpoint, synthesized_vm.qemu_logfile,
                 synthesized_vm.qmp_channel, synthesized_vm.machine.ID(),
                 synthesized_vm.fuse.modified_disk_chunks, "qemu:///system",
+                title, fwd_ports
             )
             handoff_ds._load_vm_data()
             try:
