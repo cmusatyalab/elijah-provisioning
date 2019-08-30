@@ -833,6 +833,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 base_diskmeta, base_memmeta)
             preload_thread.daemon = True
             preload_thread.start()
+            save_snapshot = False
             signal.signal(signal.SIGUSR1, self.handlesig)
             while True:
                 state, _ = synthesized_vm.machine.state()
