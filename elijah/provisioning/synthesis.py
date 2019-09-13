@@ -683,6 +683,7 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None,
             qemu_element = Element("{%s}commandline" % qemu_xmlns)
             xml.append(qemu_element)
 
+        existing_ports = False
         # remove previous custom argument, if it exists
         argument_list = qemu_element.findall("{%s}arg" % qemu_xmlns)
         remove_list = list()
@@ -692,6 +693,8 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None,
                     arg_value.startswith('logfile=') or\
                     arg_value.startswith('raw='):
                 remove_list.append(argument_item)
+            if arg_value.startswith('-redir'):
+                existing_ports = True
         for item in remove_list:
             qemu_element.remove(item)
         # append custom qemu argument
@@ -720,7 +723,7 @@ def _convert_xml(disk_path, xml=None, mem_snapshot=None,
                 )
             )
 
-        if fwd_ports is not None:
+        if fwd_ports is not None and not existing_ports:
             for f in fwd_ports:
                 qemu_element.append(Element("{%s}arg" % qemu_xmlns, {'value': '-redir'}))
                 qemu_element.append(
