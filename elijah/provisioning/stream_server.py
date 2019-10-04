@@ -825,7 +825,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 actual_resume_time,
             ))
 
-            ack_data = struct.pack("!Qd", 0x10, actual_resume_time)
+            ack_data = struct.pack("!d", 0x10, actual_resume_time)
             LOG.info("send ack to client: %d" % len(ack_data))
             self.request.sendall(ack_data)
 
