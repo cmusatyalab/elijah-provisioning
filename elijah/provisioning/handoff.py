@@ -56,6 +56,7 @@ from . import compression
 from . import process_manager
 from . import qmp_af_unix
 from . import log as logging
+from .db.api import update_op, log_op
 
 
 # to work with OpenStack's eventlet
@@ -888,7 +889,7 @@ class MockLibvirtUtil(object):
         pass
 
 
-def perform_handoff(handoff_data):
+def perform_handoff(handoff_data, operation_id):
     '''Perform VM handoff
     @param handoff_data: object of HandoffDataSend
     @return None

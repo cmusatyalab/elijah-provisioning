@@ -27,10 +27,26 @@ import sqlalchemy
 import sys
 from ..configuration import Const
 from sqlalchemy.orm import sessionmaker
+import datetime
 
-from table_def import create_db
-from table_def import BaseVM, OverlayVM, User, Session
+import table_def
 
+
+def log_op(op=None, notes=None):
+    dbconn = DBConnector()
+    new = table_def.Operations(op, notes)
+    dbconn.add_item(new)
+    return new.id
+
+def update_op(op_id, has_ended=False, notes=None):
+    dbconn = DBConnector()
+    item = dbconn.session.query(table_def.Operations).get(op_id)
+    if has_ended:
+        item.end_time = datetime.datetime.now()
+    if notes is not None:
+        item.notes = notes
+    dbconn.session.commit()
+    dbconn.session.flush()
 
 class DBConnector(object):
     def __init__(self, log=sys.stdout):
@@ -41,7 +57,7 @@ class DBConnector(object):
             dirpath = os.path.dirname(Const.CLOUDLET_DB)
             if os.path.exists(dirpath) == False:
                 os.makedirs(dirpath)
-            create_db(Const.CLOUDLET_DB)
+            table_def.create_db(Const.CLOUDLET_DB)
 
         # mapping existing DB to class
         self.engine = sqlalchemy.create_engine('sqlite:///%s' % Const.CLOUDLET_DB, echo=False)
@@ -54,6 +70,10 @@ class DBConnector(object):
 
     def del_item(self, entry):
         self.session.delete(entry)
+        self.session.commit()
+
+    def update_item(self, entry):
+        self.session.update(entry)
         self.session.commit()
 
     def list_item(self, entry):

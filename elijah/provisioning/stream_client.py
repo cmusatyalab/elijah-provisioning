@@ -44,6 +44,7 @@ from configuration import VMOverlayCreationMode
 from synthesis_protocol import Protocol
 import process_manager
 import log as logging
+from .db.api import update_op, log_op
 
 LOG = logging.getLogger(__name__)
 
@@ -149,12 +150,13 @@ class NetworkMeasurementThread(threading.Thread):
 
 class StreamSynthesisClient(process_manager.ProcWorker):
 
-    def __init__(self, remote_addr, remote_port, metadata, compdata_queue, process_controller):
+    def __init__(self, remote_addr, remote_port, metadata, compdata_queue, process_controller, operation_id):
         self.remote_addr = remote_addr
         self.remote_port = remote_port
         self.metadata = metadata
         self.compdata_queue = compdata_queue
         self.process_controller = process_controller
+        self.operation_id = operation_id
 
         # measurement
         self.monitor_network_bw = multiprocessing.RawValue(ctypes.c_double, 0)
@@ -230,6 +232,7 @@ class StreamSynthesisClient(process_manager.ProcWorker):
             blob_counter += 1
             #send the current iteration number for use at the destination
             sock.sendall(struct.pack("!I", self.process_controller.get_migration_iteration_count()))
+            update_op(self.operation_id, notes="Iteration: %d, Blobs sent: %d" % (blob_counter, self.process_controller.get_migration_iteration_count()))
 
         # end message
         end_header = {

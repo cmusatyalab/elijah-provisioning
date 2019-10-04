@@ -82,6 +82,14 @@ class Const(object):
     META_VM_TITLE = "title"
     META_FWD_PORTS = "fwd_ports"
 
+    OP_BUILD_IMAGE = "BuildImage"
+    OP_BUILD_SNAPSHOT = "BuildSnapshot"
+    OP_HANDOFF = "Handoff"
+    OP_DELETE_IMAGE = "DeleteImage"
+    OP_DELETE_SNAPSHOT = "DeleteSnapshot"
+    OP_EXPORT_IMAGE = "ExportImage"
+    OP_IMPORT_IMAGE = "ImportImage"
+
     MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
     QEMU_BIN_PATH = which("qemu-system-x86_64")
     FREE_MEMORY_BIN_PATH = which("cloudlet_free_page_scan")

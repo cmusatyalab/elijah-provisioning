@@ -52,6 +52,7 @@ from . import memory_util
 from . import delta
 from .db import api as db_api
 from .db import table_def as db_table
+from .db.api import update_op, log_op
 from .configuration import Const
 from .configuration import Options
 from .delta import DeltaList
@@ -1773,6 +1774,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
             handoff_url = 'file://%s' % (increment_filename(overlay_path)) 
             save_snapshot = True
             print 'VM entered paused state. Generating snapshot of disk and memory...'
+            op_id = log_op(op=Const.OP_BUILD_SNAPSHOT,notes="Image: %s, Dest: %s" % (base_sha, overlay_path))
             break
         elif state == libvirt.VIR_DOMAIN_SHUTDOWN:
             #disambiguate between reboot and shutoff
@@ -1805,6 +1807,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
                 break
             else:
                 print 'PID in %s does not match getpid!' % HANDOFF_TEMP
+            op_id = log_op(op=Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
 
 
 
@@ -1843,7 +1846,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
     )
     handoff_ds._load_vm_data()
     try:
-        handoff.perform_handoff(handoff_ds)
+        handoff.perform_handoff(handoff_ds, op_id)
     except handoff.HandoffError as e:
         LOG.error("Cannot perform VM handoff: %s" % (str(e)))
     # print out residue location
@@ -1861,6 +1864,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
         new = table_def.Snapshot(os.path.abspath(parsed_handoff_url.path), basevm.hash_value)
         dbconn.add_item(new)
 
+    update_op(op_id, has_ended=True)
     # terminate
     synthesized_VM.monitor.terminate()
     synthesized_VM.monitor.join()

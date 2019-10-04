@@ -20,6 +20,7 @@
 
 from __future__ import division
 import argparse
+import datetime
 import errno
 import json
 import glob
@@ -46,7 +47,7 @@ from elijah.provisioning.configuration import Const as Const
 from elijah.provisioning.configuration import Options
 from elijah.provisioning import log as logging
 import elijah.provisioning.db.table_def as table_def
-from elijah.provisioning.db.api import DBConnector
+from elijah.provisioning.db.api import DBConnector, log_op, update_op
 from elijah.provisioning.package import PackagingUtil
 
 HOSTS = (
@@ -389,6 +390,7 @@ def build_base(args):
             sys.exit(1)
         if not raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
             sys.exit(1)
+    op_id = log_op(op=Const.OP_BUILD_IMAGE,notes="Source: %s" % (source))
     print "Copying/converting source image into %s..." % DIR_NEPHELE_IMAGES
     os.system('qemu-img convert -O raw %s %s' % (source, disk_image_path))
 
@@ -396,6 +398,7 @@ def build_base(args):
     print "Created Base VM from this source image: %s" % source
     print "Base Disk Image: %s" % disk_path
     print "Base Memory Snapshot: %s" % mem_path
+    update_op(op_id, has_ended=True, notes="Source: %s, Path: %s" % (source, disk_image_path))
 
 def find_base(id):
     base = None
@@ -429,6 +432,7 @@ def build_snapshot(args):
             if state == libvirt.VIR_DOMAIN_PAUSED:
                 break
         print 'VM entered paused state. Generating snapshot of disk and memory...'
+        op_id = log_op(op=Const.OP_BUILD_SNAPSHOT,notes="Image: %s, Dest: %s" % (args.id, args.dest))
         vm_overlay.create_overlay()
 
         # print output
@@ -458,6 +462,7 @@ def build_snapshot(args):
     except Exception as e:
         print "Failed to create overlay: %s" % str(e)
     os.rename(vm_overlay.overlay_zipfile, args.dest)
+    update_op(op_id, has_ended=True)
     # save the result to DB
     dbconn = DBConnector()
     list = dbconn.list_item(table_def.Snapshot)
@@ -490,6 +495,16 @@ def list_instances(args):
     for item in list:
         print "{:<43}{:^8}{:<12}{:^8}{:<43}".format(item.title, '', item.pid, '', str(item.start_time))
 
+def show_logs(args):
+    dbconn = DBConnector()
+    if(args.all):
+        list = dbconn.session.query(table_def.Operations).order_by(table_def.Operations.id.desc())
+    else:
+        list = dbconn.session.query(table_def.Operations).limit(10).order_by(table_def.Operations.id.desc())
+    print "{:<16}{:^8}{:<18}{:^8}{:<18}{:^8}{:<30}".format('OPERATION', '','STARTED', '','FINISHED', '', 'DETAILS')
+    for item in list:
+        print "{:<16}{:^8}{:<18}{:^8}{:<18}{:^8}{:<30}".format(item.op, '', str(item.start_time)[:-7], '', str(item.end_time)[:-7], '', item.notes)
+
 def delete_snapshot(args):
     dbconn = DBConnector()
     if args.path:
@@ -502,10 +517,12 @@ def delete_snapshot(args):
             break
     if snapshot is not None:
         if raw_input("Are you sure you wish to delete the following snapshot: %s? (y/N): " % (args.path)).lower().strip().startswith("y"):
+            op_id = log_op(op=Const.OP_DELETE_SNAPSHOT,notes="Snapshot: %s" % (args.path))
             dbconn.del_item(snapshot)
             print "Snapshot removed from database."
             os.remove(args.path)
             print "Snapshot deleted from disk."
+            update_op(op_id, has_ended=True)
     else:
         print "Cannot find matching snapshot at path %s\n" % (args.path)
         return 1
@@ -513,6 +530,9 @@ def delete_snapshot(args):
 def clear_instances(args):
     dbconn = DBConnector()
     list = dbconn.list_item(table_def.Instances)
+    for item in list:
+        dbconn.del_item(item)
+    list = dbconn.list_item(table_def.Operations)
     for item in list:
         dbconn.del_item(item)
     return 1
@@ -525,22 +545,27 @@ def delete_base(args):
     else:
         if raw_input("Are you sure you wish to delete the following base image: %s? (y/N): " % (base.disk_path)).lower().strip().startswith("y"):
             if raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
+                op_id = log_op(op=Const.OP_DELETE_IMAGE,notes="Image: %s, Path: %s" % (args.id, base.disk_path))
                 dbconn.del_item(base)
                 print "Image removed from database."
                 ext = str(base.disk_path).rindex('.')
                 for f in glob.glob(base.disk_path[:ext] + '*'):
                     os.remove(f)
                 print "Image deleted from disk."
+                update_op(op_id, has_ended=True)
+                
 
 def export_base(args):
     _, base = find_base(args.id)
 
     output_path = args.dest
     if base is not None:
+        op_id = log_op(op=Const.OP_EXPORT_IMAGE,notes="Image: %s, Dest: %s" % (args.id, args.dest))
         PackagingUtil.export_basevm(
             output_path,
             base.disk_path,
             base.hash_value)
+        update_op(op_id, has_ended=True)
     else:
         print "Failed to find matching image with id: %s" % args.id
 
@@ -560,6 +585,7 @@ def import_base(args):
             sys.exit(1)
         if not raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
             sys.exit(1)
+    op_id = log_op(op=Const.OP_IMPORT_IMAGE,notes="Image Path: %s" % (rgs.path))
     print "Decompressing image to %s..." % DIR_NEPHELE_IMAGES
     zipbase = zipfile.ZipFile(source, 'r')
     zipbase.extractall(DIR_NEPHELE_IMAGES)
@@ -569,6 +595,7 @@ def import_base(args):
     new_basevm = table_def.BaseVM(disk_image_path, base_hashvalue, source)
     dbconn = DBConnector()
     dbconn.add_item(new_basevm)
+    update_op(op_id), has_ended=True)
 
 def import_snapshot(args):
     if not os.path.exists(args.path):
@@ -670,6 +697,10 @@ def _main():
 
     list_instances_parser = subparsers.add_parser('ls', help='List running nephele instances')
     list_instances_parser.set_defaults(func=list_instances)
+
+    operations_parser = subparsers.add_parser('logs', help='List logs of nephele operations performed.')
+    operations_parser.add_argument('-a', '--all',  help='Show all rows (default: last 10')
+    operations_parser.set_defaults(func=show_logs)
 
     base_parser = subparsers.add_parser('image', help='Management of base VM images')
     base_subparsers = base_parser.add_subparsers(title='base')

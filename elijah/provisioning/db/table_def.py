@@ -63,6 +63,25 @@ class Instances(Base):
         self.pid = pid
         self.start_time = datetime.datetime.now()
 
+class Operations(Base):
+    """
+    Log of operations (image/snapshot creation, handoffs, etc) that have occurred
+    """
+    __tablename__ = "operations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    op = Column(String, nullable=False)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=True)
+    notes = Column(String, nullable=True)
+
+    def __init__(self, op, notes=None):
+        self.op = op
+        self.start_time = datetime.datetime.now()
+        if notes is not None:
+            self.notes = notes
+
+
 class Snapshot(Base):
     """
     """
