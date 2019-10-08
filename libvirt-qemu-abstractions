@@ -1,0 +1,5 @@
+#deny /tmp/
+#deny /var/tmp/
+/tmp/cloudlet-*/** rw,
+/tmp/qemu_debug_messages rw,
+/tmp/qemu* rw,
