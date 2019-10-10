@@ -595,7 +595,7 @@ def import_base(args):
     new_basevm = table_def.BaseVM(disk_image_path, base_hashvalue, source)
     dbconn = DBConnector()
     dbconn.add_item(new_basevm)
-    update_op(op_id), has_ended=True)
+    update_op(op_id, has_ended=True)
 
 def import_snapshot(args):
     if not os.path.exists(args.path):

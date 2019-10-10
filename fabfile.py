@@ -77,6 +77,7 @@ def download_dependency(download_dir):
 
 @task
 def update():
+    #only refresh the python files
     current_dir = os.path.abspath(os.curdir)
     with cd(current_dir):
         # remove previous build directory
@@ -107,6 +108,17 @@ def install():
         cmd += "apparmor-utils libc6-i386 python-pip libxml2-dev libxslt1-dev xdelta3 apache2"
         if local(cmd, capture=True).failed:
             abort("Failed to install libraries")
+
+        # Python-xdelta3 is no longer supported
+        # But you can install deb
+        with cd(current_dir):
+            package_name = "python-xdelta3.deb"
+            cmd = "wget http://mirrors.kernel.org/ubuntu/pool/universe/x/xdelta3/python-xdelta3_3.0.0.dfsg-1build1_amd64.deb -O %s" % package_name
+            if local(cmd, capture=True).failed:
+                abort("Failed to download %s" % package_name)
+            if local("dpkg -i %s" % package_name, capture=True).failed:
+                abort("Failed to install %s" % package_name)
+            local("rm -rf %s" % package_name)
 
     #download and install modified qemu binaries
     download_dependency(current_dir)
