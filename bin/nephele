@@ -500,7 +500,7 @@ def show_logs(args):
     if(args.all):
         list = dbconn.session.query(table_def.Operations).order_by(table_def.Operations.id.desc())
     else:
-        list = dbconn.session.query(table_def.Operations).limit(10).order_by(table_def.Operations.id.desc())
+        list = dbconn.session.query(table_def.Operations).order_by(table_def.Operations.id.desc()).limit(10)
     print "{:<16}{:^8}{:<18}{:^8}{:<18}{:^8}{:<30}".format('OPERATION', '','STARTED', '','FINISHED', '', 'DETAILS')
     for item in list:
         print "{:<16}{:^8}{:<18}{:^8}{:<18}{:^8}{:<30}".format(item.op, '', str(item.start_time)[:-7], '', str(item.end_time)[:-7], '', item.notes)
