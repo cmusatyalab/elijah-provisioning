@@ -585,7 +585,7 @@ def import_base(args):
             sys.exit(1)
         if not raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
             sys.exit(1)
-    op_id = log_op(op=Const.OP_IMPORT_IMAGE,notes="Image Path: %s" % (rgs.path))
+    op_id = log_op(op=Const.OP_IMPORT_IMAGE,notes="Image Path: %s" % (args.path))
     print "Decompressing image to %s..." % DIR_NEPHELE_IMAGES
     zipbase = zipfile.ZipFile(source, 'r')
     zipbase.extractall(DIR_NEPHELE_IMAGES)
