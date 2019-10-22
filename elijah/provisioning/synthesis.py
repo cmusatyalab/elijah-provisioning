@@ -1562,27 +1562,6 @@ def _create_baseVM(conn, domain,
 
 
 def validate_congifuration():
-    if os.path.exists(Const.QEMU_BIN_PATH) == False:
-        LOG.error("KVM/QEMU does not exist at %s" % Const.QEMU_BIN_PATH)
-        return False
-
-    cmd = ["%s" % Const.QEMU_BIN_PATH, "--version"]
-    proc = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
-    out, err = proc.communicate()
-    if len(err) > 0:
-        LOG.error("KVM validation Error: %s" % (err))
-        return False
-    if out.find("Cloudlet") < 0:
-        LOG.error("KVM validation Error, Need custom KVM")
-        return False
-    current_version = out.split("Cloudlet Edition")[-1].strip()
-    supporting_version = "0.9.3"
-    if LooseVersion(current_version) < LooseVersion(supporting_version):
-        msg = "Need KVM Cloudlet Edition later than %s\n" % supporting_version
-        msg += "Upgrade QEMU to the latest version at %s" % Const.CLOUDLET_KVM_RELEASE
-        LOG.error(msg)
-        return False
     return True
 
 
