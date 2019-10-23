@@ -1035,7 +1035,7 @@ def perform_handoff(handoff_data, operation_id):
         metadata[Const.META_FWD_PORTS] = handoff_data.fwd_ports
         time_network_start = time.time()
         client = StreamSynthesisClient(migration_dest_ip, migration_dest_port,
-                                       metadata, compdata_queue, process_controller)
+                                       metadata, compdata_queue, process_controller, operation_id)
         client.start()
         client.join()
         cpu_stat_end = psutil.cpu_times(percpu=True)
