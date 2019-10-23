@@ -1783,10 +1783,10 @@ def synthesize(base_disk, overlay_path, **kwargs):
             if meta['pid'] == os.getpid():
                 handoff_url = meta['url']
                 print 'Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url'])
+                op_id = log_op(op=Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
                 break
             else:
                 print 'PID in %s does not match getpid!' % HANDOFF_TEMP
-            op_id = log_op(op=Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
 
 
 
