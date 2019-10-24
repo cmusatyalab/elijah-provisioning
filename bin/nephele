@@ -528,13 +528,16 @@ def delete_snapshot(args):
         return 1
 
 def clear_instances(args):
-    dbconn = DBConnector()
-    list = dbconn.list_item(table_def.Instances)
-    for item in list:
-        dbconn.del_item(item)
-    list = dbconn.list_item(table_def.Operations)
-    for item in list:
-        dbconn.del_item(item)
+    if raw_input("Are you sure you wish to clear data? (y/N): ").lower().strip().startswith("y"):
+        dbconn = DBConnector()
+        if args.instances:
+            list = dbconn.list_item(table_def.Instances)
+            for item in list:
+                dbconn.del_item(item)
+        if args.operations:
+            list = dbconn.list_item(table_def.Operations)
+            for item in list:
+                dbconn.del_item(item)
     return 1
 
 def delete_base(args):
@@ -760,7 +763,7 @@ def _main():
     run_parser.add_argument('snapshot', help='Disk/memory snapshot to instantiate from')
     run_parser.add_argument('title',  help='Title of the VM instance to display')
     run_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
-    run_parser.add_argument('-p', '--ports', help='Comma separated list of ports to forward from host to guest. -p 22,80,8080')
+    run_parser.add_argument('-p', '--ports', help='Comma separated list of ports to forward from host to guest. -p 80,443,8080,8443')
     run_parser.set_defaults(func=synthesize)
 
     handoff_parser = subparsers.add_parser('handoff', help='Handoff a running instance to another node')
@@ -768,7 +771,9 @@ def _main():
     handoff_parser.add_argument('dest', help='Handoff destination - IP address or DNS name.')
     handoff_parser.set_defaults(func=handoff)
 
-    clear_parser = subparsers.add_parser('clear', help='Clear table of running instances')
+    clear_parser = subparsers.add_parser('clear', help='Clear tables')
+    clear_parser.add_argument('-i', '--instances', action='store_true',  help='Clear table of running instances. Usually only necessary if handoff fails.')
+    clear_parser.add_argument('-o', '--operations', action='store_true',  help='Clear table of logged operations.')
     clear_parser.set_defaults(func=clear_instances)
 
     if len(sys.argv) == 1:
