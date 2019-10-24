@@ -876,7 +876,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                     if meta['pid'] == os.getpid():
                         handoff_url = meta['url']
                         print 'Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url'])
-                        op_id = log_op(op=Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
+                        op_id = log_op(op=Cloudlet_Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
                         break
                     else:
                         print 'PID in %s does not match getpid!' % HANDOFF_TEMP
@@ -935,6 +935,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 new = table_def.Snapshot(os.path.abspath(parsed_handoff_url.path), basevm.hash_value)
                 dbconn.add_item(new)
 
+            update_op(op_id, has_ended=True)
             synthesized_vm.monitor.terminate()
             synthesized_vm.monitor.join()
             synthesized_vm.terminate()
