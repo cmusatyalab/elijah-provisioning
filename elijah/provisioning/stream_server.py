@@ -1077,7 +1077,4 @@ class StreamSynthesisServer(SocketServer.TCPServer):
                     os.path.getsize(base_mempath)/1024/1024))
         LOG.info("-"*50)
 
-        if len(ret_list) == 0:
-            LOG.error("[Error] NO valid Base VM")
-            sys.exit(2)
         return ret_list
