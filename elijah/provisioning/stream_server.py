@@ -876,6 +876,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                     if meta['pid'] == os.getpid():
                         handoff_url = meta['url']
                         print 'Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url'])
+                        op_id = log_op(op=Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
                         break
                     else:
                         print 'PID in %s does not match getpid!' % HANDOFF_TEMP
@@ -916,7 +917,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             )
             handoff_ds._load_vm_data()
             try:
-                handoff.perform_handoff(handoff_ds)
+                handoff.perform_handoff(handoff_ds, op_id)
             except handoff.HandoffError as e:
                 LOG.error("Cannot perform VM handoff: %s" % (str(e)))
             # print out residue location

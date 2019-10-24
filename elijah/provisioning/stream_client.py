@@ -232,7 +232,7 @@ class StreamSynthesisClient(process_manager.ProcWorker):
             blob_counter += 1
             #send the current iteration number for use at the destination
             sock.sendall(struct.pack("!I", self.process_controller.get_migration_iteration_count()))
-            update_op(self.operation_id, notes="Iteration: %d, Blobs sent: %d" % (blob_counter, self.process_controller.get_migration_iteration_count()))
+            update_op(self.operation_id, notes="Blobs sent: %d, Iteration: %d" % (blob_counter, self.process_controller.get_migration_iteration_count()))
 
         # end message
         end_header = {
