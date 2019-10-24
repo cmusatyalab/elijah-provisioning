@@ -167,6 +167,10 @@ def install():
     local("cp TEMPLATE.qemu /etc/apparmor.d/libvirt/TEMPLATE.qemu")
     local("cat libvirt-qemu-abstractions >> /etc/apparmor.d/abstractions/libvirt-qemu")
 
+    #install stream server as a service and start it
+    local("cp stream-server.service /lib/systemd/system")
+    local("service stream-server.service start")
+
     # Check fuse support:
     #   qemu-kvm changes the permission of /dev/fuse, so we revert back the
     #   permission. This bug is fixed from udev-175-0ubuntu26
