@@ -1682,6 +1682,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
     :param kwargs-disk_only: synthesis size VM with only disk image
     :param kwargs-handoff_url: return residue of changed portion
     """
+    global HANDOFF_SIGNAL_RECEIVED
     LOG.debug("==========================================")
     LOG.debug(overlay_path)
 
@@ -1784,6 +1785,8 @@ def synthesize(base_disk, overlay_path, **kwargs):
                 handoff_url = meta['url']
                 print 'Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url'])
                 op_id = log_op(op=Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
+                HANDOFF_SIGNAL_RECEIVED = False
+                os.remove(HANDOFF_TEMP)
                 break
             else:
                 print 'PID in %s does not match getpid!' % HANDOFF_TEMP

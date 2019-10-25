@@ -645,6 +645,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         | header size | header | blob header size | blob header | blob data  |
         |  (4 bytes)  | (var)  | (4 bytes)        | (var bytes) | (var bytes)|
         '''
+        global HANDOFF_SIGNAL_RECEIVED
         # variable
         self.total_recved_size_cur = 0
         self.total_recved_size_prev = 0
@@ -877,6 +878,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                         handoff_url = meta['url']
                         print 'Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url'])
                         op_id = log_op(op=Cloudlet_Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
+                        HANDOFF_SIGNAL_RECEIVED = False
+                        os.remove(HANDOFF_TEMP)
                         break
                     else:
                         print 'PID in %s does not match getpid!' % HANDOFF_TEMP
