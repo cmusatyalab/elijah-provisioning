@@ -719,7 +719,7 @@ def _main():
     list_instances_parser.set_defaults(func=list_instances)
 
     operations_parser = subparsers.add_parser('logs', help='List logs of nephele operations performed.')
-    operations_parser.add_argument('-a', '--all',  help='Show all rows (default: last 10')
+    operations_parser.add_argument('-a', '--all', action='store_true', help='Show all rows (default: last 10')
     operations_parser.set_defaults(func=show_logs)
 
     base_parser = subparsers.add_parser('image', help='Management of base VM images')
