@@ -170,6 +170,7 @@ def install():
     #install stream server as a service and start it
     local("cp stream-server.service /lib/systemd/system")
     local("service stream-server.service start")
+    local("systemctl enable stream-server")
 
     # Check fuse support:
     #   qemu-kvm changes the permission of /dev/fuse, so we revert back the
