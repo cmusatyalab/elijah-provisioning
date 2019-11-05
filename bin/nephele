@@ -40,6 +40,7 @@ import threading
 import time
 from uuid import uuid4
 import zipfile
+from fabric.api import run,env
 
 from elijah.provisioning import synthesis as synthesis
 from elijah.provisioning import compression as compression
@@ -400,6 +401,9 @@ def build_base(args):
     print "Base Memory Snapshot: %s" % mem_path
     update_op(op_id, has_ended=True, notes="Source: %s, Path: %s" % (source, disk_image_path))
 
+    #restart the stream-server to reload list of images
+    os.system('service stream-server restart')
+
 def find_base(id):
     base = None
     dbconn = DBConnector()
@@ -494,6 +498,15 @@ def list_instances(args):
     print "{:<43}{:^8}{:<12}{:^8}{:<43}".format('TITLE', '','PID', '','STARTED')
     for item in list:
         print "{:<43}{:^8}{:<12}{:^8}{:<43}".format(item.title, '', item.pid, '', str(item.start_time))
+
+def remote_execution(host):
+        env.host_string = 'root@%s' % host
+        env.output_prefix = False
+        sys.argv.remove('-r')
+        sys.argv.remove(host)
+        cmd = ' '.join(sys.argv)
+        print "Executing %s on %s" % (cmd, host)
+        run(cmd)
 
 def show_logs(args):
     dbconn = DBConnector()
@@ -600,6 +613,9 @@ def import_base(args):
     dbconn.add_item(new_basevm)
     update_op(op_id, has_ended=True)
 
+     #restart the stream-server to reload list of images
+    os.system('service stream-server restart')
+
 def import_snapshot(args):
     if not os.path.exists(args.path):
         print "Snapshot path (%s) does not exist!" % (args.path)
@@ -696,6 +712,7 @@ def print_args(args):
 
 def _main():
     parser = argparse.ArgumentParser(prog='nephele', description='Manage VMs across cloudlets.')
+    parser.add_argument('-r', '--remote', help="Execute commands on specified remote host.")
     subparsers = parser.add_subparsers(title='command')
 
     list_instances_parser = subparsers.add_parser('ls', help='List running nephele instances')
@@ -779,8 +796,11 @@ def _main():
     if len(sys.argv) == 1:
         parser.print_help()
     args = parser.parse_args()
-    ret = args.func(args) or 0
-    sys.exit(ret)
+    if(args.remote is not None):
+        remote_execution(args.remote)
+    else: #local execution
+        ret = args.func(args) or 0
+        sys.exit(ret)
 
 if __name__ == '__main__':
     _main()
