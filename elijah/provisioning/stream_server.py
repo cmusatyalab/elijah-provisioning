@@ -1015,6 +1015,8 @@ class StreamSynthesisServer(SocketServer.TCPServer):
         SocketServer.TCPServer.handle_error(self, request, client_address)
         sys.stderr.write("handling error from client %s\n" % (str(client_address)))
         sys.stderr.write(traceback.format_exc())
+        self.terminate()
+        sys.exit(1)
 
     def handle_timeout(self):
         sys.stderr.write("timeout error\n")
