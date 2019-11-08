@@ -553,7 +553,7 @@ def clear_instances(args):
             list = dbconn.list_item(table_def.Operations)
             for item in list:
                 dbconn.del_item(item)
-    return 1
+    return 0
 
 def delete_base(args):
     dbconn, base = find_base(args.id)
