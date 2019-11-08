@@ -499,13 +499,15 @@ def list_instances(args):
     for item in list:
         print "{:<43}{:^8}{:<12}{:^8}{:<43}".format(item.title, '', item.pid, '', str(item.start_time))
 
-def remote_execution(host):
+def remote_execution(host, nohup=False):
         env.host_string = 'root@%s' % host
         env.output_prefix = False
         sys.argv.remove('-r')
         sys.argv.remove(host)
         cmd = ' '.join(sys.argv)
-        print "Executing %s on %s" % (cmd, host)
+        if nohup:
+            cmd = "nohup " + cmd
+        #print "Executing %s on %s" % (cmd, host)
         run(cmd)
 
 def show_logs(args):
@@ -646,7 +648,7 @@ def import_snapshot(args):
 
 def synthesize(args):
         if os.fork():
-            os._exit(1)
+            os._exit(0)
         overlay_meta = args.snapshot
         is_zip_contained, url_path = PackagingUtil.is_zip_contained(
             overlay_meta)
@@ -713,7 +715,7 @@ def print_args(args):
 def _main():
     parser = argparse.ArgumentParser(prog='nephele', description='Manage VMs across cloudlets.')
     parser.add_argument('-r', '--remote', help="Execute commands on specified remote host.")
-    subparsers = parser.add_subparsers(title='command')
+    subparsers = parser.add_subparsers(title='command', dest="command")
 
     list_instances_parser = subparsers.add_parser('ls', help='List running nephele instances')
     list_instances_parser.set_defaults(func=list_instances)
@@ -797,7 +799,10 @@ def _main():
         parser.print_help()
     args = parser.parse_args()
     if(args.remote is not None):
-        remote_execution(args.remote)
+        if(args.command == 'run'):
+            remote_execution(args.remote, nohup=True)
+        else:
+            remote_execution(args.remote)
     else: #local execution
         ret = args.func(args) or 0
         sys.exit(ret)
