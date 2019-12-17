@@ -85,6 +85,9 @@ def update():
             local("rm -rf ./build")
             local("pip uninstall --y elijah-provisioning")
         # install python package
+            # install python-packages
+        if local("pip install -r requirements.txt", capture=True).failed:
+                abort("Failed to install python libraries")
         if local("python setup.py install",capture=True).failed:
             abort("cannot install cloudlet library")
         # clean-up
