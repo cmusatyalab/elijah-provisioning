@@ -2,6 +2,8 @@
 delim='=============================='
 src='us-west.nephele.findcloudlet.org'
 dest='de.nephele.findlcloudlet.org' 
+snapshot='/root/vmware-demo.zip'
+nephele_run_flags='-p 3389,443,22443'
 hosts=('de.nephele.findcloudlet.org' 'sg.nephele.findcloudlet.org' 'uk.nephele.findcloudlet.org' 'us-east.nephele.findcloudlet.org' 'us-west.nephele.findcloudlet.org')
 skip_clean=1
 skip_lat=0
@@ -22,9 +24,9 @@ if [[ "$skip_clean" -eq 0 ]]; then
     echo $delim
     for i in "${hosts[@]}"; do
         echo "$i:"
-        echo "Killing any running nephele processess.."
+        echo "Killing any running nephele processes..."
         ssh root@"$i" "killall nephele"
-        echo "Killing any running qemu processess.."
+        echo "Killing any running qemu processes..."
         ssh root@"$i" "killall -s KILL qemu-system-x86_64"
         echo "Clearing instances database table..."
         nephele -r "$i" clear -i -f
@@ -61,7 +63,7 @@ waitforkey "Launch VM on $src"
 title="horizon-demo"
 title="$title""$RANDOM"
 echo "+++Launching VM ($title) on $src..."
-nephele -r "$src" run /root/vmware-demo.zip "$title" -p 3389,443,22443
+nephele -r "$src" run "$snapshot" "$title" "$nephele_run_flags"
 
 waitforkey "Handoff $title to $dest"
 echo "+++Performing handoff of $title to $dest..."
