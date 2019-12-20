@@ -543,16 +543,18 @@ def delete_snapshot(args):
         return 1
 
 def clear_instances(args):
-    if raw_input("Are you sure you wish to clear data? (y/N): ").lower().strip().startswith("y"):
+    if args.force or raw_input("Are you sure you wish to clear data? (y/N): ").lower().strip().startswith("y"):
         dbconn = DBConnector()
         if args.instances:
             list = dbconn.list_item(table_def.Instances)
             for item in list:
                 dbconn.del_item(item)
+            print "Cleared instances table."
         if args.operations:
             list = dbconn.list_item(table_def.Operations)
             for item in list:
                 dbconn.del_item(item)
+            print "Cleared operations table."
     return 0
 
 def delete_base(args):
@@ -793,6 +795,7 @@ def _main():
     clear_parser = subparsers.add_parser('clear', help='Clear tables')
     clear_parser.add_argument('-i', '--instances', action='store_true',  help='Clear table of running instances. Usually only necessary if handoff fails.')
     clear_parser.add_argument('-o', '--operations', action='store_true',  help='Clear table of logged operations.')
+    clear_parser.add_argument('-f', '--force', action='store_true',  help='Do not prompt for confirmation.')
     clear_parser.set_defaults(func=clear_instances)
 
     if len(sys.argv) == 1:
