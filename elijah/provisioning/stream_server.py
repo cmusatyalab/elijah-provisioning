@@ -425,6 +425,9 @@ class FuseFeedingProc(multiprocessing.Process):
     def terminate(self):
         self.stop.set()
 
+def chunk2mb(n):
+    return (n * 4096) / float(1024*1024)
+
 class HandoffAnalysisProc(multiprocessing.Process):
     def __init__(self, handoff_url, message_queue, disk_size, mem_size):
         self.url = handoff_url
@@ -434,6 +437,13 @@ class HandoffAnalysisProc(multiprocessing.Process):
         self.mem_chunks = mem_size / 4096
         self.time_start = self.last_update =  time.time()
         self.num_blobs = 0
+        self.total_blob_size = 0
+        self.disk_chunks_by_value = 0
+        self.disk_chunks_by_ref = 0
+        self.disk_chunks_zeroes = 0
+        self.mem_chunks_by_value = 0
+        self.mem_chunks_by_ref = 0
+        self.mem_chunks_zeroes = 0
         self.disk_applied = 0
         self.mem_applied = 0
         self.iter = 0
@@ -466,7 +476,7 @@ class HandoffAnalysisProc(multiprocessing.Process):
             height = factors[(len(factors) / 2) - 1]
         return width, height
 
-    def update_stats(self, handoff_complete=False):
+    def update_html_stats(self, handoff_complete=False):
         self.stats_file = open(name=self.stats_path, mode = 'w')
         self.stats_file.write('<div class="stats-col">')
         self.stats_file.write('Elapsed Time: %f seconds<br/>' % (time.time() - self.time_start))
@@ -478,13 +488,32 @@ class HandoffAnalysisProc(multiprocessing.Process):
 
         self.stats_file.write('<div class="stats-col">')
         self.stats_file.write('Iterations: %d <br/>' % self.iter)
-        self.stats_file.write('Blobs Transmitted: %d <br/>' % self.num_blobs)
+        self.stats_file.write('Blobs Received (Total Size): %d (%d) <br/>' % (self.num_blobs, self.total_blob_size))
         self.stats_file.write('Disk Chunks Applied: %d <br/>' % self.disk_applied)
         self.stats_file.write('Memory Chunks Applied: %d <br/>' % self.mem_applied)
         self.stats_file.write('</div>')
 
         self.stats_file.flush()
         self.stats_file.close()
+
+
+
+    def update_text_stats(self):
+        outfd = open(name='/var/tmp/cloudlet/handoff.stats', mode = 'w')
+        outfd.write('Iterations: %d\n' % self.iter)
+        outfd.write('Elapsed Time: %f seconds\n' % (time.time() - self.time_start))
+        outfd.write('VM Disk Size: %d MB\n' % (chunk2mb(self.disk_chunks)))
+        outfd.write('VM Memory Size: %d MB\n' % (chunk2mb(self.mem_chunks)))
+        outfd.write('\n\n')
+        outfd.write('Blobs Received: %d\n' % self.num_blobs)
+        outfd.write('Total MBytes Received over wire: %.2f\n' % (self.total_blob_size / float(1024*1024)))
+        outfd.write('\n\n')
+        outfd.write('VM STATE (MBytes)\n')
+        outfd.write("{:<12}{:^8}{:<8}{:^4}{:<8}{:^4}{:<8}{:^4}{:<8}\n".format('', '', 'DIRTIED', '','BY VALUE', '', 'BY REF', '','ZEROS'))
+        outfd.write("{:<12}{:^8}{:<8.2f}{:^4}{:<8.2f}{:^4}{:<8.2f}{:^4}{:<8.2f}\n".format('MEMORY', '', chunk2mb(self.mem_applied), '', chunk2mb(self.mem_chunks_by_value), '', chunk2mb(self.mem_chunks_by_ref), '', chunk2mb(self.mem_chunks_zeroes)))
+        outfd.write("{:<12}{:^8}{:<8.2f}{:^4}{:<8.2f}{:^4}{:<8.2f}{:^4}{:<8.2f}\n".format('DISK', '', chunk2mb(self.disk_applied), '', chunk2mb(self.disk_chunks_by_value), '', chunk2mb(self.disk_chunks_by_ref), '', chunk2mb(self.disk_chunks_zeroes)))
+        outfd.flush()
+        outfd.close()
 
     def update_imgs(self):
         #DISK
@@ -501,7 +530,8 @@ class HandoffAnalysisProc(multiprocessing.Process):
         while True:
             self._running = True
             if((time.time() - self.last_update) > self.viz_interval):
-                self.update_stats()
+                self.update_html_stats()
+                self.update_text_stats()
                 self.update_imgs()
                 self.outfd.write('%f ' % (time.time() - self.time_start))
                 self.outfd.write("update_imgs")
@@ -513,7 +543,8 @@ class HandoffAnalysisProc(multiprocessing.Process):
                 if message == "!E_O_Q!":
                     self.outfd.flush() #flush remaining buffer
                     self.outfd.close()
-                    self.update_stats(handoff_complete=True)
+                    self.update_html_stats(handoff_complete=True)
+                    self.update_text_stats()
                     os.rename(self.disk_path, '/var/tmp/cloudlet/disk_from_%s_at_%d.png' % (self.url, self.time_start))
                     os.rename(self.mem_path, '/var/tmp/cloudlet/mem_from_%s_at_%d.png' % (self.url, self.time_start))
                     #os.remove(self.stats_path)
@@ -536,8 +567,29 @@ class HandoffAnalysisProc(multiprocessing.Process):
                         heat = self.disk_img_data[id / self.disk_width][id % self.disk_width]
                         self.disk_img_data[id / self.disk_width][id % self.disk_width] = 255 if ((heat+64) >= 255) else heat + 64
                         self.disk_applied += 1
+                elif message.startswith("D,R"):
+                    lindex = message.find("(")
+                    rindex = message.find(")")
+                    if(int(message[lindex+1:rindex]) in [16,32,112,144]):
+                        self.disk_chunks_by_value += 1
+                    elif (int(message[lindex+1:rindex]) in [96]):
+                        self.disk_chunks_zeroes += 1
+                    else:
+                        self.disk_chunks_by_ref += 1
+                elif message.startswith("M,R"):
+                    lindex = message.find("(")
+                    rindex = message.find(")")
+                    if(int(message[lindex+1:rindex]) in [16,32,112,144]):
+                        self.mem_chunks_by_value += 1
+                    elif (int(message[lindex+1:rindex]) in [96]):
+                        self.mem_chunks_zeroes += 1
+                    else:
+                        self.mem_chunks_by_ref += 1
                 elif message.startswith("B,R,"):
                     self.num_blobs += 1
+                    tokens = message.split(',')
+                    if len(tokens) == 3 and tokens[2].isdigit():
+                        self.total_blob_size += int(tokens[2])
                 elif message.startswith("iter,"):
                     tokens = message.split(',')
                     if len(tokens) == 2 and tokens[1].isdigit():
@@ -759,7 +811,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 memory_chunk_all.update(blob_memory_chunk)
                 disk_chunk_all.update(blob_disk_chunk)
             recv_blob_counter += 1
-            analysis_mq.put("B,R,%d" % (recv_blob_counter))
+            analysis_mq.put("B,R,%d" % (blob_size))
             data = self._recv_all(4)
             iter = struct.unpack("!I", data)[0]
             analysis_mq.put("iter,%d" % (iter))
