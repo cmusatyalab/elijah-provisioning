@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 delim='=============================='
 src='us-west.nephele.findcloudlet.org'
-dest='de.nephele.findlcloudlet.org' 
+dest='de.nephele.findcloudlet.org' 
 snapshot='/root/vmware-demo.zip'
 nephele_run_flags='-p 3389,443,22443'
 hosts=('de.nephele.findcloudlet.org' 'sg.nephele.findcloudlet.org' 'uk.nephele.findcloudlet.org' 'us-east.nephele.findcloudlet.org' 'us-west.nephele.findcloudlet.org')
@@ -32,6 +32,11 @@ if [[ "$skip_clean" -eq 0 ]]; then
         nephele -r "$i" clear -i -f
         echo "Restarting stream-server..."
         ssh root@"$i" "service stream-server restart"
+        if [[ "$skip_bw" -eq 0 ]]; then
+            echo "Restarting iperf server..."
+            ssh root@"$i" "killall iperf"
+            ssh root@"$i" "iperf -s -D"
+        fi
         echo ""
     done
     echo $delim
