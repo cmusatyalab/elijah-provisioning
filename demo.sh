@@ -9,18 +9,18 @@ skip_clean=0
 skip_lat=0
 skip_bw=0
 
-waitforkey() {
-    read -n1 -r -p "Proceed to next step - $1? (y/N):" key
-    while [ "$key" != 'y' ]; do
-        echo ''
-        read -n1 -r -p "Proceed to next step - $1? (y/N):" key
+waitforresponse() {
+    while true ; do
+        read -e -p "Proceed to next step - $1? (y/N): " key
+        if [ "$key" = 'n' -o "$key" = 'N' -o "$key" = '' ]; then exit 0; fi
+        if [ "$key" = 'y' -o "$key" = 'Y' ]; then break; fi
     done
     echo $delim
     echo ''
 }
 
 if [[ "$skip_clean" -eq 0 ]]; then
-    waitforkey "Cleanup nephele hosts [DESTRUCTIVE]"
+    waitforresponse "Cleanup nephele hosts [DESTRUCTIVE]"
     echo $delim
     echo "+++Performing cleanup on nephele hosts..."
     echo $delim
@@ -66,12 +66,12 @@ if [[ "$skip_bw" -eq 0 ]]; then
     echo $delim
 fi
 
-waitforkey "Launch VM on $src"
+waitforresponse "Launch VM on $src"
 title="horizon-demo"
 title="$title""$RANDOM"
 echo "+++Launching VM ($title) on $src..."
 nephele -r "$src" run "$snapshot" "$title" "$nephele_run_flags"
 
-waitforkey "Handoff $title to $dest"
+waitforresponse "Handoff $title to $dest"
 echo "+++Performing handoff of $title to $dest..."
 nephele -r "$src" handoff "$title" "$dest"
