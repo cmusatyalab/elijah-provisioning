@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 delim='=============================='
-src='us-west.nephele.findcloudlet.org'
-dest='de.nephele.findcloudlet.org' 
+hosts=('de.nephele.findcloudlet.org' 'sg.nephele.findcloudlet.org' 'uk.nephele.findcloudlet.org' 'us-east.nephele.findcloudlet.org' 'us-west.nephele.findcloudlet.org')
+src='de.nephele.findcloudlet.org'
+dest='us-east.nephele.findcloudlet.org'
+
 snapshot='/root/vmware-demo.zip'
 nephele_run_flags='-p 3389,443,22443'
-hosts=('de.nephele.findcloudlet.org' 'sg.nephele.findcloudlet.org' 'uk.nephele.findcloudlet.org' 'us-east.nephele.findcloudlet.org' 'us-west.nephele.findcloudlet.org')
+frontail_bin='./frontail-linux'
+frontail_flags='-d --ui-hide-topbar --disable-usage-stats'
+frontail_src_path='/var/tmp/cloudlet/log-synthesis'
+frontail_dest_path='/var/tmp/cloudlet/handoff.stats'
+
 skip_clean=0
 skip_lat=0
 skip_bw=0
@@ -12,7 +18,7 @@ skip_bw=0
 waitforresponse() {
     while true ; do
         read -e -p "Proceed to next step - $1? (y/N): " key
-        if [ "$key" = 'n' -o "$key" = 'N' -o "$key" = '' ]; then exit 0; fi
+        if [ "$key" = 'n' -o "$key" = 'N' ]; then exit 0; fi
         if [ "$key" = 'y' -o "$key" = 'Y' ]; then break; fi
     done
     echo $delim
@@ -41,6 +47,11 @@ if [[ "$skip_clean" -eq 0 ]]; then
         fi
         echo ""
     done
+    echo "Setting up frontail on src/dest appropriately..."
+    ssh root@"$src" "killall $frontail_bin"
+    ssh root@"$dest" "killall $frontail_bin"
+    ssh root@"$src" "$frontail_bin $frontail_flags $frontail_src_path"
+    ssh root@"$dest" "$frontail_bin $frontail_flags $frontail_dest_path"
     echo $delim
 fi
 
