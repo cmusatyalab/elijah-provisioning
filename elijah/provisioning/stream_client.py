@@ -180,7 +180,7 @@ class StreamSynthesisClient(process_manager.ProcWorker):
                 break
             except Exception as e:
                 time.sleep(1)
-                pass
+                LOG.error(e)
         if sock == None:
             msg = "failed to connect to %s" % str(address)
             raise StreamSynthesisClientError(msg)
