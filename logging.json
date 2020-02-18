@@ -4,11 +4,11 @@
     "formatters": {
         "concise": {
             "class": "logging.Formatter",
-            "format": "%(asctime)s %(levelname).5s - %(name)s.%(funcName)s(%(lineno)d): %(message)s"
+            "format": "%(asctime)s %(levelname).5s - %(message)s"
         },
         "verbose": {
             "class": "logging.Formatter",
-            "format": "%(asctime)s %(levelname).5s - PID[%(process)d] %(threadName)s; %(name)s.%(funcName)s(%(lineno)d): %(message)s"
+            "format": "%(asctime)s %(levelname).5s - %(process)d]:(threadName)s; %(name)s.%(funcName)s#%(lineno)d: %(message)s"
         }
     },
     "handlers": {

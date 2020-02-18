@@ -63,6 +63,10 @@ import mmap
 import tool
 from delta import DeltaItem
 
+with open('/var/nephele/logging.json') as f:
+    config_dict = json.load(f)
+    logging.config.dictConfig(config_dict)
+
 LOG = logging.getLogger(__name__)
 session_resources = dict()   # dict[session_id] = obj(SessionResource)
 HANDOFF_TEMP = '/tmp/.cloudlet-handoff'
@@ -1041,10 +1045,6 @@ class StreamSynthesisServer(SocketServer.TCPServer):
         else:
             self.handoff_data = None
             self.basevm_list = self.check_basevm_from_db(DBConnector())
-
-        with open('/var/nephele/logging.json') as f:
-            config_dict = json.load(f)
-            logging.config.dictConfig(config_dict)
 
         server_address = ("0.0.0.0", self.port_number)
         self.allow_reuse_address = True
