@@ -497,9 +497,7 @@ class CreateMemoryDeltalist(process_manager.ProcWorker):
                 self.free_memory_info['freed_counter'] = self.freed_counter
 
         except Exception as e:
-            sys.stdout.write("[compression] Exception1n")
-            sys.stderr.write(traceback.format_exc())
-            sys.stderr.write("%s\n" % str(e))
+            LOG.error("[compression] Exception %s ", e)
             self.deltalist_queue.put(Const.QUEUE_FAILED_MESSAGE)
 
     def change_mode(self, new_mode):

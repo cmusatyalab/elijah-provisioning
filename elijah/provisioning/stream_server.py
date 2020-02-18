@@ -703,6 +703,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         | header size | header | blob header size | blob header | blob data  |
         |  (4 bytes)  | (var)  | (4 bytes)        | (var bytes) | (var bytes)|
         '''
+
+        LOG.info("Incoming request from %s", self.client_address)
         global HANDOFF_SIGNAL_RECEIVED
         # variable
         self.total_recved_size_cur = 0
@@ -711,6 +713,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         # get header
         data = self._recv_all(4)
         if data is None or len(data) != 4:
+            LOG.error("Incorrect header size received from client!")
             raise StreamSynthesisError("Failed to receive first byte of header")
         message_size = struct.unpack("!I", data)[0]
         msgpack_data = self._recv_all(message_size)

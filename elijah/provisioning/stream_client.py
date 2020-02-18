@@ -213,7 +213,7 @@ class StreamSynthesisClient(process_manager.ProcWorker):
             if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
                 break
             if comp_task == Const.QUEUE_FAILED_MESSAGE:
-                sys.stderr.write("Failed to get compressed data\n")
+               LOG.error("Failed to get compressed data!")
                 break
             (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
             blob_header_dict = {

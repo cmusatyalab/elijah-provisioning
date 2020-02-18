@@ -262,9 +262,7 @@ class MemoryReadProcess(process_manager.ProcWorker):
                         self.monitor_current_bw = (throughput/Const.CHUNK_SIZE)
             # prog_bar.finish()
         except Exception as e:
-            sys.stdout.write("[MemorySnapshotting] Exception1n")
-            sys.stderr.write(traceback.format_exc())
-            sys.stderr.write("%s\n" % str(e))
+            LOG.error("[MemorySnapshotting] Exception %s", e)
             self.result_queue.put(Const.QUEUE_FAILED_MESSAGE)
         else:
             self.result_queue.put(Const.QUEUE_SUCCESS_MESSAGE)

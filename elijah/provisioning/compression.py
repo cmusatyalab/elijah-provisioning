@@ -438,17 +438,15 @@ class DecompProc(multiprocessing.Process):
                 if recv_data == Const.QUEUE_SUCCESS_MESSAGE:
                     break
                 if recv_data == Const.QUEUE_FAILED_MESSAGE:
+                    LOG.error("Failed to compress the blob")
                     raise CompressionError("Failed to compress the blob")
-                    break
 
                 (comp_type, comp_data) = recv_data
                 ([], output_ready, []) = select.select([], output_fd_list, [])
                 task_queue = output_fd_dict[output_ready[0]]
                 task_queue.put(recv_data)
         except Exception as e:
-            sys.stdout.write("[decomp] Exception")
-            sys.stderr.write(traceback.format_exc())
-            sys.stderr.write("%s\n" % str(e))
+            LOG.error("[decomp] Exception %s", e)
             self.output_queue.put(Const.QUEUE_FAILED_MESSAGE)
 
         # send end meesage to every process
