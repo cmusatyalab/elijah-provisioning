@@ -56,6 +56,7 @@ from configuration import Const as Cloudlet_Const
 from compression import DecompProc
 from pprint import pformat
 import logging
+import logging.config
 import random
 import png
 import mmap
