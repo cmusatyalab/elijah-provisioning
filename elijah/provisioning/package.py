@@ -37,7 +37,7 @@ import sys
 import subprocess
 
 from .configuration import Const
-from . import log as logging
+import logging
 from .db.api import DBConnector
 from .db.table_def import BaseVM
 

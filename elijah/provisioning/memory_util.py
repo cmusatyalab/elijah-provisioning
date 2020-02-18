@@ -20,7 +20,7 @@
 
 from __future__ import division
 import struct
-from . import log as logging
+import logging
 
 LOG = logging.getLogger(__name__)
 import subprocess

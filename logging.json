@@ -1,0 +1,40 @@
+{
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+        "concise": {
+            "class": "logging.Formatter",
+            "format": "%(asctime)s %(levelname).5s - %(name)s.%(funcName)s(%(lineno)d): %(message)s"
+        },
+        "verbose": {
+            "class": "logging.Formatter",
+            "format": "%(asctime)s %(levelname).5s - PID[%(process)d] %(threadName)s; %(name)s.%(funcName)s(%(lineno)d): %(message)s"
+        }
+    },
+    "handlers": {
+        "console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "concise",
+            "stream": "ext://sys.stdout"
+        },
+        "file_handler": {
+            "level": "DEBUG",
+            "class": "logging.handlers.RotatingFileHandler",
+            "formatter": "verbose",
+            "filename": "/var/nephele/nephele.log",
+            "mode": "a",
+            "maxBytes": 26214400,
+            "backupCount": 5,
+            "encoding": "utf-8"
+        }
+    },
+    "loggers": {},
+    "root": {
+        "handlers": [
+            "console",
+            "file_handler"
+        ],
+        "level": "DEBUG"
+    }
+}

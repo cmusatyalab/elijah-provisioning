@@ -29,7 +29,7 @@ import zmq
 from .configuration import VMOverlayCreationMode
 from .migration_profile import MigrationMode
 from .migration_profile import ModeProfile
-from . import log as logging
+import logging
 
 
 LOG = logging.getLogger(__name__)

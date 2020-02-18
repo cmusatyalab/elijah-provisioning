@@ -41,12 +41,14 @@ import time
 from uuid import uuid4
 import zipfile
 from fabric.api import run,env
+import logging
+import logging.config
+import json
 
 from elijah.provisioning import synthesis as synthesis
 from elijah.provisioning import compression as compression
 from elijah.provisioning.configuration import Const as Const
 from elijah.provisioning.configuration import Options
-from elijah.provisioning import log as logging
 import elijah.provisioning.db.table_def as table_def
 from elijah.provisioning.db.api import DBConnector, log_op, update_op
 from elijah.provisioning.package import PackagingUtil
@@ -55,6 +57,12 @@ URI_TEMPLATE = 'qemu:///system'
 DIR_NEPHELE = '/var/nephele/'
 DIR_NEPHELE_IMAGES = '/var/nephele/images/'
 DIR_NEPHELE_SNAPSHOTS = '/var/nephele/snapshots/'
+
+with open('/var/nephele/logging.json') as f:
+    config_dict = json.load(f)
+    logging.config.dictConfig(config_dict)
+
+LOG = logging.getLogger(__name__)
 
 # Squash redundant reporting of libvirt errors to stderr.  This modifies
 # global state, since the Python bindings don't provide a way to do this
@@ -77,13 +85,13 @@ def build_base(args):
         if not raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
             sys.exit(1)
     op_id = log_op(op=Const.OP_BUILD_IMAGE,notes="Source: %s" % (source))
-    print "Copying/converting source image into %s..." % DIR_NEPHELE_IMAGES
+    LOG.info("Copying/converting source image into %s..." % DIR_NEPHELE_IMAGES)
     os.system('qemu-img convert -O raw %s %s' % (source, disk_image_path))
 
     disk_path, mem_path = synthesis.create_baseVM(disk_image_path, source=source, title=args.title, cpus=args.cpu, mem=args.mem)
-    print "Created Base VM from this source image: %s" % source
-    print "Base Disk Image: %s" % disk_path
-    print "Base Memory Snapshot: %s" % mem_path
+    LOG.info( "Created Base VM from this source image: %s" % source)
+    LOG.info( "Base Disk Image: %s" % disk_path)
+    LOG.info( "Base Memory Snapshot: %s" % mem_path)
     update_op(op_id, has_ended=True, notes="Source: %s, Path: %s" % (source, disk_image_path))
 
     #restart the stream-server to reload list of images
@@ -109,29 +117,28 @@ def build_snapshot(args):
 
         _, base = find_base(args.id)
         if base is None:
-            print "Failed to find matching image with id: %s" % args.id
+            LOG.error( "Failed to find matching image with id: %s" % args.id)
             return
         vm_overlay = synthesis.VM_Overlay(base.disk_path, options,
                                             qemu_args=None)
         machine = vm_overlay.resume_basevm(args.title)
-        print 'Launching VM...\nPause VM when finished modifying to begin hashing of disk/memory state.'  
+        LOG.info( 'Launching VM...\nPause VM when finished modifying to begin hashing of disk/memory state.')
         #wait until VM is paused
         while True:
             state, _ = machine.state()
             if state == libvirt.VIR_DOMAIN_PAUSED:
                 break
-        print 'VM entered paused state. Generating snapshot of disk and memory...'
+        LOG.info( 'VM entered paused state. Generating snapshot of disk and memory...' )
         op_id = log_op(op=Const.OP_BUILD_SNAPSHOT,notes="Image: %s, Dest: %s" % (args.id, args.dest))
         vm_overlay.create_overlay()
 
         # print output
         if args.zip is False:
-            sys.stdout.write("[INFO] overlay metafile (%ld) : %s\n" %
+            LOG.debug("overlay metafile (%ld) : %s\n" %
                                 (os.path.getsize(vm_overlay.overlay_metafile),
                                 vm_overlay.overlay_metafile))
             for overlay_file in vm_overlay.overlay_files:
-                sys.stdout.write(
-                    "[INFO] overlay (%ld) : %s\n" %
+                LOG.debug("overlay (%ld) : %s\n" %
                     (os.path.getsize(overlay_file), overlay_file))
         else:
             overlay_zip = zipfile.ZipFile(vm_overlay.overlay_zipfile)
@@ -144,12 +151,12 @@ def build_snapshot(args):
                     msg = "blob file : (%ld) bytes (%s)\n" % \
                         (zipinfo.file_size, zipinfo.filename)
                 filesize_count += zipinfo.file_size
-                sys.stdout.write(msg)
-            sys.stdout.write(
+                LOG.debug(msg)
+            LOG.debug(
                 "zip overhead : (%ld) bytes\n" %
                 (os.path.getsize(vm_overlay.overlay_zipfile) - filesize_count))
     except Exception as e:
-        print "Failed to create overlay: %s" % str(e)
+        LOG.error( "Failed to create overlay: %s" % str(e))
     os.rename(vm_overlay.overlay_zipfile, args.dest)
     update_op(op_id, has_ended=True)
     # save the result to DB
@@ -219,12 +226,12 @@ def delete_snapshot(args):
         if raw_input("Are you sure you wish to delete the following snapshot: %s? (y/N): " % (args.path)).lower().strip().startswith("y"):
             op_id = log_op(op=Const.OP_DELETE_SNAPSHOT,notes="Snapshot: %s" % (args.path))
             dbconn.del_item(snapshot)
-            print "Snapshot removed from database."
+            LOG.info( "Snapshot removed from database." )
             os.remove(args.path)
-            print "Snapshot deleted from disk."
+            LOG.info( "Snapshot deleted from disk." )
             update_op(op_id, has_ended=True)
     else:
-        print "Cannot find matching snapshot at path %s\n" % (args.path)
+        LOG.error( "Cannot find matching snapshot at path %s\n" % (args.path) )
         return 1
 
 def clear_instances(args):
@@ -234,29 +241,29 @@ def clear_instances(args):
             list = dbconn.list_item(table_def.Instances)
             for item in list:
                 dbconn.del_item(item)
-            print "Cleared instances table."
+            LOG.info( "Cleared instances table." )
         if args.operations:
             list = dbconn.list_item(table_def.Operations)
             for item in list:
                 dbconn.del_item(item)
-            print "Cleared operations table."
+            LOG.info( "Cleared operations table." )
     return 0
 
 def delete_base(args):
     dbconn, base = find_base(args.id)
     if base is None:
-        print "Failed to find matching image with id: %s" % args.id
+        LOG.error( "Failed to find matching image with id: %s" % args.id )
         return
     else:
         if raw_input("Are you sure you wish to delete the following base image: %s? (y/N): " % (base.disk_path)).lower().strip().startswith("y"):
             if raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
                 op_id = log_op(op=Const.OP_DELETE_IMAGE,notes="Image: %s, Path: %s" % (args.id, base.disk_path))
                 dbconn.del_item(base)
-                print "Image removed from database."
+                LOG.info( "Image removed from database." )
                 ext = str(base.disk_path).rindex('.')
                 for f in glob.glob(base.disk_path[:ext] + '*'):
                     os.remove(f)
-                print "Image deleted from disk."
+                LOG.info( "Image deleted from disk." )
                 update_op(op_id, has_ended=True)
                 
 
@@ -272,12 +279,12 @@ def export_base(args):
             base.hash_value)
         update_op(op_id, has_ended=True)
     else:
-        print "Failed to find matching image with id: %s" % args.id
+        LOG.error( "Failed to find matching image with id: %s" % args.id )
 
 def import_base(args):
     source = args.path
     if os.path.exists(source) == False or os.access(source, os.R_OK) == False:
-        print "Cannot read file: %s" % source
+        LOG.error( "Cannot read file: %s" % source )
         return 1
    
     (base_hashvalue, disk_name, memory_name, diskhash_name, memoryhash_name) = \
@@ -291,10 +298,10 @@ def import_base(args):
         if not raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
             sys.exit(1)
     op_id = log_op(op=Const.OP_IMPORT_IMAGE,notes="Image Path: %s" % (args.path))
-    print "Decompressing image to %s..." % DIR_NEPHELE_IMAGES
+    LOG.info( "Decompressing image to %s..." % DIR_NEPHELE_IMAGES )
     zipbase = zipfile.ZipFile(source, 'r')
     zipbase.extractall(DIR_NEPHELE_IMAGES)
-    print "Extracted image files to %s." % (disk_image_path)
+    LOG.info( "Extracted image files to %s." % (disk_image_path) )
 
     # add to DB
     new_basevm = table_def.BaseVM(disk_image_path, base_hashvalue, source)
@@ -307,7 +314,7 @@ def import_base(args):
 
 def import_snapshot(args):
     if not os.path.exists(args.path):
-        print "Snapshot path (%s) does not exist!" % (args.path)
+        LOG.error( "Snapshot path (%s) does not exist!" % (args.path) )
     else:
         url = 'file://' + os.path.abspath(args.path)
         overlay_filename = NamedTemporaryFile(prefix="cloudlet-overlay-file-")
@@ -322,7 +329,7 @@ def import_snapshot(args):
                 base_found = True
                 break
         if not base_found:
-            print "Cannot find base image (SHA-256: %s) referenced in overlay: %s" % (base_sha, args.path)
+            LOG.error( "Cannot find base image (SHA-256: %s) referenced in overlay: %s" % (base_sha, args.path) )
 
         # save the result to DB
         list = dbconn.list_item(table_def.Snapshot)
@@ -354,7 +361,7 @@ def synthesize(args):
                                 title=args.title,
                                 fwd_ports=args.ports)
         except Exception as e:
-            print "Failed to synthesize: %s" % str(e)
+            LOG.error( "Failed to synthesize: %s" % str(e) )
             return 1
         finally:
             dbconn = DBConnector()
@@ -394,7 +401,7 @@ def handoff(args):
         fdest.close()
         os.kill(item.pid, signal.SIGUSR1)
     else:
-        print 'Cannot find a running instance with the title [%s]!' % args.title
+        LOG.error( 'Cannot find a running instance with the title [%s]!' % args.title )
 
 def print_args(args):
     print args

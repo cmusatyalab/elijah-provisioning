@@ -43,7 +43,7 @@ from pprint import pformat
 from optparse import OptionParser
 from multiprocessing import Process, JoinableQueue, Queue, Manager
 from lzma import LZMADecompressor
-import log as logging
+import logging
 
 
 LOG = logging.getLogger(__name__)

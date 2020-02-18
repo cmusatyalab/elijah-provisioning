@@ -40,7 +40,7 @@ from .delta import DeltaItem
 from .delta import DeltaList
 from .delta import Recovered_delta
 from . import process_manager
-from . import log as logging
+import logging
 
 
 LOG = logging.getLogger(__name__)

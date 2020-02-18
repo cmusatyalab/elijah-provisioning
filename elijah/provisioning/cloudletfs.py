@@ -26,7 +26,7 @@ import threading
 import multiprocessing
 import time
 import sys
-from . import log as logging
+import logging
 from .configuration import Const
 
 LOG = logging.getLogger(__name__)

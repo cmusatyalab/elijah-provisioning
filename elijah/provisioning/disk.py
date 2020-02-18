@@ -41,7 +41,7 @@ from .delta import Recovered_delta
 from .progressbar import AnimatedProgressBar
 from .configuration import Const
 from .configuration import VMOverlayCreationMode
-from . import log as logging
+import logging
 
 
 LOG = logging.getLogger(__name__)

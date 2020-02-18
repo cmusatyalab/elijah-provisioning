@@ -26,7 +26,7 @@ if os.path.exists("../elijah") is True:
     sys.path.insert(0, "../")
 from elijah.provisioning.synthesis import validate_congifuration
 from elijah.provisioning.stream_server import *
-from elijah.provisioning import log as logging
+import logging
 
 session_resources = dict()   # dict[session_id] = obj(SessionResource)
 

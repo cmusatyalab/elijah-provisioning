@@ -63,7 +63,7 @@ from . import handoff
 from . import qmp_af_unix
 from .tool import comp_lzma
 from . import compression
-from . import log as logging
+import logging
 import elijah.provisioning.db.table_def as table_def
 from elijah.provisioning.db.api import DBConnector
 from elijah.provisioning.package import PackagingUtil

@@ -55,7 +55,7 @@ from .package import VMOverlayPackage
 from . import compression
 from . import process_manager
 from . import qmp_af_unix
-from . import log as logging
+import logging
 from .db.api import update_op, log_op
 
 

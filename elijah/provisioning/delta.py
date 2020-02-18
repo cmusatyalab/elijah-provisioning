@@ -27,7 +27,7 @@ from lzma import LZMACompressor
 
 import process_manager
 from configuration import Const
-import log as logging
+import logging
 import collections
 
 

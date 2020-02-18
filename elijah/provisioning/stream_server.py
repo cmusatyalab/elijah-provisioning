@@ -54,7 +54,7 @@ from configuration import Options
 from configuration import Const as Cloudlet_Const
 from compression import DecompProc
 from pprint import pformat
-import log as logging
+import logging
 import random
 import png
 import mmap
@@ -1039,6 +1039,10 @@ class StreamSynthesisServer(SocketServer.TCPServer):
         else:
             self.handoff_data = None
             self.basevm_list = self.check_basevm_from_db(DBConnector())
+
+        with open('/var/nephele/logging.json') as f:
+            config_dict = json.load(f)
+            logging.config.dictConfig(config_dict)
 
         server_address = ("0.0.0.0", self.port_number)
         self.allow_reuse_address = True

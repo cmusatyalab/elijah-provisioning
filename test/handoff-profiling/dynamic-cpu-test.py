@@ -14,7 +14,7 @@ import threading
 
 from elijah.provisioning.configuration import Const
 Const.LOG_PATH = os.path.join(os.path.abspath(os.curdir), "log-%s" % str(datetime.now()))
-from elijah.provisioning import log as logging
+import logging
 LOG = logging.getLogger(__name__)
 
 from elijah.provisioning.configuration import VMOverlayCreationMode

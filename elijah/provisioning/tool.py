@@ -38,7 +38,7 @@ from cython_xor import cython_xor
 
 import msgpack
 from .configuration import Const
-from . import log as logging
+import logging
 
 LOG = logging.getLogger(__name__)
 

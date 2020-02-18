@@ -7,7 +7,7 @@ import math
 from collections import OrderedDict
 from .configuration import VMOverlayCreationMode
 from operator import itemgetter
-from . import log as logging
+import logging
 
 
 LOG = logging.getLogger(__name__)
