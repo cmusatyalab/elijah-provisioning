@@ -1831,10 +1831,11 @@ def synthesize(base_disk, overlay_path, **kwargs):
         handoff.perform_handoff(handoff_ds, op_id)
     except handoff.HandoffError as e:
         LOG.error("Cannot perform VM handoff: %s" % (str(e)))
+    except Exception as e:
+        LOG.err("Unhandled exception: %s", e)
     # print out residue location
     if residue_zipfile and os.path.exists(residue_zipfile):
-        LOG.info("Save new VM overlay at: %s" %
-                (os.path.abspath(residue_zipfile)))
+        LOG.info("Save new VM overlay at: %s" % (os.path.abspath(residue_zipfile)))
     if save_snapshot:
         dbconn = DBConnector()
         list = dbconn.list_item(table_def.Snapshot)

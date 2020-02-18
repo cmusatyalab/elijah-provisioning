@@ -513,6 +513,7 @@ class ProcWorker(multiprocessing.Process):
         (self.control_queue, self.response_queue) = \
             process_manager.register(self)  # shared dictionary
 
+        LOG.debug("Instantiating ProcWorker called %s", self.worker_name)
         # not used
         self.monitor_current_bw = float(0)
         self.monitor_current_inqueue_length = multiprocessing.Value('d', -1.0)
@@ -548,6 +549,8 @@ class ProcWorker(multiprocessing.Process):
             # sys.stdout.write("Cannot be handled in super class\n")
             return False
 
+    def terminate(self):
+        LOG.debug("Terminating ProcWorker %s ", self.worker_name)
 
 class TestProc(ProcWorker):
 
