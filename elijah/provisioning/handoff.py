@@ -887,7 +887,7 @@ class MockLibvirtUtil(object):
         pass
 
 
-def perform_handoff(handoff_data, operation_id):
+def perform_handoff(handoff_data):
     '''Perform VM handoff
     @param handoff_data: object of HandoffDataSend
     @return None
@@ -1033,7 +1033,7 @@ def perform_handoff(handoff_data, operation_id):
         metadata[Const.META_FWD_PORTS] = handoff_data.fwd_ports
         time_network_start = time.time()
         client = StreamSynthesisClient(migration_dest_ip, migration_dest_port,
-                                       metadata, compdata_queue, process_controller, operation_id)
+                                       metadata, compdata_queue, process_controller)
         client.start()
         client.join()
         cpu_stat_end = psutil.cpu_times(percpu=True)

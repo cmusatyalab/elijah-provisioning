@@ -1828,7 +1828,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
     )
     handoff_ds._load_vm_data()
     try:
-        handoff.perform_handoff(handoff_ds, op_id)
+        handoff.perform_handoff(handoff_ds)
     except handoff.HandoffError as e:
         LOG.error("Cannot perform VM handoff: %s" % (str(e)))
     except Exception as e:
