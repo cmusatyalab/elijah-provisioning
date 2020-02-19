@@ -53,6 +53,9 @@ class Const(object):
     QUEUE_SUCCESS_MESSAGE_LEN = len(QUEUE_SUCCESS_MESSAGE)
     QUEUE_FAILED_MESSAGE_LEN = len(QUEUE_FAILED_MESSAGE)
 
+    CAPTURE_HANDOFF_ANALYTICS = False
+    PRODUCE_HEATMAP_IMAGES = False
+
     BASE_DISK = ".base-img"
     BASE_MEM = ".base-mem"
     BASE_DISK_META = ".base-img-meta"

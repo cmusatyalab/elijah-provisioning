@@ -172,19 +172,20 @@ class StreamSynthesisClient(process_manager.ProcWorker):
     def transfer(self):
         # connect
         address = (self.remote_addr, self.remote_port)
-        sock = None
-        for index in range(5):
-            LOG.info("Connecting to (%s).." % str(address))
+        sok = None
+        for _ in range(5):
+            LOG.info("Connecting to (%s)..", str(address))
             try:
                 sock = socket.create_connection(address, 10)
                 break
-            except Exception as e:
+            except Exception as ex:
                 time.sleep(1)
-                LOG.error(e)
-        if sock == None:
-            msg = "failed to connect to %s" % str(address)
+                LOG.error(ex)
+        if sock is None:
+            msg = "Failed to connect to %s" % str(address)
+            LOG.error(msg)
             raise StreamSynthesisClientError(msg)
-        sock.setblocking(True)
+        sok.setblocking(True)
         self.blob_sent_time_dict = dict()
         self.receive_thread = NetworkMeasurementThread(sock,
                                                        self.blob_sent_time_dict,
@@ -198,8 +199,8 @@ class StreamSynthesisClient(process_manager.ProcWorker):
             }
         header_dict.update(self.metadata)
         header = NetworkUtil.encoding(header_dict)
-        sock.sendall(struct.pack("!I", len(header)))
-        sock.sendall(header)
+        sok.sendall(struct.pack("!I", len(header)))
+        sok.sendall(header)
 
         # stream blob
         blob_counter = 0
@@ -208,12 +209,13 @@ class StreamSynthesisClient(process_manager.ProcWorker):
             if self.is_first_recv == False:
                 self.is_first_recv = True
                 self.time_first_recv = time.time()
-                LOG.debug("[time] Transfer first input at : %f" % (self.time_first_recv))
+                LOG.debug("[time] Transfer first input at : %f", (self.time_first_recv))
             transfer_size = 0
             if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
+                LOG.debug("Received SUCCESS message from compression task. Breaking...")
                 break
             if comp_task == Const.QUEUE_FAILED_MESSAGE:
-                LOG.error("Failed to get compressed data!")
+                LOG.error("Failed to get compressed data from compression thread!")
                 break
             (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
             blob_header_dict = {
@@ -224,14 +226,14 @@ class StreamSynthesisClient(process_manager.ProcWorker):
                 }
             # send
             header = NetworkUtil.encoding(blob_header_dict)
-            sock.sendall(struct.pack("!I", len(header)))
-            sock.sendall(header)
+            sok.sendall(struct.pack("!I", len(header)))
+            sok.sendall(header)
             self.blob_sent_time_dict[blob_counter] = (time.time(), len(compdata))
-            sock.sendall(compdata)
+            sok.sendall(compdata)
             transfer_size += (4+len(header)+len(compdata))
             blob_counter += 1
             #send the current iteration number for use at the destination
-            sock.sendall(struct.pack("!I", self.process_controller.get_migration_iteration_count()))
+            sok.sendall(struct.pack("!I", self.process_controller.get_migration_iteration_count()))
             update_op(self.operation_id, notes="Blobs sent: %d, Iteration: %d" % (blob_counter, self.process_controller.get_migration_iteration_count()))
 
         # end message
@@ -240,11 +242,11 @@ class StreamSynthesisClient(process_manager.ProcWorker):
             Const.META_OVERLAY_FILE_SIZE:0
         }
         header = NetworkUtil.encoding(end_header)
-        sock.sendall(struct.pack("!I", len(header)))
-        sock.sendall(header)
+        sok.sendall(struct.pack("!I", len(header)))
+        sok.sendall(header)
 
         self.is_processing_alive.value = False
         self.time_finish_transmission.value = time.time()
-        sys.stdout.write("Finish transmission. Waiting for finishing migration\n")
+        LOG.info("Finished data transmission. Waiting for response that deltas have been applied...")
         self.receive_thread.join()
-        sock.close()
+        sok.close()

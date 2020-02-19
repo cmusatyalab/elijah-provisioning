@@ -453,7 +453,7 @@ class HandoffAnalysisProc(multiprocessing.Process):
         self.disk_applied = 0
         self.mem_applied = 0
         self.iter = 0
-        self.outfd = open(name='/var/tmp/cloudlet/handoff_from_%s_at_%d.log' % (self.url, self.time_start), mode = 'w')
+        self.outfd = open(name='/var/nephele/logs/handoff_from_%s_at_%d.log' % (self.url, self.time_start), mode = 'w')
         self.stats_path = '/var/www/html/heatmap/stats.txt'
 
         self.disk_path = '/var/www/html/heatmap/disk.png'
@@ -505,7 +505,7 @@ class HandoffAnalysisProc(multiprocessing.Process):
 
 
     def update_text_stats(self):
-        outfd = open(name='/var/tmp/cloudlet/handoff.stats', mode = 'w')
+        outfd = open(name='/var/nephele/logs/handoff_from_%s_at_%d.stats' % (self.url, self.time_start), mode = 'w')
         outfd.write('Iterations: %d\n' % self.iter)
         outfd.write('Elapsed Time: %f seconds\n' % (time.time() - self.time_start))
         outfd.write('VM Disk Size: %d MB\n' % (chunk2mb(self.disk_chunks)))
@@ -538,10 +538,11 @@ class HandoffAnalysisProc(multiprocessing.Process):
             if((time.time() - self.last_update) > self.viz_interval):
                 self.update_html_stats()
                 self.update_text_stats()
-                self.update_imgs()
-                self.outfd.write('%f ' % (time.time() - self.time_start))
-                self.outfd.write("update_imgs")
-                self.outfd.write("\n")
+                if Cloudlet_Const.PRODUCE_HEATMAP_IMAGES:
+                    self.update_imgs()
+                    self.outfd.write('%f ' % (time.time() - self.time_start))
+                    self.outfd.write("update_imgs")
+                    self.outfd.write("\n")
                 self.last_update = time.time()
 
             try:
@@ -551,8 +552,8 @@ class HandoffAnalysisProc(multiprocessing.Process):
                     self.outfd.close()
                     self.update_html_stats(handoff_complete=True)
                     self.update_text_stats()
-                    os.rename(self.disk_path, '/var/tmp/cloudlet/disk_from_%s_at_%d.png' % (self.url, self.time_start))
-                    os.rename(self.mem_path, '/var/tmp/cloudlet/mem_from_%s_at_%d.png' % (self.url, self.time_start))
+                    os.rename(self.disk_path, '/var/nephele/logs/disk_from_%s_at_%d.png' % (self.url, self.time_start))
+                    os.rename(self.mem_path, '/var/nephele/logs/mem_from_%s_at_%d.png' % (self.url, self.time_start))
                     #os.remove(self.stats_path)
                     break
                 elif message.startswith("M,A,"):
@@ -725,8 +726,9 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         base_hash = metadata[Cloudlet_Const.META_BASE_VM_SHA256]
 
         analysis_mq = multiprocessing.Queue()
-        analysis_proc = HandoffAnalysisProc(handoff_url=self.client_address[0],message_queue=analysis_mq, disk_size=launch_disk_size, mem_size=launch_memory_size)
-        analysis_proc.start()
+        if Cloudlet_Const.CAPTURE_HANDOFF_ANALYTICS:
+            analysis_proc = HandoffAnalysisProc(handoff_url=self.client_address[0],message_queue=analysis_mq, disk_size=launch_disk_size, mem_size=launch_memory_size)
+            analysis_proc.start()
 
         analysis_mq.put("=" * 50)
         analysis_mq.put("Adaptive VM Handoff Initiated")
@@ -833,7 +835,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         analysis_mq.put("Adaptive VM Handoff Complete!")
         analysis_mq.put("=" * 50)
         analysis_mq.put("!E_O_Q!")
-        analysis_proc.join()
+        if Cloudlet_Const.CAPTURE_HANDOFF_ANALYTICS:
+            analysis_proc.join()
 
         if via_openstack:
             ack_data = struct.pack("!Qd", 0x10, time.time())
@@ -903,7 +906,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                     #make a new snapshot and store it
                     handoff_url = 'file:///root/%s' % (increment_filename(title)) 
                     save_snapshot = True
-                    print 'VM entered paused state. Generating snapshot of disk and memory...'
+                    LOG.info('VM entered paused state. Generating snapshot of disk and memory...')
                     break
                 elif state == libvirt.VIR_DOMAIN_SHUTDOWN:
                     #disambiguate between reboot and shutoff
@@ -914,10 +917,10 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                             if state == libvirt.VIR_DOMAIN_RUNNING:
                                 continue
                             else:
-                                print "VM has been powered off. Tearing down FUSE..."
+                                LOG.info("VM has been powered off. Tearing down FUSE...")
                                 synthesized_vm.terminate()
                         else:
-                            print "VM is no longer running. Tearing down FUSE..."
+                            LOG.info("VM is no longer running. Tearing down FUSE...")
                             synthesized_vm.terminate()
                     except libvirt.libvirtError as e:
                         synthesized_vm.terminate()
@@ -937,14 +940,13 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                     #validate that the meta data is really for us
                     if meta['pid'] == os.getpid():
                         handoff_url = meta['url']
-                        print 'Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url'])
+                        LOG.info('Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url']))
                         op_id = log_op(op=Cloudlet_Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
                         HANDOFF_SIGNAL_RECEIVED = False
                         os.remove(HANDOFF_TEMP)
                         break
                     else:
-                        print 'PID in %s does not match getpid!' % HANDOFF_TEMP
-        
+                        LOG.error('PID in %s does not match getpid!' % HANDOFF_TEMP)
 
             options = Options()
             options.TRIM_SUPPORT = True
