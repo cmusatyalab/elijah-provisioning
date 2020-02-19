@@ -150,13 +150,12 @@ class NetworkMeasurementThread(threading.Thread):
 
 class StreamSynthesisClient(process_manager.ProcWorker):
 
-    def __init__(self, remote_addr, remote_port, metadata, compdata_queue, process_controller, operation_id):
+    def __init__(self, remote_addr, remote_port, metadata, compdata_queue, process_controller):
         self.remote_addr = remote_addr
         self.remote_port = remote_port
         self.metadata = metadata
         self.compdata_queue = compdata_queue
         self.process_controller = process_controller
-        self.operation_id = operation_id
 
         # measurement
         self.monitor_network_bw = multiprocessing.RawValue(ctypes.c_double, 0)
@@ -172,9 +171,9 @@ class StreamSynthesisClient(process_manager.ProcWorker):
     def transfer(self):
         # connect
         address = (self.remote_addr, self.remote_port)
-        sok = None
+        sock = None
         for _ in range(5):
-            LOG.info("Connecting to (%s)..", str(address))
+            LOG.info("Attempting connection to (%s)..", str(address))
             try:
                 sock = socket.create_connection(address, 10)
                 break
@@ -185,68 +184,68 @@ class StreamSynthesisClient(process_manager.ProcWorker):
             msg = "Failed to connect to %s" % str(address)
             LOG.error(msg)
             raise StreamSynthesisClientError(msg)
-        sok.setblocking(True)
-        self.blob_sent_time_dict = dict()
-        self.receive_thread = NetworkMeasurementThread(sock,
-                                                       self.blob_sent_time_dict,
-                                                       self.monitor_network_bw,
-                                                       self.vm_resume_time_at_dest)
-        self.receive_thread.start()
+        else:
+            sock.setblocking(True)
+            self.blob_sent_time_dict = dict()
+            self.receive_thread = NetworkMeasurementThread(sock,
+                                                        self.blob_sent_time_dict,
+                                                        self.monitor_network_bw,
+                                                        self.vm_resume_time_at_dest)
+            self.receive_thread.start()
 
-        # send header
-        header_dict = {
-            Protocol.KEY_SYNTHESIS_OPTION: None,
-            }
-        header_dict.update(self.metadata)
-        header = NetworkUtil.encoding(header_dict)
-        sok.sendall(struct.pack("!I", len(header)))
-        sok.sendall(header)
-
-        # stream blob
-        blob_counter = 0
-        while True:
-            comp_task = self.compdata_queue.get()
-            if self.is_first_recv == False:
-                self.is_first_recv = True
-                self.time_first_recv = time.time()
-                LOG.debug("[time] Transfer first input at : %f", (self.time_first_recv))
-            transfer_size = 0
-            if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
-                LOG.debug("Received SUCCESS message from compression task. Breaking...")
-                break
-            if comp_task == Const.QUEUE_FAILED_MESSAGE:
-                LOG.error("Failed to get compressed data from compression thread!")
-                break
-            (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
-            blob_header_dict = {
-                Const.META_OVERLAY_FILE_COMPRESSION: blob_comp_type,
-                Const.META_OVERLAY_FILE_SIZE:len(compdata),
-                Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
-                Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
+            # send header
+            header_dict = {
+                Protocol.KEY_SYNTHESIS_OPTION: None,
                 }
-            # send
-            header = NetworkUtil.encoding(blob_header_dict)
-            sok.sendall(struct.pack("!I", len(header)))
-            sok.sendall(header)
-            self.blob_sent_time_dict[blob_counter] = (time.time(), len(compdata))
-            sok.sendall(compdata)
-            transfer_size += (4+len(header)+len(compdata))
-            blob_counter += 1
-            #send the current iteration number for use at the destination
-            sok.sendall(struct.pack("!I", self.process_controller.get_migration_iteration_count()))
-            update_op(self.operation_id, notes="Blobs sent: %d, Iteration: %d" % (blob_counter, self.process_controller.get_migration_iteration_count()))
+            header_dict.update(self.metadata)
+            header = NetworkUtil.encoding(header_dict)
+            sock.sendall(struct.pack("!I", len(header)))
+            sock.sendall(header)
 
-        # end message
-        end_header = {
-            "blob_type": "blob",
-            Const.META_OVERLAY_FILE_SIZE:0
-        }
-        header = NetworkUtil.encoding(end_header)
-        sok.sendall(struct.pack("!I", len(header)))
-        sok.sendall(header)
+            # stream blob
+            blob_counter = 0
+            while True:
+                comp_task = self.compdata_queue.get()
+                if self.is_first_recv == False:
+                    self.is_first_recv = True
+                    self.time_first_recv = time.time()
+                    LOG.debug("[time] Transfer first input at : %f", (self.time_first_recv))
+                transfer_size = 0
+                if comp_task == Const.QUEUE_SUCCESS_MESSAGE:
+                    LOG.debug("Received SUCCESS message from compression task. Breaking...")
+                    break
+                if comp_task == Const.QUEUE_FAILED_MESSAGE:
+                    LOG.error("Failed to get compressed data from compression thread!")
+                    break
+                (blob_comp_type, compdata, disk_chunks, memory_chunks) = comp_task
+                blob_header_dict = {
+                    Const.META_OVERLAY_FILE_COMPRESSION: blob_comp_type,
+                    Const.META_OVERLAY_FILE_SIZE:len(compdata),
+                    Const.META_OVERLAY_FILE_DISK_CHUNKS: disk_chunks,
+                    Const.META_OVERLAY_FILE_MEMORY_CHUNKS: memory_chunks
+                    }
+                # send
+                header = NetworkUtil.encoding(blob_header_dict)
+                sock.sendall(struct.pack("!I", len(header)))
+                sock.sendall(header)
+                self.blob_sent_time_dict[blob_counter] = (time.time(), len(compdata))
+                sock.sendall(compdata)
+                transfer_size += (4+len(header)+len(compdata))
+                blob_counter += 1
+                #send the current iteration number for use at the destination
+                sock.sendall(struct.pack("!I", self.process_controller.get_migration_iteration_count()))
 
-        self.is_processing_alive.value = False
-        self.time_finish_transmission.value = time.time()
-        LOG.info("Finished data transmission. Waiting for response that deltas have been applied...")
-        self.receive_thread.join()
-        sok.close()
+            # end message
+            end_header = {
+                "blob_type": "blob",
+                Const.META_OVERLAY_FILE_SIZE:0
+            }
+            header = NetworkUtil.encoding(end_header)
+            sock.sendall(struct.pack("!I", len(header)))
+            sock.sendall(header)
+
+            self.is_processing_alive.value = False
+            self.time_finish_transmission.value = time.time()
+            LOG.info("Finished data transmission. Waiting for response that deltas have been applied...")
+            self.receive_thread.join()
+            sock.close()
