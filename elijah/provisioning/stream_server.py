@@ -536,9 +536,9 @@ class HandoffAnalysisProc(multiprocessing.Process):
         while True:
             self._running = True
             if((time.time() - self.last_update) > self.viz_interval):
-                self.update_html_stats()
                 self.update_text_stats()
                 if Cloudlet_Const.PRODUCE_HEATMAP_IMAGES:
+                    self.update_html_stats()
                     self.update_imgs()
                     self.outfd.write('%f ' % (time.time() - self.time_start))
                     self.outfd.write("update_imgs")
@@ -550,11 +550,12 @@ class HandoffAnalysisProc(multiprocessing.Process):
                 if message == "!E_O_Q!":
                     self.outfd.flush() #flush remaining buffer
                     self.outfd.close()
-                    self.update_html_stats(handoff_complete=True)
+
                     self.update_text_stats()
-                    os.rename(self.disk_path, '/var/nephele/logs/disk_from_%s_at_%d.png' % (self.url, self.time_start))
-                    os.rename(self.mem_path, '/var/nephele/logs/mem_from_%s_at_%d.png' % (self.url, self.time_start))
-                    #os.remove(self.stats_path)
+                    if Cloudlet_Const.PRODUCE_HEATMAP_IMAGES:
+                        self.update_html_stats(handoff_complete=True)
+                        os.rename(self.disk_path, '/var/nephele/logs/disk_from_%s_at_%d.png' % (self.url, self.time_start))
+                        os.rename(self.mem_path, '/var/nephele/logs/mem_from_%s_at_%d.png' % (self.url, self.time_start))
                     break
                 elif message.startswith("M,A,"):
                     #parse message to find index in third token
@@ -1035,7 +1036,7 @@ class StreamSynthesisConst(object):
     SERVER_PORT_NUMBER = 8022
     VERSION = 0.1
 
-class StreamSynthesisServer(SocketServer.TCPServer):
+class StreamSynthesisServer(SocketServer.ForkingTCPServer):
     def __init__(self, port_number=StreamSynthesisConst.SERVER_PORT_NUMBER,
                  timeout=None, handoff_datafile=None):
         self.port_number = port_number
@@ -1076,13 +1077,12 @@ class StreamSynthesisServer(SocketServer.TCPServer):
 
     def handle_error(self, request, client_address):
         SocketServer.TCPServer.handle_error(self, request, client_address)
-        sys.stderr.write("handling error from client %s\n" % (str(client_address)))
-        sys.stderr.write(traceback.format_exc())
+        LOG.error("Error while processing request from client %s\n" % (str(client_address)))
         self.terminate()
         sys.exit(1)
 
     def handle_timeout(self):
-        sys.stderr.write("timeout error\n")
+        LOG.error("Client connection timed out.")
 
     def terminate(self):
         # close all thread
