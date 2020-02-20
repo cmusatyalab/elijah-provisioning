@@ -392,7 +392,7 @@ def handoff(args):
             break
     if instance is not None:
         #send USR1 to that process and put the destination into a temp file for reading
-        fdest = open('/tmp/.cloudlet-handoff', "wb")
+        fdest = open('/tmp/%s.cloudlet-handoff' % item.pid, "wb")
         meta = dict()
         meta['title'] = item.title
         meta['pid'] = item.pid
