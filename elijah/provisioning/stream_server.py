@@ -69,7 +69,7 @@ with open('/var/nephele/logging.json') as f:
 
 LOG = logging.getLogger(__name__)
 session_resources = dict()   # dict[session_id] = obj(SessionResource)
-HANDOFF_TEMP = '/tmp/.cloudlet-handoff'
+HANDOFF_TEMP = '/tmp/%s/.cloudlet-handoff' % os.getpid()
 HANDOFF_SIGNAL_RECEIVED = False
 
 class StreamSynthesisError(Exception):
