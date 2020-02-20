@@ -726,9 +726,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         base_hash = metadata[Cloudlet_Const.META_BASE_VM_SHA256]
 
         analysis_mq = multiprocessing.Queue()
-        if Cloudlet_Const.CAPTURE_HANDOFF_ANALYTICS:
-            analysis_proc = HandoffAnalysisProc(handoff_url=self.client_address[0],message_queue=analysis_mq, disk_size=launch_disk_size, mem_size=launch_memory_size)
-            analysis_proc.start()
+        analysis_proc = HandoffAnalysisProc(handoff_url=self.client_address[0],message_queue=analysis_mq, disk_size=launch_disk_size, mem_size=launch_memory_size)
+        analysis_proc.start()
 
         analysis_mq.put("=" * 50)
         analysis_mq.put("Adaptive VM Handoff Initiated")
@@ -835,8 +834,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
         analysis_mq.put("Adaptive VM Handoff Complete!")
         analysis_mq.put("=" * 50)
         analysis_mq.put("!E_O_Q!")
-        if Cloudlet_Const.CAPTURE_HANDOFF_ANALYTICS:
-            analysis_proc.join()
+        analysis_proc.join()
 
         if via_openstack:
             ack_data = struct.pack("!Qd", 0x10, time.time())
