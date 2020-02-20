@@ -1776,7 +1776,8 @@ def synthesize(base_disk, overlay_path, **kwargs):
                 return
         elif HANDOFF_SIGNAL_RECEIVED == True:
             #read destination from file
-            fdest = open('/tmp/%s.cloudlet-handoff' % os.getpid(), "rb")
+            handoff_temp = '/tmp/%s.cloudlet-handoff' % os.getpid()
+            fdest = open(handoff_temp, "rb")
             meta = msgpack.unpackb(fdest.read())
             fdest.close()
             #validate that the meta data is really for us
@@ -1785,7 +1786,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
                 print 'Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url'])
                 op_id = log_op(op=Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
                 HANDOFF_SIGNAL_RECEIVED = False
-                os.remove(HANDOFF_TEMP)
+                os.remove(handoff_temp)
                 break
             else:
                 print 'PID in %s does not match getpid!' % HANDOFF_TEMP
