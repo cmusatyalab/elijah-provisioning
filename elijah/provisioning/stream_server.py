@@ -69,7 +69,6 @@ with open('/var/nephele/logging.json') as f:
 
 LOG = logging.getLogger(__name__)
 session_resources = dict()   # dict[session_id] = obj(SessionResource)
-HANDOFF_TEMP = '/tmp/%s.cloudlet-handoff' % os.getpid()
 HANDOFF_SIGNAL_RECEIVED = False
 
 class StreamSynthesisError(Exception):
@@ -935,7 +934,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                         return
                 elif HANDOFF_SIGNAL_RECEIVED == True:
                     #read destination from file
-                    fdest = open(HANDOFF_TEMP, "rb")
+                    fdest = open('/tmp/%s.cloudlet-handoff' % os.getpid(), "rb")
                     meta = msgpack.unpackb(fdest.read())
                     fdest.close()
                     #validate that the meta data is really for us

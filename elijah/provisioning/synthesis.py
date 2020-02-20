@@ -82,7 +82,6 @@ except ImportError as e:
 
 
 LOG = logging.getLogger(__name__)
-HANDOFF_TEMP = '/tmp/%s.cloudlet-handoff' % os.getpid()
 HANDOFF_SIGNAL_RECEIVED = False
 
 class CloudletGenerationError(Exception):
@@ -1777,7 +1776,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
                 return
         elif HANDOFF_SIGNAL_RECEIVED == True:
             #read destination from file
-            fdest = open(HANDOFF_TEMP, "rb")
+            fdest = open('/tmp/%s.cloudlet-handoff' % os.getpid(), "rb")
             meta = msgpack.unpackb(fdest.read())
             fdest.close()
             #validate that the meta data is really for us
