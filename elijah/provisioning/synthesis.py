@@ -82,7 +82,7 @@ except ImportError as e:
 
 
 LOG = logging.getLogger(__name__)
-HANDOFF_TEMP = '/tmp/%s/.cloudlet-handoff' % os.getpid()
+HANDOFF_TEMP = '/tmp/%s.cloudlet-handoff' % os.getpid()
 HANDOFF_SIGNAL_RECEIVED = False
 
 class CloudletGenerationError(Exception):
