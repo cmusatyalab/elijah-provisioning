@@ -942,7 +942,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                     if meta['pid'] == os.getpid():
                         handoff_url = meta['url']
                         LOG.info('Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url']))
-                        op_id = log_op(op=Cloudlet_Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
                         HANDOFF_SIGNAL_RECEIVED = False
                         os.remove(HANDOFF_TEMP)
                         break
@@ -984,7 +983,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             )
             handoff_ds._load_vm_data()
             try:
-                handoff.perform_handoff(handoff_ds, op_id)
+                handoff.perform_handoff(handoff_ds)
             except handoff.HandoffError as e:
                 LOG.error("Cannot perform VM handoff: %s" % (str(e)))
             # print out residue location
@@ -1002,7 +1001,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                 new = table_def.Snapshot(os.path.abspath(parsed_handoff_url.path), basevm.hash_value)
                 dbconn.add_item(new)
 
-            update_op(op_id, has_ended=True)
             synthesized_vm.monitor.terminate()
             synthesized_vm.monitor.join()
             synthesized_vm.terminate()
