@@ -1,0 +1,158 @@
+- name: (nephele-server) get vmx support
+  shell: egrep '^flags.*(vmx|svm)' /proc/cpuinfo
+  register: vmx_present
+  tags: prereqs
+
+- name: (nephele-server) check vmx support
+  fail: 
+    msg: "nephele requires virtual machine extensions (vmx)!"
+  when: vmx_present.rc !=0
+  tags: prereqs
+
+- name: (nephele-server) check os support
+  fail: 
+    msg: "nephele requires Ubuntu bionic (18.04) or xenial (16.04)!"
+  when: ansible_distribution_release != 'xenial' and ansible_distribution_release != 'bionic'
+  tags: prereqs
+
+- name: (nephele-server) install system-wide packages
+  apt:
+    name: "{{item}}"
+    state: present
+  with_items:
+    - apache2
+    - apparmor-utils
+    - libc6-i386 
+    - python-dev
+    - python-lxml
+    - python-lxml
+    - python-lzma
+    - python-pip 
+    - qemu-kvm
+    - virt-manager
+  update_cache: yes
+  tags: syspackages
+
+- name: (nephele-server) download out-of-band xdelta3
+  get_url:
+    url: http://mirrors.kernel.org/ubuntu/pool/universe/x/xdelta3/python-xdelta3_3.0.0.dfsg-1build1_amd64.deb
+    dest: /root/python-xdelta3.deb
+  tags: syspackages
+
+- name: (nephele-server) download/extract modified QEMU binaries
+  unarchive:
+    src: https://owncloud.cmusatyalab.org/owncloud/index.php/s/viEQ29YYOMlkgJm/download
+    dest: /root
+    remote_src: yes
+  tags: syspackages
+
+- name: (nephele-server) install xdelta and qemu binaries with dpkg
+  apt:
+    deb: "{{item}}"
+  with_items:
+    - /root/python-xdelta3.deb
+    - /root/qemu_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-block-extra_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-guest-agent_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-kvm_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-system_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-system-arm_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-system-common_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-system-mips_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-system-misc_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-system-ppc_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-system-sparc_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-system-x86_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-user_2.5+dfsg-5elijah10.41_amd64.deb
+    - /root/qemu-utils_2.5+dfsg-5elijah10.41_amd64.deb
+  tags: syspackages
+
+- name: (nephele-server) install requirements with pip
+  pip:
+    chdir: /root/elijah-provisioning
+    requirements: requirements.txt
+  tags: pippackages
+
+- name: (nephele-server) create heatmap www dir
+  file:
+    path: /var/www/html/heatmap
+    state: directory
+    mode: '0664'
+  tags: directories
+
+- name: (nephele-server) copy www files
+  copy:
+    src: /root/elijah-provisioning/heatmap
+    dest: /var/www/html/heatmap
+    remote_src: yes
+  tags: directories
+  
+- name: (nephele-server) create nephele dir
+  file:
+    path: /var/nephele/images
+    state: directory
+    mode: '0660'
+  tags: directories
+
+- name: (nephele-server) create nephele logs dir
+  file:
+    path: /var/nephele/logs
+    state: directory
+    mode: '0660'
+  tags: directories
+
+- name: (nephele-server) create symlinks for bios files (1/2)
+  file:
+    src: /usr/share/qemu/bios.bin
+    dest: /usr/share/seabios/bios.bin
+    owner: root
+    group: root
+    state: link
+  tags: symlinks
+
+- name: (nephele-server) create symlinks for bios files (2/2)
+  file:
+    src: /usr/share/qemu/vgabios-cirrus.bin
+    dest: /usr/share/seabios/vgabios-cirrus.bin
+    owner: root
+    group: root
+    state: link
+  tags: symlinks
+
+- name: (nephele-server) app armor complain
+  shell: aa-complain /usr/sbin/libvirtd
+  tags: aa
+
+- name: (nephele-server) rules to run in qemu system space (1/2)
+  copy:
+    src: /root/elijah-provisioning/TEMPLATE.qemu
+    dest: /etc/apparmor.d/libvirt/TEMPLATE.qemu
+    remote_src: yes
+  tags: aa
+
+- name: (nephele-server) rules to run in qemu system space (1/2)
+  shell: cat libvirt-qemu-abstractions >> /etc/apparmor.d/abstractions/libvirt-qemu
+  tags: aa
+
+- name: (nephele-server) install stream-server service
+  copy:
+    src: /root/elijah-provisioning/stream-server.service
+    dest: /lib/systemd/system
+    remote_src: yes
+  tags: stream-server
+
+- name: (nephele-server) enable stream-server at boot
+  shell: systemctl enable stream-server
+  tags: stream-server
+
+- name: (nephele-server) restart stream-server
+  service:
+    name: stream-server
+    state: restarted
+  tags: stream-server
+
+- name: (nephele-server) python setup.py
+  shell: python setup.py install
+  tags: pippackages
+
+

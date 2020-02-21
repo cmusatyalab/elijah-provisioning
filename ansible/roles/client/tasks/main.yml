@@ -1,0 +1,11 @@
+#pip install rpyc
+- name: (nephele-client) install requirements with pip
+  pip:
+    name: rpyc
+  tags: pippackages
+
+- name: (nephele-client) install nephele-client
+  copy:
+    src: /root/elijah-provisioning/bin/nephele-client
+    dest: /usr/local/bin/
+  tags: binaries
