@@ -49,6 +49,7 @@ from elijah.provisioning import compression as compression
 from elijah.provisioning.configuration import Const as Const
 from elijah.provisioning.configuration import Options
 import logging
+import logging.config
 import elijah.provisioning.db.table_def as table_def
 from elijah.provisioning.db.api import DBConnector, log_op, update_op
 from elijah.provisioning.package import PackagingUtil
