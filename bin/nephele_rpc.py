@@ -159,28 +159,21 @@ class Nephele(rpyc.Service):
 
             # print output
             if args.zip is False:
-                sys.stdout.write("[INFO] overlay metafile (%ld) : %s\n" %
-                                    (os.path.getsize(vm_overlay.overlay_metafile),
-                                    vm_overlay.overlay_metafile))
+                LOG.info("overlay metafile (%ld) : %s",os.path.getsize(vm_overlay.overlay_metafile),
+                                    vm_overlay.overlay_metafile)
                 for overlay_file in vm_overlay.overlay_files:
-                    sys.stdout.write(
-                        "[INFO] overlay (%ld) : %s\n" %
-                        (os.path.getsize(overlay_file), overlay_file))
+                    LOG.info("overlay (%ld) : %s",os.path.getsize(overlay_file), overlay_file)
             else:
                 overlay_zip = zipfile.ZipFile(vm_overlay.overlay_zipfile)
                 filesize_count = 0
                 for zipinfo in overlay_zip.infolist():
                     if zipinfo.filename == Const.OVERLAY_META:
-                        msg = "meta file : (%ld) bytes\n" % \
-                            (zipinfo.file_size)
+                        msg = "meta file : (%ld) bytes" % (zipinfo.file_size)
                     else:
-                        msg = "blob file : (%ld) bytes (%s)\n" % \
-                            (zipinfo.file_size, zipinfo.filename)
+                        msg = "blob file : (%ld) bytes (%s)" % (zipinfo.file_size, zipinfo.filename)
                     filesize_count += zipinfo.file_size
-                    sys.stdout.write(msg)
-                sys.stdout.write(
-                    "zip overhead : (%ld) bytes\n" %
-                    (os.path.getsize(vm_overlay.overlay_zipfile) - filesize_count))
+                    LOG.info(msg)
+                LOG.info("zip overhead : (%ld) bytes",os.path.getsize(vm_overlay.overlay_zipfile) - filesize_count)
         except Exception as e:
             print "Failed to create overlay: %s" % str(e)
         os.rename(vm_overlay.overlay_zipfile, args.dest)
@@ -331,7 +324,7 @@ class Nephele(rpyc.Service):
 
     def x_import_snapshot(self, args):
         if not os.path.exists(args.path):
-            print "Snapshot path (%s) does not exist!" % (args.path)
+            msg = "Snapshot path (%s) does not exist!" % (args.path)
         else:
             url = 'file://' + os.path.abspath(args.path)
             overlay_filename = NamedTemporaryFile(prefix="cloudlet-overlay-file-")
@@ -346,7 +339,7 @@ class Nephele(rpyc.Service):
                     base_found = True
                     break
             if not base_found:
-                print "Cannot find base image (SHA-256: %s) referenced in overlay: %s" % (base_sha, args.path)
+                msg = "Cannot find base image (SHA-256: %s) referenced in overlay: %s" % (base_sha, args.path)
             else:
                 # save the result to DB
                 items = dbconn.list_item(table_def.Snapshot)
@@ -356,6 +349,9 @@ class Nephele(rpyc.Service):
                         break
                 new = table_def.Snapshot(args.path, base_sha)
                 dbconn.add_item(new)
+                msg = "Successfully imported snapshot (%s)." % (args.path)
+
+        return msg
 
     def x_synthesize(self, args):
         overlay_meta = args.snapshot
