@@ -72,7 +72,6 @@ def import_base(args, remote):
     remote.root.import_base(args)
 
 def import_snapshot(args, remote):
-    remote.root.stdout_redirect(sys.stdout) #redirect remote's stdout
     remote.root.import_snapshot(args)
 
 def synthesize(args, remote):
@@ -91,7 +90,7 @@ def _main():
     parser.add_argument('remote', help="Execute commands on specified remote host.")
     subparsers = parser.add_subparsers(title='command', dest="command")
 
-    list_instances_parser = subparsers.add_parser('ls', help='List running nephele instances')
+    list_instances_parser = subparsers.add_parser('ps', help='List running nephele instances')
     list_instances_parser.set_defaults(func=list_instances)
 
     operations_parser = subparsers.add_parser('logs', help='List logs of nephele operations performed.')
