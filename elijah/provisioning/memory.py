@@ -112,7 +112,6 @@ class Memory(object):
         apply_free_memory = kwargs.get("apply_free_memory", True)
         free_pfn_dict = kwargs.get("free_pfn_dict", None)
         LOG.info("Get hash list of memory page")
-        prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
 
         total_size = end_offset
         ram_offset = 0
@@ -180,10 +179,6 @@ class Memory(object):
                     raise MemoryError("possibly comparing with wrong base VM")
             ram_offset += len(data)
             # print progress bar for every 100 page
-            if (ram_offset % (Memory.RAM_PAGE_SIZE*100)) == 0:
-                prog_bar.set_percent(100.0*ram_offset/total_size)
-                prog_bar.show_progress()
-        prog_bar.finish()
         return freed_page_counter
 
     @staticmethod

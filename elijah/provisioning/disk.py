@@ -53,10 +53,7 @@ class DiskError(Exception):
 
 def hashing(disk_path, meta_path, chunk_size=4096, window_size=512):
 
-    prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
     total_iteration = os.path.getsize(disk_path)/window_size
-    iter_count = 0
-    prog_interval = 100
 
     disk_file = open(disk_path, "rb")
     out_file = open(meta_path, "w+b")
@@ -71,11 +68,6 @@ def hashing(disk_path, meta_path, chunk_size=4096, window_size=512):
     data_len = len(data)
     hash_dic = dict()
     while True:
-        if (iter_count) % prog_interval == 0:
-            prog_bar.process(100.0*prog_interval/total_iteration)
-            prog_bar.show_progress()
-        iter_count += 1
-
         hashed_data = sha256(data).digest()
         if hash_dic.get(hashed_data) is None:
             hash_dic[hashed_data] = (hashed_data, s_offset, data_len)
