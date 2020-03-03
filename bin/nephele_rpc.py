@@ -382,6 +382,7 @@ class Nephele(rpyc.Service):
                 if args.title == item.title:
                     dbconn.del_item(item)
                     break
+            return 0
 
     def x_snapshot_details(self, args):
         try:
@@ -402,10 +403,11 @@ class Nephele(rpyc.Service):
                 break
         if instance is not None:
             #send USR1 to that process and put the destination into a temp file for reading
-            fdest = open('/tmp/.cloudlet-handoff', "wb")
+            handoff_temp = '/tmp/%s.cloudlet-handoff' % instance.pid
+            fdest = open(handoff_temp, "wb")
             meta = dict()
-            meta['title'] = item.title
-            meta['pid'] = item.pid
+            meta['title'] = instance.title
+            meta['pid'] = instance.pid
             meta['url'] = handoff_url
             fdest.write(msgpack.packb(meta))
             fdest.close()
@@ -415,7 +417,8 @@ class Nephele(rpyc.Service):
 
 
 def _main():
-    t = rpyc.utils.server.ForkingServer(Nephele, protocol_config={"exposed_prefix":"x_"}, port=RPC_PORT, authenticator=SSHAuthenticator)
+    cfg = {"exposed_prefix":"x_"}
+    t = rpyc.utils.server.ForkingServer(Nephele, logger=LOG, protocol_config=cfg, port=RPC_PORT, authenticator=SSHAuthenticator)
     t.start()
 
 if __name__ == '__main__':
