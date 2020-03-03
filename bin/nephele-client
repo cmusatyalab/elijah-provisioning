@@ -20,17 +20,16 @@
 from __future__ import division
 import argparse
 import sys
+import time
 import rpyc
 from plumbum import SshMachine
 
 NEPHELE_PORT = 19999
 
 def build_base(args, remote):
-    remote.root.stdout_redirect(sys.stdout) #redirect remote's stdout
     remote.root.build_base(args)
 
 def build_snapshot(args, remote):
-    remote.root.stdout_redirect(sys.stdout) #redirect remote's stdout
     remote.root.build_snapshot(args)
 
 def list_base(args, remote):
@@ -75,14 +74,12 @@ def import_snapshot(args, remote):
     remote.root.import_snapshot(args)
 
 def synthesize(args, remote):
-    remote.root.stdout_redirect(sys.stdout) #redirect remote's stdout
     remote.root.synthesize(args)
 
 def snapshot_details(args, remote):
     print(remote.root.snapshot_details(args))
 
 def handoff(args, remote):
-    remote.root.stdout_redirect(sys.stdout) #redirect remote's stdout
     remote.root.handoff(args)
 
 def _main():
