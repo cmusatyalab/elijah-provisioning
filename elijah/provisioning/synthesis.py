@@ -1173,18 +1173,13 @@ class MemoryReadThread(native_threading.Thread):
             LOG.info("Header size of memory snapshot is %s" % len(new_header))
 
             # write rest of the memory data
-            prog_bar = AnimatedProgressBar(end=100, width=80, stdout=sys.stdout)
             while True:
                 data = self.in_fd.read(1024 * 10)
                 if data is None or len(data) <= 0:
                     break
                 self.out_fd.write(data)
                 total_read_size += len(data)
-                prog_bar.set_percent(
-                    100.0 * total_read_size / self.machine_memory_size)
-                prog_bar.show_progress()
             self.out_fd.flush()
-            prog_bar.finish()
             if total_read_size != self.out_fd.tell():
                 msg = "output file size is different from stream size"
                 raise Exception(msg)
