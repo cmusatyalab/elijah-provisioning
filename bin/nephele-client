@@ -42,39 +42,54 @@ def list_instances(args, remote):
     print(remote.root.list_instances(args))
 
 def show_logs(args, remote):
-    print remote.root.show_logs(args)
+    print(remote.root.show_logs(args))
 
 def delete_snapshot(args, remote):
     remote.root.stdout_redirect(sys.stdout) #redirect remote's stdout
     remote.root.stdin_redirect(sys.stdin) #redirect remote's stdin
     remote.root.stderr_redirect(sys.stdout) #redirect remote's stderr
     remote.root.delete_snapshot(args)
+    remote.root.restore()
 
 def clear_instances(args, remote):
     remote.root.stdout_redirect(sys.stdout) #redirect remote's stdout
     remote.root.stdin_redirect(sys.stdin) #redirect remote's stdin
     remote.root.stderr_redirect(sys.stdout) #redirect remote's stderr
     remote.root.clear_instances(args)
+    remote.root.restore()
 
 def delete_base(args, remote):
     remote.root.stdout_redirect(sys.stdout) #redirect remote's stdout
     remote.root.stdin_redirect(sys.stdin) #redirect remote's stdin
     remote.root.stderr_redirect(sys.stdout) #redirect remote's stderr
     remote.root.delete_base(args)
+    remote.root.restore()
                 
 def export_base(args, remote):
     remote.root.stdout_redirect(sys.stdout) #redirect remote's stdout
     remote.root.export_base(args)
+    remote.root.restore()
 
 def import_base(args, remote):
     remote.root.stdout_redirect(sys.stdout) #redirect remote's stdout
     remote.root.import_base(args)
+    remote.root.restore()
 
 def import_snapshot(args, remote):
     remote.root.import_snapshot(args)
 
 def synthesize(args, remote):
-    remote.root.synthesize(args)
+    async_task = rpyc.async_(remote.root.synthesize)
+    future = async_task(args)
+    future.set_expiry(5)
+    try:
+        future.wait()
+    except rpyc.AsyncResultTimeout as art:
+        pass
+    if future.error:
+        print future.value
+    else:
+        print "HOST\t\t%s\nTITLE\t\t%s\nSNAPSHOT\t%s\nFWDPORTS\t %s\nVM should be resumed shortly; check the virt-manager window." % (args.remote,args.title, args.snapshot, args.ports)
 
 def snapshot_details(args, remote):
     print(remote.root.snapshot_details(args))
@@ -174,9 +189,7 @@ def _main():
          "sync_request_timeout":None}) #needed for long running operations like nephele run
 
     remote = rpyc.ssh_connect(SshMachine(args.remote, user="root"), NEPHELE_PORT, config=cfg) 
-    #remote = rpyc.connect(args.remote, NEPHELE_PORT, config=cfg) 
     ret = args.func(args, remote) or 0
-    remote.root.restore() #no longer redirect
     sys.exit(ret)
 
 if __name__ == '__main__':

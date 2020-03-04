@@ -354,12 +354,13 @@ class Nephele(rpyc.Service):
         return msg
 
     def x_synthesize(self, args):
+        err = False
         overlay_meta = args.snapshot
         is_zip_contained, url_path = PackagingUtil.is_zip_contained(
             overlay_meta)
         if is_zip_contained is True:
             overlay_meta = url_path
-        print "Beginning synthesis of: %s" % args.snapshot
+        LOG.info( "Beginning synthesis of: %s", args.snapshot)
         try:
             # save the instance info to DB
             dbconn = DBConnector()
@@ -373,8 +374,8 @@ class Nephele(rpyc.Service):
                                 title=args.title,
                                 fwd_ports=args.ports)
         except Exception as e:
-            print "Failed to synthesize: %s" % str(e)
-            return 1
+            LOG.error("Failed to synthesize: %s", str(e))
+            err = True
         finally:
             dbconn = DBConnector()
             items = dbconn.list_item(table_def.Instances)
@@ -382,7 +383,8 @@ class Nephele(rpyc.Service):
                 if args.title == item.title:
                     dbconn.del_item(item)
                     break
-            return 0
+        if err:
+            raise Exception(e)
 
     def x_snapshot_details(self, args):
         try:
