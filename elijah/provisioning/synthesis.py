@@ -1747,7 +1747,7 @@ def synthesize(base_disk, overlay_path, **kwargs):
             #make a new snapshot and store it
             handoff_url = 'file://%s' % (increment_filename(overlay_path)) 
             save_snapshot = True
-            print 'VM entered paused state. Generating snapshot of disk and memory...'
+            LOG.info('VM entered paused state. Generating snapshot of disk and memory...')
             op_id = log_op(op=Const.OP_BUILD_SNAPSHOT,notes="Image: %s, Dest: %s" % (base_sha, overlay_path))
             break
         elif state == libvirt.VIR_DOMAIN_SHUTDOWN:
@@ -1759,11 +1759,11 @@ def synthesize(base_disk, overlay_path, **kwargs):
                     if state == libvirt.VIR_DOMAIN_RUNNING:
                         continue
                     else:
-                        print "VM has been powered off. Tearing down FUSE..."
+                        LOG.info("VM has been powered off. Tearing down FUSE...")
                         synthesized_VM.terminate()
                         return
                 else:
-                    print "VM is no longer running. Tearing down FUSE..."
+                    LOG.info("VM is no longer running. Tearing down FUSE...")
                     synthesized_VM.terminate()
                     return
             except libvirt.libvirtError as e:
@@ -1771,20 +1771,19 @@ def synthesize(base_disk, overlay_path, **kwargs):
                 return
         elif HANDOFF_SIGNAL_RECEIVED == True:
             #read destination from file
-            handoff_temp = '/tmp/%s.cloudlet-handoff' % os.getpid()
+            handoff_temp = '/var/nephele/pid/%s.pid' % os.getpid()
             fdest = open(handoff_temp, "rb")
             meta = msgpack.unpackb(fdest.read())
             fdest.close()
             #validate that the meta data is really for us
             if meta['pid'] == os.getpid():
                 handoff_url = meta['url']
-                print 'Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url'])
+                LOG.info('Handoff initiated for %s to the following destination: %s', (meta['title'], meta['url']))
                 op_id = log_op(op=Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
                 HANDOFF_SIGNAL_RECEIVED = False
-                os.remove(handoff_temp)
                 break
             else:
-                print 'PID in %s does not match getpid!' % HANDOFF_TEMP
+                LOG.error('PID in %s does not match getpid!', HANDOFF_TEMP)
 
 
 

@@ -206,11 +206,9 @@ class Nephele(rpyc.Service):
         return output
 
     def x_list_instances(self, args):
-        dbconn = DBConnector()
-        items = dbconn.list_item(table_def.Instances)
-        output = "{:<43}{:^8}{:<12}{:^8}{:<43}\n".format('TITLE', '', 'PID', '', 'STARTED')
-        for item in items:
-            output = output + "{:<43}{:^8}{:<12}{:^8}{:<43}\n".format(item.title, '', item.pid, '', str(item.start_time))
+        output = "{:<6}{:^8}{:<20}{:^8}{:<45}{:^8}{:<30}{:^8}{:<50}\n".format('PID', '', 'TITLE', '', 'UUID', '', 'STARTED', '', 'HANDOFFURL')
+        for item in self.walk_nephele_pids():
+            output = "{:<6}{:^8}{:<20}{:^8}{:<45}{:^8}{:<30}{:^8}{:<50}\n".format(item['pid'], '', item['title'], '', item['uuid'], '', item['started'], '', item['url'])
         return output
 
     def x_show_logs(self,args):
@@ -364,10 +362,12 @@ class Nephele(rpyc.Service):
         LOG.info( "Beginning synthesis of: %s", args.snapshot)
         try:
             # generate pid file
-            path = DIR_NEPHELE_PID + '%s' % os.getpid()
+            path = DIR_NEPHELE_PID + '%s.pid' % os.getpid()
             fdest = open(path, "wb")
             meta = dict()
             meta['title'] = args.title
+            meta['pid'] = os.getpid()
+            meta['started'] = datetime.datetime.now()
             meta['uuid'] = None
             meta['url'] = None
             fdest.write(msgpack.packb(meta))
@@ -385,13 +385,7 @@ class Nephele(rpyc.Service):
         except Exception as e:
             LOG.error("Failed to synthesize: %s", str(e))
             err = True
-        finally:
-            dbconn = DBConnector()
-            items = dbconn.list_item(table_def.Instances)
-            for item in items:
-                if args.title == item.title:
-                    dbconn.del_item(item)
-                    break
+
         if err:
             raise Exception(e)
 
@@ -402,29 +396,49 @@ class Nephele(rpyc.Service):
             output = str(e)
         return output
 
+    def walk_nephele_pids(self):
+        instances = list()
+        for root, dirs, files in os.walk(DIR_NEPHELE_PID):
+            for filename in files:
+                path = os.path.join(root, filename)
+                with open(path, 'rb') as file:
+                    meta = msgpack.unpackb(file.read())
+                    instances.append(meta)
+        return instances
+
     def x_handoff(self, args):
         handoff_url = 'tcp://' + args.dest + ':8022'
 
-        dbconn = DBConnector()
-        items = dbconn.list_item(table_def.Instances)
-        instance = None
-        for item in items:
-            if (args.title == item.title):
-                instance = item
-                break
-        if instance is not None:
-            #send USR1 to that process and put the destination into a temp file for reading
-            handoff_temp = '/tmp/%s.cloudlet-handoff' % instance.pid
-            fdest = open(handoff_temp, "wb")
-            meta = dict()
-            meta['title'] = instance.title
-            meta['pid'] = instance.pid
-            meta['url'] = handoff_url
-            fdest.write(msgpack.packb(meta))
-            fdest.close()
-            os.kill(item.pid, signal.SIGUSR1)
+        #see if we can find a matching pid first by title, then uuid
+        title_matched = False
+        uuid_matched = False
+        metadata = None
+        matching_path = None
+        for root, dirs, files in os.walk(DIR_NEPHELE_PID):
+            for filename in files:
+                path = os.path.join(root, filename)
+                with open(path, 'rb') as file:
+                    meta = msgpack.unpackb(file.read())
+                    if meta["title"] == args.title:
+                        if title_matched == True:
+                            raise Exception("Ambiguous instance (TITLE: %s matches more than one instance) ; try using UUID instead!" % args.title)
+                        title_matched = True
+                        metadata = meta
+                        matching_path = path
+                    if meta["uuid"] == args.title:
+                        uuid_matched = True
+                        metadata = meta
+                        matching_path = path
+
+        if not uuid_matched and not title_matched:
+            raise Exception("Could not find an instance (using TITLE or UUID) that matches %s!" % args.title)
         else:
-            print 'Cannot find a running instance with the title [%s]!' % args.title
+            #send USR1 to that process and put the destination into the pid file
+            fdest = open(matching_path, "wb")
+            metadata['url'] = handoff_url
+            fdest.write(msgpack.packb(metadata))
+            fdest.close()
+            os.kill(metadata['pid'], signal.SIGUSR1)
 
 
 def _main():

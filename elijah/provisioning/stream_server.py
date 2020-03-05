@@ -932,7 +932,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                         return
                 elif HANDOFF_SIGNAL_RECEIVED == True:
                     #read destination from file
-                    handoff_temp = '/tmp/%s.cloudlet-handoff' % os.getpid()
+                    handoff_temp = '/var/nephele/pid/%s.pid' % os.getpid()
                     fdest = open(handoff_temp, "rb")
                     meta = msgpack.unpackb(fdest.read())
                     fdest.close()
@@ -941,7 +941,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                         handoff_url = meta['url']
                         LOG.info('Handoff initiated for %s to the following destination: %s' % (meta['title'], meta['url']))
                         HANDOFF_SIGNAL_RECEIVED = False
-                        os.remove(handoff_temp)
                         break
                     else:
                         LOG.error('PID in %s does not match getpid!' % HANDOFF_TEMP)
