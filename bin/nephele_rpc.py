@@ -206,9 +206,9 @@ class Nephele(rpyc.Service):
         return output
 
     def x_list_instances(self, args):
-        output = "{:<6}{:^1}{:<20}{:^8}{:<45}{:^8}{:<25}{:^1}{:<50}\n".format('PID', '', 'TITLE', '', 'UUID', '', 'STARTED', '', 'HANDOFFURL')
+        output = "{:<6}{:^1}{:<20}{:^8}{:<36}{:^8}{:<26}{:^1}{:<50}\n".format('PID', '', 'TITLE', '', 'UUID', '', 'STARTED', '', 'HANDOFFURL')
         for item in self.walk_nephele_pids():
-            output = output + "{:<6}{:^1}{:<20}{:^8}{:<45}{:^8}{:<25}{:^1}{:<50}\n".format(item['pid'], '', item['title'], '', item['uuid'], '', item['started'], '', item['url'])
+            output = output + "{:<6}{:^1}{:<20}{:^8}{:<36}{:^8}{:<26}{:^1}{:<50}\n".format(item['pid'], '', item['title'], '', item['uuid'], '', item['started'], '', item['url'])
         return output
 
     def x_show_logs(self,args):

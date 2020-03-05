@@ -1741,6 +1741,13 @@ def synthesize(base_disk, overlay_path, **kwargs):
     preload_thread.daemon = True
     preload_thread.start()
     signal.signal(signal.SIGUSR1, handlesig)
+
+    #update pid info with kvm uuid
+    fdest = open('/var/nephele/pid/%s.pid' % os.getpid(), "wb")
+    metadata['uuid'] = machine.UUIDString()
+    fdest.write(msgpack.packb(metadata))
+    fdest.close()
+    
     while True:
         state, _ = machine.state()
         if state == libvirt.VIR_DOMAIN_PAUSED:
