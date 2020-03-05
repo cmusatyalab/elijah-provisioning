@@ -1744,10 +1744,11 @@ def synthesize(base_disk, overlay_path, **kwargs):
 
     #update pid info with kvm uuid
     path = '/var/nephele/pid/%s.pid' % os.getpid()
-    with open(path, 'wrb') as file:
-        metadata = msgpack.unpackb(file.read())
+    with open(path, 'rb') as f:
+        metadata = msgpack.unpackb(f.read())
+    with open(path, 'wb') as f:
         metadata['uuid'] = machine.UUIDString()
-        file.write(msgpack.packb(metadata))
+        f.write(msgpack.packb(metadata))
 
     while True:
         state, _ = machine.state()

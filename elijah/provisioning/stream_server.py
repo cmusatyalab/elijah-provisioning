@@ -852,10 +852,17 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             sys.stdout.write("openstack\t%s\t%s\t%s\t%s" % (launch_disk_size, launch_memory_size, disk_overlay_map, memory_overlay_map))
 
         else:
-            # save the instance info to DB
-            dbconn = DBConnector()
-            new = table_def.Instances(title, os.getpid())
-            dbconn.add_item(new)
+            # generate pid file
+            path = DIR_NEPHELE_PID + '%s.pid' % os.getpid()
+            fdest = open(path, "wb")
+            meta = dict()
+            meta['title'] = title
+            meta['pid'] = os.getpid()
+            meta['started'] = str(datetime.datetime.now())
+            meta['uuid'] = None
+            meta['url'] = None
+            fdest.write(msgpack.packb(meta))
+            fdest.close()
 
             # We told to FUSE that we have everything ready, so we need to wait
             # until delta_proc finishes. we cannot start VM before delta_proc
@@ -898,6 +905,15 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             preload_thread.start()
             save_snapshot = False
             signal.signal(signal.SIGUSR1, self.handlesig)
+
+            #update pid info with kvm uuid
+            path = '/var/nephele/pid/%s.pid' % os.getpid()
+            with open(path, 'rb') as f:
+                metadata = msgpack.unpackb(f.read())
+            with open(path, 'wb') as f:
+                metadata['uuid'] = synthesized_vm.machine.UUIDString()
+                f.write(msgpack.packb(metadata))
+
             while True:
                 state, _ = synthesized_vm.machine.state()
                 if state == libvirt.VIR_DOMAIN_PAUSED:
