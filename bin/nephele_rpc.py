@@ -367,7 +367,7 @@ class Nephele(rpyc.Service):
             path = DIR_NEPHELE_PID + '%s' % os.getpid()
             fdest = open(path, "wb")
             meta = dict()
-            meta['title'] = instance.title
+            meta['title'] = args.title
             meta['uuid'] = None
             meta['url'] = None
             fdest.write(msgpack.packb(meta))
