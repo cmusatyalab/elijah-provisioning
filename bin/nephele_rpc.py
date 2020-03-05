@@ -57,6 +57,7 @@ from elijah.provisioning.package import PackagingUtil
 DIR_NEPHELE = '/var/nephele/'
 DIR_NEPHELE_IMAGES = '/var/nephele/images/'
 DIR_NEPHELE_SNAPSHOTS = '/var/nephele/snapshots/'
+DIR_NEPHELE_PID = '/var/nephele/pid/'
 RPC_PORT = 19999
 
 with open('/var/nephele/logging.json') as f:
@@ -362,10 +363,15 @@ class Nephele(rpyc.Service):
             overlay_meta = url_path
         LOG.info( "Beginning synthesis of: %s", args.snapshot)
         try:
-            # save the instance info to DB
-            dbconn = DBConnector()
-            new = table_def.Instances(args.title, os.getpid())
-            dbconn.add_item(new)
+            # generate pid file
+            path = DIR_NEPHELE_PID + '%s' % os.getpid()
+            fdest = open(path, "wb")
+            meta = dict()
+            meta['title'] = instance.title
+            meta['uuid'] = None
+            meta['url'] = None
+            fdest.write(msgpack.packb(meta))
+            fdest.close()
 
             synthesis.synthesize(None, overlay_meta,
                                 disk_only=args.disk_only,
@@ -373,6 +379,9 @@ class Nephele(rpyc.Service):
                                 zip_container=is_zip_contained,
                                 title=args.title,
                                 fwd_ports=args.ports)
+
+            if os.path.exists(path):
+                os.unlink(path)
         except Exception as e:
             LOG.error("Failed to synthesize: %s", str(e))
             err = True

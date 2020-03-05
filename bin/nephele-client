@@ -89,7 +89,8 @@ def synthesize(args, remote):
     if future.error:
         print future.value
     else:
-        print "HOST\t\t%s\nTITLE\t\t%s\nSNAPSHOT\t%s\nFWDPORTS\t %s\nVM should be resumed shortly; check the virt-manager window." % (args.remote,args.title, args.snapshot, args.ports)
+        print "HOST\t\t%s\nTITLE\t\t%s\nSNAPSHOT\t%s\nFWDPORTS\t%s" % (args.remote, args.title, args.snapshot, args.ports)
+        print "VM should be resumed shortly; check the virt-manager window."
 
 def snapshot_details(args, remote):
     print(remote.root.snapshot_details(args))
