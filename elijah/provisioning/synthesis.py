@@ -1743,11 +1743,12 @@ def synthesize(base_disk, overlay_path, **kwargs):
     signal.signal(signal.SIGUSR1, handlesig)
 
     #update pid info with kvm uuid
-    fdest = open('/var/nephele/pid/%s.pid' % os.getpid(), "wb")
-    metadata['uuid'] = machine.UUIDString()
-    fdest.write(msgpack.packb(metadata))
-    fdest.close()
-    
+    path = '/var/nephele/pid/%s.pid' % os.getpid()
+    with open(path, 'wrb') as file:
+        metadata = msgpack.unpackb(file.read())
+        metadata['uuid'] = machine.UUIDString()
+        file.write(msgpack.packb(metadata))
+
     while True:
         state, _ = machine.state()
         if state == libvirt.VIR_DOMAIN_PAUSED:
