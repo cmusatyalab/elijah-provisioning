@@ -367,7 +367,7 @@ class Nephele(rpyc.Service):
             meta = dict()
             meta['title'] = args.title
             meta['pid'] = os.getpid()
-            meta['started'] = datetime.datetime.now()
+            meta['started'] = str(datetime.datetime.now())
             meta['uuid'] = None
             meta['url'] = None
             fdest.write(msgpack.packb(meta))
