@@ -6,6 +6,8 @@
 
 - name: (nephele-client) install nephele-client
   copy:
-    src: /root/elijah-provisioning/bin/nephele-client
+    src: "{{ lookup('env', 'PWD') }}/../bin/nephele-client"
     dest: /usr/local/bin/
+    mode: 0775
+  become: yes
   tags: binaries
