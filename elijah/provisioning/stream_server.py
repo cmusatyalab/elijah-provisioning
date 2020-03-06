@@ -939,12 +939,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                     except libvirt.libvirtError as e:
                         synthesized_vm.terminate()
                     finally:
-                        dbconn = DBConnector()
-                        list = dbconn.list_item(table_def.Instances)
-                        for item in list:
-                            if title == item.title:
-                                dbconn.del_item(item)
-                                break
                         return
                 elif HANDOFF_SIGNAL_RECEIVED == True:
                     #read destination from file
@@ -1017,12 +1011,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             synthesized_vm.monitor.terminate()
             synthesized_vm.monitor.join()
             synthesized_vm.terminate()
-            dbconn = DBConnector()
-            list = dbconn.list_item(table_def.Instances)
-            for item in list:
-                if title == item.title:
-                    dbconn.del_item(item)
-                    break
 
     def terminate(self):
         # force terminate when something wrong in handling request

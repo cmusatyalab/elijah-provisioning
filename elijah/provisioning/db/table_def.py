@@ -46,23 +46,6 @@ class BaseVM(Base):
         self.hash_value = hash_value
         self.source = source
 
-class Instances(Base):
-    """
-    Captures the pid and title of an instantiated VM
-    so that we can send signals to running instances
-    """
-    __tablename__ = "instances"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    title = Column(String, nullable=False)
-    pid = Column(Integer, nullable=False)
-    start_time = Column(DateTime, nullable=False)
-
-    def __init__(self, title, pid):
-        self.title = title
-        self.pid = pid
-        self.start_time = datetime.datetime.now()
-
 class Operations(Base):
     """
     Log of operations (image/snapshot creation, handoffs, etc) that have occurred

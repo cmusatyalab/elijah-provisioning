@@ -247,11 +247,6 @@ class Nephele(rpyc.Service):
     def x_clear_instances(self, args):
         if args.force or raw_input("Are you sure you wish to clear data? (y/N): ").lower().strip().startswith("y"):
             dbconn = DBConnector()
-            if args.instances:
-                list = dbconn.list_item(table_def.Instances)
-                for item in list:
-                    dbconn.del_item(item)
-                print "Cleared instances table."
             if args.operations:
                 list = dbconn.list_item(table_def.Operations)
                 for item in list:
