@@ -434,6 +434,7 @@ class Nephele(rpyc.Service):
             fdest.write(msgpack.packb(metadata))
             fdest.close()
             os.kill(metadata['pid'], signal.SIGUSR1)
+            return "Handoff initiated for %s [%s] to the following destination: %s" % (metadata['title'], metadata['uuid'], metadata['url'])
 
 
 def _main():

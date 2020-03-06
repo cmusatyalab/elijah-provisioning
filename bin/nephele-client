@@ -96,7 +96,7 @@ def snapshot_details(args, remote):
     print(remote.root.snapshot_details(args))
 
 def handoff(args, remote):
-    remote.root.handoff(args)
+    print(remote.root.handoff(args))
 
 def _main():
     parser = argparse.ArgumentParser(prog='nephele', description='Manage VMs across cloudlets.')
