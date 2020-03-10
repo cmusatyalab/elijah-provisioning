@@ -134,22 +134,35 @@
   shell: cat libvirt-qemu-abstractions >> /etc/apparmor.d/abstractions/libvirt-qemu
   tags: aa
 
+- name: (nephele-server) install nephele service
+  copy:
+    src: /root/elijah-provisioning/nephele.service
+    dest: /lib/systemd/system
+    remote_src: yes
+  tags: services
+
+
 - name: (nephele-server) install stream-server service
   copy:
     src: /root/elijah-provisioning/stream-server.service
     dest: /lib/systemd/system
     remote_src: yes
-  tags: stream-server
+  tags: services
+
+- name: (nephele-server) enable nephele at boot
+  shell: systemctl enable nephele
+  tags: services
+
 
 - name: (nephele-server) enable stream-server at boot
   shell: systemctl enable stream-server
-  tags: stream-server
+  tags: services
 
 - name: (nephele-server) restart stream-server
   service:
     name: stream-server
     state: restarted
-  tags: stream-server
+  tags: services
 
 - name: (nephele-server) python setup.py
   shell: python setup.py install
