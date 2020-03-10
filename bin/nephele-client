@@ -110,6 +110,9 @@ def _main():
     operations_parser.add_argument('-a', '--all', action='store_true', help='Show all rows (default: last 10')
     operations_parser.set_defaults(func=show_logs)
 
+    images_parser = subparsers.add_parser('images', help='List base images tracked by Nephele')
+    images_parser.set_defaults(func=list_base)
+
     base_parser = subparsers.add_parser('image', help='Management of base VM images')
     base_subparsers = base_parser.add_subparsers(title='base')
     build_parser = base_subparsers.add_parser('build', help='Build a base image from an existing raw disk image')
@@ -134,6 +137,9 @@ def _main():
     delete_base_parser = base_subparsers.add_parser('rm', help='Remove a base image from Nephele')
     delete_base_parser.add_argument('id', help='ID of base image to remove')
     delete_base_parser.set_defaults(func=delete_base)
+
+    snapshots_parser = subparsers.add_parser('snapshots', help='List snapshots known to nephele')
+    snapshots_parser.set_defaults(func=list_snapshots)
 
     snapshot_parser = subparsers.add_parser('snapshot', help='Management of VM snapshots')
     snapshot_subparsers = snapshot_parser.add_subparsers(title='snapshot')
