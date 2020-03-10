@@ -141,7 +141,6 @@
     remote_src: yes
   tags: services
 
-
 - name: (nephele-server) install stream-server service
   copy:
     src: /root/elijah-provisioning/stream-server.service

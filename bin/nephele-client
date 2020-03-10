@@ -41,9 +41,6 @@ def list_snapshots(args, remote):
 def list_instances(args, remote):
     print(remote.root.list_instances(args))
 
-def show_logs(args, remote):
-    print(remote.root.show_logs(args))
-
 def delete_snapshot(args, remote):
     remote.root.stdout_redirect(sys.stdout) #redirect remote's stdout
     remote.root.stdin_redirect(sys.stdin) #redirect remote's stdin
@@ -100,24 +97,21 @@ def handoff(args, remote):
 
 def _main():
     parser = argparse.ArgumentParser(prog='nephele', description='Manage VMs across cloudlets.')
-    parser.add_argument('remote', help="Execute commands on specified remote host.")
+    parser.add_argument('host', help="Execute commands on specified remote host.")
     subparsers = parser.add_subparsers(title='command', dest="command")
 
-    list_instances_parser = subparsers.add_parser('ps', help='List running nephele instances')
-    list_instances_parser.set_defaults(func=list_instances)
+    #HANDOFF COMMAND
+    handoff_parser = subparsers.add_parser('handoff', help='Handoff a running instance to another nephele node')
+    handoff_parser.add_argument('title',  help='Title of the VM instance to handoff')
+    handoff_parser.add_argument('dest', help='Handoff destination - IP address or DNS name.')
+    handoff_parser.set_defaults(func=handoff)
 
-    operations_parser = subparsers.add_parser('logs', help='List logs of nephele operations performed.')
-    operations_parser.add_argument('-a', '--all', action='store_true', help='Show all rows (default: last 10')
-    operations_parser.set_defaults(func=show_logs)
-
-    images_parser = subparsers.add_parser('images', help='List base images tracked by Nephele')
-    images_parser.set_defaults(func=list_base)
-
+    #IMAGE COMMANDS
     base_parser = subparsers.add_parser('image', help='Management of base VM images')
     base_subparsers = base_parser.add_subparsers(title='base')
-    build_parser = base_subparsers.add_parser('build', help='Build a base image from an existing raw disk image')
-    build_parser.add_argument('path', help='Path to an existing base image in raw format')
-    build_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
+    build_parser = base_subparsers.add_parser('build', help='Build a base image from an existing disk image')
+    build_parser.add_argument('path', help='Path to an existing base image (will be converted to raw format)')
+    build_parser.add_argument('-t', '--title',  help='Title of the VM instance to display in virt-manager')
     build_parser.add_argument('-c', '--cpu', type=int, help='Override number of vCPUs. By default, the number specified in the VM_TEMPLATE.xml will be used.')
     build_parser.add_argument('-m', '--mem', type=int, help='Override amount of memory (in KiB). By default, the number specified in the VM_TEMPLATE.xml will be used.')
     build_parser.set_defaults(func=build_base)
@@ -131,23 +125,35 @@ def _main():
     import_parser.add_argument('path', help='an existing zip file containing a base image')
     import_parser.set_defaults(func=import_base)
 
-    list_base_parser = base_subparsers.add_parser('ls', help='List base images tracked by Nephele')
+    list_base_parser = base_subparsers.add_parser('ls', help='List base images tracked by nephele')
     list_base_parser.set_defaults(func=list_base)
 
-    delete_base_parser = base_subparsers.add_parser('rm', help='Remove a base image from Nephele')
+    delete_base_parser = base_subparsers.add_parser('rm', help='Remove a base image from nephele')
     delete_base_parser.add_argument('id', help='ID of base image to remove')
     delete_base_parser.set_defaults(func=delete_base)
 
-    snapshots_parser = subparsers.add_parser('snapshots', help='List snapshots known to nephele')
-    snapshots_parser.set_defaults(func=list_snapshots)
+    images_parser = subparsers.add_parser('images', help='List base images tracked by nephele')
+    images_parser.set_defaults(func=list_base)
 
+    list_instances_parser = subparsers.add_parser('ps', help='List running nephele instances')
+    list_instances_parser.set_defaults(func=list_instances)
+
+    #RUN COMMAND
+    run_parser = subparsers.add_parser('run', help='Instantiate a VM from an existing snapshot')
+    run_parser.add_argument('snapshot', help='Disk/memory snapshot to instantiate from')
+    run_parser.add_argument('title',  help='Title of the VM instance to display in virt-manager')
+    run_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
+    run_parser.add_argument('-p', '--ports', help='Comma separated list of ports to forward from host to guest. -p 80,443,8080,8443')
+    run_parser.set_defaults(func=synthesize)
+
+    #SNAPSHOT COMMANDS
     snapshot_parser = subparsers.add_parser('snapshot', help='Management of VM snapshots')
     snapshot_subparsers = snapshot_parser.add_subparsers(title='snapshot')
 
     build_snapshot_parser = snapshot_subparsers.add_parser('build', help='Interact with a base VM to create a new snapshot')
     build_snapshot_parser.add_argument('id', help='an existing base image to start with')
     build_snapshot_parser.add_argument('dest', help='Destination path for snapshot')
-    build_snapshot_parser.add_argument('-t', '--title',  help='Title of the VM instance to display')
+    build_snapshot_parser.add_argument('-t', '--title',  help='Title of the VM instance to display in virt-manager')
     build_snapshot_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
     build_snapshot_parser.add_argument('-m', '--free-mem', action='store_true', help='Extract free memory (default=False)')
     build_snapshot_parser.add_argument('-n', '--no-trim', action='store_true', help='Disable TRIM support. (default=False)')
@@ -169,24 +175,8 @@ def _main():
     delete_snapshot_parser.add_argument('path', help='Path of snapshot to remove')
     delete_snapshot_parser.set_defaults(func=delete_snapshot)
 
-    run_parser = subparsers.add_parser('run',
-            help='Instantiate a VM from an existing snapshot')
-    run_parser.add_argument('snapshot', help='Disk/memory snapshot to instantiate from')
-    run_parser.add_argument('title',  help='Title of the VM instance to display')
-    run_parser.add_argument('-d', '--disk-only', action='store_true',  help='Ignore memory, create delta from disk blocks only. (default=False)')
-    run_parser.add_argument('-p', '--ports', help='Comma separated list of ports to forward from host to guest. -p 80,443,8080,8443')
-    run_parser.set_defaults(func=synthesize)
-
-    handoff_parser = subparsers.add_parser('handoff', help='Handoff a running instance to another node')
-    handoff_parser.add_argument('title',  help='Title of the VM instance to handoff')
-    handoff_parser.add_argument('dest', help='Handoff destination - IP address or DNS name.')
-    handoff_parser.set_defaults(func=handoff)
-
-    clear_parser = subparsers.add_parser('clear', help='Clear tables')
-    clear_parser.add_argument('-i', '--instances', action='store_true',  help='Clear table of running instances. Usually only necessary if handoff fails.')
-    clear_parser.add_argument('-o', '--operations', action='store_true',  help='Clear table of logged operations.')
-    clear_parser.add_argument('-f', '--force', action='store_true',  help='Do not prompt for confirmation.')
-    clear_parser.set_defaults(func=clear_instances)
+    snapshots_parser = subparsers.add_parser('snapshots', help='List snapshots known to nephele')
+    snapshots_parser.set_defaults(func=list_snapshots)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -195,7 +185,7 @@ def _main():
         {"allow_public_attrs":True, #can only write to stdout if we allow public attrs
          "sync_request_timeout":None}) #needed for long running operations like nephele run
 
-    remote = rpyc.ssh_connect(SshMachine(args.remote, user="root"), NEPHELE_PORT, config=cfg) 
+    remote = rpyc.ssh_connect(SshMachine(args.host, user="root"), NEPHELE_PORT, config=cfg) 
     ret = args.func(args, remote) or 0
     sys.exit(ret)
 
