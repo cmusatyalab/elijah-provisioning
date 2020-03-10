@@ -1,8 +1,15 @@
-#pip install rpyc
-- name: (nephele-client) install requirements with pip
+- name: (nephele-client) apt packages
+  apt:
+    name:
+      - python-pip
+      - virt-manager
+  become: yes
+  tags: prereqs
+
+- name: (nephele-client) pip packages
   pip:
     name: rpyc
-  tags: pippackages
+  tags: prereqs
 
 - name: (nephele-client) install nephele-client
   copy:
