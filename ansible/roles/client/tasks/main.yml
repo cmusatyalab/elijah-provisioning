@@ -1,3 +1,10 @@
+- name: (nephele-client) git pull
+  git:
+    repo: 'https://github.com/cmusatyalab/elijah-provisioning'
+    dest: "{{ lookup('env', 'PWD') }}/.."
+    version: nephele
+  tags: git
+
 - name: (nephele-client) apt packages
   apt:
     name:

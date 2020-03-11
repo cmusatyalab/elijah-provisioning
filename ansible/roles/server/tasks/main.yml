@@ -1,3 +1,10 @@
+- name: (nephele-server) git pull
+  git:
+    repo: 'https://github.com/cmusatyalab/elijah-provisioning'
+    dest: "/root/elijah-provisioning"
+    version: nephele
+  tags: git
+
 - name: (nephele-server) get vmx support
   shell: egrep '^flags.*(vmx|svm)' /proc/cpuinfo
   register: vmx_present
@@ -19,6 +26,7 @@
   apt:
     name: "{{item}}"
     state: present
+    update_cache: yes
   with_items:
     - apache2
     - apparmor-utils
@@ -30,7 +38,6 @@
     - python-pip 
     - qemu-kvm
     - virt-manager
-  update_cache: yes
   tags: syspackages
 
 - name: (nephele-server) download out-of-band xdelta3
@@ -71,6 +78,12 @@
   pip:
     chdir: /root/elijah-provisioning
     requirements: requirements.txt
+  tags: pippackages
+
+- name: (nephele-server) python setup.py
+  shell: python setup.py install
+  args:
+    chdir: /root/elijah-provisioning/
   tags: pippackages
 
 - name: (nephele-server) create heatmap www dir
@@ -162,9 +175,5 @@
     name: stream-server
     state: restarted
   tags: services
-
-- name: (nephele-server) python setup.py
-  shell: python setup.py install
-  tags: pippackages
 
 
