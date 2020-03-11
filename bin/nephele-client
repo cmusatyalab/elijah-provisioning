@@ -86,7 +86,7 @@ def synthesize(args, remote):
     if future.error:
         print future.value
     else:
-        print "HOST\t\t%s\nTITLE\t\t%s\nSNAPSHOT\t%s\nFWDPORTS\t%s" % (args.remote, args.title, args.snapshot, args.ports)
+        print "HOST\t\t%s\nTITLE\t\t%s\nSNAPSHOT\t%s\nFWDPORTS\t%s" % (args.host, args.title, args.snapshot, args.ports)
         print "VM should be resumed shortly; check the virt-manager window."
 
 def snapshot_details(args, remote):
@@ -102,7 +102,7 @@ def _main():
 
     #HANDOFF COMMAND
     handoff_parser = subparsers.add_parser('handoff', help='Handoff a running instance to another nephele node')
-    handoff_parser.add_argument('title',  help='Title of the VM instance to handoff')
+    handoff_parser.add_argument('title',  help='Title (or UUID) of the VM instance to handoff')
     handoff_parser.add_argument('dest', help='Handoff destination - IP address or DNS name.')
     handoff_parser.set_defaults(func=handoff)
 
