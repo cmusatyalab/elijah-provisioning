@@ -8,8 +8,8 @@ snapshot='/root/vmware-demo.zip'
 nephele_run_flags='-p 3389,443,22443'
 frontail_bin='./frontail-linux'
 frontail_flags='-d --ui-hide-topbar --disable-usage-stats'
-frontail_src_path='/var/tmp/cloudlet/log-synthesis'
-frontail_dest_path='/var/tmp/cloudlet/handoff.stats'
+frontail_src_path='/var/nephele/nephele.log'
+frontail_dest_path='/var/nephele/nephele.log'
 
 skip_clean=0
 skip_lat=0
@@ -32,12 +32,10 @@ if [[ "$skip_clean" -eq 0 ]]; then
     echo $delim
     for i in "${hosts[@]}"; do
         echo "$i:"
-        echo "Killing any running nephele processes..."
-        ssh root@"$i" "killall nephele"
+        echo "Restarting nephele RPC server..."
+        ssh root@"$i" "service nephele restart"
         echo "Killing any running qemu processes..."
         ssh root@"$i" "killall -s KILL qemu-system-x86_64"
-        echo "Clearing instances database table..."
-        nephele -r "$i" clear -i -f
         echo "Restarting stream-server..."
         ssh root@"$i" "service stream-server restart"
         if [[ "$skip_bw" -eq 0 ]]; then
@@ -82,11 +80,11 @@ launch_time="date +%s"
 title="horizon-demo"
 title="$title""$RANDOM"
 echo "+++Launching VM ($title) on $src..."
-nephele -r "$src" run "$snapshot" "$title" "$nephele_run_flags"
+nephele-client "$src" run "$snapshot" "$title" "$nephele_run_flags"
 
 waitforresponse "Handoff $title to $dest"
 handoff_time="date +%s"
 duration=handoff_time - launch_time
 echo "Time between launch and handoff (seconds): $duration"
 echo "+++Performing handoff of $title to $dest..."
-nephele -r "$src" handoff "$title" "$dest"
+nephele-client "$src" handoff "$title" "$dest"
