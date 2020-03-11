@@ -84,7 +84,7 @@ nephele-client "$src" run "$snapshot" "$title" "$nephele_run_flags"
 
 waitforresponse "Handoff $title to $dest"
 handoff_time="date +%s"
-duration=handoff_time - launch_time
+duration="$(($handoff_time-$launch_time))"
 echo "Time between launch and handoff (seconds): $duration"
 echo "+++Performing handoff of $title to $dest..."
 nephele-client "$src" handoff "$title" "$dest"
