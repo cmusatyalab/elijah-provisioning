@@ -941,6 +941,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
                     except libvirt.libvirtError as e:
                         synthesized_vm.terminate()
                     finally:
+                        if os.path.exists(path):
+                            os.unlink(path)
                         return
                 elif HANDOFF_SIGNAL_RECEIVED == True:
                     #read destination from file
@@ -1013,6 +1015,8 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             synthesized_vm.monitor.terminate()
             synthesized_vm.monitor.join()
             synthesized_vm.terminate()
+            if os.path.exists(path):
+                os.unlink(path)
 
     def terminate(self):
         # force terminate when something wrong in handling request
