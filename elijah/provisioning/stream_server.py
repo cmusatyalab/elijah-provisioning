@@ -38,6 +38,7 @@ from tempfile import mkdtemp
 from urlparse import urlsplit
 import msgpack
 import json
+import datetime
 
 from server import NetworkUtil
 from synthesis_protocol import Protocol as Protocol
