@@ -70,6 +70,7 @@ with open('/var/nephele/logging.json') as f:
 LOG = logging.getLogger(__name__)
 session_resources = dict()   # dict[session_id] = obj(SessionResource)
 HANDOFF_SIGNAL_RECEIVED = False
+DIR_NEPHELE_PID = '/var/nephele/pid/'
 
 class StreamSynthesisError(Exception):
     pass

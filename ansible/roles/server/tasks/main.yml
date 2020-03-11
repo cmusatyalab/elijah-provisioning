@@ -114,6 +114,14 @@
     mode: '0660'
   tags: directories
 
+- name: (nephele-server) create nephele pid dir
+  file:
+    path: /var/nephele/pid
+    state: directory
+    mode: '0660'
+  tags: directories
+
+
 - name: (nephele-server) create symlinks for bios files (1/2)
   file:
     src: /usr/share/qemu/bios.bin
@@ -173,6 +181,12 @@
 - name: (nephele-server) restart stream-server
   service:
     name: stream-server
+    state: restarted
+  tags: services
+
+- name: (nephele-server) restart nephele
+  service:
+    name: nephele
     state: restarted
   tags: services
 
