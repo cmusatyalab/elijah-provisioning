@@ -76,15 +76,15 @@ if [[ "$skip_bw" -eq 0 ]]; then
 fi
 
 waitforresponse "Launch VM on $src"
-launch_time="date +%s"
+launch_time=$(date +%s)
 title="horizon-demo"
 title="$title""$RANDOM"
 echo "+++Launching VM ($title) on $src..."
 nephele-client "$src" run "$snapshot" "$title" "$nephele_run_flags"
 
 waitforresponse "Handoff $title to $dest"
-handoff_time="date +%s"
-duration="$(($handoff_time-$launch_time))"
+handoff_time=$(date +%s)
+duration=$(($handoff_time-$launch_time))
 echo "Time between launch and handoff (seconds): $duration"
 echo "+++Performing handoff of $title to $dest..."
 nephele-client "$src" handoff "$title" "$dest"
