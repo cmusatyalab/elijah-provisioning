@@ -12,7 +12,7 @@ under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2
 To enable on-demand fetching of the virtual machine, we use a modified-QEMU,
 which is distributed under GPLv2.
   - [Repository for modified-QEMU](https://github.com/cmusatyalab/elijah-qemu)
-  - [Download link for the binary](https://github.com/cmusatyalab/elijah-qemu/releases/download/cloudlet-v0.9.4/qemu-system-x86_64)
+  - [Download link for the binaries](https://owncloud.cmusatyalab.org/owncloud/index.php/s/viEQ29YYOMlkgJm/download)
 
 A copy of this license is reproduced in the [LICENSE](LICENSE) file.
 
@@ -37,8 +37,16 @@ ansible-playbook client.yml --ask-sudo-pass
 
 ## Usage
 
-[virtman1]: ./images/virtman1.jpg
-virt-manager is used for display/keyboard/mouse interaction with virtual machine instances.  You should run virt-manager and add remote connections to each server node so you will be able to see what instances are running there.
+[virtman-main]: http://virt-manager.org/wp-content/uploads/2013/04/virt-manager-vm-list.png "virt-manager"
+[virtman-add]: http://virt-manager.org/wp-content/uploads/2013/04/virt-manager-new-connection.png "virt-manager"
+
+![virt manager][virtman-main]
+
+[virt-manager](http://virt-manager.org) is used for display/keyboard/mouse interaction with virtual machine instances.  You should run virt-manager and add __remote__ connections to each nephele server node in order to see what instances are running there and interact with them.
+
+![Adding a remote connection][virtman-add]
+
+While nephele VMs can be viewed/interacted with via virt-manager just like normal KVM/QEMU instances, they have to be managed by using nephele-client which has the following command-line interface:
 
 ```bash
 $ nephele-client
@@ -89,7 +97,7 @@ optional arguments:
                         number specified in the VM_TEMPLATE.xml will be used.
 ```
 
-You can use the -c and -m option to explicitly set the size the of the VM. By default, the values in [VM_TEMPLATE.xml] will be used. If you do not provide a title with the -t option, the VM will be entitled __nephele-(libvirt UUID)__.
+You can use the -c and -m option to explicitly set the size the of the VM. By default, the values in [VM_TEMPLATE.xml](elijah/provisioning/config/VM_TEMPLATE.xml) will be used. If you do not provide a title with the -t option, the VM will be entitled __nephele-(libvirt UUID)__.
 
 #### Listing Images
 
