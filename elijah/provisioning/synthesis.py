@@ -1669,6 +1669,20 @@ def increment_filename(path):
             index    += 1
     return os.path.join(dir,candidate)
 
+def generate_pidfile(title, ports=None):
+    # generate pid file
+    path = Const.DIR_NEPHELE_PID + '%s.pid' % os.getpid()
+    fdest = open(path, "wb")
+    meta = dict()
+    meta['title'] = title
+    meta['pid'] = os.getpid()
+    meta['ports'] = ports
+    meta['started'] = str(datetime.datetime.now())[:-7]
+    meta['uuid'] = None
+    meta['url'] = None
+    fdest.write(msgpack.packb(meta))
+    fdest.close()
+
 def synthesize(base_disk, overlay_path, **kwargs):
     """VM Synthesis and run recoverd VM
     :param base_disk: path to base disk

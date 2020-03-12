@@ -854,17 +854,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             sys.stdout.write("openstack\t%s\t%s\t%s\t%s" % (launch_disk_size, launch_memory_size, disk_overlay_map, memory_overlay_map))
 
         else:
-            # generate pid file
-            path = DIR_NEPHELE_PID + '%s.pid' % os.getpid()
-            fdest = open(path, "wb")
-            meta = dict()
-            meta['title'] = title
-            meta['pid'] = os.getpid()
-            meta['started'] = str(datetime.datetime.now())
-            meta['uuid'] = None
-            meta['url'] = None
-            fdest.write(msgpack.packb(meta))
-            fdest.close()
+            synthesis.generate_pidfile(title, fwd_ports)
 
             # We told to FUSE that we have everything ready, so we need to wait
             # until delta_proc finishes. we cannot start VM before delta_proc

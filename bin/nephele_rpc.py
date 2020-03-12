@@ -57,7 +57,6 @@ from elijah.provisioning.package import PackagingUtil
 DIR_NEPHELE = '/var/nephele/'
 DIR_NEPHELE_IMAGES = '/var/nephele/images/'
 DIR_NEPHELE_SNAPSHOTS = '/var/nephele/snapshots/'
-DIR_NEPHELE_PID = '/var/nephele/pid/'
 RPC_PORT = 19999
 
 with open('/var/nephele/logging.json') as f:
@@ -206,9 +205,9 @@ class Nephele(rpyc.Service):
         return output
 
     def x_list_instances(self, args):
-        output = "{:<6}{:^1}{:<20}{:^8}{:<36}{:^8}{:<26}{:^1}{:<50}\n".format('PID', '', 'TITLE', '', 'UUID', '', 'STARTED', '', 'HANDOFFURL')
+        output = "{:<6}{:^1}{:<15}{:^1}{:<12}{:^1}{:<36}{:^1}{:<19}{:^1}{:<50}\n".format('PID', '', 'TITLE', '', 'PORTS', '', 'UUID', '', 'STARTED', '', 'HANDOFFURL')
         for item in self.walk_nephele_pids():
-            output = output + "{:<6}{:^1}{:<20}{:^8}{:<36}{:^8}{:<26}{:^1}{:<50}\n".format(item['pid'], '', item['title'], '', item['uuid'], '', item['started'], '', item['url'])
+            output = output + "{:<6}{:^1}{:<15}{:^1}{:<12}{:^1}{:<36}{:^1}{:<19}{:^1}{:<50}\n".format(item['pid'], '', item['title'], '', item['ports'], '', item['uuid'], '', item['started'], '', item['url'])
         return output
 
     def x_show_logs(self,args):
@@ -356,18 +355,7 @@ class Nephele(rpyc.Service):
             overlay_meta = url_path
         LOG.info( "Beginning synthesis of: %s", args.snapshot)
         try:
-            # generate pid file
-            path = DIR_NEPHELE_PID + '%s.pid' % os.getpid()
-            fdest = open(path, "wb")
-            meta = dict()
-            meta['title'] = args.title
-            meta['pid'] = os.getpid()
-            meta['started'] = str(datetime.datetime.now())
-            meta['uuid'] = None
-            meta['url'] = None
-            fdest.write(msgpack.packb(meta))
-            fdest.close()
-
+            synthesis.generate_pidfile(args.title, args.ports)
             synthesis.synthesize(None, overlay_meta,
                                 disk_only=args.disk_only,
                                 handoff_url=None,

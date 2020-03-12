@@ -53,6 +53,8 @@ class Const(object):
     QUEUE_SUCCESS_MESSAGE_LEN = len(QUEUE_SUCCESS_MESSAGE)
     QUEUE_FAILED_MESSAGE_LEN = len(QUEUE_FAILED_MESSAGE)
 
+    DIR_NEPHELE_PID = "/var/nephele/pid"
+
     PRODUCE_HEATMAP_IMAGES = False
 
     BASE_DISK = ".base-img"
