@@ -1682,6 +1682,7 @@ def generate_pidfile(title, ports=None):
     meta['url'] = None
     fdest.write(msgpack.packb(meta))
     fdest.close()
+    return path
 
 def synthesize(base_disk, overlay_path, **kwargs):
     """VM Synthesis and run recoverd VM

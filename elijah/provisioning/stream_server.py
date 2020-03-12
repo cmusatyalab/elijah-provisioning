@@ -854,7 +854,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             sys.stdout.write("openstack\t%s\t%s\t%s\t%s" % (launch_disk_size, launch_memory_size, disk_overlay_map, memory_overlay_map))
 
         else:
-            synthesis.generate_pidfile(title, fwd_ports)
+            path = synthesis.generate_pidfile(title, fwd_ports)
 
             # We told to FUSE that we have everything ready, so we need to wait
             # until delta_proc finishes. we cannot start VM before delta_proc
@@ -899,7 +899,6 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             signal.signal(signal.SIGUSR1, self.handlesig)
 
             #update pid info with kvm uuid
-            path = '/var/nephele/pid/%s.pid' % os.getpid()
             with open(path, 'rb') as f:
                 metadata = msgpack.unpackb(f.read())
             with open(path, 'wb') as f:

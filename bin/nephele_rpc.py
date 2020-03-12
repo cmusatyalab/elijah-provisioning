@@ -355,7 +355,7 @@ class Nephele(rpyc.Service):
             overlay_meta = url_path
         LOG.info( "Beginning synthesis of: %s", args.snapshot)
         try:
-            synthesis.generate_pidfile(args.title, args.ports)
+            path = synthesis.generate_pidfile(args.title, args.ports)
             synthesis.synthesize(None, overlay_meta,
                                 disk_only=args.disk_only,
                                 handoff_url=None,
