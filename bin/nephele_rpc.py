@@ -381,7 +381,7 @@ class Nephele(rpyc.Service):
 
     def walk_nephele_pids(self):
         instances = list()
-        for root, dirs, files in os.walk(DIR_NEPHELE_PID):
+        for root, dirs, files in os.walk(Const.DIR_NEPHELE_PID):
             for filename in files:
                 path = os.path.join(root, filename)
                 with open(path, 'rb') as file:
