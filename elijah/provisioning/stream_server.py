@@ -46,6 +46,7 @@ from synthesis import run_fuse
 from synthesis import SynthesizedVM
 from synthesis import connect_vnc
 from synthesis import increment_filename
+from synthesis import generate_pidfile
 import handoff
 from elijah.provisioning.package import PackagingUtil
 
@@ -854,7 +855,7 @@ class StreamSynthesisHandler(SocketServer.StreamRequestHandler):
             sys.stdout.write("openstack\t%s\t%s\t%s\t%s" % (launch_disk_size, launch_memory_size, disk_overlay_map, memory_overlay_map))
 
         else:
-            path = synthesis.generate_pidfile(title, fwd_ports)
+            path = generate_pidfile(title, fwd_ports)
 
             # We told to FUSE that we have everything ready, so we need to wait
             # until delta_proc finishes. we cannot start VM before delta_proc

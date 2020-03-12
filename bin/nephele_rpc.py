@@ -362,12 +362,12 @@ class Nephele(rpyc.Service):
                                 zip_container=is_zip_contained,
                                 title=args.title,
                                 fwd_ports=args.ports)
-
-            if os.path.exists(path):
-                os.unlink(path)
         except Exception as e:
             LOG.error("Failed to synthesize: %s", str(e))
             err = True
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
 
         if err:
             raise Exception(e)
