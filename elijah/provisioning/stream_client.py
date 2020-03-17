@@ -44,7 +44,6 @@ from configuration import VMOverlayCreationMode
 from synthesis_protocol import Protocol
 import process_manager
 import logging
-from .db.api import update_op, log_op
 
 LOG = logging.getLogger(__name__)
 

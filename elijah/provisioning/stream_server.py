@@ -50,7 +50,6 @@ from synthesis import generate_pidfile
 import handoff
 from elijah.provisioning.package import PackagingUtil
 
-from db.api import DBConnector, update_op, log_op
 from db.table_def import BaseVM
 from db import table_def
 from configuration import Options

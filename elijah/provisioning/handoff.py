@@ -56,7 +56,6 @@ from . import compression
 from . import process_manager
 from . import qmp_af_unix
 import logging
-from .db.api import update_op, log_op
 
 
 # to work with OpenStack's eventlet

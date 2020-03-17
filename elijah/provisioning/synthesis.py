@@ -52,7 +52,6 @@ from . import memory_util
 from . import delta
 from .db import api as db_api
 from .db import table_def as db_table
-from .db.api import update_op, log_op
 from .configuration import Const
 from .configuration import Options
 from .delta import DeltaList
@@ -1772,7 +1771,6 @@ def synthesize(base_disk, overlay_path, **kwargs):
             handoff_url = 'file://%s' % (increment_filename(overlay_path)) 
             save_snapshot = True
             LOG.info('VM entered paused state. Generating snapshot of disk and memory...')
-            op_id = log_op(op=Const.OP_BUILD_SNAPSHOT,notes="Image: %s, Dest: %s" % (base_sha, overlay_path))
             break
         elif state == libvirt.VIR_DOMAIN_SHUTDOWN:
             #disambiguate between reboot and shutoff
@@ -1803,7 +1801,6 @@ def synthesize(base_disk, overlay_path, **kwargs):
             if meta['pid'] == os.getpid():
                 handoff_url = meta['url']
                 LOG.info('Handoff initiated for %s to the following destination: %s', (meta['title'], meta['url']))
-                op_id = log_op(op=Const.OP_HANDOFF,notes="Title: %s, PID: %d, Dest: %s" % (meta['title'], meta['pid'], handoff_url))
                 HANDOFF_SIGNAL_RECEIVED = False
                 break
             else:

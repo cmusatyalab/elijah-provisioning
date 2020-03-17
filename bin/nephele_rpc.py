@@ -51,7 +51,7 @@ from elijah.provisioning.configuration import Options
 import logging
 import logging.config
 import elijah.provisioning.db.table_def as table_def
-from elijah.provisioning.db.api import DBConnector, log_op, update_op
+from elijah.provisioning.db.api import DBConnector
 from elijah.provisioning.package import PackagingUtil
 
 DIR_NEPHELE = '/var/nephele/'
@@ -120,7 +120,6 @@ class Nephele(rpyc.Service):
                 sys.exit(1)
             if not raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
                 sys.exit(1)
-        op_id = log_op(op=Const.OP_BUILD_IMAGE,notes="Source: %s" % (source))
         print "Copying/converting source image into %s..." % DIR_NEPHELE_IMAGES
         os.system('qemu-img convert -O raw %s %s' % (source, disk_image_path))
 
@@ -128,7 +127,6 @@ class Nephele(rpyc.Service):
         print "Created Base VM from this source image: %s" % source
         print "Base Disk Image: %s" % disk_path
         print "Base Memory Snapshot: %s" % mem_path
-        update_op(op_id, has_ended=True, notes="Source: %s, Path: %s" % (source, disk_image_path))
 
         #restart the stream-server to reload list of images
         os.system('service stream-server restart')
@@ -154,7 +152,6 @@ class Nephele(rpyc.Service):
                 if state == libvirt.VIR_DOMAIN_PAUSED:
                     break
             print 'VM entered paused state. Generating snapshot of disk and memory...'
-            op_id = log_op(op=Const.OP_BUILD_SNAPSHOT,notes="Image: %s, Dest: %s" % (args.id, args.dest))
             vm_overlay.create_overlay()
 
             # print output
@@ -177,7 +174,6 @@ class Nephele(rpyc.Service):
         except Exception as e:
             print "Failed to create overlay: %s" % str(e)
         os.rename(vm_overlay.overlay_zipfile, args.dest)
-        update_op(op_id, has_ended=True)
         # save the result to DB
         dbconn = DBConnector()
         snapshots = dbconn.list_item(table_def.Snapshot)
@@ -210,17 +206,6 @@ class Nephele(rpyc.Service):
             output = output + "{:<6}{:^1}{:<15}{:^1}{:<12}{:^1}{:<36}{:^1}{:<19}{:^1}{:<50}\n".format(item['pid'], '', item['title'], '', item['ports'], '', item['uuid'], '', item['started'], '', item['url'])
         return output
 
-    def x_show_logs(self,args):
-        dbconn = DBConnector()
-        if(args.all):
-            items = dbconn.session.query(table_def.Operations).order_by(table_def.Operations.id.desc())
-        else:
-            items = dbconn.session.query(table_def.Operations).order_by(table_def.Operations.id.desc()).limit(10)
-        output = "{:<16}{:^8}{:<18}{:^8}{:<18}{:^8}{:<30}\n".format('OPERATION', '','STARTED', '','FINISHED', '', 'DETAILS')
-        for item in items:
-            output = output + "{:<16}{:^8}{:<18}{:^8}{:<18}{:^8}{:<30}\n".format(item.op, '', str(item.start_time)[:-7], '', str(item.end_time)[:-7], '', item.notes)
-        return output
-
     def x_delete_snapshot(self, args):
         dbconn = DBConnector()
         if args.path:
@@ -233,25 +218,13 @@ class Nephele(rpyc.Service):
                 break
         if snapshot is not None:
             if raw_input("Are you sure you wish to delete the following snapshot: %s? (y/N): " % (args.path)).lower().strip().startswith("y"):
-                op_id = log_op(op=Const.OP_DELETE_SNAPSHOT,notes="Snapshot: %s" % (args.path))
                 dbconn.del_item(snapshot)
                 print "Snapshot removed from database."
                 os.remove(args.path)
                 print "Snapshot deleted from disk."
-                update_op(op_id, has_ended=True)
         else:
             print "Cannot find matching snapshot at path %s!\n" % (args.path)
             return 1
-
-    def x_clear_instances(self, args):
-        if args.force or raw_input("Are you sure you wish to clear data? (y/N): ").lower().strip().startswith("y"):
-            dbconn = DBConnector()
-            if args.operations:
-                list = dbconn.list_item(table_def.Operations)
-                for item in list:
-                    dbconn.del_item(item)
-                print "Cleared operations table."
-        return 0
 
     def x_delete_base(self, args):
         dbconn, base = self.find_base(args.id)
@@ -261,26 +234,22 @@ class Nephele(rpyc.Service):
         else:
             if raw_input("Are you sure you wish to delete the following base image: %s? (y/N): " % (base.disk_path)).lower().strip().startswith("y"):
                 if raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
-                    op_id = log_op(op=Const.OP_DELETE_IMAGE,notes="Image: %s, Path: %s" % (args.id, base.disk_path))
                     dbconn.del_item(base)
                     print "Image removed from database."
                     ext = str(base.disk_path).rindex('.')
                     for f in glob.glob(base.disk_path[:ext] + '*'):
                         os.remove(f)
                     print "Image deleted from disk."
-                    update_op(op_id, has_ended=True)
 
     def x_export_base(self, args):
         _, base = self.find_base(args.id)
 
         output_path = args.dest
         if base is not None:
-            op_id = log_op(op=Const.OP_EXPORT_IMAGE, notes="Image: %s, Dest: %s" % (args.id, args.dest))
             PackagingUtil.export_basevm(
                 output_path,
                 base.disk_path,
                 base.hash_value)
-            update_op(op_id, has_ended=True)
         else:
             print "Failed to find matching image with id: %s" % args.id
 
@@ -300,7 +269,6 @@ class Nephele(rpyc.Service):
                 sys.exit(1)
             if not raw_input("This will render any snapshots based on this image unusable. Are you certain? (y/N): ").lower().strip().startswith("y"):
                 sys.exit(1)
-        op_id = log_op(op=Const.OP_IMPORT_IMAGE,notes="Image Path: %s" % (args.path))
         print "Decompressing image to %s..." % DIR_NEPHELE_IMAGES
         zipbase = zipfile.ZipFile(source, 'r')
         zipbase.extractall(DIR_NEPHELE_IMAGES)
@@ -310,7 +278,6 @@ class Nephele(rpyc.Service):
         new_basevm = table_def.BaseVM(disk_image_path, base_hashvalue, source)
         dbconn = DBConnector()
         dbconn.add_item(new_basevm)
-        update_op(op_id, has_ended=True)
 
         #restart the stream-server to reload list of images
         os.system('service stream-server restart')
@@ -397,7 +364,7 @@ class Nephele(rpyc.Service):
         uuid_matched = False
         metadata = None
         matching_path = None
-        for root, dirs, files in os.walk(DIR_NEPHELE_PID):
+        for root, dirs, files in os.walk(Const.DIR_NEPHELE_PID):
             for filename in files:
                 path = os.path.join(root, filename)
                 with open(path, 'rb') as file:

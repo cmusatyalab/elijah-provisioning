@@ -32,22 +32,6 @@ import datetime
 import table_def
 
 
-def log_op(op=None, notes=None):
-    dbconn = DBConnector()
-    new = table_def.Operations(op, notes)
-    dbconn.add_item(new)
-    return new.id
-
-def update_op(op_id, has_ended=False, notes=None):
-    dbconn = DBConnector()
-    item = dbconn.session.query(table_def.Operations).get(op_id)
-    if has_ended:
-        item.end_time = datetime.datetime.now()
-    if notes is not None:
-        item.notes = notes
-    dbconn.session.commit()
-    dbconn.session.flush()
-
 class DBConnector(object):
     def __init__(self, log=sys.stdout):
 
