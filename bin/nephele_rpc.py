@@ -348,11 +348,12 @@ class Nephele(rpyc.Service):
 
     def walk_nephele_pids(self):
         instances = list()
-        for root, dirs, files in os.walk(Const.DIR_NEPHELE_PID):
+        for root, _, files in os.walk(Const.DIR_NEPHELE_PID):
             for filename in files:
                 path = os.path.join(root, filename)
                 with open(path, 'rb') as file:
                     meta = msgpack.unpackb(file.read())
+                    meta['path'] = path
                     instances.append(meta)
         return instances
 
@@ -364,21 +365,17 @@ class Nephele(rpyc.Service):
         uuid_matched = False
         metadata = None
         matching_path = None
-        for root, dirs, files in os.walk(Const.DIR_NEPHELE_PID):
-            for filename in files:
-                path = os.path.join(root, filename)
-                with open(path, 'rb') as file:
-                    meta = msgpack.unpackb(file.read())
-                    if meta["title"] == args.title:
-                        if title_matched == True:
-                            raise Exception("Ambiguous instance (TITLE: %s matches more than one instance) ; try using UUID instead!" % args.title)
-                        title_matched = True
-                        metadata = meta
-                        matching_path = path
-                    if meta["uuid"] == args.title:
-                        uuid_matched = True
-                        metadata = meta
-                        matching_path = path
+        for item in self.walk_nephele_pids():
+            if item["title"] == args.title:
+                if title_matched == True:
+                    raise Exception("Ambiguous instance (TITLE: %s matches more than one instance) ; try using UUID instead!" % args.title)
+                title_matched = True
+                metadata = item
+                matching_path = item['path']
+            if item["uuid"] == args.title:
+                uuid_matched = True
+                metadata = item
+                matching_path = item['path']
 
         if not uuid_matched and not title_matched:
             raise Exception("Could not find an instance (using TITLE or UUID) that matches %s!" % args.title)
