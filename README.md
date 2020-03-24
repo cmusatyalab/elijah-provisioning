@@ -40,13 +40,15 @@ ansible-playbook client.yml --ask-sudo-pass
 [virtman-main]: http://virt-manager.org/wp-content/uploads/2013/04/virt-manager-vm-list.png "virt-manager"
 [virtman-add]: http://virt-manager.org/wp-content/uploads/2013/04/virt-manager-new-connection.png "virt-manager"
 
-![virt manager][virtman-main]
-
 [virt-manager](http://virt-manager.org) is used for display/keyboard/mouse interaction with virtual machine instances.  You should run virt-manager and add __remote__ connections to each nephele server node in order to see what instances are running there and interact with them.
 
 ![Adding a remote connection][virtman-add]
 
-While nephele VMs can be viewed/interacted with via virt-manager just like normal KVM/QEMU instances, they have to be managed by using nephele-client which has the following command-line interface:
+While nephele VMs can be viewed/interacted with via virt-manager just like normal KVM/QEMU instances...
+
+![virt manager][virtman-main]
+
+...they have to be managed by using nephele-client which has the following command-line interface:
 
 ```bash
 $ nephele-client
@@ -239,8 +241,35 @@ The `nephele-client <host> ps` command will display details about any running in
 
 ```bash
 $ ./nephele-client localhost ps
-PID    TITLE                       UUID                                        STARTED                    HANDOFFURL
-106642 test0                       c3d52a9a-5bd1-44f8-9763-0059b71a00dc        2020-03-11 15:21:22.843227 tcp://nodeB:8022
-109359 test1                       66ea5fdb-d9ba-43e8-afcc-6ff8d6bb2ed2        2020-03-11 15:31:37.759324 None
-109451 test2_noports               None                                        2020-03-11 15:31:56.555322 None
+PID    TITLE           PORTS        UUID                                 STARTED             HANDOFFURL
+89268  test2           None         5d2bee02-48c6-4301-9dda-1618b040dcbd 2020-03-19 15:34:21 tcp://nodeB:8022
+106642 test0           None         c3d52a9a-5bd1-44f8-9763-0059b71a00dc 2020-03-19 15:21:22 None
+109359 test1           9000         66ea5fdb-d9ba-43e8-afcc-6ff8d6bb2ed2 2020-03-19 15:31:37 None
 ```
+
+### Analysis
+
+The main nephele log file can be found at `/var/nephele/nephele.log`. It contains the actions from any client calls as well as the machinations of the instances running on that particular nephele node.
+
+Individual logs pertaining to handoffs can be found in the `/var/nephele/logs` directory on the destination node; the filenames follow the format `handoff_from_<ip>_at_<timestamp>.[log|stats]`. The handoff log file is a rather verbose file that details all of the memory and disk blocks that were transferred during the handoff and how they were applied. The handoff stats file presents a synopsis of migration that includes the total migration time, amount of data sent over the wire, and a breakdown of the disk/memory state that was transferred.
+
+```bash
+Iterations: 1
+Elapsed Time: 129.345255 seconds
+VM Disk Size: 25600 MB
+VM Memory Size: 9024 MB
+
+
+Blobs Received: 292
+Total MBytes Received over wire: 146.63
+
+
+VM STATE (MBytes)
+                    DIRTIED     BY VALUE    BY REF      ZEROS
+MEMORY              1876.41     514.30      397.12      964.99
+DISK                186.96      77.52       101.62      7.82
+```
+
+In the above example, the handoff of a 25GB disk/8GB RAM virtual machine took just over 2 minutes. Though there was nearly 2GB of dirty state between memory and disk, about 1/4 of it was shipped by reference as it could already be found at the destination. In addition, about 1/2 of dirty state was zero blocks which can be highly compressed before transfer. As a result, the total amount of data shipped across the wire was roughly 150MB, a small fraction of the amount of total dirty state.
+
+Additionally, you can enable a live 'heatmap' view of the handoff by setting `Const.PRODUCE_HEATMAP_IMAGES  = True` in [configuration.py](elijah/provisioning/configuration.py#L58) on each nephele server. This will expose a webpage at `http://<node>/heatmap/index.html` that will show a layout of both memory and disk regions along with some statistics. As the handoff progresses, this page on the destination host will be periodically updated to show the disk/memory regions that are being dirtied. This page uses [OpenSeadragon](https://openseadragon.github.io/) to support zooming into more granular regions within each image (memory and disk). The more times a particular block gets dirtied, the brighter (whiter) it gets.
